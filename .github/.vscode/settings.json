@@ -1,0 +1,12 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "python-envs.pythonProjects": [
+        {
+            "path": ".",
+            "envManager": "ms-python.python:conda",
+            "packageManager": "ms-python.python:conda"
+        }
+    ],
+    "livePreview.defaultPreviewPath": "/2_成本统计收集excel情况汇总/项目毛利率变化图.html"
+}
