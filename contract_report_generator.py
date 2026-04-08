@@ -32,18 +32,18 @@ from contract_report_loaders import (
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
 
 INPUT_PATHS = {
     "合同管理": BASE_DIR / "5_合同管理",
-    "采购明细": BASE_DIR / "9_采购部采购台账/B_汇总数据/A_合并汇总/2026年03月_材料采购_merged.xlsx",
+    "采购明细": BASE_DIR / "9_采购部采购台账/B_汇总数据/B_标准化汇总/2026年03月_材料采购_merged.xlsx",
     "商混混凝土": [BASE_DIR / "9.1_商混站混凝土/B_标准化数据/搅拌站混凝土汇总报表_202604.xlsx"],
     "机具使用费": BASE_DIR / "10_机具使用费/B_汇总文件/机具费汇总_20260326_104453.xlsx",
     "人工费汇总": BASE_DIR / "11_人工费🙎🏻‍♂️/B_输出标准化人工费台账/人工费汇总_20260404_115727.xlsx",
     "财务分包": BASE_DIR / "12-财务部💰/B_输出汇总文件/2026-03-14_分包对账与付款统计表_分包台账汇总_20260403_094523.xlsx",
     "分包合同台账": BASE_DIR / "5.1_分包合同/2_标准化汇总分包合同台账/分包签订合同汇总_2026-03.xlsx",
     "成本统计": BASE_DIR / "2_成本统计收集excel情况汇总/项目统计数据汇总_全月份.xlsx",
-    "项目经理": BASE_DIR / "0_项目基本信息情况/在建项目-各项目成本统计表.xlsx",
+    "项目经理": BASE_DIR / "0_项目基本信息情况/项目基本信息表.xlsx",
     "预算金额": BASE_DIR / "6_预算部分/5.1_主材汇总（广联达软件导出）/【总汇总】所有标段_20260314_091348.xlsx",
     "责任成本": BASE_DIR / "6_预算部分/6.1_责任成本书/汇总版",
 }

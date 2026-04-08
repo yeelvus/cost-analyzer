@@ -83,30 +83,60 @@ def scale_wan_amount_columns(df: pd.DataFrame, amount_keywords: List[str], exclu
 def load_project_manager_map(manager_path: Path) -> Dict[str, str]:
     if not manager_path.exists():
         return {}
-    try:
-        df = pd.read_excel(manager_path, sheet_name=0, header=1)
-    except Exception:
-        return {}
 
-    if "项目编码" not in df.columns:
-        return {}
+    def _read_candidates() -> List[pd.DataFrame]:
+        result: List[pd.DataFrame] = []
+        for header in (0, 1):
+            try:
+                df_tmp = pd.read_excel(manager_path, sheet_name=0, header=header)
+                if not df_tmp.empty:
+                    result.append(df_tmp)
+            except Exception:
+                continue
+        return result
 
-    manager_col = None
-    for col in df.columns:
-        if "经理" in str(col):
-            manager_col = col
-            break
-    if manager_col is None:
-        return {}
+    def _pick_col(columns, candidates: List[str]) -> Optional[str]:
+        for cand in candidates:
+            if cand in columns:
+                return cand
+        return None
 
-    mapping = {}
-    for _, row in df.iterrows():
-        code = str(row.get("项目编码", "")).strip()
-        if not code:
+    for df in _read_candidates():
+        cols = [str(c).strip() for c in df.columns]
+        df.columns = cols
+
+        manager_col = _pick_col(cols, ["项目经理", "项目经理人", "经理", "负责人"])
+        if manager_col is None:
+            for col in cols:
+                if "经理" in col:
+                    manager_col = col
+                    break
+        if manager_col is None:
             continue
-        manager = str(row.get(manager_col, "")).strip() or "其他"
-        mapping[code] = manager
-    return mapping
+
+        code_col = _pick_col(cols, ["项目编码", "项目代码", "项目编号", "编码"])
+        name_col = _pick_col(cols, ["项目名称", "项目全称", "项目简称"])
+
+        mapping: Dict[str, str] = {}
+        for _, row in df.iterrows():
+            code = normalize_project_code(row.get(code_col, "")) if code_col else ""
+
+            if not code and name_col:
+                name_val = str(row.get(name_col, "")).strip()
+                match = re.search(r"(THCC-\d{4}-\d{3})", name_val, re.IGNORECASE)
+                if match:
+                    code = match.group(1).upper()
+
+            if not code:
+                continue
+
+            manager = str(row.get(manager_col, "")).strip() or "其他"
+            mapping[code] = manager
+
+        if mapping:
+            return mapping
+
+    return {}
 
 
 def read_txt_file(file_path: Path) -> str:

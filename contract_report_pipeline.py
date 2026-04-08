@@ -157,7 +157,7 @@ def build_provenance_rows(
     add_input("人工", "人工费汇总", labor_path, sheet="按项目汇总", columns="项目编码, 项目名称, 中方正式工铢, 中方劳务工铢, 子公司属地工铢, 劳务公司铢, 签证费, 总人工费")
     add_input("财务", "分包对账与付款统计", finance_path, sheet="项目汇总（万泰铢）/分类汇总")
     add_input("成本统计", "项目统计数据汇总", cost_stats_path, sheet="默认sheet", columns="成本统计字段集合")
-    add_input("项目经理", "在建项目成本统计表", manager_map_path, sheet="默认sheet（header=1）")
+    add_input("项目经理", "项目基本信息表", manager_map_path, sheet="默认sheet（自动识别表头）")
     add_input("预算", "预算总汇总", budget_path, sheet="总汇总")
 
     cost_stats_columns = [
