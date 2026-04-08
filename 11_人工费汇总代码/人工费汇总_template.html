@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>人工费汇总分析</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.1.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0 18px 32px; background: #f7f7fb; color: #222; }
+    h1 { font-size: 22px; margin: 16px 0 8px; }
+    .card { background: white; border-radius: 10px; padding: 14px 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); margin: 12px 0; }
+    .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: start; }
+    label { font-weight: 600; display: block; margin-bottom: 6px; }
+    select { width: 100%; min-height: 120px; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+    button { cursor: pointer; padding: 6px 12px; border: none; border-radius: 6px; font-weight: 600; }
+    .primary { background: #4c7ef3; color: #fff; }
+    .secondary { background: #e4e7ef; color: #333; }
+    .range-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 4px; }
+    details { margin-top: 12px; border: 1px solid #e3e5ed; border-radius: 8px; background: #fff; }
+    summary { padding: 10px 12px; font-weight: 700; cursor: pointer; user-select: none; }
+    .chart { width: 100%; height: 360px; }
+    .empty { color: #888; padding: 12px; }
+  </style>
+</head>
+<body>
+  <h1>人工费汇总分析（含总人工费趋势）</h1>
+  <div class="card">
+    <div class="controls">
+      <div>
+        <label>项目状态（多选）</label>
+        <select id="statusSelect" multiple></select>
+        <div class="btn-row">
+          <button class="secondary" id="statusSelectAll">全选</button>
+          <button class="secondary" id="statusReset">重置</button>
+        </div>
+      </div>
+      <div>
+        <label>项目名称（多选）</label>
+        <select id="projectSelect" multiple></select>
+        <div class="btn-row">
+          <button class="secondary" id="projectSelectAll">全选</button>
+          <button class="secondary" id="projectReset">重置</button>
+        </div>
+      </div>
+      <div>
+        <label>时间范围（年月）</label>
+        <div class="range-row">
+          <div>
+            <small>起始</small>
+            <select id="startMonth"></select>
+          </div>
+          <div>
+            <small>结束</small>
+            <select id="endMonth"></select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="primary" id="applyFilters">应用筛选</button>
+      <button class="secondary" id="resetAll">重置全部</button>
+    </div>
+  </div>
+
+  <div id="chartsContainer"></div>
+
+  <script>
+    const metricsOrder = __METRICS__;
+    const metricsData = __METRICS_DATA__;
+    const projectStatusMap = __PROJECT_STATUS__;
+    const months = __MONTHS__;
+    const statuses = ['全部', ...new Set(Object.values(projectStatusMap))];
+    const projects = __PROJECTS__;
+
+    const statusSelect = document.getElementById('statusSelect');
+    const projectSelect = document.getElementById('projectSelect');
+    const startMonth = document.getElementById('startMonth');
+    const endMonth = document.getElementById('endMonth');
+    const container = document.getElementById('chartsContainer');
+
+    function populateSelect(selectEl, options) {
+      selectEl.innerHTML = '';
+      options.forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt;
+        o.selected = true;
+        selectEl.appendChild(o);
+      });
+    }
+
+    function populateMonths() {
+      startMonth.innerHTML = '';
+      endMonth.innerHTML = '';
+      months.forEach((m, idx) => {
+        const s = document.createElement('option');
+        s.value = m; s.textContent = m;
+        if (idx === 0) s.selected = true;
+        startMonth.appendChild(s);
+        const e = document.createElement('option');
+        e.value = m; e.textContent = m;
+        if (idx === months.length - 1) e.selected = true;
+        endMonth.appendChild(e);
+      });
+    }
+
+    function getSelected(selectEl) {
+      return Array.from(selectEl.selectedOptions).map(o => o.value);
+    }
+
+    function selectAll(selectEl) {
+      Array.from(selectEl.options).forEach(o => { o.selected = true; });
+    }
+
+    function resetAllSelects() {
+      selectAll(statusSelect);
+      selectAll(projectSelect);
+      startMonth.selectedIndex = 0;
+      endMonth.selectedIndex = endMonth.options.length - 1;
+    }
+
+    function filteredProjects(statusesSel, projectsSel) {
+      const allowAllStatus = statusesSel.length === 0 || statusesSel.includes('全部');
+      const allowAllProject = projectsSel.length === 0;
+      return projects.filter(p => {
+        const status = projectStatusMap[p] || '未知';
+        const statusOk = allowAllStatus || statusesSel.includes(status);
+        const projOk = allowAllProject || projectsSel.includes(p);
+        return statusOk && projOk;
+      });
+    }
+
+    function monthRange() {
+      const start = startMonth.value || months[0];
+      const end = endMonth.value || months[months.length - 1];
+      const startIdx = months.indexOf(start);
+      const endIdx = months.indexOf(end);
+      if (startIdx === -1 || endIdx === -1) return months;
+      return months.slice(Math.min(startIdx, endIdx), Math.max(startIdx, endIdx) + 1);
+    }
+
+    function renderCharts() {
+      container.innerHTML = '';
+      const selStatuses = getSelected(statusSelect);
+      const selProjects = getSelected(projectSelect);
+      const allowedProjects = filteredProjects(selStatuses, selProjects);
+      const monthsSel = monthRange();
+
+      if (allowedProjects.length === 0) {
+        const div = document.createElement('div');
+        div.className = 'empty card';
+        div.textContent = '无符合条件的项目';
+        container.appendChild(div);
+        return;
+      }
+
+      metricsOrder.forEach((metric, metricIdx) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'card';
+
+        const title = document.createElement('div');
+        title.style.fontWeight = '700';
+        title.style.marginBottom = '6px';
+        title.textContent = metric + ' 趋势';
+        wrapper.appendChild(title);
+
+        const chartDiv = document.createElement('div');
+        chartDiv.className = 'chart';
+        const chartId = 'chart_idx_' + metricIdx;
+        chartDiv.id = chartId;
+        wrapper.appendChild(chartDiv);
+        container.appendChild(wrapper);
+
+        const traces = [];
+        allowedProjects.forEach(proj => {
+          const series = metricsData[metric]?.[proj];
+          if (!series) return;
+          const x = [];
+          const y = [];
+          monthsSel.forEach(m => {
+            const idx = series.x.indexOf(m);
+            x.push(m);
+            y.push(idx >= 0 ? series.y[idx] : 0);
+          });
+          const hasData = y.some(v => Math.abs(v) > 0);
+          if (!hasData) return;
+          traces.push({
+            x,
+            y,
+            mode: 'lines+markers',
+            name: proj,
+            hovertemplate: `<b>${proj}</b><br>年-月: %{x}<br>${metric}: %{y:,.0f}<extra></extra>`
+          });
+        });
+
+        if (traces.length === 0) {
+          chartDiv.innerHTML = '<div class="empty">该指标在当前筛选下无数据</div>';
+          return;
+        }
+
+        Plotly.newPlot(chartId, traces, {
+          title: metric,
+          height: 360,
+          hovermode: 'closest',
+          legend: { orientation: 'h', y: -0.2 },
+          margin: { t: 40, l: 60, r: 20, b: 60 },
+          xaxis: { title: '年-月' },
+          yaxis: { title: metric }
+        }, {displaylogo: false});
+      });
+    }
+
+    populateSelect(statusSelect, statuses);
+    populateSelect(projectSelect, projects);
+    populateMonths();
+    renderCharts();
+
+    document.getElementById('applyFilters').onclick = renderCharts;
+    document.getElementById('resetAll').onclick = () => { resetAllSelects(); renderCharts(); };
+    document.getElementById('statusSelectAll').onclick = () => { selectAll(statusSelect); };
+    document.getElementById('projectSelectAll').onclick = () => { selectAll(projectSelect); };
+    document.getElementById('statusReset').onclick = () => { selectAll(statusSelect); };
+    document.getElementById('projectReset').onclick = () => { selectAll(projectSelect); };
+  </script>
+</body>
+</html>

@@ -1,0 +1,464 @@
+import re
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+import warnings
+
+import pandas as pd
+
+from contract_report_pipeline import (
+    build_project_summary,
+    build_provenance_rows,
+    cleanup_legacy_output_files,
+    export_index_file,
+    export_project_report,
+    export_provenance_excel,
+    load_responsibility_cost_mapping,
+    replicate_outputs,
+)
+from contract_report_loaders import (
+    coerce_float,
+    load_budget_summary,
+    load_concrete,
+    load_contracts_from_folder,
+    load_cost_statistics,
+    load_equipment,
+    load_finance_summary,
+    load_labor,
+    load_labor_monthly,
+    load_procurement,
+    load_project_manager_map,
+    load_subcontract_ledger,
+)
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+INPUT_PATHS = {
+    "合同管理": BASE_DIR / "5_合同管理",
+    "采购明细": BASE_DIR / "9_采购部采购台账/B_汇总数据/A_合并汇总/2026年03月_材料采购_merged.xlsx",
+    "商混混凝土": [BASE_DIR / "9.1_商混站混凝土/B_标准化数据/搅拌站混凝土汇总报表_202604.xlsx"],
+    "机具使用费": BASE_DIR / "10_机具使用费/B_汇总文件/机具费汇总_20260326_104453.xlsx",
+    "人工费汇总": BASE_DIR / "11_人工费🙎🏻‍♂️/B_输出标准化人工费台账/人工费汇总_20260404_115727.xlsx",
+    "财务分包": BASE_DIR / "12-财务部💰/B_输出汇总文件/2026-03-14_分包对账与付款统计表_分包台账汇总_20260403_094523.xlsx",
+    "分包合同台账": BASE_DIR / "5.1_分包合同/2_标准化汇总分包合同台账/分包签订合同汇总_2026-03.xlsx",
+    "成本统计": BASE_DIR / "2_成本统计收集excel情况汇总/项目统计数据汇总_全月份.xlsx",
+    "项目经理": BASE_DIR / "0_项目基本信息情况/在建项目-各项目成本统计表.xlsx",
+    "预算金额": BASE_DIR / "6_预算部分/5.1_主材汇总（广联达软件导出）/【总汇总】所有标段_20260314_091348.xlsx",
+    "责任成本": BASE_DIR / "6_预算部分/6.1_责任成本书/汇总版",
+}
+
+FORCED_EQUIPMENT_FILE = BASE_DIR / "10_机具使用费/B_汇总文件/2026年02月租赁机具台账_汇总.xlsx"
+
+OUTPUT_PATH = BASE_DIR / "18_output"
+PROJECT_REPORTS_DIRNAME = "项目合同汇总"
+PROJECT_MANAGER_DIRNAME = "项目经理"
+PROJECT_STATUS_DIRNAME = "项目状态"
+
+
+def calculate_responsibility_cost_summary(responsibility_data) -> Tuple[float, str]:
+    """兼容旧调用：供 config_driven_report_builder 动态导入。"""
+    if not responsibility_data:
+        return 0.0, ""
+
+    total_amount = 0.0
+    currency = ""
+
+    for _, df in responsibility_data.items():
+        if df.empty:
+            continue
+
+        amount_col = None
+        curr_col = None
+        for col in df.columns:
+            col_lower = str(col).lower()
+            if "金额" in str(col):
+                if amount_col is None:
+                    amount_col = col
+                if "泰铢" in str(col) or "thb" in col_lower:
+                    amount_col = col
+                    curr_col = "THB"
+                    break
+                if "人民币" in str(col) or "cny" in col_lower or "rmb" in col_lower:
+                    amount_col = col
+                    curr_col = "CNY"
+
+        if amount_col is None:
+            continue
+
+        try:
+            col_sum = df[amount_col].apply(coerce_float).sum()
+            total_amount += col_sum
+            if curr_col is None:
+                curr_col = "CNY" if "人民币" in str(amount_col) else "THB"
+            if not currency:
+                currency = curr_col
+        except Exception:
+            continue
+
+    return total_amount, currency if currency else "THB"
+
+
+def detect_latest_year_month(df) -> str:
+    if df.empty:
+        return ""
+
+    if {"年", "月"}.issubset(df.columns):
+        ym_df = df[["年", "月"]].copy()
+        ym_df["年"] = ym_df["年"].apply(lambda x: float(x) if str(x).strip() not in {"", "nan", "None"} else float("nan"))
+        ym_df["月"] = ym_df["月"].apply(lambda x: float(x) if str(x).strip() not in {"", "nan", "None"} else float("nan"))
+        ym_df = ym_df.dropna(subset=["年", "月"])
+        if not ym_df.empty:
+            ym_df = ym_df.sort_values(["年", "月"], ascending=[False, False])
+            latest = ym_df.iloc[0]
+            return f"{int(latest['年'])}年{int(latest['月']):02d}月"
+
+    if "年-月" in df.columns:
+        values = df["年-月"].dropna().astype(str)
+        pairs = []
+        for value in values:
+            match = re.search(r"(\d{4})\D?(\d{1,2})", value)
+            if match:
+                pairs.append((int(match.group(1)), int(match.group(2))))
+        if pairs:
+            year, month = max(pairs)
+            return f"{year}年{month:02d}月"
+
+    return ""
+
+
+def pick_latest_file(root: Path, pattern: str, recursive: bool = True) -> Optional[Path]:
+    if not root.exists():
+        return None
+    iterator = root.rglob(pattern) if recursive else root.glob(pattern)
+    files = [p for p in iterator if p.is_file() and not p.name.startswith("~$")]
+    if not files:
+        return None
+    return max(files, key=lambda p: p.stat().st_mtime)
+
+
+def pick_latest_existing(candidates: List[Tuple[Path, str, bool]]) -> Optional[Path]:
+    for root, pattern, recursive in candidates:
+        latest = pick_latest_file(root, pattern, recursive=recursive)
+        if latest:
+            return latest
+    return None
+
+
+def resolve_input_paths() -> Dict:
+    resolved = dict(INPUT_PATHS)
+
+    contract_dir = INPUT_PATHS["合同管理"]
+    contract_latest = pick_latest_existing([
+        (contract_dir, "总包合同+分包合同汇总_*.xlsx", True),
+        (contract_dir, "合同管理_总包分包汇总_*.xlsx", True),
+    ])
+    if contract_latest:
+        resolved["合同管理汇总"] = contract_latest
+
+    finance_latest = pick_latest_existing([
+        (BASE_DIR / "12-财务部💰/B_输出汇总文件", "*分包台账汇总_*.xlsx", False),
+        (BASE_DIR / "12-财务部💰", "*分包台账汇总_*.xlsx", True),
+    ])
+    if finance_latest:
+        resolved["财务分包"] = finance_latest
+
+    budget_latest = pick_latest_existing([
+        (BASE_DIR / "6_预算部分/5.1_主材汇总（广联达软件导出）", "【总汇总】所有标段_*.xlsx", False),
+        (BASE_DIR / "6_预算部分/5.1_主材汇总（广联达软件导出）/2_数据汇总分析", "【总汇总】所有标段_*.xlsx", False),
+        (BASE_DIR / "6_预算部分", "【总汇总】所有标段_*.xlsx", True),
+    ])
+    if budget_latest:
+        resolved["预算金额"] = budget_latest
+
+    if FORCED_EQUIPMENT_FILE.exists():
+        resolved["机具使用费"] = FORCED_EQUIPMENT_FILE
+    else:
+        equip_root = BASE_DIR / "10_机具使用费/B_汇总文件"
+        equip_latest = pick_latest_existing([
+            (equip_root, "*租赁机具台账_汇总.xlsx", False),
+            (equip_root, "*机具台账*_汇总.xlsx", False),
+            (equip_root, "*_汇总.xlsx", False),
+            (equip_root, "机具费汇总_*.xlsx", False),
+            (equip_root, "*_已汇总_*.xlsx", False),
+        ])
+        if equip_latest:
+            resolved["机具使用费"] = equip_latest
+
+    labor_default = INPUT_PATHS.get("人工费汇总")
+    if isinstance(labor_default, Path) and labor_default.exists():
+        resolved["人工费汇总"] = labor_default
+    else:
+        labor_latest = pick_latest_existing([
+            (BASE_DIR / "11_人工费🙎🏻‍♂️/B_输出标准化人工费台账", "人工费汇总_*.xlsx", False),
+            (BASE_DIR / "11_人工费🙎🏻‍♂️/B_输出标准化人工费台账", "综合汇总_*.xlsx", False),
+            (BASE_DIR / "11_人工费🙎🏻‍♂️", "综合汇总_*.xlsx", True),
+            (BASE_DIR / "11_人工费🙎🏻‍♂️/子公司人力资源发", "综合汇总.xlsx", True),
+        ])
+        if labor_latest:
+            resolved["人工费汇总"] = labor_latest
+
+    procurement_default = INPUT_PATHS.get("采购明细")
+    proc_latest = pick_latest_existing([
+        (BASE_DIR / "9_采购部采购台账/B_汇总数据/A_合并汇总", "*_材料采购_merged.xlsx", False),
+        (BASE_DIR / "9_采购部采购台账/B_汇总数据/A_合并汇总", "*.xlsx", False),
+        (BASE_DIR / "9_采购部采购台账/B_汇总数据/B_标准化汇总", "*_材料采购_merged.xlsx", False),
+        (BASE_DIR / "9_采购部采购台账/C_数据分析", "*_merged_标准化汇总.xlsx", True),
+        (BASE_DIR / "9_采购部采购台账/B_汇总数据", "*_材料采购_merged.xlsx", True),
+    ])
+    if proc_latest:
+        resolved["采购明细"] = proc_latest
+    elif isinstance(procurement_default, Path) and procurement_default.exists():
+        resolved["采购明细"] = procurement_default
+
+    concrete_default = INPUT_PATHS.get("商混混凝土", [])
+    concrete_default = [p for p in concrete_default if isinstance(p, Path) and p.exists()]
+    if concrete_default:
+        resolved["商混混凝土"] = concrete_default
+    else:
+        concrete_latest = pick_latest_existing([
+            (BASE_DIR / "9.1_商混站混凝土/B_标准化数据", "搅拌站混凝土汇总报表_*.xlsx", False),
+            (BASE_DIR / "9.1_商混站混凝土/B_标准化数据", "*.xlsx", False),
+            (BASE_DIR / "9.1_商混站混凝土/A_商混凝站混凝土数据_按月统计数据", "混凝土汇总报表_*.xlsx", False),
+            (BASE_DIR / "9.1_商混站混凝土/A_商混凝站混凝土数据_按月统计数据", "*混凝土*汇总*.xlsx", False),
+            (BASE_DIR / "9.1_商混站混凝土", "混凝土汇总报表_*.xlsx", True),
+            (BASE_DIR / "9.1_商混站混凝土", "*混凝土*汇总*.xlsx", True),
+        ])
+        if concrete_latest:
+            resolved["商混混凝土"] = [concrete_latest]
+        else:
+            resolved["商混混凝土"] = []
+
+    sub_contract_latest = pick_latest_existing([
+        (BASE_DIR / "5.1_分包合同/2_标准化汇总分包合同台账", "分包签订合同汇总_*.xlsx", False),
+        (BASE_DIR / "5.1_分包合同/2_标准化汇总分包合同台账", "*.xlsx", False),
+    ])
+    if sub_contract_latest:
+        resolved["分包合同台账"] = sub_contract_latest
+
+    return resolved
+
+
+def _collect_year_month_candidates(text: str) -> List[Tuple[int, int]]:
+    candidates: List[Tuple[int, int]] = []
+    if not text:
+        return candidates
+
+    for year, month in re.findall(r"(20\d{2})\D{0,2}(1[0-2]|0?[1-9])", text):
+        candidates.append((int(year), int(month)))
+
+    for year, month in re.findall(r"(20\d{2})(0[1-9]|1[0-2])\d{0,2}", text):
+        candidates.append((int(year), int(month)))
+
+    return candidates
+
+
+def infer_latest_year_month_from_texts(texts: List[str]) -> str:
+    all_candidates: List[Tuple[int, int]] = []
+    for text in texts:
+        all_candidates.extend(_collect_year_month_candidates(str(text)))
+
+    if not all_candidates:
+        return ""
+
+    year, month = max(all_candidates)
+    return f"{year}年{month:02d}月"
+
+
+def infer_cutoff_from_path(path: Path) -> str:
+    if not path:
+        return ""
+    return infer_latest_year_month_from_texts([path.name, str(path)])
+
+
+def infer_cutoff_from_paths(paths: List[Path]) -> str:
+    if not paths:
+        return ""
+    texts: List[str] = []
+    for p in paths:
+        texts.append(str(p.name))
+        texts.append(str(p))
+    return infer_latest_year_month_from_texts(texts)
+
+
+def infer_cutoff_from_month_column(df, col_name: str = "月份") -> str:
+    if df.empty or col_name not in df.columns:
+        return ""
+    values = df[col_name].dropna().astype(str).tolist()
+    return infer_latest_year_month_from_texts(values)
+
+
+def run_cli():
+    resolved_inputs = resolve_input_paths()
+    default_contract_dir = resolved_inputs["合同管理"]
+    default_procurement = resolved_inputs["采购明细"]
+    default_concrete = resolved_inputs["商混混凝土"]
+    default_equipment = resolved_inputs["机具使用费"]
+    default_labor = resolved_inputs["人工费汇总"]
+    default_finance = resolved_inputs["财务分包"]
+    default_sub_contract = resolved_inputs.get("分包合同台账", INPUT_PATHS.get("分包合同台账"))
+    default_cost_stats = resolved_inputs["成本统计"]
+    default_manager_map = resolved_inputs["项目经理"]
+    default_budget = resolved_inputs["预算金额"]
+    default_responsibility_cost_dir = resolved_inputs["责任成本"]
+    default_output = OUTPUT_PATH
+
+    print("\n=== 当前数据源路径（自动解析） ===")
+    for key, value in resolved_inputs.items():
+        if isinstance(value, list):
+            for item in value:
+                print(f"{key}: {item}")
+        else:
+            print(f"{key}: {value}")
+
+    cost_stats_cutoff = infer_cutoff_from_path(default_cost_stats)
+    finance_cutoff = infer_cutoff_from_path(default_finance)
+    procurement_cutoff = infer_cutoff_from_path(default_procurement)
+    concrete_cutoff = infer_cutoff_from_paths(default_concrete)
+    equipment_cutoff = infer_cutoff_from_path(default_equipment)
+    labor_cutoff_by_name = infer_cutoff_from_path(default_labor)
+
+    responsibility_candidates = list(load_responsibility_cost_mapping(default_responsibility_cost_dir).values())
+    responsibility_cutoff = infer_cutoff_from_paths(responsibility_candidates)
+
+    data_source_info = {
+        "项目成本统计汇总表": {"文件名": default_cost_stats.name, "统计截止日期": cost_stats_cutoff or "未知"},
+        "财务分包付款明细": {"文件名": default_finance.name, "统计截止日期": finance_cutoff or "未知"},
+        "材料采购明细": {"文件名": default_procurement.name, "统计截止日期": procurement_cutoff or "未知"},
+        "商混站明细": {"文件名": "; ".join([p.name for p in default_concrete]) if default_concrete else "未知", "统计截止日期": concrete_cutoff or "未知"},
+        "机具使用费明细": {"文件名": default_equipment.name, "统计截止日期": equipment_cutoff or "未知"},
+        "人工费汇总": {"文件名": default_labor.name, "统计截止日期": labor_cutoff_by_name or "未知"},
+        "责任成本": {"文件名": default_responsibility_cost_dir.name, "编制日期": responsibility_cutoff or "未知"},
+    }
+
+    contract_dir = default_contract_dir
+    output_root = default_output
+    project_reports_dir = output_root / PROJECT_REPORTS_DIRNAME
+    project_reports_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        datasets = load_contracts_from_folder(contract_dir)
+        procurement_df = load_procurement(default_procurement)
+        concrete_df = load_concrete(default_concrete)
+        equipment_df = load_equipment(default_equipment)
+        labor_df = load_labor(default_labor)
+        labor_month_df = load_labor_monthly(default_labor)
+        labor_cutoff = detect_latest_year_month(labor_month_df)
+        if labor_cutoff:
+            data_source_info["人工费汇总"]["统计截止日期"] = labor_cutoff
+        finance_summary_df, finance_category_df = load_finance_summary(default_finance)
+        cost_stats_df = load_cost_statistics(default_cost_stats)
+        cost_stats_cutoff_from_data = infer_cutoff_from_month_column(cost_stats_df, "月份")
+        if cost_stats_cutoff_from_data:
+            data_source_info["项目成本统计汇总表"]["统计截止日期"] = cost_stats_cutoff_from_data
+        manager_map = load_project_manager_map(default_manager_map)
+        budget_df = load_budget_summary(default_budget)
+        responsibility_cost_mapping = load_responsibility_cost_mapping(default_responsibility_cost_dir)
+        sub_contract_df = load_subcontract_ledger(default_sub_contract) if default_sub_contract else None
+
+    except Exception as exc:
+        print(f"❌ 读取失败：{exc}")
+        return
+
+    main_df = datasets.get("总包合同", pd.DataFrame())
+    sub_df = sub_contract_df if sub_contract_df is not None and not sub_contract_df.empty else datasets.get("分包合同", pd.DataFrame())
+
+    summary_rows: List[Dict] = []
+    for (
+        code,
+        project_name,
+        summary_row,
+        main_rows,
+        sub_rows,
+        procurement_rows,
+        extra_proc_rows,
+        concrete_rows,
+        equipment_rows,
+        labor_rows,
+        labor_month_rows,
+        finance_category_rows,
+    ) in build_project_summary(main_df, sub_df, procurement_df, concrete_df, equipment_df, labor_df, labor_month_df, finance_summary_df, finance_category_df, budget_df):
+        export_project_report(
+            project_reports_dir,
+            code,
+            project_name,
+            summary_row,
+            main_rows,
+            sub_rows,
+            procurement_rows,
+            extra_proc_rows,
+            concrete_rows,
+            equipment_rows,
+            labor_rows,
+            labor_month_rows,
+            finance_category_rows,
+            cost_stats_df,
+            budget_df,
+            responsibility_cost_mapping,
+            data_source_info,
+        )
+        summary_rows.append(summary_row)
+
+    export_index_file(project_reports_dir, summary_rows, cost_stats_df, budget_df)
+    (
+        input_rows,
+        cost_stats_fields,
+        procurement_fields,
+        concrete_fields,
+        equipment_fields,
+        labor_fields,
+        finance_fields,
+        budget_fields,
+    ) = build_provenance_rows(
+        contract_dir=contract_dir,
+        procurement_path=default_procurement,
+        concrete_paths=default_concrete,
+        equipment_path=default_equipment,
+        labor_path=default_labor,
+        finance_path=default_finance,
+        cost_stats_path=default_cost_stats,
+        manager_map_path=default_manager_map,
+        budget_path=default_budget,
+    )
+
+    export_provenance_excel(
+        project_reports_dir,
+        input_rows,
+        cost_stats_fields,
+        procurement_fields,
+        concrete_fields,
+        equipment_fields,
+        labor_fields,
+        finance_fields,
+        budget_fields,
+    )
+
+    replicate_outputs(
+        project_reports_dir,
+        output_root,
+        summary_rows,
+        manager_map,
+        PROJECT_MANAGER_DIRNAME,
+        PROJECT_STATUS_DIRNAME,
+    )
+
+    cleanup_legacy_output_files(
+        output_root,
+        project_reports_dir,
+        summary_rows,
+        PROJECT_MANAGER_DIRNAME,
+        PROJECT_STATUS_DIRNAME,
+    )
+
+    if labor_cutoff:
+        print(f"✓ 人工费数据最新统计月份：{labor_cutoff}")
+    print(f"\n✓ 完成！已生成 {len(summary_rows)} 个项目的合同汇总")
+    print(f"📁 输出根目录：{output_root}")
+    print(f"📁 项目合同汇总：{project_reports_dir}")
+    print(f"📁 项目经理目录：{output_root / PROJECT_MANAGER_DIRNAME}")
+    print(f"📁 项目状态目录：{output_root / PROJECT_STATUS_DIRNAME}")
+    print(f"📄 索引文件：{project_reports_dir / '项目汇总索引.xlsx'}")
+
+
+if __name__ == "__main__":
+    run_cli()

@@ -1,0 +1,392 @@
+{
+  "meta": {
+    "version": "1.0",
+    "generated_at": "2026-01-29 14:49:30",
+    "source_file": "/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集excel情况汇总/2025年12月/项目统计数据汇总.xlsx",
+    "description": "成本分析报告自动生成配置"
+  },
+  "report_structure": [
+    {
+      "section_number": "一",
+      "section_id": "综合指标",
+      "section_title": "一、项目综合指标",
+      "enabled": true,
+      "fields": [
+        {
+          "field_name": "预计总成本",
+          "display_name": "预计总成本",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 1,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "责任成本汇总金额",
+          "display_name": "责任成本汇总金额",
+          "currency": "THB",
+          "source": "责任成本",
+          "priority": 1.5,
+          "format": "amount",
+          "note": "来自责任成本sheet"
+        },
+        {
+          "field_name": "收入",
+          "display_name": "收入",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 2,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "毛利",
+          "display_name": "毛利",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 3,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "毛利率",
+          "display_name": "毛利率",
+          "currency": "",
+          "source": "成本统计",
+          "priority": 4,
+          "format": "percentage",
+          "note": ""
+        }
+      ],
+      "custom_fields": [],
+      "notes": []
+    },
+    {
+      "section_number": "二",
+      "section_id": "业主合同",
+      "section_title": "二、业主合同额",
+      "enabled": true,
+      "fields": [
+        {
+          "field_name": "业主预计结算额",
+          "display_name": "预计结算额",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 10,
+          "format": "amount",
+          "note": ""
+        }
+      ],
+      "custom_fields": [],
+      "notes": []
+    },
+    {
+      "section_number": "三",
+      "section_id": "分包合同",
+      "section_title": "三、分包合同金额",
+      "enabled": true,
+      "fields": [
+        {
+          "field_name": "分包结算额",
+          "display_name": "分包结算额",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 20,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "分包已付款",
+          "display_name": "分包已付款金额",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 21,
+          "format": "amount",
+          "note": ""
+        }
+      ],
+      "custom_fields": [],
+      "notes": []
+    },
+    {
+      "section_number": "四",
+      "section_id": "材料费",
+      "section_title": "四、材料采购费",
+      "enabled": true,
+      "fields": [
+        {
+          "field_name": "材料采购实际已发生",
+          "display_name": "实际已发生",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 30,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "材料采购后续预估发生",
+          "display_name": "后续预估发生",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 31,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "采购部采购金额",
+          "display_name": "采购部采购",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 32,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "项目部采购金额",
+          "display_name": "项目部采购",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 33,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "材料租赁费用",
+          "display_name": "租赁费用",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 60,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "材料租赁后续预估",
+          "display_name": "租赁后续预估",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 61,
+          "format": "amount",
+          "note": ""
+        }
+      ],
+      "custom_fields": [],
+      "notes": []
+    },
+    {
+      "section_number": "五",
+      "section_id": "商混站数据",
+      "section_title": "五、商混站数据",
+      "enabled": true,
+      "fields": [
+        {
+          "field_name": "商混总方量",
+          "display_name": "总方量",
+          "currency": "",
+          "source": "商混",
+          "priority": 35,
+          "format": "amount",
+          "note": "从商混明细sheet汇总"
+        },
+        {
+          "field_name": "商混总金额",
+          "display_name": "总金额",
+          "currency": "THB",
+          "source": "商混",
+          "priority": 36,
+          "format": "amount",
+          "note": "从商混明细sheet汇总"
+        }
+      ],
+      "custom_fields": [],
+      "notes": []
+    },
+    {
+      "section_number": "六",
+      "section_id": "人工费",
+      "section_title": "六、人工费",
+      "enabled": true,
+      "fields": [
+        {
+          "field_name": "工资支出",
+          "display_name": "工资支出",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 40,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "管理人员工资",
+          "display_name": "管理人员工资",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 41,
+          "format": "amount",
+          "note": ""
+        }
+      ],
+      "custom_fields": [],
+      "notes": []
+    },
+    {
+      "section_number": "七",
+      "section_id": "机具费",
+      "section_title": "七、机具费",
+      "enabled": true,
+      "fields": [
+        {
+          "field_name": "机具费支出",
+          "display_name": "机具费支出",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 50,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "机具费后续预估",
+          "display_name": "机具费后续预估",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 51,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "机具使用费",
+          "display_name": "机具使用费（明细汇总）",
+          "currency": "THB",
+          "source": "汇总",
+          "priority": 52,
+          "format": "amount",
+          "note": "从机具使用费明细sheet汇总"
+        }
+      ],
+      "custom_fields": [],
+      "notes": []
+    },
+    {
+      "section_number": "九",
+      "section_id": "其他费用",
+      "section_title": "九、其他费用",
+      "enabled": true,
+      "fields": [
+        {
+          "field_name": "人员调遣支出",
+          "display_name": "人员调遣支出",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 70,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "人员调遣后续预估",
+          "display_name": "人员调遣后续预估",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 71,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "其他费用支出",
+          "display_name": "其他费用支出",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 72,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "其他费用后续预估",
+          "display_name": "其他费用后续预估",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 73,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "临建费用支出",
+          "display_name": "临建费用支出",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 74,
+          "format": "amount",
+          "note": ""
+        },
+        {
+          "field_name": "临建费用后续预估",
+          "display_name": "临建费用后续预估",
+          "currency": "THB",
+          "source": "成本统计",
+          "priority": 75,
+          "format": "amount",
+          "note": ""
+        }
+      ],
+      "custom_fields": [],
+      "notes": []
+    }
+  ],
+  "formatting": {
+    "title": {
+      "font_size": 14,
+      "font_bold": true,
+      "font_color": "FFFFFF",
+      "fill_color": "4F81BD",
+      "alignment": "center"
+    },
+    "section_header": {
+      "font_size": 12,
+      "font_bold": true,
+      "font_color": "000000",
+      "fill_color": "D9E1F2",
+      "alignment": "left"
+    },
+    "field_header": {
+      "font_size": 11,
+      "font_bold": true,
+      "font_color": "000000",
+      "fill_color": "E7E6E6",
+      "alignment": "center"
+    },
+    "data_row": {
+      "font_size": 11,
+      "font_bold": false,
+      "alignment": "left"
+    },
+    "note_row": {
+      "font_size": 10,
+      "fill_color": "FFF2CC",
+      "font_italic": true
+    },
+    "column_widths": {
+      "项目/科目": 20,
+      "明细": 25,
+      "币种": 8,
+      "金额": 15,
+      "备注": 30
+    },
+    "number_format": {
+      "amount": "#,##0.00",
+      "percentage": "0.00%"
+    }
+  },
+  "validation": {
+    "required_sections": [
+      "综合指标",
+      "业主合同",
+      "分包合同"
+    ],
+    "min_fields_per_section": 1,
+    "allow_empty_values": true,
+    "currency_validation": [
+      "THB",
+      "CNY",
+      "USD",
+      ""
+    ]
+  }
+}
