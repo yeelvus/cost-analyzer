@@ -25,7 +25,7 @@ from project_name_matcher import (
 from excel_formatting_utils import apply_common_excel_layout
 
 # ================= 项目名称标准化配置 =================
-MAPPING_EXCEL_PATH = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目编码名称汇总.xlsx"
+MAPPING_EXCEL_PATH = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
 MATCH_DB_PATH = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/project_name_match_db.json"
 INPUT_SOURCE = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_1_子公司人力资源台账"
 INPUT_GLOB = "泰国子公司项目人工费统计台账*.xlsx"
@@ -366,6 +366,12 @@ summary_df = (
 summary_df['总人工费'] = summary_df[agg_cols].sum(axis=1)
 summary_df = summary_df[['项目编码', '项目名称'] + agg_cols + ['总人工费']]
 
+# 新增万泰铢口径汇总（金额列统一除以 10000）
+summary_wan_df = summary_df.copy()
+summary_amount_cols = agg_cols + ['总人工费']
+summary_wan_df[summary_amount_cols] = summary_wan_df[summary_amount_cols] / 10000.0
+summary_wan_df = summary_wan_df.rename(columns={c: f"{c}(万泰铢)" for c in summary_amount_cols})
+
 # 输出目录（固定到 B_输出标准化人工费台账）
 base_name = os.path.basename(excel_file).rsplit('.', 1)[0]
 output_folder = OUTPUT_ROOT
@@ -398,6 +404,7 @@ raw_output_df = raw_output_df.drop(columns=hidden_export_cols, errors='ignore')
 with pd.ExcelWriter(combined_file, engine='openpyxl') as writer:
     proj_summary.to_excel(writer, sheet_name='项目求和', index=False)
     summary_df.to_excel(writer, sheet_name='按项目汇总', index=False)
+    summary_wan_df.to_excel(writer, sheet_name='按项目汇总(万泰铢)', index=False)
     raw_output_df.to_excel(writer, sheet_name='原始数据', index=False)
     for metric in metrics:
         pivot = grouped.pivot_table(

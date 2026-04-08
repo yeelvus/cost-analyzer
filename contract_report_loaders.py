@@ -195,29 +195,23 @@ def load_contracts_from_folder(root_dir: Path) -> Dict[str, pd.DataFrame]:
 
     records = {kw: [] for kw in target_keywords}
 
-    for current_root, dirs, _ in os.walk(root_dir):
-        folder_name = os.path.basename(current_root)
-        if not any(kw in folder_name for kw in target_keywords):
-            continue
-        parent_name = os.path.basename(os.path.dirname(current_root))
-        if any(kw in parent_name for kw in target_keywords):
-            continue
-        dirs[:] = []
+    def _looks_like_project_dir(name: str) -> bool:
+        if not name or "_" not in name:
+            return False
+        prefix = name.split("_", 1)[0].strip().upper()
+        return ("-" in prefix and any(ch.isdigit() for ch in prefix))
 
-        hit_kw = next(kw for kw in target_keywords if kw in folder_name)
-        parent_dir = Path(current_root).parent
-        raw_project_name = parent_dir.name
+    def _append_project_contracts(hit_kw: str, project_dir: Path, project_status: str):
+        raw_project_name = project_dir.name
         if raw_project_name not in project_mapping:
             project_mapping[raw_project_name] = raw_project_name
         project_name = project_mapping[raw_project_name]
-        grandparent_dir = parent_dir.parent
-        project_status = grandparent_dir.name if grandparent_dir != root_dir else ""
 
-        contract_folder = Path(current_root)
+        contract_folder = project_dir
         subfolder_data: Dict[str, Dict] = {}
         for sub_root, _, __ in os.walk(contract_folder):
             rel_path = Path(sub_root).relative_to(contract_folder)
-            sub_key = str(rel_path) if str(rel_path) != "." else folder_name
+            sub_key = str(rel_path) if str(rel_path) != "." else contract_folder.name
             abs_sub_path = Path(sub_root)
             data = read_contract_data(abs_sub_path)
             subfolder_data[sub_key] = data
@@ -248,6 +242,88 @@ def load_contracts_from_folder(root_dir: Path) -> Dict[str, pd.DataFrame]:
             rec["项目编码"], rec["项目简称"] = split_project_fields(project_name)
             rec["是否采购类合同"] = detect_procurement(pd.Series(rec))
             records[hit_kw].append(rec)
+
+    # 优先解析新结构：合同类型根目录 -> 项目状态 -> 项目 -> 合同子文件夹
+    for contract_root in root_dir.iterdir() if root_dir.exists() else []:
+        if not contract_root.is_dir():
+            continue
+        root_name = contract_root.name
+        if "签证" in root_name:
+            continue
+        if not any(kw in root_name for kw in target_keywords):
+            continue
+
+        hit_kw = next(kw for kw in target_keywords if kw in root_name)
+        for status_or_project in contract_root.iterdir():
+            if not status_or_project.is_dir():
+                continue
+
+            # 兼容“合同类型根目录 -> 项目”与“合同类型根目录 -> 状态 -> 项目”两种层级
+            if _looks_like_project_dir(status_or_project.name):
+                _append_project_contracts(hit_kw, status_or_project, "")
+                continue
+
+            project_status = status_or_project.name
+            for project_dir in status_or_project.iterdir():
+                if not project_dir.is_dir() or not _looks_like_project_dir(project_dir.name):
+                    continue
+                _append_project_contracts(hit_kw, project_dir, project_status)
+
+    # 旧结构兜底：项目目录下直接包含“总包合同/分包合同”目录
+    if all(len(records[kw]) == 0 for kw in target_keywords):
+        for current_root, dirs, _ in os.walk(root_dir):
+            folder_name = os.path.basename(current_root)
+            if not any(kw in folder_name for kw in target_keywords):
+                continue
+            parent_name = os.path.basename(os.path.dirname(current_root))
+            if any(kw in parent_name for kw in target_keywords):
+                continue
+            dirs[:] = []
+
+            hit_kw = next(kw for kw in target_keywords if kw in folder_name)
+            parent_dir = Path(current_root).parent
+            raw_project_name = parent_dir.name
+            if raw_project_name not in project_mapping:
+                project_mapping[raw_project_name] = raw_project_name
+            project_name = project_mapping[raw_project_name]
+            grandparent_dir = parent_dir.parent
+            project_status = grandparent_dir.name if grandparent_dir != root_dir else ""
+
+            contract_folder = Path(current_root)
+            subfolder_data: Dict[str, Dict] = {}
+            for sub_root, _, __ in os.walk(contract_folder):
+                rel_path = Path(sub_root).relative_to(contract_folder)
+                sub_key = str(rel_path) if str(rel_path) != "." else folder_name
+                abs_sub_path = Path(sub_root)
+                data = read_contract_data(abs_sub_path)
+                subfolder_data[sub_key] = data
+
+            for sub_key, fields in subfolder_data.items():
+                if all(str(v).strip() == "" or v == 0.0 for k, v in fields.items() if k != "币种"):
+                    continue
+                sub_abs_path = (contract_folder / sub_key).resolve()
+                attachments = detect_attachment_files(sub_abs_path)
+                rec = {
+                    "项目状态": project_status,
+                    "项目名称": project_name,
+                    "合同子文件夹": sub_key,
+                    "对方单位公司名称": fields.get("对方单位公司名称", ""),
+                    "合同编号": fields.get("合同编号", ""),
+                    "合同签订日期": fields.get("合同签订日期", ""),
+                    "币种": fields.get("币种", ""),
+                    "合同金额": fields.get("合同金额", 0.0),
+                    "汇率": fields.get("汇率", ""),
+                    "备注": fields.get("备注", ""),
+                    **attachments,
+                }
+                for k, v in fields.items():
+                    if k not in rec:
+                        rec[k] = v
+                rec["金额_含税优先"] = rec.get("合同金额", 0.0)
+                rec["金额_THB"] = convert_amount_to_thb(rec.get("合同金额", 0.0), rec.get("币种", ""), rec.get("汇率", ""))
+                rec["项目编码"], rec["项目简称"] = split_project_fields(project_name)
+                rec["是否采购类合同"] = detect_procurement(pd.Series(rec))
+                records[hit_kw].append(rec)
 
     base_columns = [
         "项目状态", "项目名称", "项目编码", "项目简称", "合同子文件夹", "合同金额", "币种", "汇率", "金额_THB", "金额_含税优先", "是否采购类合同",
