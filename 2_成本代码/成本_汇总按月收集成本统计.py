@@ -25,11 +25,17 @@ FINANCE_COL_KEYWORDS = (
 )
 
 # ==================== 自动化指令编辑区 ====================
+SCRIPT_DIR = Path(__file__).resolve().parent
+CODE_ROOT_DIR = SCRIPT_DIR.parent
+DEFAULT_MATCHER_DIR = CODE_ROOT_DIR / "0_项目基本信息"
+
 CONFIG = {
 "base_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/A_原始数据",
 "output_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_汇总表格/项目统计数据汇总_全月份.xlsx",
 "profit_rate_chart_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_汇总表格/项目毛利率变化图.html",
-"project_match_db_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/project_name_match_db.json",
+"project_matcher_dir": str(DEFAULT_MATCHER_DIR),
+"project_match_db_file": "",
+"project_info_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx",
 "finance_payment_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务部💰",
 "contract_management_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理",
 "contract_management_sheet": "1_总包分包汇总(全部)",
@@ -317,15 +323,51 @@ def pick_first_existing_column(columns, candidates):
             return candidate
     return None
 
-def init_project_matcher(project_code_file=None, match_db_file=None):
-    if match_db_file:
-        match_db_path = Path(match_db_file)
-        matcher_dir = match_db_path.parent
-    elif project_code_file:
-        matcher_dir = Path(project_code_file).parent
-        match_db_path = matcher_dir / "project_name_match_db.json"
+def find_data_root_from_base_dir(base_dir):
+    base_path = Path(base_dir).expanduser().resolve()
+    for candidate in [base_path, *base_path.parents]:
+        if (candidate / "0_项目基本信息情况").exists():
+            return candidate
+    return None
+
+def resolve_matcher_paths(config):
+    matcher_dir_raw = config.get("project_matcher_dir")
+    matcher_dir = Path(matcher_dir_raw).expanduser().resolve() if matcher_dir_raw else DEFAULT_MATCHER_DIR
+
+    db_file_raw = config.get("project_match_db_file")
+    if db_file_raw:
+        db_path = Path(db_file_raw).expanduser().resolve()
     else:
-        raise ValueError("project_code_file 与 match_db_file 不能同时为空")
+        db_path = (matcher_dir / "project_name_match_db.json").resolve()
+
+    # If an old/invalid DB path is configured, prefer the DB next to matcher module.
+    local_db_path = (matcher_dir / "project_name_match_db.json").resolve()
+    if not db_path.exists() and local_db_path.exists():
+        db_path = local_db_path
+
+    project_info_raw = config.get("project_info_file")
+    if project_info_raw:
+        project_info_path = Path(project_info_raw).expanduser().resolve()
+    else:
+        data_root = find_data_root_from_base_dir(config.get("base_dir", ""))
+        project_info_path = (data_root / "0_项目基本信息情况" / "项目基本信息表.xlsx").resolve() if data_root else None
+
+    return matcher_dir, db_path, project_info_path
+
+def init_project_matcher(project_code_file=None, match_db_file=None, matcher_dir=None):
+    if matcher_dir:
+        matcher_dir = Path(matcher_dir).expanduser().resolve()
+    elif match_db_file:
+        matcher_dir = Path(match_db_file).expanduser().resolve().parent
+    elif project_code_file:
+        matcher_dir = DEFAULT_MATCHER_DIR
+    else:
+        matcher_dir = DEFAULT_MATCHER_DIR
+
+    if match_db_file:
+        match_db_path = Path(match_db_file).expanduser().resolve()
+    else:
+        match_db_path = (matcher_dir / "project_name_match_db.json").resolve()
 
     matcher_file = matcher_dir / "project_name_matcher.py"
     if not matcher_file.exists():
@@ -343,8 +385,16 @@ def init_project_matcher(project_code_file=None, match_db_file=None):
     mark_unmatched = matcher_module.mark_unmatched
     save_db = matcher_module.save_db
 
-    # 直接从已有 JSON 匹配库加载；不再依赖项目编码Excel。
     standard_projects = []
+    project_code_path = Path(project_code_file).expanduser().resolve() if project_code_file else None
+    if not match_db_path.exists() and project_code_path and project_code_path.exists():
+        try:
+            project_df = pd.read_excel(project_code_path)
+            standard_projects = build_standard_projects_from_dataframe(project_df)
+            print(f"✓ JSON匹配库不存在，已从项目基本信息初始化标准项目: {len(standard_projects)} 条")
+        except Exception as e:
+            print(f"⚠️ 使用项目基本信息初始化匹配库失败: {e}")
+
     match_db = load_or_init_db(str(match_db_path), standard_projects)
 
     contract_name_by_code = {}
@@ -476,8 +526,16 @@ def process_all_projects():
 
     print("正在加载项目匹配库(JSON)...")
 
+    matcher_dir, match_db_path, project_info_path = resolve_matcher_paths(CONFIG)
+    print(f"✓ 项目匹配模块目录: {matcher_dir}")
+    print(f"✓ 项目匹配库路径: {match_db_path}")
+    if project_info_path:
+        print(f"✓ 项目基本信息文件: {project_info_path}")
+
     matcher = init_project_matcher(
-        match_db_file=CONFIG.get("project_match_db_file"),
+        project_code_file=str(project_info_path) if project_info_path else None,
+        match_db_file=str(match_db_path),
+        matcher_dir=str(matcher_dir),
     )
     match_db = matcher['db']
     match_project_fn = matcher['match_project']
