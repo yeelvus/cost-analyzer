@@ -6,21 +6,50 @@ import importlib.util
 from datetime import datetime
 
 # ===== 项目配置与客户映射 =====
-def _repo_root():
-    # 本脚本位于 01成本统计/9.1_商混站混凝土/，向上一级即仓库根
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-def _base_dir():
-    return os.path.dirname(os.path.abspath(__file__))
+CODE_ROOT = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DATA_WORKSPACE = '/Users/wyattsun/Desktop/邯郸中材/01成本统计'
 
 
-def _output_dir():
-    out = os.path.join(_base_dir(), 'B_标准化数据')
+def _data_workspace():
+    """数据总目录，可通过环境变量覆盖。"""
+    return os.environ.get('CONCRETE_DATA_WORKSPACE', DEFAULT_DATA_WORKSPACE)
+
+
+def _resolve_data_dir():
+    """解析混凝土数据目录，优先环境变量，其次自动探测。"""
+    explicit = os.environ.get('CONCRETE_DATA_DIR', '').strip()
+    if explicit and os.path.isdir(explicit):
+        return explicit
+
+    ws = _data_workspace()
+    candidates = [
+        os.path.join(ws, '9.1_商混站混凝土'),
+        os.path.join(ws, '9.1_商混凝站混凝土'),
+        os.path.join(ws, '9.1_商混站混凝土', 'A_商混凝站混凝土数据_按月统计数据'),
+    ]
+    for p in candidates:
+        if os.path.isdir(p):
+            return p
+
+    if os.path.isdir(ws):
+        for name in os.listdir(ws):
+            p = os.path.join(ws, name)
+            if not os.path.isdir(p):
+                continue
+            if name.startswith('9.1_') and ('混凝土' in name or '商混' in name):
+                return p
+
+    # 兼容旧布局：数据与脚本放在同目录
+    return CODE_ROOT
+
+
+def _output_dir(data_dir):
+    out = os.path.join(data_dir, 'B_标准化数据')
     os.makedirs(out, exist_ok=True)
     return out
 
 
-MATCHER_DIR = '/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息'
+MATCHER_DIR = os.path.join(os.path.dirname(CODE_ROOT), '0_项目基本信息')
 
 
 def _load_module_from_path(module_name, file_path):
@@ -43,7 +72,7 @@ match_project = _project_name_matcher.match_project
 prompt_unmatched_project_mappings = _project_name_matcher.prompt_unmatched_project_mappings
 save_db = _project_name_matcher.save_db
 
-PROJECT_MATCH_DB_PATH = '/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/project_name_match_db.json'
+PROJECT_MATCH_DB_PATH = os.path.join(MATCHER_DIR, 'project_name_match_db.json')
 
 def _norm(s):
     return (str(s).strip() if s is not None else '').upper()
@@ -97,9 +126,24 @@ def _read_detail_with_header_detection(detail_path):
     # 所有 sheet 都未检测到，退回默认读取
     return _read_detail_excel(detail_path)
 
+
+def _make_unique_columns(columns):
+    """将重复列名改为唯一列名，保留首个原名，其余追加后缀 _2/_3。"""
+    seen = {}
+    unique_cols = []
+    for col in columns:
+        name = str(col).strip()
+        if name in seen:
+            seen[name] += 1
+            unique_cols.append(f"{name}_{seen[name]}")
+        else:
+            seen[name] = 1
+            unique_cols.append(name)
+    return unique_cols
+
 def _normalize_detail_df(detail_df):
     # 清洗列名空格，防止匹配失败
-    detail_df.columns = detail_df.columns.str.strip()
+    detail_df.columns = _make_unique_columns(detail_df.columns)
 
     def pick_col(candidates):
         return next((c for c in candidates if c in detail_df.columns), None)
@@ -220,13 +264,13 @@ def _pick_detail_files(folder_path):
         excel_files.append(os.path.join(folder_path, f))
     return excel_files
 
-def _iter_detail_files(base_dir):
+def _iter_detail_files(data_dir):
     detail_items = []
-    output_dir = _output_dir()
-    for name in os.listdir(base_dir):
+    output_dir = _output_dir(data_dir)
+    for name in os.listdir(data_dir):
         if name.startswith('.') or name == '__pycache__':
             continue
-        folder_path = os.path.join(base_dir, name)
+        folder_path = os.path.join(data_dir, name)
         if not os.path.isdir(folder_path):
             continue
         detail_paths = _pick_detail_files(folder_path)
@@ -280,15 +324,18 @@ def find_project_for_customer(customer_name, match_db):
 
 def process_concrete_data():
     try:
-        base_dir = _base_dir()
-        price_path = _find_price_file(base_dir)
-        if not price_path:
-            raise RuntimeError(f"未找到报价单文件，请在目录中放置含‘报价’的 Excel：{base_dir}")
-        price_df = pd.read_excel(price_path)
+        data_dir = _resolve_data_dir()
+        print(f"数据目录: {data_dir}")
 
-        detail_items = _iter_detail_files(base_dir)
+        price_path = _find_price_file(data_dir)
+        if not price_path:
+            raise RuntimeError(f"未找到报价单文件，请在目录中放置含‘报价’的 Excel：{data_dir}")
+        price_df = pd.read_excel(price_path)
+        price_df.columns = _make_unique_columns(price_df.columns)
+
+        detail_items = _iter_detail_files(data_dir)
         if not detail_items:
-            raise RuntimeError(f"未在子文件夹中找到明细文件：{base_dir}")
+            raise RuntimeError(f"未在子文件夹中找到明细文件：{data_dir}")
 
         # 初始化统一项目匹配库（仅使用 project_name_match_db.json）
         match_db = load_or_init_db(PROJECT_MATCH_DB_PATH, [])
@@ -298,8 +345,6 @@ def process_concrete_data():
             f"别名 {len(match_db.get('alias_to_standard', {}))} 个，"
             f"未匹配留痕 {len(match_db.get('unmatched_aliases', []))} 个"
         )
-
-        price_df.columns = price_df.columns.str.strip()
 
         # 自动识别报价单中的价格列名（优先顺序）
         price_candidates = ['价格', '单价', '报价', 'Price', 'Unit Price']
@@ -616,7 +661,7 @@ def process_concrete_data():
             _write_outputs(merged_df, detail_summary, customer_summary, monthly_volume_pivot, monthly_amount_pivot, output_path)
 
         print("数据处理成功！")
-        print(f"文件保存位置: {base_dir}")
+        print(f"文件保存位置: {data_dir}")
 
     except Exception as e:
         print(f"处理过程中出现错误: {e}")

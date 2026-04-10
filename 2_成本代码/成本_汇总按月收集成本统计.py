@@ -541,13 +541,13 @@ def build_margin_change_wide_df(summary_df):
     margin_df["月份"] = margin_df["月份日期"].apply(lambda d: f"{d.year}年{d.month}月")
 
     wide_df = margin_df.pivot_table(
-        index="月份",
-        columns="项目名称",
+        index="项目名称",
+        columns="月份",
         values="毛利率环比变化",
         aggfunc="last",
     )
-    wide_df = wide_df.reindex(ordered_month_labels)
-    wide_df.index.name = "月份"
+    wide_df = wide_df.reindex(columns=ordered_month_labels)
+    wide_df.index.name = "项目名称"
     return wide_df
 
 def write_margin_change_sheet(wb, wide_df, sheet_name="毛利率环比变化宽表"):
@@ -556,20 +556,20 @@ def write_margin_change_sheet(wb, wide_df, sheet_name="毛利率环比变化宽�
     ws = wb.create_sheet(title=sheet_name)
 
     if wide_df is None or wide_df.empty:
-        ws.cell(row=1, column=1, value="月份")
+        ws.cell(row=1, column=1, value="项目名称")
         ws.cell(row=1, column=2, value="提示")
         ws.cell(row=2, column=2, value="暂无可用毛利率环比变化数据")
         return
 
-    project_cols = list(wide_df.columns)
-    ws.cell(row=1, column=1, value="月份")
-    for col_idx, project_name in enumerate(project_cols, start=2):
-        ws.cell(row=1, column=col_idx, value=project_name)
+    month_cols = list(wide_df.columns)
+    ws.cell(row=1, column=1, value="项目名称")
+    for col_idx, month_label in enumerate(month_cols, start=2):
+        ws.cell(row=1, column=col_idx, value=month_label)
 
-    for row_idx, month_label in enumerate(wide_df.index.tolist(), start=2):
-        ws.cell(row=row_idx, column=1, value=month_label)
-        for col_idx, project_name in enumerate(project_cols, start=2):
-            value = wide_df.at[month_label, project_name]
+    for row_idx, project_name in enumerate(wide_df.index.tolist(), start=2):
+        ws.cell(row=row_idx, column=1, value=project_name)
+        for col_idx, month_label in enumerate(month_cols, start=2):
+            value = wide_df.at[project_name, month_label]
             if pd.isna(value):
                 ws.cell(row=row_idx, column=col_idx, value=None)
             else:

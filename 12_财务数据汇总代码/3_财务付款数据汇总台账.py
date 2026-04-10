@@ -42,13 +42,29 @@ def load_project_name_matcher_module():
     return module
 
 
+def load_subject_mapper_class():
+    module_path = os.path.join(CURRENT_DIR, "subject_mapper.py")
+    if not os.path.exists(module_path):
+        raise FileNotFoundError(f"未找到摘要匹配模块: {module_path}")
+
+    spec = importlib.util.spec_from_file_location("subject_mapper", module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"无法加载摘要匹配模块: {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.SubjectMapper
+
+
 APPLY_COMMON_EXCEL_LAYOUT = load_apply_common_excel_layout()
 PROJECT_NAME_MATCHER = load_project_name_matcher_module()
+SUBJECT_MAPPER_CLASS = load_subject_mapper_class()
 
 
 INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务部💰/A_财务付款数据/A_原始数据"
 OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务部💰/A_财务付款数据/B_标准化数据"
 PROJECT_MATCH_DB_PATH = os.path.join(PROJECT_INFO_DIR, "project_name_match_db.json")
+SUBJECT_RULES_PATH = os.path.join(CURRENT_DIR, "rules.json")
 
 
 TARGET_COLUMNS = [
@@ -72,25 +88,8 @@ MIN_REQUIRED_COLUMNS = ["项目名称", "摘要", "实付金额"]
 
 AMOUNT_COLUMNS = ["应付金额", "预扣税额", "实付金额", "增值税额", "不含税额"]
 
-SUMMARY_HEADERS = ["实付金额汇总", "增值税额汇总", "实付金额+增值税额"]
-
-CATEGORY_ALIAS_MAP = {
-    "分包款": ["分包款", "分包工程款", "分包付款", "专业分包", "劳务分包", "分包"],
-    "材料采购": ["材料采购", "材料款", "采购款", "物资采购", "原材料", "材料"],
-    "工资薪金": ["工资薪金", "工资", "薪金", "职工薪酬", "人员工资", "人工费", "薪酬"],
-    "机具费": [
-        "机具费",
-        "机具使用费",
-        "机械费",
-        "机械使用费",
-        "设备使用费",
-        "设备租赁费",
-        "机具租赁费",
-        "机具租赁",
-    ],
-}
-DEFAULT_CATEGORY = "管理费"
-LEVEL1_ORDER = ["分包款", "材料采购", "工资薪金", "机具费", "管理费"]
+DEFAULT_CATEGORY = "6_管理费"
+LEVEL1_ORDER = ["0_分包", "2_材料采购", "1_人工费", "3_机具费", "6_管理费"]
 
 
 COLUMN_ALIASES = {
@@ -159,160 +158,89 @@ def excel_sheet_ref(sheet_name):
     return "'" + sheet_name.replace("'", "''") + "'"
 
 
-def classify_subject_levels(subject_value):
-    raw = "" if subject_value is None else str(subject_value).strip()
-    norm = normalize_text(raw)
-    if not norm:
-        return DEFAULT_CATEGORY, "(空白)"
+def _level1_sort_key(level1):
+    text = str(level1).strip()
+    m = re.match(r"^(\d+)_", text)
+    if m:
+        return (0, int(m.group(1)), text)
+    return (1, 9999, text)
 
-    for level1, aliases in CATEGORY_ALIAS_MAP.items():
-        for alias in aliases:
-            alias_norm = normalize_text(alias)
-            if alias_norm and alias_norm in norm:
-                return level1, ""
 
-    return DEFAULT_CATEGORY, raw
+def init_subject_matcher():
+    mapper = SUBJECT_MAPPER_CLASS(SUBJECT_RULES_PATH)
+    level1_values = sorted(
+        {
+            str(rule.get("一级科目", "")).strip()
+            for rule in mapper.rules
+            if str(rule.get("一级科目", "")).strip()
+        },
+        key=_level1_sort_key,
+    )
+
+    default_level1 = next((x for x in level1_values if "管理费" in x), "6_管理费")
+    ordered = [x for x in level1_values if x != default_level1] + [default_level1]
+    return mapper, ordered if ordered else LEVEL1_ORDER, default_level1
+
+
+SUBJECT_MAPPER, LEVEL1_ORDER, DEFAULT_CATEGORY = init_subject_matcher()
+
+
+def classify_subject_levels(subject_value, summary_value):
+    raw_subject = "" if subject_value is None else str(subject_value).strip()
+
+    try:
+        level1, level2 = SUBJECT_MAPPER.classify(subject_value, summary_value)
+    except Exception:
+        level1, level2 = "", ""
+
+    level1 = str(level1).strip() if level1 is not None else ""
+    level2 = str(level2).strip() if level2 is not None else ""
+
+    # 兼容旧版本 mapper：未命中时可能返回 (原始科目, 原始科目)。
+    if raw_subject and level1 == raw_subject and level2 == raw_subject:
+        level1 = ""
+
+    if not level1:
+        level1 = DEFAULT_CATEGORY
+
+    if not level2:
+        level2 = raw_subject if raw_subject else "(空白)"
+
+    return level1, level2
 
 
 def append_subject_levels(df):
     enriched = df.copy()
-    if "科目" not in enriched.columns:
+    if "科目" not in enriched.columns and "摘要" not in enriched.columns:
         enriched["一级科目"] = DEFAULT_CATEGORY
         enriched["二级科目"] = "(空白)"
         return enriched
 
-    level_pairs = enriched["科目"].apply(classify_subject_levels)
+    level_pairs = enriched.apply(
+        lambda row: classify_subject_levels(row.get("科目"), row.get("摘要")),
+        axis=1,
+    )
     enriched["一级科目"] = level_pairs.apply(lambda x: x[0])
     enriched["二级科目"] = level_pairs.apply(lambda x: x[1])
+
+    # 将科目分级列放到“摘要”之前，便于查看分类依据。
+    cols = [c for c in enriched.columns if c not in {"一级科目", "二级科目"}]
+    if "摘要" in cols:
+        idx = cols.index("摘要")
+        cols = cols[:idx] + ["一级科目", "二级科目"] + cols[idx:]
+    else:
+        cols = cols + ["一级科目", "二级科目"]
+    enriched = enriched[cols]
+
     return enriched
 
 
-def build_subject_summary_sheet(detail_df, detail_sheet_name):
-    level1_col = "一级科目"
-    level2_col = "二级科目"
-    paid_col = "实付金额"
-    vat_col = "增值税额"
-
-    if level1_col not in detail_df.columns or level2_col not in detail_df.columns:
-        summary_df = pd.DataFrame(columns=["一级科目", "二级科目"] + SUMMARY_HEADERS)
-        return summary_df
-
-    detail_ref = excel_sheet_ref(detail_sheet_name)
-    level1_col_idx = detail_df.columns.get_loc(level1_col) + 1
-    level2_col_idx = detail_df.columns.get_loc(level2_col) + 1
-    paid_col_idx = detail_df.columns.get_loc(paid_col) + 1 if paid_col in detail_df.columns else None
-    vat_col_idx = detail_df.columns.get_loc(vat_col) + 1 if vat_col in detail_df.columns else None
-
-    level1_letter = get_column_letter(level1_col_idx)
-    level2_letter = get_column_letter(level2_col_idx)
-    paid_letter = get_column_letter(paid_col_idx) if paid_col_idx else None
-    vat_letter = get_column_letter(vat_col_idx) if vat_col_idx else None
-
-    rows = []
-    current_row = 2
-    for level1 in LEVEL1_ORDER[:-1]:
-        paid_formula = (
-            f"=SUMIFS({detail_ref}!${paid_letter}:${paid_letter},{detail_ref}!${level1_letter}:${level1_letter},$A{current_row})"
-            if paid_letter
-            else ""
-        )
-        vat_formula = (
-            f"=SUMIFS({detail_ref}!${vat_letter}:${vat_letter},{detail_ref}!${level1_letter}:${level1_letter},$A{current_row})"
-            if vat_letter
-            else ""
-        )
-        total_formula = f"=C{current_row}+D{current_row}"
-        rows.append(
-            {
-                "一级科目": level1,
-                "二级科目": "",
-                "实付金额汇总": paid_formula,
-                "增值税额汇总": vat_formula,
-                "实付金额+增值税额": total_formula,
-            }
-        )
-        current_row += 1
-
-    # 管理费一级汇总
-    mgmt_row = current_row
-    paid_formula = (
-        f"=SUMIFS({detail_ref}!${paid_letter}:${paid_letter},{detail_ref}!${level1_letter}:${level1_letter},$A{mgmt_row})"
-        if paid_letter
-        else ""
-    )
-    vat_formula = (
-        f"=SUMIFS({detail_ref}!${vat_letter}:${vat_letter},{detail_ref}!${level1_letter}:${level1_letter},$A{mgmt_row})"
-        if vat_letter
-        else ""
-    )
-    rows.append(
-        {
-            "一级科目": DEFAULT_CATEGORY,
-            "二级科目": "",
-            "实付金额汇总": paid_formula,
-            "增值税额汇总": vat_formula,
-            "实付金额+增值税额": f"=C{mgmt_row}+D{mgmt_row}",
-        }
-    )
-    current_row += 1
-
-    # 管理费二级明细：其余科目全部挂在管理费下
-    mgmt_series = detail_df.loc[detail_df[level1_col] == DEFAULT_CATEGORY, level2_col]
-    mgmt_sub_levels = sorted(set(mgmt_series.fillna("(空白)").astype(str).str.strip()))
-    mgmt_sub_levels = [x for x in mgmt_sub_levels if x]
-
-    for level2 in mgmt_sub_levels:
-        paid_formula = (
-            f"=SUMIFS({detail_ref}!${paid_letter}:${paid_letter},{detail_ref}!${level1_letter}:${level1_letter},$A{current_row},{detail_ref}!${level2_letter}:${level2_letter},$B{current_row})"
-            if paid_letter
-            else ""
-        )
-        vat_formula = (
-            f"=SUMIFS({detail_ref}!${vat_letter}:${vat_letter},{detail_ref}!${level1_letter}:${level1_letter},$A{current_row},{detail_ref}!${level2_letter}:${level2_letter},$B{current_row})"
-            if vat_letter
-            else ""
-        )
-        rows.append(
-            {
-                "一级科目": DEFAULT_CATEGORY,
-                "二级科目": level2,
-                "实付金额汇总": paid_formula,
-                "增值税额汇总": vat_formula,
-                "实付金额+增值税额": f"=C{current_row}+D{current_row}",
-            }
-        )
-        current_row += 1
-
-    total_row = current_row
-    rows.append(
-        {
-            "一级科目": "总计",
-            "二级科目": "",
-            "实付金额汇总": f"=SUBTOTAL(9,C2:C{total_row - 1})",
-            "增值税额汇总": f"=SUBTOTAL(9,D2:D{total_row - 1})",
-            "实付金额+增值税额": f"=C{total_row}+D{total_row}",
-        }
-    )
-
-    return pd.DataFrame(rows, columns=["一级科目", "二级科目"] + SUMMARY_HEADERS)
-
-
-def build_subject_summary_wan_sheet(summary_df, summary_sheet_name):
-    rows = []
-    summary_ref = excel_sheet_ref(summary_sheet_name)
-
-    for idx, row in enumerate(summary_df.itertuples(index=False), start=2):
-        rows.append(
-            {
-                "一级科目": getattr(row, "一级科目"),
-                "二级科目": getattr(row, "二级科目"),
-                "实付金额汇总": f"={summary_ref}!C{idx}/10000",
-                "增值税额汇总": f"={summary_ref}!D{idx}/10000",
-                "实付金额+增值税额": f"={summary_ref}!E{idx}/10000",
-            }
-        )
-
-    return pd.DataFrame(rows, columns=["一级科目", "二级科目"] + SUMMARY_HEADERS)
+def build_detail_wan_sheet(detail_df):
+    wan_df = detail_df.copy()
+    for col in AMOUNT_COLUMNS:
+        if col in wan_df.columns:
+            wan_df[col] = pd.to_numeric(wan_df[col], errors="coerce") / 10000.0
+    return wan_df
 
 
 def find_column_mapping(df):
@@ -517,15 +445,25 @@ def process_time_folder(folder_path):
         output_path = os.path.join(output_dir, output_name)
 
         detail_sheet_name = "明细数据"
-        summary_sheet_name = "科目分类汇总"
-        summary_wan_sheet_name = "科目分类汇总_万泰铢"
-        summary_df = build_subject_summary_sheet(project_df, detail_sheet_name)
-        summary_wan_df = build_subject_summary_wan_sheet(summary_df, summary_sheet_name)
+        detail_wan_sheet_name = "明细数据_万泰铢"
+        detail_wan_df = build_detail_wan_sheet(project_df)
+
+        if os.path.exists(output_path):
+            updated = SUBJECT_MAPPER.update_excel_subject_columns(
+                output_path,
+                sheet_names=[detail_wan_sheet_name, detail_sheet_name],
+                subject_col="科目",
+                summary_col="摘要",
+                level1_col="一级科目",
+                level2_col="二级科目",
+            )
+            print(f"  ♻️ 已存在文件，仅更新科目分类列：{os.path.basename(output_path)} | 更新行数: {updated}")
+            output_paths.append(output_path)
+            continue
 
         with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+            detail_wan_df.to_excel(writer, sheet_name=detail_wan_sheet_name, index=False)
             project_df.to_excel(writer, sheet_name=detail_sheet_name, index=False)
-            summary_df.to_excel(writer, sheet_name=summary_sheet_name, index=False)
-            summary_wan_df.to_excel(writer, sheet_name=summary_wan_sheet_name, index=False)
 
         apply_output_format(output_path)
         output_paths.append(output_path)
@@ -542,7 +480,7 @@ def apply_output_format(output_path):
         wb.save(output_path)
         return
 
-    amount_headers = set(AMOUNT_COLUMNS + SUMMARY_HEADERS)
+    amount_headers = set(AMOUNT_COLUMNS)
     for ws in wb.worksheets:
         APPLY_COMMON_EXCEL_LAYOUT(
             ws,

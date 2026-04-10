@@ -23,10 +23,12 @@ def apply_common_excel_layout(
     *,
     numeric_start_col: int = 3,
     amount_headers: Iterable[str] | None = None,
+    percent_headers: Iterable[str] | None = None,
     header_row: int = 1,
     header_height: float = 40,
     freeze_panes: str = "A2",
     thousand_number_format: str = "#,##0.00",
+    percent_number_format: str = "0.00%",
     min_col_width: float = 10,
     max_col_width: float = 60,
     extra_padding: float = 2,
@@ -62,6 +64,16 @@ def apply_common_excel_layout(
         for col_idx in amount_indices:
             for row_idx in range(header_row + 1, worksheet.max_row + 1):
                 worksheet.cell(row=row_idx, column=col_idx).number_format = thousand_number_format
+
+    # 若指定了百分比列头名称，则按表头精确应用百分比格式。
+    if percent_headers:
+        header_values = [cell.value for cell in worksheet[header_row]]
+        percent_indices = [
+            idx + 1 for idx, value in enumerate(header_values) if value in set(percent_headers)
+        ]
+        for col_idx in percent_indices:
+            for row_idx in range(header_row + 1, worksheet.max_row + 1):
+                worksheet.cell(row=row_idx, column=col_idx).number_format = percent_number_format
 
     for column_cells in worksheet.iter_cols(min_col=1, max_col=worksheet.max_column):
         col_letter = column_cells[0].column_letter
@@ -105,10 +117,9 @@ def set_columns_number_format(
     end_row: int | None = None,
 ) -> None:
     """按列索引批量设置数字格式。"""
-    if end_row is None:
-        end_row = worksheet.max_row
+    actual_end_row = worksheet.max_row if end_row is None else end_row
     for col_idx in col_indices:
-        for row_idx in range(start_row, end_row + 1):
+        for row_idx in range(start_row, actual_end_row + 1):
             worksheet.cell(row=row_idx, column=col_idx).number_format = number_format
 
 
@@ -161,15 +172,13 @@ def auto_adjust_column_widths(
     ignore_formula: bool = True,
 ) -> None:
     """按显示长度自动调整列宽。"""
-    if end_col is None:
-        end_col = worksheet.max_column
-    if end_row is None:
-        end_row = worksheet.max_row
+    actual_end_col = worksheet.max_column if end_col is None else end_col
+    actual_end_row = worksheet.max_row if end_row is None else end_row
 
-    for col_idx in range(start_col, end_col + 1):
+    for col_idx in range(start_col, actual_end_col + 1):
         col_letter = worksheet.cell(row=start_row, column=col_idx).column_letter
         max_len = 0
-        for row_idx in range(start_row, end_row + 1):
+        for row_idx in range(start_row, actual_end_row + 1):
             value = worksheet.cell(row=row_idx, column=col_idx).value
             if ignore_formula and isinstance(value, str) and value.startswith("="):
                 continue
