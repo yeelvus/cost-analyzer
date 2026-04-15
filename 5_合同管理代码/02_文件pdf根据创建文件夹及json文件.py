@@ -1,224 +1,239 @@
-import os
+im.ort os
 import shutil
 import json
 from collections import OrderedDict
 
 # ==================== 配置区 ====================
-# 默认合同根目录路径（可修改为你的实际路径）
-DEFAULT_CONTRACT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑"  # 相对路径
-# 或使用绝对路径：
-# DEFAULT_CONTRACT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理"
+DEFAULT_CONTRACT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑"
 # ==============================================
 
-def organize_contract_files_v3(root_path):
-    # 新结构匹配逻辑：
-    # 1. 路径任意层级包含“总包合同” -> 归类为总包
-    # 2. 路径任意层级包含“分包合同” -> 归类为分包
+def organize_contract_files_v4_2(root_path):
     valid_extensions = ('.pdf', '.doc', '.docx', '.xls', '.xlsx')
-    
-    pending_tasks = []
-
-    def is_project_level_dir(abs_dir_path, base_root):
-        """仅允许在项目层处理文件，避免生成三级结构。
-        标准层级：合同类型/项目状态/项目编码_项目名/<文件>
-        即相对 base_root 深度为 3。
-        """
-        rel = os.path.relpath(abs_dir_path, base_root)
-        if rel == ".":
-            return False
-        parts = rel.split(os.sep)
-        return len(parts) == 3
+    new_tasks = []        # 需要新建文件夹 + 移动文件
+    update_tasks = []     # 需要更新JSON（重点加强）
 
     def detect_contract_type_by_path(abs_dir_path, base_root):
-        """根据目录相对路径判断合同类型，兼容A_总包合同/B_分包合同等新结构。"""
-        rel = os.path.relpath(abs_dir_path, base_root)
-        if rel == ".":
-            parts = [os.path.basename(base_root)]
-        else:
-            parts = rel.split(os.sep)
+        """增强版合同类型检测"""
+        try:
+            rel = os.path.relpath(abs_dir_path, base_root)
+            parts = rel.split(os.sep) if rel != "." else [os.path.basename(base_root)]
+            for p in reversed(parts):
+                p_lower = p.lower()
+                if "总包合同" in p or ("总包" in p_lower and "合同" in p_lower):
+                    return "总包"
+                if "分包合同" in p or ("分包" in p_lower and "合同" in p_lower):
+                    return "分包"
+            return None
+        except:
+            return None
 
-        # 同时命中时优先更深层目录；一般不会冲突
-        for p in reversed(parts):
-            if "总包合同" in p:
-                return "总包"
-            if "分包合同" in p:
-                return "分包"
-        return None
+    def get_new_json_template(contract_type):
+        return OrderedDict([
+            ("项目名称", ""),
+            ("合同编号", ""),
+            ("合同类型", contract_type),
+            ("对方公司名称", ""),
+            ("合同签订日期", ""),
+            ("预计竣工日期", ""),
+            ("工期/交货期", ""),
+            ("币种", ""),
+            ("合同金额", 0.0),
+            ("汇率", ""),
+            ("付款方式", ""),
+            ("履约保证金", ""),
+            ("备注", "")
+        ])
 
-    # 1. 扫描目录并识别所属合同类型
+    print("🔍 正在扫描目录，请稍等...\n")
+
     for root, dirs, files in os.walk(root_path):
-        current_dir_name = os.path.basename(root)
         contract_type = detect_contract_type_by_path(root, root_path)
-        is_project_level = is_project_level_dir(root, root_path)
-        
-        # 仅处理项目层目录中的文件，防止在合同子文件夹内重复套娃
-        if contract_type and is_project_level:
-            for file_name in files:
-                # 过滤隐藏文件、JSON、临时文件
-                if file_name.startswith('.') or file_name.endswith('.json') or file_name.startswith('~$'):
-                    continue
-                
-                if file_name.lower().endswith(valid_extensions):
-                    file_full_path = os.path.join(root, file_name)
-                    # 准备创建的子文件夹名（即文件名）
-                    folder_name = os.path.splitext(file_name)[0]
-                    target_folder_path = os.path.join(root, folder_name)
-                    
-                    # 只有当同名文件夹不存在时，才视为待处理文件
-                    if not os.path.exists(target_folder_path):
-                        pending_tasks.append({
-                            "source_file": file_full_path,
-                            "file_name": file_name,
-                            "target_dir": target_folder_path,
-                            "type": contract_type,
-                            "parent_dir": current_dir_name
-                        })
+        if not contract_type:
+            continue
 
-    # 2. 检查是否有待处理任务
-    if not pending_tasks:
-        print("\n[状态] 未发现符合条件的待处理文件。")
-        print("当前匹配规则：")
-        print(" - 文件所在路径任意层级包含 '总包合同' 或 '分包合同'")
-        print(" - 且文件必须位于项目层（合同类型/项目状态/项目编码_项目名）")
+        current_dir_name = os.path.basename(root)
+        json_files = [f for f in files if f == "合同信息.json"]
+        contract_files = [f for f in files if f.lower().endswith(valid_extensions) 
+                         and not f.startswith('.') and not f.startswith('~$')]
+
+        # ==================== 核心修复 ====================
+        target_dirs_to_check = []
+
+        # 情况1：目录下有合同文件（需要归档到同名文件夹）
+        for file_name in contract_files:
+            folder_name = os.path.splitext(file_name)[0]
+            target_dir = os.path.join(root, folder_name)
+            target_dirs_to_check.append((target_dir, file_name, "new"))
+
+        # 情况2：目录下已经有“合同信息.json”的文件夹（重点！用于仅更新JSON）
+        for d in dirs:
+            potential_target = os.path.join(root, d)
+            if os.path.exists(os.path.join(potential_target, "合同信息.json")):
+                # 尝试找到对应的合同文件（可能已经在文件夹里了）
+                inner_files = os.listdir(potential_target)
+                contract_file_in_folder = next((f for f in inner_files if f.lower().endswith(valid_extensions)), None)
+                file_name = contract_file_in_folder if contract_file_in_folder else "(已归档文件)"
+                target_dirs_to_check.append((potential_target, file_name, "update"))
+
+        # 处理所有待检查的目标文件夹
+        for target_dir, file_name, action in target_dirs_to_check:
+            json_path = os.path.join(target_dir, "合同信息.json")
+
+            if action == "new" and not os.path.exists(target_dir):
+                new_tasks.append({
+                    "source_file": os.path.join(root, file_name),
+                    "file_name": file_name,
+                    "target_dir": target_dir,
+                    "type": contract_type,
+                    "parent_dir": current_dir_name,
+                    "action": "new"
+                })
+            else:
+                # 所有已有合同信息.json 的文件夹都加入更新任务
+                update_tasks.append({
+                    "target_dir": target_dir,
+                    "file_name": file_name,
+                    "type": contract_type,
+                    "parent_dir": current_dir_name,
+                    "action": "update_json"
+                })
+
+    # 去重 update_tasks
+    seen = set()
+    unique_update = []
+    for t in update_tasks:
+        key = t["target_dir"]
+        if key not in seen:
+            seen.add(key)
+            unique_update.append(t)
+
+    all_tasks = new_tasks + unique_update
+
+    if not all_tasks:
+        print("❌ 未发现任何可处理的项目。")
+        print("提示：请确认根目录下是否存在包含“总包合同”或“分包合同”的文件夹。")
         return
 
-    # 统计各类型数量
-    total_count = len([t for t in pending_tasks if t['type'] == '总包'])
-    subcontract_count = len([t for t in pending_tasks if t['type'] == '分包'])
-    
-    # 3. 让用户选择处理类型
-    print(f"\n{'='*20} 合同归档统计 {'='*20}")
-    print(f"📊 总包合同: {total_count} 个")
-    print(f"📊 分包合同: {subcontract_count} 个")
-    print(f"📊 合计: {len(pending_tasks)} 个")
+    print(f"\n{'='*25} 扫描结果 {'='*25}")
+    print(f"📊 需要新建文件夹并归档的文件: {len(new_tasks)} 个")
+    print(f"📊 需要更新合同信息.json 的文件夹: {len(unique_update)} 个")
     print("=" * 60)
-    
-    print("\n请选择要处理的合同类型：")
-    print("1. 仅处理总包合同")
-    print("2. 仅处理分包合同")
-    print("3. 处理全部合同")
-    print("0. 取消操作")
-    
+
+    print("\n请选择操作类型：")
+    print("1. 仅处理新建文件夹（移动文件 + 创建新JSON）")
+    print("2. 仅更新所有已存在的合同信息.json（推荐先执行）")
+    print("3. 处理全部（新建 + 更新）")
+    print("0. 取消")
     choice = input("\n请输入选项 (0-3): ").strip()
-    
-    # 根据选择过滤任务
+
     if choice == '0':
         print("已取消操作。")
         return
     elif choice == '1':
-        filtered_tasks = [t for t in pending_tasks if t['type'] == '总包']
-        task_desc = "总包合同"
+        filtered_tasks = new_tasks
+        task_desc = "新建归档"
     elif choice == '2':
-        filtered_tasks = [t for t in pending_tasks if t['type'] == '分包']
-        task_desc = "分包合同"
+        filtered_tasks = unique_update
+        task_desc = "更新现有JSON"
     elif choice == '3':
-        filtered_tasks = pending_tasks
-        task_desc = "全部合同"
+        filtered_tasks = all_tasks
+        task_desc = "全部任务"
     else:
-        print("无效选项，已取消操作。")
+        print("无效选项，已取消。")
         return
-    
+
     if not filtered_tasks:
-        print(f"\n[状态] 没有符合条件的{task_desc}需要处理。")
+        print(f"\n[状态] 没有符合条件的{task_desc}。")
         return
-    
-    # 4. 显示过滤后的清单
-    print(f"\n{'='*20} 待归档{task_desc}清单 {'='*20}")
+
+    # 显示清单
+    print(f"\n{'='*20} 即将执行的任务 ({task_desc}) {'='*20}")
     for i, task in enumerate(filtered_tasks, 1):
-        print(f"{i}. 【{task['type']}】所在目录: {task['parent_dir']}")
-        print(f"   待处理文件: {task['file_name']}")
-        print(f"   -> 将移动至: {os.path.basename(task['target_dir'])}/")
-        print("-" * 50)
-    
-    # 5. 最终确认执行
-    confirm = input(f"\n共计 {len(filtered_tasks)} 个任务，确认批量执行？(y/n): ").lower().strip()
+        act = "【新建并归档】" if task.get("action") == "new" else "【仅更新JSON】"
+        print(f"{i}. {act} 【{task['type']}】 目录: {task['parent_dir']}")
+        print(f"   文件/文件夹: {task.get('file_name', '合同信息.json')}")
+        print("-" * 60)
+
+    confirm = input(f"\n共计 {len(filtered_tasks)} 个任务，确认执行？(y/n): ").lower().strip()
     if confirm != 'y':
         print("已取消操作。")
         return
-    
-    # 使用过滤后的任务列表
-    pending_tasks = filtered_tasks
 
-    # 4. 执行逻辑
-    success_count = 0
-    fail_count = 0
-    
-    for task in pending_tasks:
+    # ====================== 执行 ======================
+    success = 0
+    fail = 0
+    for task in filtered_tasks:
         try:
-            # 创建文件夹
-            os.makedirs(task['target_dir'], exist_ok=True)
-            
-            # 移动文件
-            final_file_path = os.path.join(task['target_dir'], task['file_name'])
-            shutil.move(task['source_file'], final_file_path)
-            
-            # 生成 JSON
-            json_path = os.path.join(task['target_dir'], "合同信息.json")
-            template = OrderedDict([
-                ("项目名称", ""),
-                ("合同编号", ""),
-                ("合同类型", task['type']),
-                ("对方公司名称", ""),
-                ("合同签订日期", ""),
-                ("生效日期", ""),
-                ("结束日期", ""),
-                ("工期/交货期", ""),
-                ("币种", ""),
-                ("合同金额", 0.0),
-                ("含税金额", 0.0),
-                ("不含税金额", 0.0),
-                ("税率", ""),
-                ("付款方式", ""),
-                ("履约保证金", ""),
-                ("合同状态", ""),
-                ("关联主合同编号", ""),
-                ("联系人及电话", ""),
-                ("PDF文件路径", final_file_path),
-                ("收付款记录", []),
-                ("备注", "")
-            ])
-            
-            with open(json_path, 'w', encoding='utf-8') as f:
-                json.dump(template, f, ensure_ascii=False, indent=4)
-            
-            print(f" ✅ [OK] 成功归档: {task['file_name']}")
-            success_count += 1
-        except Exception as e:
-            print(f" ❌ [Err] 处理 {task['file_name']} 时失败: {e}")
-            fail_count += 1
+            target_dir = task['target_dir']
+            os.makedirs(target_dir, exist_ok=True)
+            json_path = os.path.join(target_dir, "合同信息.json")
 
-    print(f"\n{'='*60}")
-    print(f"✅ 任务全部处理完毕！")
-    print(f"   成功: {success_count} 个")
-    if fail_count > 0:
-        print(f"   失败: {fail_count} 个")
-    print(f"{'='*60}")
+            if task.get("action") == "new":
+                # 移动文件
+                source = task['source_file']
+                final_file = os.path.join(target_dir, task['file_name'])
+                if os.path.exists(source) and source != final_file:
+                    shutil.move(source, final_file)
+                # 创建新JSON
+                template = get_new_json_template(task['type'])
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(template, f, ensure_ascii=False, indent=4)
+            else:
+                # 更新JSON（核心）
+                if not os.path.exists(json_path):
+                    template = get_new_json_template(task['type'])
+                    with open(json_path, 'w', encoding='utf-8') as f:
+                        json.dump(template, f, ensure_ascii=False, indent=4)
+                else:
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f, object_pairs_hook=OrderedDict)
+
+                    # 删除不需要的字段
+                    to_remove = ["合同状态", "关联主合同编号", "联系人及电话",
+                                 "PDF文件路径", "收付款记录", "含税金额",
+                                 "不含税金额", "生效日期", "税率"]
+                    for field in to_remove:
+                        data.pop(field, None)
+
+                    # 字段改名
+                    if "结束日期" in data:
+                        data["预计竣工日期"] = data.pop("结束日期")
+                    if "税率" in data:
+                        data["汇率"] = data.pop("税率", "")
+
+                    # 确保字段存在
+                    if "预计竣工日期" not in data:
+                        data["预计竣工日期"] = ""
+                    if "汇率" not in data:
+                        data["汇率"] = ""
+
+                    with open(json_path, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, ensure_ascii=False, indent=4)
+
+            print(f" ✅ 成功: {task.get('file_name', '合同信息.json')}")
+            success += 1
+
+        except Exception as e:
+            print(f" ❌ 失败: {task.get('file_name', 'JSON')} → {e}")
+            fail += 1
+
+    print(f"\n{'='*70}")
+    print(f"🎉 处理完成！成功: {success} 个 | 失败: {fail} 个")
+    print(f"{'='*70}")
+
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("📋 合同归档工具 (新结构兼容版)")
-    print("=" * 60)
-    
-    # 使用默认路径
+    print("=" * 70)
+    print("📋 合同归档工具 v4.2 （JSON更新加强版）")
+    print("=" * 70)
+
     default_path = DEFAULT_CONTRACT_ROOT
-    print(f"\n📁 当前默认路径: {default_path}")
-    print(f"   绝对路径: {os.path.abspath(default_path)}")
-    
-    # 询问是否使用默认路径
-    use_default = input("\n是否使用默认路径？(y/n，直接回车使用默认): ").strip().lower()
-    
-    if use_default == 'n' or use_default == 'no' or use_default == '否':
-        path = input("请输入合同根目录路径: ").strip()
-        if not path:
-            print("⚠️ 未输入路径，使用默认路径。")
-            path = default_path
-    else:
-        path = default_path
-    
-    # 验证路径
+    print(f"当前默认路径: {default_path}")
+
+    use_default = input("\n是否使用默认路径？(y/n，直接回车=是): ").strip().lower()
+    path = default_path if use_default not in ['n', 'no', '否'] else (input("请输入路径: ").strip() or default_path)
+
     if os.path.exists(path):
-        print(f"\n✅ 开始扫描目录: {os.path.abspath(path)}\n")
-        organize_contract_files_v3(path)
+        organize_contract_files_v4_2(path)
     else:
-        print(f"\n❌ 路径无效: {path}")
-        print("💡 提示: 请检查路径是否正确，或修改代码中的 DEFAULT_CONTRACT_ROOT 配置。")
+        print(f"❌ 路径不存在: {path}")
