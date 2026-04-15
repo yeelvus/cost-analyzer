@@ -18,8 +18,8 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 # ==============================================================================
 
 # 固定输入输出根路径（批量模式：输入根目录下每个子文件夹视为一个月份）
-INPUT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务部💰/A_分包对账与付款统计表原始文件"
-OUTPUT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务部💰/B_输出汇总文件"
+INPUT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务部💰/A_分包对账与付款/A_分包对账与付款_原始数据"
+OUTPUT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务部💰/A_分包对账与付款/B_分包对账与付款_汇总数据"
 
 # 后置分析脚本：在分包台账汇总完成后自动执行
 POST_ANALYSIS_SCRIPT = os.path.join(
