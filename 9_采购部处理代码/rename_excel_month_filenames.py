@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 EXCEL_EXTENSIONS = {".xlsx", ".xls", ".xlsm"}
-DEFAULT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购部采购台账/A_原始数据"
+DEFAULT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/A_采购部采购台账_raw"
 
 
 def build_new_stem(stem: str) -> str:

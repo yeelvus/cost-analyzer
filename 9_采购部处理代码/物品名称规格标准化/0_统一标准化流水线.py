@@ -10,7 +10,7 @@ from openpyxl import load_workbook
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-SUMMARY_INPUT_ROOT = SCRIPT_DIR.parent.parent / "B_汇总数据"
+SUMMARY_INPUT_ROOT = SCRIPT_DIR.parent.parent / "9_采购台账📦/B_采购部采购台账_sum"
 ANALYSIS_OUTPUT_ROOT = SCRIPT_DIR.parent.parent / "C_数据分析"
 INPUT_GLOB = "*_材料采购_merged.xlsx"
 DEFAULT_OUTPUT_SUFFIX = "_标准化汇总"
