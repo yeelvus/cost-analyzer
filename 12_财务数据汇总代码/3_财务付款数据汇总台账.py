@@ -61,8 +61,8 @@ PROJECT_NAME_MATCHER = load_project_name_matcher_module()
 SUBJECT_MAPPER_CLASS = load_subject_mapper_class()
 
 
-INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务部💰/A_财务付款数据/A_财务付款_原始数据"
-OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务部💰/A_财务付款数据/B_财务付款_标准化数据"
+INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_财务付款数据/A_财务付款_原始数据"
+OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_财务付款数据/B_财务付款_标准化数据"
 PROJECT_MATCH_DB_PATH = os.path.join(PROJECT_INFO_DIR, "project_name_match_db.json")
 SUBJECT_RULES_PATH = os.path.join(CURRENT_DIR, "rules.json")
 

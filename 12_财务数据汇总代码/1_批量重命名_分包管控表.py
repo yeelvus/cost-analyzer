@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 
 
-ROOT_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务部💰/A_分包对账与付款/A_分包对账与付款_原始数据")
+ROOT_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_分包对账与付款/A_分包对账与付款_原始数据")
 TARGET_SUFFIX = "分包管控表.xlsx"
 NAME_PATTERN = re.compile(r"^(?P<prefix>.+?)分包管控表\.xlsx$")
 
