@@ -11,11 +11,11 @@ from openpyxl.utils import get_column_letter
 
 
 # ============= 路径配置 =============
-RAW_DATA_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购部采购台账/A_原始数据"
-OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购部采购台账/B_采购部标准化"
+RAW_DATA_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购部采购台账/A_采购部采购台账_raw"
+OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购部采购台账/B_采购部采购台账_std"
 PROJECT_INFO_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
-PROJECT_MATCH_DB_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/project_name_match_db.json"
-PROJECT_MATCHER_MODULE_PATH = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/project_name_matcher.py"
+PROJECT_MATCH_DB_FILE = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
+PROJECT_MATCHER_MODULE_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_matcher.py"
 
 
 # ============= 标准化流水线配置 =============
