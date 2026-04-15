@@ -9,7 +9,7 @@ from datetime import datetime
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 # 项目名称匹配统一从 0_项目基本信息情况 加载，确保与其他模块共用同一 matcher 与数据库。
-MATCHER_DIR = SCRIPT_DIR.parent / "/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息"
+MATCHER_DIR = SCRIPT_DIR.parent / "/Users/wyattsun/Desktop/code/0_项目基本信息"
 LEGACY_MATCHER_DIR = SCRIPT_DIR.parent / "19_代码"
 for p in [MATCHER_DIR, LEGACY_MATCHER_DIR]:
     if p.exists() and str(p) not in sys.path:
@@ -26,10 +26,10 @@ from excel_formatting_utils import apply_common_excel_layout
 
 # ================= 项目名称标准化配置 =================
 MAPPING_EXCEL_PATH = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
-MATCH_DB_PATH = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/project_name_match_db.json"
-INPUT_SOURCE = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_1_子公司人力资源台账"
+MATCH_DB_PATH = r"/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
+INPUT_SOURCE = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_1_人工费台账/A_人工费台账_raw"
 INPUT_GLOB = "泰国子公司项目人工费统计台账*.xlsx"
-OUTPUT_ROOT = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/B_输出标准化人工费台账"
+OUTPUT_ROOT = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std"
 HTML_OUTPUT_ROOT = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/C_数据分析"
 HTML_TEMPLATE_PATH = SCRIPT_DIR / "人工费汇总_template.html"
 # ====================================================

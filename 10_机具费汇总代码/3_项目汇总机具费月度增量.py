@@ -8,15 +8,15 @@ from pathlib import Path
 import pandas as pd
 
 
-INPUT_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具使用费/B_汇总文件")
-OUTPUT_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具使用费/C_机具租赁分析报告")
+INPUT_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_sum")
+OUTPUT_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/C_机具租赁分析报告")
 TARGET_SHEET = "项目汇总机具费"
 OUTPUT_PREFIX = "机具费_项目月度总额与增加量"
 
 FILE_MONTH_RE = re.compile(r"(20\d{2})\s*年\s*(1[0-2]|0?[1-9])\s*月")
 
 FORMATTER_DIR = Path(__file__).resolve().parents[1] / "0_项目基本信息情况"
-EXCEL_FORMATTING_UTILS_PATH = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/excel_formatting_utils.py")
+EXCEL_FORMATTING_UTILS_PATH = Path("/Users/wyattsun/Desktop/code/0_项目基本信息/excel_formatting_utils.py")
 
 
 def _load_module_from_path(module_name: str, module_path: Path):

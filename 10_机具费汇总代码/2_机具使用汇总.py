@@ -10,12 +10,17 @@ import sys
 from datetime import datetime
 import json
 
-MATCHER_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    '0_项目基本信息情况'
-)
-if MATCHER_DIR not in sys.path:
-    sys.path.insert(0, MATCHER_DIR)
+BASE_CODE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MATCHER_DIR_CANDIDATES = [
+    os.path.join(BASE_CODE_DIR, '0_项目基本信息'),
+    os.path.join(BASE_CODE_DIR, '0_项目基本信息情况'),
+]
+
+for matcher_dir in MATCHER_DIR_CANDIDATES:
+    if os.path.exists(os.path.join(matcher_dir, 'project_name_matcher.py')):
+        if matcher_dir not in sys.path:
+            sys.path.insert(0, matcher_dir)
+        break
 
 from project_name_matcher import (
     build_standard_projects_from_dataframe,
@@ -28,26 +33,30 @@ from project_name_matcher import (
 
 # ==================== 配置区 ====================
 # 标准化文件目录（自动选择最新文件）
-STANDARDIZED_INPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具使用费/B_标准化文件"
+STANDARDIZED_INPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_std"
 
 # 如需临时强制指定某个文件，可填写绝对路径；默认留空自动选择最新
 EXCEL_FILE_OVERRIDE = ""
 
-# 映射表文件名
-PROJECT_MAPPING_TXT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具使用费/区域映射表.txt"        # ←←← 项目区域映射文件
-MACHINE_MAPPING_TXT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具使用费/机具映射表.txt"        # ←←← 机具种类和型号映射文件
+# 映射表文件名（JSON）
+PROJECT_MAPPING_JSON = "/Users/wyattsun/Desktop/code/10_机具费汇总代码/区域映射表.json"      # ←←← 项目区域映射文件(JSON)
+MACHINE_MAPPING_JSON = "/Users/wyattsun/Desktop/code/10_机具费汇总代码/机具映射表.json"      # ←←← 机具种类和型号映射文件(JSON)
+
+# 兼容旧版TXT映射表（仅用于首次自动迁移）
+PROJECT_MAPPING_TXT_LEGACY = "/Users/wyattsun/Desktop/code/10_机具费汇总代码/区域映射表.txt"
+MACHINE_MAPPING_TXT_LEGACY = "/Users/wyattsun/Desktop/code/10_机具费汇总代码/机具映射表.txt"
 
 # 项目编码名称汇总文件（统一标准项目映射）
-PROJECT_CODE_NAME_MAPPING_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目编码名称汇总.xlsx"  # ←←← 统一的项目编码映射表
+PROJECT_CODE_NAME_MAPPING_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"  # ←←← 统一的项目编码映射表
 
 # 汇总文件输出文件夹路径
-OUTPUT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具使用费/B_汇总文件"                  # ←←← 汇总文件保存位置
+OUTPUT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_sum"                  # ←←← 汇总文件保存位置
 
 # 汇总输出文件名前缀（精简）
 OUTPUT_FILENAME_PREFIX = "机具费汇总"
 OUTPUT_FILE_SUFFIX = "汇总"
 
-PROJECT_MATCH_DB_PATH = os.path.join(MATCHER_DIR, 'project_name_match_db.json')
+PROJECT_MATCH_DB_PATH = os.path.join("/Users/wyattsun/Desktop/code/0_项目基本信息", 'project_name_match_db.json')
 
 # 汇总后新 sheet 的名字
 SUMMARY_SHEET_NAME = "汇总"
@@ -217,27 +226,13 @@ def extract_project_name_from_sheet(sheet_name):
     
     return sheet_name  # 否则使用整个sheet名
 
-def load_project_mapping(txt_path):
-    """加载项目→区域的映射"""
-    if not os.path.exists(txt_path):
-        # 创建初始模板
-        with open(txt_path, "w", encoding="utf-8") as f:
-            f.write("# 项目→区域 映射表\n")
-            f.write("# 格式：标准区域名称: 原始项目名称1, 原始项目名称2, ...\n")
-            f.write("# 示例：\n")
-            f.write("#   曼谷区域: 曼谷项目, 曼谷工地, Bangkok Project\n")
-            f.write("#   清迈区域: 清迈项目, 清迈垃圾发电, Chiang Mai\n")
-            f.write("# 请手动编辑此文件来调整映射关系\n\n")
-        print(f"已创建区域映射表模板：{txt_path}")
-        return {}
-    
+def parse_project_mapping_txt(txt_path):
+    """解析旧版TXT：标准区域: 别名1, 别名2... -> {别名: 标准区域}。"""
     project_to_region = {}
     with open(txt_path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if ":" not in line:
+            if not line or line.startswith("#") or ":" not in line:
                 continue
             standard, raw_list = line.split(":", 1)
             standard = standard.strip()
@@ -246,6 +241,68 @@ def load_project_mapping(txt_path):
                 if raw:
                     project_to_region[raw] = standard
     return project_to_region
+
+
+def load_project_mapping(json_path, legacy_txt_path=None):
+    """加载项目→区域映射。优先JSON，不存在时自动从旧TXT迁移。
+
+    JSON支持两种结构：
+    1) 推荐分组：{"region_to_projects": {"春武里府": ["欣旺达", "樱花"]}}
+    2) 兼容扁平：{"project_to_region": {"欣旺达": "春武里府"}}
+    返回统一为 {项目别名: 区域}。
+    """
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            mapping = {}
+            if isinstance(data, dict) and "region_to_projects" in data:
+                region_to_projects = data.get("region_to_projects", {})
+                if isinstance(region_to_projects, dict):
+                    for region, projects in region_to_projects.items():
+                        region = str(region).strip()
+                        if not region:
+                            continue
+                        if isinstance(projects, list):
+                            for project in projects:
+                                project = str(project).strip()
+                                if project:
+                                    mapping[project] = region
+                        elif isinstance(projects, str):
+                            for project in re.split(r'[，,]', projects):
+                                project = project.strip()
+                                if project:
+                                    mapping[project] = region
+            elif isinstance(data, dict) and "project_to_region" in data:
+                flat_mapping = data.get("project_to_region", {})
+                if isinstance(flat_mapping, dict):
+                    mapping = {
+                        str(project).strip(): str(region).strip()
+                        for project, region in flat_mapping.items()
+                        if str(project).strip()
+                    }
+            elif isinstance(data, dict):
+                # 兼容直接以 {raw: std} 存储的JSON
+                mapping = {
+                    str(project).strip(): str(region).strip()
+                    for project, region in data.items()
+                    if str(project).strip()
+                }
+
+            return mapping
+        except Exception as e:
+            print(f"警告：读取项目映射JSON失败 {json_path}: {e}")
+
+    if legacy_txt_path and os.path.exists(legacy_txt_path):
+        mapping = parse_project_mapping_txt(legacy_txt_path)
+        save_project_mapping(json_path, mapping)
+        print(f"已将旧TXT项目映射迁移到JSON：{json_path}")
+        return mapping
+
+    save_project_mapping(json_path, {})
+    print(f"已创建项目区域映射JSON模板：{json_path}")
+    return {}
 
 def apply_smart_mapping_rules(raw_name):
     """智能映射规则：根据关键词自动识别机具种类"""
@@ -341,134 +398,213 @@ def normalize_special_vehicle_kind(raw_name):
 
     return value
 
-def load_machine_mapping(txt_path):
-    """加载机具种类和型号规格的映射（层级结构）"""
-    machine_kind_map = {}      # 原始机具种类 → 标准机具种类
-    model_map = {}             # (标准机具种类, 原始型号) → 标准型号
-    
-    if not os.path.exists(txt_path):
-        # 创建初始模板
-        with open(txt_path, "w", encoding="utf-8") as f:
-            f.write("# 机具种类和型号规格映射表\n")
-            f.write("# 格式说明：\n")
-            f.write("# 1. 机具种类映射：标准机具种类: 原始名称1, 原始名称2, ...\n")
-            f.write("# 2. 型号规格映射：在[机具种类]标题下，标准型号: 原始型号1, 原始型号2, ...\n")
-            f.write("# \n")
-            f.write("# 示例：\n")
-            f.write("# 挖掘机: 挖掘机, 挖机, 挖土机, Excavator\n")
-            f.write("# [挖掘机]\n")
-            f.write("# PC200: PC200, PC-200, PC200-8\n")
-            f.write("# PC300: PC300, PC-300, PC300-7\n")
-            f.write("# \n")
-            f.write("# 装载机: 装载机, 铲车, Loader\n")
-            f.write("# [装载机]\n")
-            f.write("# ZL50: ZL50, ZL-50, ZL50C\n")
-            f.write("# \n")
-            f.write("# ==================== 机具种类映射 ====================\n\n")
-        print(f"已创建机具映射表模板：{txt_path}")
-        return machine_kind_map, model_map
-    
-    current_kind = None  # 当前处理的标准机具种类
-    
+def parse_machine_mapping_txt(txt_path):
+    """解析旧版TXT机具映射。"""
+    machine_kind_map = {}
+    model_map = {}
+    current_kind = None
+
     with open(txt_path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            
-            # 识别机具种类段落标题 [挖掘机]
+
             if line.startswith("[") and line.endswith("]"):
                 current_kind = line[1:-1].strip()
                 continue
-            
+
             if ":" not in line:
                 continue
-            
+
             standard, raw_list = line.split(":", 1)
             standard = standard.strip()
             raws = [r.strip() for r in raw_list.split(",") if r.strip()]
-            
+
             if current_kind is None:
-                # 这是机具种类映射
                 for raw in raws:
                     machine_kind_map[raw] = standard
             else:
-                # 这是型号规格映射（在某个机具种类下）
                 for raw in raws:
                     model_map[(current_kind, raw)] = standard
-    
+
     return machine_kind_map, model_map
 
-def save_project_mapping(txt_path, project_mapping):
-    """保存项目区域映射表"""
-    try:
-        with open(txt_path, "w", encoding="utf-8") as f:
-            f.write("# 项目→区域 映射表\n")
-            f.write("# 格式：标准区域名称: 原始项目名称1, 原始项目名称2, ...\n")
-            f.write("# 请手动编辑此文件来调整映射关系\n\n")
-            
-            # 按标准区域分组
-            region_to_projects = {}
-            for raw, std in project_mapping.items():
-                if std not in region_to_projects:
-                    region_to_projects[std] = set()
-                region_to_projects[std].add(raw)
-            
-            for std in sorted(region_to_projects.keys()):
-                projects = sorted(region_to_projects[std])
-                f.write(f"{std}: {', '.join(projects)}\n")
-        
-        print(f"已保存区域映射表到：{txt_path}")
-    except Exception as e:
-        print(f"保存区域映射表失败：{e}")
 
-def save_machine_mapping(txt_path, kind_mapping, model_mapping):
-    """保存机具种类和型号规格映射表（层级结构）"""
+def load_machine_mapping(json_path, legacy_txt_path=None):
+    """加载机具种类和型号规格映射。优先JSON，不存在时自动从旧TXT迁移。
+
+    JSON支持两种结构：
+    1) 推荐分组：
+       - kind_to_aliases: {标准机具种类: [原始机具别名...]}
+       - model_to_aliases: {标准机具种类: {标准型号: [原始型号别名...]}}
+    2) 兼容旧版：
+       - machine_kind_map: {原始机具别名: 标准机具种类}
+       - model_map: {标准机具种类: {原始型号别名: 标准型号}}
+    返回统一为：
+       machine_kind_map = {原始机具别名: 标准机具种类}
+       model_map = {(标准机具种类, 原始型号别名): 标准型号}
+    """
+    machine_kind_map = {}
+    model_map = {}
+
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            # 机具种类：优先读取推荐分组结构
+            grouped_kind_map = data.get("kind_to_aliases", {}) if isinstance(data, dict) else {}
+            legacy_kind_map = data.get("machine_kind_map", {}) if isinstance(data, dict) else {}
+
+            if isinstance(grouped_kind_map, dict) and grouped_kind_map:
+                for std_kind, aliases in grouped_kind_map.items():
+                    std_kind = str(std_kind).strip()
+                    if not std_kind:
+                        continue
+                    if isinstance(aliases, list):
+                        for alias in aliases:
+                            alias = str(alias).strip()
+                            if alias:
+                                machine_kind_map[alias] = std_kind
+                    elif isinstance(aliases, str):
+                        for alias in re.split(r'[，,]', aliases):
+                            alias = alias.strip()
+                            if alias:
+                                machine_kind_map[alias] = std_kind
+            elif isinstance(legacy_kind_map, dict):
+                machine_kind_map = {
+                    str(raw).strip(): str(std).strip()
+                    for raw, std in legacy_kind_map.items()
+                    if str(raw).strip()
+                }
+
+            # 型号映射：优先读取推荐分组结构
+            grouped_model_map = data.get("model_to_aliases", {}) if isinstance(data, dict) else {}
+            legacy_model_map = data.get("model_map", {}) if isinstance(data, dict) else {}
+
+            if isinstance(grouped_model_map, dict) and grouped_model_map:
+                for kind, std_model_dict in grouped_model_map.items():
+                    kind = str(kind).strip()
+                    if not kind or not isinstance(std_model_dict, dict):
+                        continue
+                    for std_model, aliases in std_model_dict.items():
+                        std_model = str(std_model).strip()
+                        if not std_model:
+                            continue
+                        if isinstance(aliases, list):
+                            for alias in aliases:
+                                alias = str(alias).strip()
+                                if alias:
+                                    model_map[(kind, alias)] = std_model
+                        elif isinstance(aliases, str):
+                            for alias in re.split(r'[，,]', aliases):
+                                alias = alias.strip()
+                                if alias:
+                                    model_map[(kind, alias)] = std_model
+            elif isinstance(legacy_model_map, dict):
+                for kind, model_dict in legacy_model_map.items():
+                    kind = str(kind).strip()
+                    if not kind or not isinstance(model_dict, dict):
+                        continue
+                    for raw_model, std_model in model_dict.items():
+                        raw_model = str(raw_model).strip()
+                        std_model = str(std_model).strip()
+                        if raw_model:
+                            model_map[(kind, raw_model)] = std_model
+
+            return machine_kind_map, model_map
+        except Exception as e:
+            print(f"警告：读取机具映射JSON失败 {json_path}: {e}")
+
+    if legacy_txt_path and os.path.exists(legacy_txt_path):
+        machine_kind_map, model_map = parse_machine_mapping_txt(legacy_txt_path)
+        save_machine_mapping(json_path, machine_kind_map, model_map)
+        print(f"已将旧TXT机具映射迁移到JSON：{json_path}")
+        return machine_kind_map, model_map
+
+    save_machine_mapping(json_path, machine_kind_map, model_map)
+    print(f"已创建机具映射JSON模板：{json_path}")
+    return machine_kind_map, model_map
+
+def save_project_mapping(json_path, project_mapping):
+    """保存项目区域映射JSON（按区域分组）。"""
     try:
-        with open(txt_path, "w", encoding="utf-8") as f:
-            f.write("# 机具种类和型号规格映射表\n")
-            f.write("# 格式说明：\n")
-            f.write("# 1. 机具种类映射：标准机具种类: 原始名称1, 原始名称2, ...\n")
-            f.write("# 2. 型号规格映射：在[机具种类]标题下，标准型号: 原始型号1, 原始型号2, ...\n")
-            f.write("# 示例：\n")
-            f.write("#   挖掘机: 1#挖机, 小挖机, 挖机（夜班）\n")
-            f.write("#   [挖掘机]\n")
-            f.write("#   PC200: PC200, PC-200, PC200-8\n")
-            f.write("# 请手动编辑此文件来调整映射关系\n\n")
-            
-            # 1. 先写机具种类映射（逆向聚合：标准名: 原始名列表）
-            f.write("# ==================== 机具种类映射 ====================\n")
-            kind_to_raws = {}
-            for raw, std in kind_mapping.items():
-                if std not in kind_to_raws:
-                    kind_to_raws[std] = set()
-                kind_to_raws[std].add(raw)
-            
-            for std in sorted(kind_to_raws.keys()):
-                raws = sorted(kind_to_raws[std])
-                f.write(f"{std}: {', '.join(raws)}\n")
-            
-            # 2. 再写型号规格映射（按机具种类分组，同样逆向聚合）
-            f.write("\n# ==================== 型号规格映射 ====================\n")
-            
-            # 按标准机具种类分组型号规格
-            kind_to_models = {}
-            for (kind, raw_model), std_model in model_mapping.items():
-                if kind not in kind_to_models:
-                    kind_to_models[kind] = {}
-                if std_model not in kind_to_models[kind]:
-                    kind_to_models[kind][std_model] = set()
-                kind_to_models[kind][std_model].add(raw_model)
-            
-            for kind in sorted(kind_to_models.keys()):
-                f.write(f"\n[{kind}]\n")
-                for std_model in sorted(kind_to_models[kind].keys()):
-                    raw_models = sorted(kind_to_models[kind][std_model])
-                    f.write(f"{std_model}: {', '.join(raw_models)}\n")
-        
-        print(f"已保存机具映射表到：{txt_path}")
+        normalized = {
+            str(raw).strip(): str(std).strip()
+            for raw, std in project_mapping.items()
+            if str(raw).strip()
+        }
+
+        region_to_projects = {}
+        for project, region in normalized.items():
+            if not region:
+                continue
+            region_to_projects.setdefault(region, []).append(project)
+
+        region_to_projects = {
+            region: sorted(projects)
+            for region, projects in sorted(region_to_projects.items(), key=lambda kv: kv[0])
+        }
+
+        payload = {
+            "_comment": "项目→区域映射，推荐结构: {区域: [项目别名1, 项目别名2, ...]}",
+            "region_to_projects": region_to_projects,
+        }
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        print(f"已保存区域映射JSON到：{json_path}")
     except Exception as e:
-        print(f"保存机具映射表失败：{e}")
+        print(f"保存区域映射JSON失败：{e}")
+
+def save_machine_mapping(json_path, kind_mapping, model_mapping):
+    """保存机具种类和型号规格映射JSON（按标准项分组）。"""
+    try:
+        normalized_kind_map = {
+            str(raw).strip(): str(std).strip()
+            for raw, std in kind_mapping.items()
+            if str(raw).strip()
+        }
+
+        kind_to_aliases = {}
+        for raw_alias, std_kind in normalized_kind_map.items():
+            if not std_kind:
+                continue
+            kind_to_aliases.setdefault(std_kind, []).append(raw_alias)
+
+        kind_to_aliases = {
+            std_kind: sorted(aliases)
+            for std_kind, aliases in sorted(kind_to_aliases.items(), key=lambda kv: kv[0])
+        }
+
+        model_to_aliases = {}
+        for (kind, raw_model), std_model in model_mapping.items():
+            kind = str(kind).strip()
+            raw_model = str(raw_model).strip()
+            std_model = str(std_model).strip()
+            if not kind or not raw_model:
+                continue
+            model_to_aliases.setdefault(kind, {}).setdefault(std_model, []).append(raw_model)
+
+        model_to_aliases = {
+            kind: {
+                std_model: sorted(alias_list)
+                for std_model, alias_list in sorted(std_model_dict.items(), key=lambda kv: kv[0])
+            }
+            for kind, std_model_dict in sorted(model_to_aliases.items(), key=lambda kv: kv[0])
+        }
+
+        payload = {
+            "_comment": "机具映射，推荐结构：kind_to_aliases为{标准机具种类:[原始机具别名...]}; model_to_aliases为{标准机具种类:{标准型号:[原始型号别名...]}}",
+            "kind_to_aliases": kind_to_aliases,
+            "model_to_aliases": model_to_aliases,
+        }
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+
+        print(f"已保存机具映射JSON到：{json_path}")
+    except Exception as e:
+        print(f"保存机具映射JSON失败：{e}")
 
 
 def guess_region_from_sheet_name(sheet_name, mapping):
@@ -748,8 +884,8 @@ def main(excel_path_override=None):
         return
 
     # 1. 加载映射表和项目配置
-    project_mapping = load_project_mapping(PROJECT_MAPPING_TXT)          # 项目→区域
-    kind_mapping, model_mapping = load_machine_mapping(MACHINE_MAPPING_TXT)  # 机具种类、型号
+    project_mapping = load_project_mapping(PROJECT_MAPPING_JSON, PROJECT_MAPPING_TXT_LEGACY)          # 项目→区域
+    kind_mapping, model_mapping = load_machine_mapping(MACHINE_MAPPING_JSON, MACHINE_MAPPING_TXT_LEGACY)  # 机具种类、型号
     
     # 加载项目配置：优先使用统一的项目编码映射表
     project_config = load_unified_project_mapping()
@@ -1229,12 +1365,12 @@ def main(excel_path_override=None):
         
         # 保存更新后的映射表到两个独立文件
         if new_projects:
-            save_project_mapping(PROJECT_MAPPING_TXT, project_mapping)
+            save_project_mapping(PROJECT_MAPPING_JSON, project_mapping)
         if new_kinds or new_models:
             # 将新型号添加到model_mapping
             for std_kind, raw_model in new_models:
                 model_mapping[(std_kind, raw_model)] = raw_model
-            save_machine_mapping(MACHINE_MAPPING_TXT, kind_mapping, model_mapping)
+            save_machine_mapping(MACHINE_MAPPING_JSON, kind_mapping, model_mapping)
         print(f"已自动补充新数据到映射表，请人工检查/修改！\n")
     
     # 4. 合并所有 sheet

@@ -14,10 +14,10 @@ from openpyxl.utils.datetime import from_excel
 
 
 DEFAULT_INPUT_DIR = Path(
-    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具使用费/A_原始数据"
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/A_机具费_raw"
 )
 DEFAULT_OUTPUT_DIR = Path(
-    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具使用费/B_标准化文件"
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_std"
 )
 DEFAULT_OUTPUT_SUFFIX = "_标准化"
 DEFAULT_YEAR_WITHOUT_EXPLICIT = 2025
