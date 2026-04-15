@@ -247,6 +247,42 @@ def resolve_project_by_code(raw_project_name, code_to_meta):
     # 未匹配时保留原名，并保留提取到的编码
     return raw, project_code
 
+
+def infer_project_context(contract_folder_path, sub_abs_path, code_to_meta):
+    """从合同子路径推断项目状态、项目名、项目编码与项目目录（兼容新旧层级）。"""
+    rel_path = os.path.relpath(sub_abs_path, contract_folder_path)
+    parts = [] if rel_path == "." else rel_path.split(os.sep)
+
+    # 新结构下通常第1层是项目状态（如 A_在建项目 / D_1_已完工...）
+    # 旧结构或异常结构下回退到合同类型目录名
+    project_status = parts[0] if parts else os.path.basename(contract_folder_path)
+
+    raw_project_name = ""
+    project_dir = ""
+
+    # 优先识别“项目目录”层：编码在映射库中，或形如 THCC-2025-001 的编码模式
+    for idx, part in enumerate(parts):
+        code = extract_project_code_from_folder_name(part)
+        if code and (code in code_to_meta or re.match(r"^[A-Za-z]{2,}-\d{4}-\d+$", code)):
+            raw_project_name = part
+            project_dir = os.path.join(contract_folder_path, *parts[:idx + 1])
+            break
+
+    # 回退：常见为 [状态, 项目, 合同子文件夹...]
+    if not raw_project_name:
+        if len(parts) >= 2:
+            raw_project_name = parts[1]
+            project_dir = os.path.join(contract_folder_path, parts[0], parts[1])
+        elif len(parts) == 1:
+            raw_project_name = parts[0]
+            project_dir = os.path.join(contract_folder_path, parts[0])
+        else:
+            raw_project_name = os.path.basename(os.path.dirname(contract_folder_path))
+            project_dir = os.path.dirname(contract_folder_path)
+
+    project_name, project_code = resolve_project_by_code(raw_project_name, code_to_meta)
+    return project_status, project_name, project_code, project_dir
+
 # =========================
 # 列顺序读取（直接使用固定文件）
 # =========================
@@ -296,34 +332,6 @@ for current_root, dirs, files in os.walk(root_dir):
     contract_folder_path = current_root
     print(f"[{project_counts[hit_kw]}] 发现 {hit_kw} 文件夹：{contract_folder_path}")
 
-    parent_dir = os.path.dirname(contract_folder_path)
-    raw_project_name = os.path.basename(parent_dir)
-    project_name, project_code = resolve_project_by_code(raw_project_name, project_code_map)
-    settlement_key = project_code if project_code else project_name
-    
-    grandparent_dir = os.path.dirname(parent_dir)
-    project_status = os.path.basename(grandparent_dir) if grandparent_dir != root_dir else "根目录"
-
-    # 检测结算资料
-    # 注意：由于可能多个文件夹映射到同一个 project_name，这里需要合并状态（有资料优先）
-    if settlement_key not in settlement_results:
-        settlement_results[settlement_key] = {check["name"]: "" for check in SETTLEMENT_CHECKS}
-
-    for check in SETTLEMENT_CHECKS:
-        # 如果该项目已经标记为有资料，则跳过（避免被后续无资料的文件夹覆盖）
-        if settlement_results[settlement_key].get(check["name"]) == "有资料":
-            continue
-            
-        for item in os.listdir(parent_dir):
-            item_path = os.path.join(parent_dir, item)
-            if not os.path.isdir(item_path):
-                continue
-            if re.match(check["pattern"], item):
-                has_content = is_folder_non_empty(item_path)
-                if has_content:
-                    settlement_results[settlement_key][check["name"]] = "有资料"
-                break
-
     # 读取 txt（同前）
     subfolder_data = {}
     for sub_root, _, sub_files in os.walk(contract_folder_path):
@@ -340,6 +348,33 @@ for current_root, dirs, files in os.walk(root_dir):
             continue
         sub_abs_path = os.path.join(contract_folder_path, sub) if sub != folder_name else contract_folder_path
         sub_abs_path = os.path.normpath(sub_abs_path)
+
+        project_status, project_name, project_code, project_dir = infer_project_context(
+            contract_folder_path,
+            sub_abs_path,
+            project_code_map,
+        )
+        settlement_key = project_code if project_code else project_name
+
+        # 检测结算资料：按“项目目录”识别，兼容新旧结构
+        if settlement_key and settlement_key not in settlement_results:
+            settlement_results[settlement_key] = {check["name"]: "" for check in SETTLEMENT_CHECKS}
+
+        if settlement_key:
+            for check in SETTLEMENT_CHECKS:
+                # 已有“有资料”则不再重复扫描
+                if settlement_results[settlement_key].get(check["name"]) == "有资料":
+                    continue
+                if not os.path.isdir(project_dir):
+                    continue
+                for item in os.listdir(project_dir):
+                    item_path = os.path.join(project_dir, item)
+                    if not os.path.isdir(item_path):
+                        continue
+                    if re.match(check["pattern"], item):
+                        if is_folder_non_empty(item_path):
+                            settlement_results[settlement_key][check["name"]] = "有资料"
+                        break
         
         # 检测附件文件
         attachments = detect_attachment_files(sub_abs_path)
@@ -448,7 +483,7 @@ with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
                     sum_row["合同签订日期"] = min_date
                 for check_name in settlement_cols:
                     if check_name in sum_row:
-                        sum_row[check_name] = settlement_results.get(settlement_key, {}).get(check_name, "")
+                        sum_row[check_name] = settlement_results.get(str(settlement_key).strip(), {}).get(check_name, "")
                 for c in dynamic_cols:
                     if c not in sum_row:
                         continue

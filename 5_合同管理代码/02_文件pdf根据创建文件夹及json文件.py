@@ -11,25 +11,48 @@ DEFAULT_CONTRACT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_�
 # ==============================================
 
 def organize_contract_files_v3(root_path):
-    # 严格匹配逻:：
-    # 1. 文件夹以 'E_' 开头且包含 '总包合同' -> 总包
-    # 2. 文件夹以 'F_' 开头且包含 '分包合同' -> 分包
+    # 新结构匹配逻辑：
+    # 1. 路径任意层级包含“总包合同” -> 归类为总包
+    # 2. 路径任意层级包含“分包合同” -> 归类为分包
     valid_extensions = ('.pdf', '.doc', '.docx', '.xls', '.xlsx')
     
     pending_tasks = []
 
-    # 1. 扫描符合特定命名规则的文件夹
+    def is_project_level_dir(abs_dir_path, base_root):
+        """仅允许在项目层处理文件，避免生成三级结构。
+        标准层级：合同类型/项目状态/项目编码_项目名/<文件>
+        即相对 base_root 深度为 3。
+        """
+        rel = os.path.relpath(abs_dir_path, base_root)
+        if rel == ".":
+            return False
+        parts = rel.split(os.sep)
+        return len(parts) == 3
+
+    def detect_contract_type_by_path(abs_dir_path, base_root):
+        """根据目录相对路径判断合同类型，兼容A_总包合同/B_分包合同等新结构。"""
+        rel = os.path.relpath(abs_dir_path, base_root)
+        if rel == ".":
+            parts = [os.path.basename(base_root)]
+        else:
+            parts = rel.split(os.sep)
+
+        # 同时命中时优先更深层目录；一般不会冲突
+        for p in reversed(parts):
+            if "总包合同" in p:
+                return "总包"
+            if "分包合同" in p:
+                return "分包"
+        return None
+
+    # 1. 扫描目录并识别所属合同类型
     for root, dirs, files in os.walk(root_path):
         current_dir_name = os.path.basename(root)
+        contract_type = detect_contract_type_by_path(root, root_path)
+        is_project_level = is_project_level_dir(root, root_path)
         
-        contract_type = None
-        if current_dir_name.startswith('E_') and "总包合同" in current_dir_name:
-            contract_type = "总包"
-        elif current_dir_name.startswith('F_') and "分包合同" in current_dir_name:
-            contract_type = "分包"
-        
-        # 如果命中规则
-        if contract_type:
+        # 仅处理项目层目录中的文件，防止在合同子文件夹内重复套娃
+        if contract_type and is_project_level:
             for file_name in files:
                 # 过滤隐藏文件、JSON、临时文件
                 if file_name.startswith('.') or file_name.endswith('.json') or file_name.startswith('~$'):
@@ -55,8 +78,8 @@ def organize_contract_files_v3(root_path):
     if not pending_tasks:
         print("\n[状态] 未发现符合条件的待处理文件。")
         print("当前匹配规则：")
-        print(" - 文件夹需以 'E_' 开头并包含 '总包合同'")
-        print(" - 或文件夹需以 'F_' 开头并包含 '分包合同'")
+        print(" - 文件所在路径任意层级包含 '总包合同' 或 '分包合同'")
+        print(" - 且文件必须位于项目层（合同类型/项目状态/项目编码_项目名）")
         return
 
     # 统计各类型数量
@@ -173,7 +196,7 @@ def organize_contract_files_v3(root_path):
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("📋 合同归档工具 (精准匹配版)")
+    print("📋 合同归档工具 (新结构兼容版)")
     print("=" * 60)
     
     # 使用默认路径
