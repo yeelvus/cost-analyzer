@@ -30,14 +30,14 @@ CODE_ROOT_DIR = SCRIPT_DIR.parent
 DEFAULT_MATCHER_DIR = CODE_ROOT_DIR / "0_项目基本信息"
 
 CONFIG = {
-"base_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/A_原始数据",
-"output_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_汇总表格/项目统计数据汇总_全月份.xlsx",
-"profit_rate_chart_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_汇总表格/项目毛利率变化图.html",
+"base_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/A_成本统计_raw",
+"output_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_sum/项目统计数据汇总_全月份.xlsx",
+"profit_rate_chart_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_sum/项目毛利率变化图.html",
 "project_matcher_dir": str(DEFAULT_MATCHER_DIR),
 "project_match_db_file": "",
 "project_info_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx",
 "finance_payment_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰",
-"contract_management_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理",
+"contract_management_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑",
 "contract_management_sheet": "1_总包分包汇总(全部)",
 "procurement_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_sum",
 "tool_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_sum",

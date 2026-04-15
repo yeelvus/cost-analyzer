@@ -16,7 +16,7 @@ warnings.filterwarnings('ignore')
 
 # ==================== 配置区 ====================
 BASE_DIR = Path(__file__).resolve().parent
-SUMMARY_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_汇总表格")
+SUMMARY_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_sum")
 INPUT_EXCEL = SUMMARY_DIR / "项目统计数据汇总_全月份.xlsx"
 OUTPUT_DIR = SUMMARY_DIR / "项目成本分析报告_TEXT"
 
