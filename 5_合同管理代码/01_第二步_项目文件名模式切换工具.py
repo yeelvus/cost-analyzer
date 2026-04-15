@@ -14,7 +14,7 @@ from datetime import datetime
 import pandas as pd
 
 # ==================== 配置区 ====================
-EXCEL_PATH = "0_项目基本信息情况/项目基本信息表.xlsx"
+EXCEL_PATH = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
 HEADER_ROW = 0
 
 CODE_COLUMN = "项目编码"
@@ -23,7 +23,7 @@ STATUS_COLUMN = "项目状态"
 # 可选值："项目全称" 或 "项目名称"
 NAME_MODE_COLUMN = "项目全称"
 
-ROOT_DIR = "5_合同管理"
+ROOT_DIR = "5_合同管理📑"
 CONTRACT_TYPES = ["总包合同", "分包合同", "总包签证", "分包签证"]
 LOG_FOLDER = "日志"
 # ==============================================

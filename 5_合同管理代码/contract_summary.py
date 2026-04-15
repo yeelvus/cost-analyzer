@@ -7,7 +7,7 @@ from openpyxl.utils import get_column_letter
 # 合同数据自动汇总统计”脚本，主要用来把分散在各项目目录里的合同信息做成一份年度统计表。
 
 
-DEFAULT_OUTPUT_DIR = r'/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况'
+DEFAULT_OUTPUT_DIR = r'/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report'
 DEFAULT_OUTPUT_FILE = '合同汇总统计.xlsx'
 
 

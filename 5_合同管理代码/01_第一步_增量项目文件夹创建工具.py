@@ -26,7 +26,7 @@ NAME_COLUMN = "项目全称"
 STATUS_COLUMN = "项目状态"
 
 # 根目录（相对于脚本执行位置）
-ROOT_DIR = "5_合同管理"
+ROOT_DIR = "5_合同管理📑"
 
 # 合同类型目录（固定4类）
 CONTRACT_TYPES = [

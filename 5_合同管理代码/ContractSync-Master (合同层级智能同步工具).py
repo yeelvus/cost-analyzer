@@ -41,9 +41,9 @@ from datetime import datetime
 
 # ================= 配置区域 =================
 EXCEL_PATH = r'/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/在建项目-各项目成本统计表.xlsx' 
-BASE_DIR = r'/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理'
+BASE_DIR = r'/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑'
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_MATCH_DB_PATH = r'/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/project_name_match_db.json'
+PROJECT_MATCH_DB_PATH = r'/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json'
 LOG_PATH = os.path.join(SCRIPT_DIR, "file_migration_log.txt")
 
 # 运行模式：True (从Excel生成临时配置), False (从project_name_match_db.json读取配置)

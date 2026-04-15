@@ -20,9 +20,9 @@ from openpyxl.utils import get_column_letter
 # =========================
 # 配置区域
 # =========================
-CONTRACT_BASE_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理"
-PROJECT_MATCH_DB_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/project_name_match_db.json"
-OUTPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理"
+CONTRACT_BASE_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑"
+PROJECT_MATCH_DB_FILE = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
+OUTPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑"
 GENERAL_CONTRACT_DIR = "总包合同"
 SUBPACKAGE_CONTRACT_DIR = "分包合同"
 

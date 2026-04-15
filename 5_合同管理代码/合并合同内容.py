@@ -5,7 +5,7 @@ from tkinter import ttk, messagebox
 
 # ================= 配置区域 =================
 # 指向“5_合同管理”这一层
-BASE_DIR = r'/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理'
+BASE_DIR = r'/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑'
 # ===========================================
 
 class UniversalMergeTool:

@@ -5,7 +5,7 @@ from collections import OrderedDict
 
 # ==================== 配置区 ====================
 # 默认合同根目录路径（可修改为你的实际路径）
-DEFAULT_CONTRACT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理"  # 相对路径
+DEFAULT_CONTRACT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑"  # 相对路径
 # 或使用绝对路径：
 # DEFAULT_CONTRACT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理"
 # ==============================================

@@ -14,7 +14,7 @@ import shutil
 from datetime import datetime
 
 # ==================== 配置区 ====================
-ROOT_DIR = "5_合同管理"
+ROOT_DIR = "5_合同管理📑"
 LOG_FOLDER = "日志"
 CENTRAL_FOLDER_NAME = "历史其他子文件夹集中区"
 

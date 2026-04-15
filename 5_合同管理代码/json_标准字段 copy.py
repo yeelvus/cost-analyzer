@@ -193,7 +193,7 @@ def update_contract_json_logic(root_dir):
 
 
 # --- 配置区 ---
-target_path = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理"
+target_path = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑"
 
 
 if __name__ == "__main__":

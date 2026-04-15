@@ -49,11 +49,11 @@ OUTPUT_EXCLUDED_COLUMNS = {
 # 配置 + 列顺序记忆
 # =========================
 # 【配置】在此设置项目主目录路径（留空则弹出选择对话框）
-ROOT_DIR_PATH = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理"
+ROOT_DIR_PATH = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑"
 
 COLUMN_ORDER_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "column_order.txt")  # 新增：记忆列顺序（固定保存到当前代码目录）
-PROJECT_CODE_DB_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/project_name_match_db.json"  # 项目名称/别名 -> 项目编码库
-PROJECT_CODE_DB_FALLBACK = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/project_name_match_db.json"
+PROJECT_CODE_DB_FILE = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"  # 项目名称/别名 -> 项目编码库
+PROJECT_CODE_DB_FALLBACK = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
 
 # 使用配置路径或弹出选择对话框
 if ROOT_DIR_PATH and os.path.isdir(ROOT_DIR_PATH):
