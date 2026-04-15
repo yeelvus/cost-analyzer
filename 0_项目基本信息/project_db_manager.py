@@ -17,7 +17,7 @@ from project_name_matcher import (  # noqa: F401
 # ====================== 主程序 ======================
 if __name__ == "__main__":
     # 兼容旧入口：仅保留参数与调用，核心逻辑已统一到 project_name_matcher.py。
-    db_path = "db.json"
+    db_path = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
     excel_path = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
 
     # 如果你的 Excel 列名与下面不同，请在这里修改
