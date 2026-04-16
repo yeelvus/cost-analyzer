@@ -18,7 +18,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 
 # 引入格式化工具
-_UTILS_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况")
+_UTILS_DIR = Path("/Users/wyattsun/Desktop/code/0_项目基本信息")
 if str(_UTILS_DIR) not in sys.path and _UTILS_DIR.exists():
     sys.path.insert(0, str(_UTILS_DIR))
 from excel_formatting_utils import apply_common_excel_layout  # noqa: E402
@@ -27,8 +27,8 @@ from excel_formatting_utils import apply_common_excel_layout  # noqa: E402
 # =========================
 # 配置区域
 # =========================
-DATA_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_标准化汇总分包合同台账"
-OUTPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/3_分包合同汇总数据"
+DATA_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_分包合同台账_std"
+OUTPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/3_分包合同_sum"
 AMOUNT_TOLERANCE = 1.0  # 金额差异容差（泰铢）
 
 

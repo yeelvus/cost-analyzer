@@ -7,23 +7,12 @@ from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
-CURRENT_FILE = Path(__file__).resolve()
-
-
-def find_project_root(start_file: Path) -> Path:
-    """向上查找包含项目关键目录的根路径。"""
-    for p in [start_file.parent, *start_file.parents]:
-        if (p / '0_项目基本信息情况').exists() and (p / '19_代码').exists():
-            return p
-    # 兜底：保持与历史逻辑一致
-    return start_file.parents[2]
-
-
-PROJECT_ROOT = find_project_root(CURRENT_FILE)
+DATA_ROOT = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计')
+CODE_ROOT = Path('/Users/wyattsun/Desktop/code')
 MODULE_DIRS = [
-    PROJECT_ROOT / '0_项目基本信息情况',
-    PROJECT_ROOT / '19_代码',
-    PROJECT_ROOT / '19_代码' / '0_项目基本信息',
+    DATA_ROOT / '0_项目基本信息情况',
+    CODE_ROOT,
+    CODE_ROOT / '0_项目基本信息',
 ]
 for module_dir in MODULE_DIRS:
     if module_dir.exists() and str(module_dir) not in sys.path:
@@ -40,7 +29,7 @@ def _load_module_from_path(module_name: str, file_path: Path):
     return module
 
 
-MODULE_BASE = PROJECT_ROOT / '19_代码' / '0_项目基本信息'
+MODULE_BASE = Path('/Users/wyattsun/Desktop/code/0_项目基本信息')
 project_name_matcher = _load_module_from_path(
     'project_name_matcher',
     MODULE_BASE / 'project_name_matcher.py'
@@ -59,17 +48,17 @@ match_project = project_name_matcher.match_project
 apply_common_excel_layout = excel_formatting_utils.apply_common_excel_layout
 
 # ================= 配置区域 =================
-EXCEL_INFO_PATH = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
+EXCEL_INFO_PATH = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx')
 
 # 新目录结构：5_合同管理/B_分包合同
-NEW_SUBPACKAGE_ROOT = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理/B_分包合同"
-NEW_INPUT_DIR = os.path.join(NEW_SUBPACKAGE_ROOT, "1_分包合同台账")
-NEW_OUTPUT_DIR = os.path.join(NEW_SUBPACKAGE_ROOT, "2_标准化汇总分包合同台账")
+NEW_SUBPACKAGE_ROOT = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同')
+NEW_INPUT_DIR = NEW_SUBPACKAGE_ROOT / '/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/1_分包合同台账_raw'
+NEW_OUTPUT_DIR = NEW_SUBPACKAGE_ROOT / '2_分包合同台账_std'
 
 INPUT_DIR = NEW_INPUT_DIR
 OUTPUT_DIR = NEW_OUTPUT_DIR
 
-MATCH_DB_PATH = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/project_name_match_db.json"
+MATCH_DB_PATH = Path('/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json')
 # ===========================================
 
 def smart_process_and_match():

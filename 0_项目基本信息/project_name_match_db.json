@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-04-15 15:53:22",
+  "updated_at": "2026-04-16 08:42:14",
   "projects": {
     "永强车业项目": {
       "project_code": "THCC-2025-005",
@@ -380,24 +380,24 @@
     },
     "振威特（装修）": {
       "project_code": "THCC-2024-005",
-      "target_status": "",
+      "target_status": "需手动核对",
       "aliases": []
     },
     "TPI技改项目": {
       "project_code": "LSBM-01",
-      "target_status": "",
+      "target_status": "需手动核对",
       "aliases": [
         "TPI项目"
       ]
     },
     "欣旺达（缓建区）": {
       "project_code": "THCC-2025-009",
-      "target_status": "",
+      "target_status": "需手动核对",
       "aliases": []
     },
     "北新建材": {
       "project_code": "THCC-2023-013",
-      "target_status": "",
+      "target_status": "需手动核对",
       "aliases": []
     },
     "建华一期": {
@@ -417,17 +417,17 @@
     },
     "天盾科技": {
       "project_code": "THCC-2026-004",
-      "target_status": "",
+      "target_status": "需手动核对",
       "aliases": []
     },
     "恰恰二期": {
       "project_code": "THCC-2026-003",
-      "target_status": "",
+      "target_status": "需手动核对",
       "aliases": []
     },
     "东威科技": {
       "project_code": "THCC-2026-002",
-      "target_status": "",
+      "target_status": "A_在建项目",
       "aliases": []
     }
   },
