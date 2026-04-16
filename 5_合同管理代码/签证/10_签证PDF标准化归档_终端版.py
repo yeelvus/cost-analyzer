@@ -12,6 +12,7 @@ TXT_ENCODING = "utf-8-sig"
 PDF_PATTERN = re.compile(
     r"^\s*(?P<index>\d+)\s*[_ ]?\s*(?P<name>.+?)\s*_\s*(?P<amount>-?\d+(?:\.\d+)?)\s*$"
 )
+SUPPORTED_EXTENSIONS = {".pdf", ".jpg", ".jpeg"}
 INVALID_PATH_CHARS = str.maketrans({
     "/": "／",
     "\\": "＼",
@@ -46,6 +47,7 @@ class ParsedPdf:
     index: int
     visa_name: str
     amount: str
+    extension: str
 
 
 @dataclass
@@ -53,7 +55,7 @@ class OrganizeTask:
     parsed: ParsedPdf
     target_stem: str
     target_dir: Path
-    target_pdf: Path
+    target_file: Path
 
 
 def clean_text_segment(text: str) -> str:
@@ -67,6 +69,10 @@ def normalize_input_path(raw_path: str) -> Path:
 
 
 def parse_pdf_file(pdf_path: Path) -> ParsedPdf | None:
+    extension = pdf_path.suffix.lower()
+    if extension not in SUPPORTED_EXTENSIONS:
+        return None
+
     match = PDF_PATTERN.match(pdf_path.stem)
     if not match:
         return None
@@ -81,12 +87,17 @@ def parse_pdf_file(pdf_path: Path) -> ParsedPdf | None:
         index=int(match.group("index")),
         visa_name=visa_name,
         amount=amount,
+        extension=extension,
     )
 
 
 def build_tasks(folder_path: Path) -> tuple[list[OrganizeTask], list[Path]]:
     pdf_files = sorted(
-        [file for file in folder_path.iterdir() if file.is_file() and file.suffix.lower() == ".pdf"],
+        [
+            file
+            for file in folder_path.iterdir()
+            if file.is_file() and file.suffix.lower() in SUPPORTED_EXTENSIONS
+        ],
         key=lambda file: file.name,
     )
 
@@ -107,13 +118,13 @@ def build_tasks(folder_path: Path) -> tuple[list[OrganizeTask], list[Path]]:
     for parsed in sorted(parsed_items, key=lambda item: (item.index, item.visa_name, item.amount)):
         target_stem = f"{str(parsed.index).zfill(index_width)}_{parsed.visa_name}_{parsed.amount}"
         target_dir = folder_path / target_stem
-        target_pdf = target_dir / f"{target_stem}.pdf"
+        target_file = target_dir / f"{target_stem}{parsed.extension}"
         tasks.append(
             OrganizeTask(
                 parsed=parsed,
                 target_stem=target_stem,
                 target_dir=target_dir,
-                target_pdf=target_pdf,
+                target_file=target_file,
             )
         )
 
@@ -170,10 +181,10 @@ def write_metadata_files(task: OrganizeTask) -> dict[str, str]:
 def move_pdf_file(task: OrganizeTask) -> None:
     task.target_dir.mkdir(parents=True, exist_ok=True)
 
-    if task.target_pdf.exists():
-        raise FileExistsError(f"目标PDF已存在: {task.target_pdf}")
+    if task.target_file.exists():
+        raise FileExistsError(f"目标文件已存在: {task.target_file}")
 
-    shutil.move(str(task.parsed.source_path), str(task.target_pdf))
+    shutil.move(str(task.parsed.source_path), str(task.target_file))
 
 
 def delete_generated_txt_files(folder_path: Path) -> int:
@@ -251,17 +262,17 @@ def write_summary_excel(folder_path: Path, summary_rows: list[dict[str, str]]) -
 
 def print_preview(tasks: list[OrganizeTask], unmatched_files: list[Path]) -> None:
     print("\n扫描完成。")
-    print(f"可处理PDF数量: {len(tasks)}")
-    print(f"跳过的PDF数量: {len(unmatched_files)}")
+    print(f"可处理文件数量: {len(tasks)}")
+    print(f"跳过的文件数量: {len(unmatched_files)}")
 
     if tasks:
         print("\n将执行以下标准化操作:")
         for task in tasks:
             print(f"- {task.parsed.source_path.name}")
-            print(f"  -> {task.target_dir.name}/{task.target_pdf.name}")
+            print(f"  -> {task.target_dir.name}/{task.target_file.name}")
 
     if unmatched_files:
-        print("\n以下PDF未匹配到“序号_名称_金额.pdf”规则，已跳过:")
+        print("\n以下文件未匹配到“序号_名称_金额.扩展名”规则，已跳过:")
         for file_path in unmatched_files:
             print(f"- {file_path.name}")
 
@@ -275,7 +286,7 @@ def process_tasks(tasks: list[OrganizeTask]) -> tuple[int, list[str]]:
             move_pdf_file(task)
             write_metadata_files(task)
             success_count += 1
-            print(f"✓ 已处理: {task.parsed.source_path.name} -> {task.target_pdf}")
+            print(f"✓ 已处理: {task.parsed.source_path.name} -> {task.target_file}")
         except Exception as exc:
             errors.append(f"{task.parsed.source_path.name}: {exc}")
             print(f"✗ 处理失败: {task.parsed.source_path.name}: {exc}")
@@ -286,9 +297,9 @@ def process_tasks(tasks: list[OrganizeTask]) -> tuple[int, list[str]]:
 def main() -> None:
     print("=" * 70)
     print("签证PDF标准化归档工具")
-    print("功能: 序号补零、创建文件夹、移动PDF、仅输出JSON、删除历史txt、输出Excel汇总")
+    print("功能: 序号补零、创建文件夹、移动PDF/JPG、仅输出JSON、删除历史txt、输出Excel汇总")
     print("=" * 70)
-    print("说明: 只处理当前目录下一级的PDF文件，不递归处理子文件夹。")
+    print("说明: 只处理当前目录下一级的PDF/JPG/JPEG文件，不递归处理子文件夹。")
 
     folder_input = input("\n请输入需要处理的文件夹路径: ").strip()
     if not folder_input:
@@ -304,7 +315,7 @@ def main() -> None:
     print_preview(tasks, unmatched_files)
 
     if not tasks:
-        print("\n未找到可处理的PDF文件，将仅执行：删除旧txt、规范json、生成Excel汇总。")
+        print("\n未找到可处理的文件，将仅执行：删除旧txt、规范json、生成Excel汇总。")
 
     dry_run_choice = input("\n是否先仅预演、不实际移动文件？(y/N): ").strip().lower()
     if dry_run_choice in {"y", "yes", "是"}:
@@ -330,7 +341,7 @@ def main() -> None:
         print("\n未收集到可汇总的签证数据，未生成Excel汇总。")
 
     print("\n处理完成。")
-    print(f"成功处理PDF: {success_count} 个")
+    print(f"成功处理文件: {success_count} 个")
     print(f"汇总签证目录: {len(summary_rows)} 个")
     print(f"失败: {len(errors)} 个")
 
