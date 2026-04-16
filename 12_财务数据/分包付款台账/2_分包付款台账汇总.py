@@ -8,6 +8,7 @@ from openpyxl.utils import get_column_letter
 import json
 import re
 import importlib.util
+from pathlib import Path
 
 # 忽略UserWarning，通常来自openpyxl或pandas
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -27,14 +28,24 @@ POST_ANALYSIS_SCRIPT = os.path.join(
     "3_分包付款汇总分析_按日期与月增量.py"
 )
 
-# 项目名称匹配模块与数据库（固定路径）
-PROJECT_MATCHER_MODULE_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    '0_项目基本信息',
-    'project_name_matcher.py'
-)
-PROJECT_MATCHER_DB_PATH = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/project_name_match_db.json"
-EXCEL_FORMATTING_UTILS_PATH = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/excel_formatting_utils.py"
+# 项目名称匹配模块与数据库路径（优先按脚本相对路径自动定位，兼容目录迁移）
+def _resolve_base_info_dir():
+    """向上查找包含 `0_项目基本信息` 的代码根目录。"""
+    current = Path(__file__).resolve().parent
+    for parent in [current] + list(current.parents):
+        candidate = parent / "0_项目基本信息"
+        if candidate.is_dir():
+            return str(candidate)
+
+    # 回退到历史固定路径（兼容旧环境）
+    legacy = Path("/Users/wyattsun/Desktop/code/0_项目基本信息")
+    return str(legacy)
+
+
+BASE_INFO_DIR = _resolve_base_info_dir()
+PROJECT_MATCHER_MODULE_PATH = os.path.join(BASE_INFO_DIR, "project_name_matcher.py")
+PROJECT_MATCHER_DB_PATH = os.path.join(BASE_INFO_DIR, "project_name_match_db.json")
+EXCEL_FORMATTING_UTILS_PATH = os.path.join(BASE_INFO_DIR, "excel_formatting_utils.py")
 
 # 定义要提取的列名（基于用户要求更新，包含人民币换算列和汇率）
 columns_to_extract = [
@@ -169,7 +180,7 @@ def load_excel_formatting_utils():
 
 # 函数：从项目名称提取标准名称
 def extract_project_name(project_name_str):
-    """提取项目名：优先取“_分包管控表.xlsx”前缀，否则兼容旧规则。"""
+    """提取项目名：优先去除分包台账后缀，再兼容旧规则。"""
     if not project_name_str:
         return None
     
@@ -179,19 +190,23 @@ def extract_project_name(project_name_str):
     if name.lower().endswith('.xlsx'):
         name = os.path.splitext(name)[0]
 
-    # 优先规则：识别“_分包管控表”之前的内容
+    # 优先规则：识别“_分包管控表 / _分包对账与付款统计表”之前的内容
     # 例如："邯郸某项目_分包管控表" -> "邯郸某项目"
-    m = re.match(r'^(.*?)_分包管控表(?:\s*\(\d+\))?$', name)
+    m = re.match(r'^(.*?)_(?:分包管控表|分包对账与付款统计表)(?:\s*[\(（]\d+[\)）])?$', name)
     if m and m.group(1).strip():
         return m.group(1).strip()
 
     # 兼容无下划线写法
-    m2 = re.match(r'^(.*?)\s*分包管控表(?:\s*\(\d+\))?$', name)
+    m2 = re.match(r'^(.*?)\s*(?:分包管控表|分包对账与付款统计表)(?:\s*[\(（]\d+[\)）])?$', name)
     if m2 and m2.group(1).strip():
         return m2.group(1).strip()
     
     # 移除常见后缀
-    suffixes = [' 总计', '总计', ' 小计', '小计', ' 分包管控表', '分包管控表']
+    suffixes = [
+        ' 总计', '总计', ' 小计', '小计',
+        ' 分包管控表', '分包管控表',
+        ' 分包对账与付款统计表', '分包对账与付款统计表'
+    ]
     for suffix in suffixes:
         if name.endswith(suffix):
             name = name[:-len(suffix)].strip()
