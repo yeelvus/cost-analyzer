@@ -2,7 +2,6 @@ import json
 import os
 import re
 from datetime import datetime
-
 import pandas as pd
 
 try:
@@ -231,11 +230,10 @@ def match_project(raw_name, db):
     return None
 
 
-def prompt_unmatched_project_mappings(unmatched_names, db, window_title="手动项目匹配"):
-    """为未匹配项目弹窗选择标准项目，并将映射写入 db。
-
-    Returns:
-        dict: {raw_name: standard_name_or_empty}
+def prompt_unmatched_project_mappings(unmatched_names, db, window_title="手动项目匹配", db_path=None):
+    """
+    为未匹配项目弹窗选择标准项目，并将映射写入 db。
+    新增 db_path 参数：如果传入，则手动匹配后自动保存到文件。
     """
     unmatched_names = [str(n).strip() for n in unmatched_names if str(n).strip()]
     unmatched_names = sorted(set(unmatched_names))
@@ -315,17 +313,27 @@ def prompt_unmatched_project_mappings(unmatched_names, db, window_title="手动�
     root.wait_window(win)
     root.destroy()
 
+    # ====================== 核心修改部分 ======================
     selected_map = {}
+    any_mapped = False
+
     for raw_name, var in var_map.items():
         selected = var.get().strip()
         if not result["ok"] or selected == blank_option or not selected:
             selected_map[raw_name] = ""
             mark_unmatched(db, raw_name)
             continue
+
         std_name = option_to_standard.get(selected, "")
         selected_map[raw_name] = std_name
         if std_name:
             add_mapping(db, raw_name, std_name)
+            any_mapped = True
+
+    # 如果进行了任何手动映射，并且传入了 db_path，则立即保存到文件
+    if any_mapped and db_path and os.path.exists(os.path.dirname(db_path)):
+        save_db(db_path, db)
+        print(f"✅ 手动匹配结果已自动保存到数据库: {db_path}")
 
     return selected_map
 
@@ -391,7 +399,7 @@ def update_db_from_excel(db_path, excel_path,
             }
             db["alias_to_standard"][name] = name
             new_count += 1
-            print(f"✅ 新增项目: {name}  (编码: {code})  状态: {status or '空'}")
+            print(f"✅ 新增项目: {name} (编码: {code}) 状态: {status or '空'}")
 
     save_db(db_path, db)
 
