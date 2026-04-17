@@ -406,6 +406,7 @@ def build_project_summary(
     main_df: pd.DataFrame,
     sub_df: pd.DataFrame,
     procurement_df: pd.DataFrame,
+    material_arrears_df: pd.DataFrame,
     concrete_df: pd.DataFrame,
     equipment_df: pd.DataFrame,
     labor_df: pd.DataFrame,
@@ -417,6 +418,7 @@ def build_project_summary(
     main_df = ensure_columns(main_df, ["项目编码", "项目简称", "项目状态", "金额_THB", "是否采购类合同"])
     sub_df = ensure_columns(sub_df, ["项目编码", "项目简称", "项目状态", "金额_THB", "是否采购类合同"])
     procurement_df = ensure_columns(procurement_df, ["项目编码", "金额_THB"])
+    material_arrears_df = ensure_columns(material_arrears_df, ["项目编码", "欠款金额_THB", "标准项目名称"])
     concrete_df = ensure_columns(concrete_df, ["项目编码", "金额_THB", "标准项目名称"])
     equipment_df = ensure_columns(equipment_df, ["项目编码", "金额_THB", "标准项目名称"])
     labor_df = ensure_columns(labor_df, ["项目编码", "人工费汇总（泰铢）", "项目名称", "target_status"])
@@ -432,6 +434,7 @@ def build_project_summary(
     all_codes = set(main_df.get("项目编码", pd.Series(dtype=str)).unique())
     all_codes |= set(sub_df.get("项目编码", pd.Series(dtype=str)).unique())
     all_codes |= set(procurement_df.get("项目编码", pd.Series(dtype=str)).unique())
+    all_codes |= set(material_arrears_df.get("项目编码", pd.Series(dtype=str)).unique())
     all_codes |= set(concrete_df.get("项目编码", pd.Series(dtype=str)))
     all_codes |= set(equipment_df.get("项目编码", pd.Series(dtype=str)))
     all_codes |= set(labor_df.get("项目编码", pd.Series(dtype=str)))
@@ -441,6 +444,7 @@ def build_project_summary(
         all_codes |= set(budget_df.get("项目编码", pd.Series(dtype=str)).unique())
 
     proc_sum = procurement_df.groupby("项目编码")["金额_THB"].sum() if not procurement_df.empty else {}
+    material_arrears_sum = material_arrears_df.groupby("项目编码")["欠款金额_THB"].sum() if not material_arrears_df.empty else {}
     concrete_sum = concrete_df.groupby("项目编码")["金额_THB"].sum() if not concrete_df.empty else {}
     equipment_sum = equipment_df.groupby("项目编码")["金额_THB"].sum() if not equipment_df.empty else {}
     labor_sum = labor_df.groupby("项目编码")["人工费汇总（泰铢）"].sum() if not labor_df.empty else {}
@@ -479,6 +483,8 @@ def build_project_summary(
         sub_rows = sub_df[sub_df["项目编码"] == code_str].copy()
         project_name = first_notna(main_rows["项目简称"]) or first_notna(sub_rows["项目简称"]) or first_notna(
             procurement_df.loc[procurement_df["项目编码"] == code_str, "标准项目名称"]
+        ) or first_notna(
+            material_arrears_df.loc[material_arrears_df["项目编码"] == code_str, "标准项目名称"]
         ) or first_notna(
             concrete_df.loc[concrete_df["项目编码"] == code_str, "标准项目名称"]
         ) or first_notna(
@@ -520,6 +526,7 @@ def build_project_summary(
             "总包合同金额": main_rows.get("金额_THB", pd.Series(dtype=float)).sum(),
             "分包合同金额": sub_rows.get("金额_THB", pd.Series(dtype=float)).sum(),
             "材料采购金额": proc_sum.get(code_str, 0.0),
+            "材料欠款金额": material_arrears_sum.get(code_str, 0.0),
             "商混站金额": concrete_sum.get(code_str, 0.0),
             "机具使用费": equipment_sum.get(code_str, 0.0),
             "人工费": labor_sum.get(code_str, 0.0),
@@ -916,7 +923,7 @@ def export_index_file(output_dir: Path, summary_rows: List[Dict], cost_stats_df:
 
     df_wan = df.copy()
     amount_columns = [
-        "总包合同金额", "分包合同金额", "材料采购金额", "商混站金额", "机具使用费", "人工费", "含税实付金额（万泰铢）", "国内代付人民币金额（万泰铢）", "付款汇总（万泰铢）", "利润额", "分包代付款",
+        "总包合同金额", "分包合同金额", "材料采购金额", "材料欠款金额", "商混站金额", "机具使用费", "人工费", "含税实付金额（万泰铢）", "国内代付人民币金额（万泰铢）", "付款汇总（万泰铢）", "利润额", "分包代付款",
         "预计总成本", "收入", "毛利", "业主预计结算额", "总包合同额(万泰铢)", "签证情况", "分包结算额", "分包合同额(万泰铢)", "分包签证情况", "分包已付款", "材料采购实际已发生", "材料采购后续预估发生",
         "采购部采购金额", "项目部采购金额", "材料租赁费用", "材料租赁后续预估", "工资支出", "管理人员工资", "机具费支出", "机具费后续预估", "人员调遣支出", "人员调遣后续预估", "其他费用支出", "实际已发生金额",
         "其他费用后续预估", "临建费用支出", "临建费用后续预估",
@@ -968,7 +975,7 @@ def export_index_file(output_dir: Path, summary_rows: List[Dict], cost_stats_df:
                 ws[f"{get_column_letter(sub_payment_col)}{row}"] = sub_payment_formula
 
         style_sheet(ws, amount_headers=[
-            "总包合同金额", "分包合同金额", "材料采购金额", "商混站金额", "机具使用费", "人工费", "含税实付金额（万泰铢）", "国内代付金额（人民币）", "国内代付人民币金额（万泰铢）", "付款汇总（万泰铢）", "利润额", "分包代付款",
+            "总包合同金额", "分包合同金额", "材料采购金额", "材料欠款金额", "商混站金额", "机具使用费", "人工费", "含税实付金额（万泰铢）", "国内代付金额（人民币）", "国内代付人民币金额（万泰铢）", "付款汇总（万泰铢）", "利润额", "分包代付款",
             "预计总成本", "收入", "毛利", "业主预计结算额", "总包合同额(万泰铢)", "签证情况", "分包结算额", "分包合同额(万泰铢)", "分包签证情况", "分包已付款", "材料采购实际已发生", "材料采购后续预估发生", "采购部采购金额", "项目部采购金额",
             "材料租赁费用", "材料租赁后续预估", "工资支出", "管理人员工资", "机具费支出", "机具费后续预估", "人员调遣支出", "人员调遣后续预估", "其他费用支出", "实际已发生金额", "其他费用后续预估", "临建费用支出", "临建费用后续预估",
         ])
@@ -998,7 +1005,7 @@ def export_index_file(output_dir: Path, summary_rows: List[Dict], cost_stats_df:
                 ws_wan[f"{get_column_letter(sub_payment_col_wan)}{row}"] = sub_payment_formula_wan
 
         style_sheet(ws_wan, amount_headers=[
-            "总包合同金额", "分包合同金额", "材料采购金额", "商混站金额", "机具使用费", "人工费", "含税实付金额（万泰铢）", "国内代付金额（人民币）", "国内代付人民币金额（万泰铢）", "付款汇总（万泰铢）", "利润额", "分包代付款",
+            "总包合同金额", "分包合同金额", "材料采购金额", "材料欠款金额", "商混站金额", "机具使用费", "人工费", "含税实付金额（万泰铢）", "国内代付金额（人民币）", "国内代付人民币金额（万泰铢）", "付款汇总（万泰铢）", "利润额", "分包代付款",
             "预计总成本", "收入", "毛利", "业主预计结算额", "总包合同额(万泰铢)", "签证情况", "分包结算额", "分包合同额(万泰铢)", "分包签证情况", "分包已付款", "材料采购实际已发生", "材料采购后续预估发生", "采购部采购金额", "项目部采购金额",
             "材料租赁费用", "材料租赁后续预估", "工资支出", "管理人员工资", "机具费支出", "机具费后续预估", "人员调遣支出", "人员调遣后续预估", "其他费用支出", "实际已发生金额", "其他费用后续预估", "临建费用支出", "临建费用后续预估",
         ])

@@ -462,6 +462,50 @@ def load_procurement(procurement_path: Path) -> pd.DataFrame:
     return df
 
 
+def load_material_arrears(material_arrears_path: Path) -> pd.DataFrame:
+    if not material_arrears_path.exists():
+        return pd.DataFrame(columns=["项目编码", "标准项目名称", "欠款金额_THB"])
+
+    try:
+        xl = pd.ExcelFile(material_arrears_path)
+        preferred_sheets = ["欠款汇总", "项目汇总", "汇总", xl.sheet_names[0]]
+        sheet = next((s for s in preferred_sheets if s in xl.sheet_names), xl.sheet_names[0])
+        df = xl.parse(sheet)
+    except Exception as e:
+        print(f"警告：读取材料欠款文件失败 {material_arrears_path}: {e}")
+        return pd.DataFrame(columns=["项目编码", "标准项目名称", "欠款金额_THB"])
+
+    if "项目编码" not in df.columns:
+        for alt in ["标准项目编码", "project_code", "编码"]:
+            if alt in df.columns:
+                df["项目编码"] = df[alt]
+                break
+
+    if "标准项目名称" not in df.columns:
+        for alt in ["项目名称", "标准项目名称", "project_name", "名称"]:
+            if alt in df.columns:
+                df["标准项目名称"] = df[alt]
+                break
+
+    amount_col = None
+    for col in ["欠款金额（泰铢）", "欠款金额", "欠款金额(泰铢)", "金额_THB", "金额（泰铢）", "金额"]:
+        if col in df.columns:
+            amount_col = col
+            break
+
+    if amount_col is None:
+        df["欠款金额_THB"] = 0.0
+    else:
+        df["欠款金额_THB"] = df[amount_col].apply(coerce_float)
+
+    df = ensure_columns(df, ["项目编码", "标准项目名称", "欠款金额_THB"])
+    df["项目编码"] = df["项目编码"].apply(normalize_project_code)
+    df["标准项目名称"] = df["标准项目名称"].apply(normalize_project_name)
+    df = df[(df["项目编码"] != "") | (df["标准项目名称"] != "")]
+
+    return df
+
+
 def load_concrete(concrete_paths: List[Path]) -> pd.DataFrame:
     frames: List[pd.DataFrame] = []
     for path in concrete_paths:

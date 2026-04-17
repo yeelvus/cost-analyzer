@@ -25,6 +25,7 @@ from contract_report_loaders import (
     load_finance_summary,
     load_labor,
     load_labor_monthly,
+    load_material_arrears,
     load_procurement,
     load_project_name_map,
     load_project_manager_map,
@@ -38,6 +39,7 @@ BASE_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
 INPUT_PATHS = {
     "合同管理": BASE_DIR / "5_合同管理📑",
     "采购明细": BASE_DIR / "9_采购台账📦/B_采购部采购台账_sum/2026年03月_采购台账_std_merged.xlsx",
+    "材料欠款": BASE_DIR / "9.1_材料欠款/B_材料欠款_std/泰国子公司材料采购欠款汇总_标准化.xlsx",
     "商混混凝土": [BASE_DIR / "9.1_商混站🚛/B_商混站_std/搅拌站混凝土汇总报表_202604.xlsx"],
     "机具使用费": BASE_DIR / "10_机具费🚜/B_机具费_sum/2026年02月租赁机具台账_汇总.xlsx",
     "人工费汇总": BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std/人工费汇总_20260415_093536.xlsx",
@@ -217,6 +219,18 @@ def resolve_input_paths() -> Dict:
     elif isinstance(procurement_default, Path) and procurement_default.exists():
         resolved["采购明细"] = procurement_default
 
+    arrears_default = INPUT_PATHS.get("材料欠款")
+    arrears_latest = pick_latest_existing([
+        (BASE_DIR / "9.1_材料欠款/B_材料欠款_std", "*材料采购欠款汇总*_标准化*.xlsx", False),
+        (BASE_DIR / "9.1_材料欠款/B_材料欠款_std", "*欠款汇总*.xlsx", False),
+        (BASE_DIR / "9.1_材料欠款", "*材料采购欠款汇总*_标准化*.xlsx", True),
+        (BASE_DIR / "9.1_材料欠款", "*欠款汇总*.xlsx", True),
+    ])
+    if arrears_latest:
+        resolved["材料欠款"] = arrears_latest
+    elif isinstance(arrears_default, Path) and arrears_default.exists():
+        resolved["材料欠款"] = arrears_default
+
     concrete_default = INPUT_PATHS.get("商混混凝土", [])
     concrete_default = [p for p in concrete_default if isinstance(p, Path) and p.exists()]
     if concrete_default:
@@ -296,6 +310,7 @@ def run_cli():
     resolved_inputs = resolve_input_paths()
     default_contract_dir = resolved_inputs["合同管理"]
     default_procurement = resolved_inputs["采购明细"]
+    default_material_arrears = resolved_inputs["材料欠款"]
     default_concrete = resolved_inputs["商混混凝土"]
     default_equipment = resolved_inputs["机具使用费"]
     default_labor = resolved_inputs["人工费汇总"]
@@ -318,6 +333,7 @@ def run_cli():
     cost_stats_cutoff = infer_cutoff_from_path(default_cost_stats)
     finance_cutoff = infer_cutoff_from_path(default_finance)
     procurement_cutoff = infer_cutoff_from_path(default_procurement)
+    material_arrears_cutoff = infer_cutoff_from_path(default_material_arrears)
     concrete_cutoff = infer_cutoff_from_paths(default_concrete)
     equipment_cutoff = infer_cutoff_from_path(default_equipment)
     labor_cutoff_by_name = infer_cutoff_from_path(default_labor)
@@ -329,6 +345,7 @@ def run_cli():
         "项目成本统计汇总表": {"文件名": default_cost_stats.name, "统计截止日期": cost_stats_cutoff or "未知"},
         "财务分包付款明细": {"文件名": default_finance.name, "统计截止日期": finance_cutoff or "未知"},
         "材料采购明细": {"文件名": default_procurement.name, "统计截止日期": procurement_cutoff or "未知"},
+        "材料欠款明细": {"文件名": default_material_arrears.name, "统计截止日期": material_arrears_cutoff or "未知"},
         "商混站明细": {"文件名": "; ".join([p.name for p in default_concrete]) if default_concrete else "未知", "统计截止日期": concrete_cutoff or "未知"},
         "机具使用费明细": {"文件名": default_equipment.name, "统计截止日期": equipment_cutoff or "未知"},
         "人工费汇总": {"文件名": default_labor.name, "统计截止日期": labor_cutoff_by_name or "未知"},
@@ -343,6 +360,7 @@ def run_cli():
     try:
         datasets = load_contracts_from_folder(contract_dir)
         procurement_df = load_procurement(default_procurement)
+        material_arrears_df = load_material_arrears(default_material_arrears)
         concrete_df = load_concrete(default_concrete)
         equipment_df = load_equipment(default_equipment)
         labor_df = load_labor(default_labor)
@@ -382,7 +400,7 @@ def run_cli():
         labor_rows,
         labor_month_rows,
         finance_category_rows,
-    ) in build_project_summary(main_df, sub_df, procurement_df, concrete_df, equipment_df, labor_df, labor_month_df, finance_summary_df, finance_category_df, budget_df):
+    ) in build_project_summary(main_df, sub_df, procurement_df, material_arrears_df, concrete_df, equipment_df, labor_df, labor_month_df, finance_summary_df, finance_category_df, budget_df):
         official_project_name = project_name_map.get(str(code).strip().upper(), "")
         if official_project_name:
             project_name = official_project_name
