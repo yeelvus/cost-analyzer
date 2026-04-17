@@ -1031,10 +1031,18 @@ def cleanup_legacy_output_files(
     project_manager_dirname: str,
     project_status_dirname: str,
 ) -> None:
-    managed_filenames = {
+    root_only_filenames = {
         "项目汇总索引.xlsx",
         "数据来源与字段映射.xlsx",
     }
+
+    # 根目录专属文件：保留在 output_root，并清理项目合同汇总下的历史副本
+    for filename in root_only_filenames:
+        nested_path = project_reports_dir / filename
+        if nested_path.exists() and nested_path.is_file():
+            nested_path.unlink()
+
+    managed_filenames = set()
 
     for row in summary_rows:
         code = str(row.get("项目编码", "")).strip()
@@ -1042,16 +1050,6 @@ def cleanup_legacy_output_files(
         if not code:
             continue
         managed_filenames.add(sanitize_filename(f"{code}_{project_name}" if project_name else code) + ".xlsx")
-
-    for filename in managed_filenames:
-        legacy_path = output_root / filename
-        target_path = project_reports_dir / filename
-        if not legacy_path.exists() or legacy_path == target_path:
-            continue
-        if target_path.exists():
-            legacy_path.unlink()
-        else:
-            shutil.move(str(legacy_path), str(target_path))
 
     legacy_dir_mapping = {
         project_manager_dirname: output_root / project_manager_dirname,

@@ -26,6 +26,7 @@ from contract_report_loaders import (
     load_labor,
     load_labor_monthly,
     load_procurement,
+    load_project_name_map,
     load_project_manager_map,
     load_subcontract_ledger,
 )
@@ -35,20 +36,20 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 BASE_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
 
 INPUT_PATHS = {
-    "合同管理": BASE_DIR / "5_合同管理",
-    "采购明细": BASE_DIR / "9_采购部采购台账/B_汇总数据/B_标准化汇总/2026年03月_材料采购_merged.xlsx",
-    "商混混凝土": [BASE_DIR / "9.1_商混站混凝土/B_标准化数据/搅拌站混凝土汇总报表_202604.xlsx"],
-    "机具使用费": BASE_DIR / "10_机具使用费/B_汇总文件/机具费汇总_20260326_104453.xlsx",
-    "人工费汇总": BASE_DIR / "11_人工费🙎🏻‍♂️/B_输出标准化人工费台账/人工费汇总_20260404_115727.xlsx",
-    "财务分包": BASE_DIR / "12-财务部💰/B_输出汇总文件/2026-03-14_分包对账与付款统计表_分包台账汇总_20260403_094523.xlsx",
-    "分包合同台账": BASE_DIR / "5.1_分包合同/2_标准化汇总分包合同台账/分包签订合同汇总_2026-03.xlsx",
-    "成本统计": BASE_DIR / "2_成本统计收集excel情况汇总/项目统计数据汇总_全月份.xlsx",
+    "合同管理": BASE_DIR / "5_合同管理📑",
+    "采购明细": BASE_DIR / "9_采购台账📦/B_采购部采购台账_sum/2026年03月_采购台账_std_merged.xlsx",
+    "商混混凝土": [BASE_DIR / "9.1_商混站🚛/B_商混站_std/搅拌站混凝土汇总报表_202604.xlsx"],
+    "机具使用费": BASE_DIR / "10_机具费🚜/B_机具费_sum/2026年02月租赁机具台账_汇总.xlsx",
+    "人工费汇总": BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std/人工费汇总_20260415_093536.xlsx",
+    "财务分包": BASE_DIR / "12-财务数据💰/A_分包对账与付款/B_分包对账与付款_sum/2026-04-08_分包对账与付款统计表_分包台账汇总_20260416_232731.xlsx",
+    "分包合同台账": BASE_DIR / "5.1_分包合同/2_分包合同台账_std/分包签订合同汇总_2026-03.xlsx",
+    "成本统计": BASE_DIR / "2_成本统计收集/B_成本统计_sum/项目统计数据汇总_全月份.xlsx",
     "项目经理": BASE_DIR / "0_项目基本信息情况/项目基本信息表.xlsx",
-    "预算金额": BASE_DIR / "6_预算部分/5.1_主材汇总（广联达软件导出）/【总汇总】所有标段_20260314_091348.xlsx",
-    "责任成本": BASE_DIR / "6_预算部分/6.1_责任成本书/汇总版",
+    "预算金额": BASE_DIR / "3_预算部分/5.1_主材汇总（广联达软件导出）/【总汇总】所有标段_20260314_091348.xlsx",
+    "责任成本": BASE_DIR / "3_预算部分/6.1_责任成本书/汇总版",
 }
 
-FORCED_EQUIPMENT_FILE = BASE_DIR / "10_机具使用费/B_汇总文件/2026年02月租赁机具台账_汇总.xlsx"
+FORCED_EQUIPMENT_FILE = None
 
 OUTPUT_PATH = BASE_DIR / "18_output"
 PROJECT_REPORTS_DIRNAME = "项目合同汇总"
@@ -157,24 +158,23 @@ def resolve_input_paths() -> Dict:
         resolved["合同管理汇总"] = contract_latest
 
     finance_latest = pick_latest_existing([
-        (BASE_DIR / "12-财务部💰/B_输出汇总文件", "*分包台账汇总_*.xlsx", False),
-        (BASE_DIR / "12-财务部💰", "*分包台账汇总_*.xlsx", True),
+        (BASE_DIR / "12-财务数据💰/A_分包对账与付款/B_分包对账与付款_sum", "*分包台账汇总_*.xlsx", False),
+        (BASE_DIR / "12-财务数据💰", "*分包台账汇总_*.xlsx", True),
     ])
     if finance_latest:
         resolved["财务分包"] = finance_latest
 
     budget_latest = pick_latest_existing([
-        (BASE_DIR / "6_预算部分/5.1_主材汇总（广联达软件导出）", "【总汇总】所有标段_*.xlsx", False),
-        (BASE_DIR / "6_预算部分/5.1_主材汇总（广联达软件导出）/2_数据汇总分析", "【总汇总】所有标段_*.xlsx", False),
-        (BASE_DIR / "6_预算部分", "【总汇总】所有标段_*.xlsx", True),
+        (BASE_DIR / "3_预算部分/5.1_主材汇总（广联达软件导出）", "【总汇总】所有标段_*.xlsx", False),
+        (BASE_DIR / "3_预算部分", "【总汇总】所有标段_*.xlsx", True),
     ])
     if budget_latest:
         resolved["预算金额"] = budget_latest
 
-    if FORCED_EQUIPMENT_FILE.exists():
+    if FORCED_EQUIPMENT_FILE and FORCED_EQUIPMENT_FILE.exists():
         resolved["机具使用费"] = FORCED_EQUIPMENT_FILE
     else:
-        equip_root = BASE_DIR / "10_机具使用费/B_汇总文件"
+        equip_root = BASE_DIR / "10_机具费🚜/B_机具费_sum"
         equip_latest = pick_latest_existing([
             (equip_root, "*租赁机具台账_汇总.xlsx", False),
             (equip_root, "*机具台账*_汇总.xlsx", False),
@@ -185,13 +185,20 @@ def resolve_input_paths() -> Dict:
         if equip_latest:
             resolved["机具使用费"] = equip_latest
 
+    cost_stats_latest = pick_latest_existing([
+        (BASE_DIR / "2_成本统计收集/B_成本统计_sum", "*.xlsx", False),
+        (BASE_DIR / "2_成本统计收集", "项目统计数据汇总_*.xlsx", True),
+        (BASE_DIR / "2_成本统计收集", "*.xlsx", True),
+    ])
+    if cost_stats_latest:
+        resolved["成本统计"] = cost_stats_latest
+
     labor_default = INPUT_PATHS.get("人工费汇总")
     if isinstance(labor_default, Path) and labor_default.exists():
         resolved["人工费汇总"] = labor_default
     else:
         labor_latest = pick_latest_existing([
-            (BASE_DIR / "11_人工费🙎🏻‍♂️/B_输出标准化人工费台账", "人工费汇总_*.xlsx", False),
-            (BASE_DIR / "11_人工费🙎🏻‍♂️/B_输出标准化人工费台账", "综合汇总_*.xlsx", False),
+            (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费汇总_*.xlsx", False),
             (BASE_DIR / "11_人工费🙎🏻‍♂️", "综合汇总_*.xlsx", True),
             (BASE_DIR / "11_人工费🙎🏻‍♂️/子公司人力资源发", "综合汇总.xlsx", True),
         ])
@@ -200,11 +207,10 @@ def resolve_input_paths() -> Dict:
 
     procurement_default = INPUT_PATHS.get("采购明细")
     proc_latest = pick_latest_existing([
-        (BASE_DIR / "9_采购部采购台账/B_汇总数据/A_合并汇总", "*_材料采购_merged.xlsx", False),
-        (BASE_DIR / "9_采购部采购台账/B_汇总数据/A_合并汇总", "*.xlsx", False),
-        (BASE_DIR / "9_采购部采购台账/B_汇总数据/B_标准化汇总", "*_材料采购_merged.xlsx", False),
-        (BASE_DIR / "9_采购部采购台账/C_数据分析", "*_merged_标准化汇总.xlsx", True),
-        (BASE_DIR / "9_采购部采购台账/B_汇总数据", "*_材料采购_merged.xlsx", True),
+        (BASE_DIR / "9_采购台账📦/B_采购部采购台账_sum", "*_采购台账_std_merged.xlsx", False),
+        (BASE_DIR / "9_采购台账📦/B_采购部采购台账_sum", "*.xlsx", False),
+        (BASE_DIR / "9_采购台账📦/C_数据分析", "*_merged_标准化汇总.xlsx", True),
+        (BASE_DIR / "9_采购台账📦", "*_采购台账_std_merged.xlsx", True),
     ])
     if proc_latest:
         resolved["采购明细"] = proc_latest
@@ -217,12 +223,10 @@ def resolve_input_paths() -> Dict:
         resolved["商混混凝土"] = concrete_default
     else:
         concrete_latest = pick_latest_existing([
-            (BASE_DIR / "9.1_商混站混凝土/B_标准化数据", "搅拌站混凝土汇总报表_*.xlsx", False),
-            (BASE_DIR / "9.1_商混站混凝土/B_标准化数据", "*.xlsx", False),
-            (BASE_DIR / "9.1_商混站混凝土/A_商混凝站混凝土数据_按月统计数据", "混凝土汇总报表_*.xlsx", False),
-            (BASE_DIR / "9.1_商混站混凝土/A_商混凝站混凝土数据_按月统计数据", "*混凝土*汇总*.xlsx", False),
-            (BASE_DIR / "9.1_商混站混凝土", "混凝土汇总报表_*.xlsx", True),
-            (BASE_DIR / "9.1_商混站混凝土", "*混凝土*汇总*.xlsx", True),
+            (BASE_DIR / "9.1_商混站🚛/B_商混站_std", "搅拌站混凝土汇总报表_*.xlsx", False),
+            (BASE_DIR / "9.1_商混站🚛/B_商混站_std", "*.xlsx", False),
+            (BASE_DIR / "9.1_商混站🚛", "混凝土汇总报表_*.xlsx", True),
+            (BASE_DIR / "9.1_商混站🚛", "*混凝土*汇总*.xlsx", True),
         ])
         if concrete_latest:
             resolved["商混混凝土"] = [concrete_latest]
@@ -230,8 +234,8 @@ def resolve_input_paths() -> Dict:
             resolved["商混混凝土"] = []
 
     sub_contract_latest = pick_latest_existing([
-        (BASE_DIR / "5.1_分包合同/2_标准化汇总分包合同台账", "分包签订合同汇总_*.xlsx", False),
-        (BASE_DIR / "5.1_分包合同/2_标准化汇总分包合同台账", "*.xlsx", False),
+        (BASE_DIR / "5.1_分包合同/2_分包合同台账_std", "分包签订合同汇总_*.xlsx", False),
+        (BASE_DIR / "5.1_分包合同/2_分包合同台账_std", "*.xlsx", False),
     ])
     if sub_contract_latest:
         resolved["分包合同台账"] = sub_contract_latest
@@ -351,6 +355,7 @@ def run_cli():
         cost_stats_cutoff_from_data = infer_cutoff_from_month_column(cost_stats_df, "月份")
         if cost_stats_cutoff_from_data:
             data_source_info["项目成本统计汇总表"]["统计截止日期"] = cost_stats_cutoff_from_data
+        project_name_map = load_project_name_map(default_manager_map)
         manager_map = load_project_manager_map(default_manager_map)
         budget_df = load_budget_summary(default_budget)
         responsibility_cost_mapping = load_responsibility_cost_mapping(default_responsibility_cost_dir)
@@ -378,6 +383,11 @@ def run_cli():
         labor_month_rows,
         finance_category_rows,
     ) in build_project_summary(main_df, sub_df, procurement_df, concrete_df, equipment_df, labor_df, labor_month_df, finance_summary_df, finance_category_df, budget_df):
+        official_project_name = project_name_map.get(str(code).strip().upper(), "")
+        if official_project_name:
+            project_name = official_project_name
+            summary_row["项目名称"] = official_project_name
+
         export_project_report(
             project_reports_dir,
             code,
@@ -399,7 +409,7 @@ def run_cli():
         )
         summary_rows.append(summary_row)
 
-    export_index_file(project_reports_dir, summary_rows, cost_stats_df, budget_df)
+    export_index_file(output_root, summary_rows, cost_stats_df, budget_df)
     (
         input_rows,
         cost_stats_fields,
@@ -422,7 +432,7 @@ def run_cli():
     )
 
     export_provenance_excel(
-        project_reports_dir,
+        output_root,
         input_rows,
         cost_stats_fields,
         procurement_fields,
@@ -457,7 +467,8 @@ def run_cli():
     print(f"📁 项目合同汇总：{project_reports_dir}")
     print(f"📁 项目经理目录：{output_root / PROJECT_MANAGER_DIRNAME}")
     print(f"📁 项目状态目录：{output_root / PROJECT_STATUS_DIRNAME}")
-    print(f"📄 索引文件：{project_reports_dir / '项目汇总索引.xlsx'}")
+    print(f"📄 索引文件：{output_root / '项目汇总索引.xlsx'}")
+    print(f"📄 字段映射：{output_root / '数据来源与字段映射.xlsx'}")
 
 
 if __name__ == "__main__":

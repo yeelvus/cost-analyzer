@@ -139,6 +139,50 @@ def load_project_manager_map(manager_path: Path) -> Dict[str, str]:
     return {}
 
 
+def load_project_name_map(manager_path: Path) -> Dict[str, str]:
+    """从项目基本信息表读取 `项目编码 -> 项目名称` 映射。"""
+    if not manager_path.exists():
+        return {}
+
+    def _read_candidates() -> List[pd.DataFrame]:
+        result: List[pd.DataFrame] = []
+        for header in (0, 1):
+            try:
+                df_tmp = pd.read_excel(manager_path, sheet_name=0, header=header)
+                if not df_tmp.empty:
+                    result.append(df_tmp)
+            except Exception:
+                continue
+        return result
+
+    def _pick_col(columns, candidates: List[str]) -> Optional[str]:
+        for cand in candidates:
+            if cand in columns:
+                return cand
+        return None
+
+    for df in _read_candidates():
+        cols = [str(c).strip() for c in df.columns]
+        df.columns = cols
+
+        code_col = _pick_col(cols, ["项目编码", "项目代码", "项目编号", "编码"])
+        name_col = _pick_col(cols, ["项目名称", "项目全称", "项目简称"])
+        if code_col is None or name_col is None:
+            continue
+
+        mapping: Dict[str, str] = {}
+        for _, row in df.iterrows():
+            code = normalize_project_code(row.get(code_col, ""))
+            name = normalize_project_name(row.get(name_col, ""))
+            if code and name:
+                mapping[code] = name
+
+        if mapping:
+            return mapping
+
+    return {}
+
+
 def read_txt_file(file_path: Path) -> str:
     content = ""
     for enc in ["utf-8", "gbk"]:
