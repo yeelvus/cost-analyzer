@@ -1,12 +1,3 @@
-"""
-合同汇总对比脚本（自动化版本）
-功能：
-1. 自动扫描指定目录下的所有合同汇总文件（Excel/JSON）
-2. 按时间排序，对比所有相邻月份
-3. 输出每月新增、删除、金额变化的合同
-4. 所有结果汇总到一个Excel文件中
-"""
-
 import pandas as pd
 import os
 import re
@@ -30,6 +21,8 @@ from excel_formatting_utils import apply_common_excel_layout  # noqa: E402
 DATA_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_分包合同台账_std"
 OUTPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/3_分包合同_sum"
 AMOUNT_TOLERANCE = 1.0  # 金额差异容差（泰铢）
+
+OUTPUT_FILENAME = "合同逐月对比汇总.xlsx"   # ← 固定文件名，无时间戳后缀
 
 
 def extract_year_month(filename):
@@ -585,9 +578,9 @@ def build_project_contract_total_summary(files_data):
 
 
 def main():
-    """主函数"""
+    """主函数 - 支持增量更新 Excel"""
     print("="*80)
-    print("合同汇总自动对比系统")
+    print("合同汇总自动对比系统（支持增量更新版本）")
     print("="*80)
 
     # 扫描文件
@@ -597,70 +590,65 @@ def main():
         print("\n错误：至少需要2个月份的数据才能进行对比")
         return
 
-    # 准备输出
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_file = os.path.join(OUTPUT_DIR, f'合同逐月对比汇总_{timestamp}.xlsx')
+    output_file = os.path.join(OUTPUT_DIR, OUTPUT_FILENAME)
 
-    # 存储所有变化记录
-    all_change_parts = []
+    file_exists = os.path.exists(output_file)
+    print(f"输出文件: {output_file}  (已存在: {file_exists})")
 
-    # 逐月对比
-    print("\n" + "="*80)
-    print("开始逐月对比...")
-    print("="*80)
+    # 存储本次新产生的变化记录（仅用于追加）
+    all_new_change_parts = []
 
+    print("\n开始逐月对比...")
     for i in range(len(files_data) - 1):
         prev_month, prev_file, _, df_prev = files_data[i]
         curr_month, curr_file, _, df_curr = files_data[i + 1]
 
-        print(f"\n对比: {format_month_display(prev_month)} vs {format_month_display(curr_month)}")
-        print(f"  前: {prev_file}")
-        print(f"  后: {curr_file}")
+        print(f"  对比: {format_month_display(prev_month)} vs {format_month_display(curr_month)}")
 
         comparison = compare_two_months(df_prev, df_curr, prev_month, curr_month)
-
-        new_count = len(comparison['new'])
-        deleted_count = len(comparison['deleted'])
-        changed_count = len(comparison['changed'])
-
-        print(f"  ✓ 新增: {new_count} 个")
-        print(f"  ✓ 删除: {deleted_count} 个")
-        print(f"  ✓ 金额变化: {changed_count} 个")
-
         simple_change_df = build_simple_change_rows(comparison, prev_month, curr_month)
-        if len(simple_change_df) > 0:
-            all_change_parts.append(simple_change_df)
 
-    # 生成各汇总表
-    print("\n正在生成汇总表...")
+        if len(simple_change_df) > 0:
+            all_new_change_parts.append(simple_change_df)
+            print(f"    ✓ 本次新增变化记录: {len(simple_change_df)} 条")
+
+    # 生成各汇总表（每次都基于最新数据重新生成）
+    print("\n生成汇总表...")
     project_contract_total_df = build_project_contract_total_summary(files_data)
     project_month_summary_df = build_project_month_amount_summary(files_data)
     project_month_increment_df = build_project_month_increment_summary(files_data)
     project_subcontractor_df = build_project_subcontractor_summary(files_data)
 
-    # 写入Excel
-    print("正在写入Excel报告...")
-    with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
-        # Sheet0: 项目分包合同汇总（最新月份）
+    # 合并本次变化记录
+    new_changes_df = pd.concat(all_new_change_parts, ignore_index=True) if all_new_change_parts else pd.DataFrame(
+        columns=['对比月份', '变化类型', '合同编号', '项目名称', '上月合同额', '本月合同额', '变化额']
+    )
+
+    # 写入Excel（支持增量更新）
+    print("正在写入/更新 Excel...")
+    
+    writer_kwargs = dict(engine='openpyxl', mode='a' if file_exists else 'w')
+    if file_exists:
+        writer_kwargs['if_sheet_exists'] = 'replace'
+    with pd.ExcelWriter(output_file, **writer_kwargs) as writer:
+        # 1. 完整覆盖更新的Sheet（快照类）
         project_contract_total_df.to_excel(writer, sheet_name='项目分包合同汇总', index=False)
-
-        # Sheet1: 项目年月合同额汇总
         project_month_summary_df.to_excel(writer, sheet_name='项目年月合同额汇总', index=False)
-
-        # Sheet2: 签订金额增量对比（首月空白，后续月显示与上月差值）
         project_month_increment_df.to_excel(writer, sheet_name='签订金额增量对比', index=False)
-
-        # Sheet3: 项目分包单位统计
         project_subcontractor_df.to_excel(writer, sheet_name='项目分包单位统计', index=False)
 
-        # Sheet4: 合同变化汇总（精简版：新增合同额 + 合同额变化）
-        if all_change_parts:
-            changes_df = pd.concat(all_change_parts, ignore_index=True)
-            changes_df.to_excel(writer, sheet_name='合同变化汇总', index=False)
+        # 2. 合同变化汇总：仅追加新记录（核心需求）
+        sheet_name = '合同变化汇总'
+        
+        if file_exists and sheet_name in writer.book.sheetnames:
+            # 已存在Sheet → 追加（不写表头）
+            new_changes_df.to_excel(writer, sheet_name=sheet_name, index=False, header=False, startrow=writer.book[sheet_name].max_row)
+            print(f"  → 已追加 {len(new_changes_df)} 条新变化记录到 '合同变化汇总'")
         else:
-            pd.DataFrame(columns=['对比月份', '变化类型', '合同编号', '项目名称', '上月合同额', '本月合同额', '变化额']).to_excel(
-                writer, sheet_name='合同变化汇总', index=False)
+            # 不存在或首次创建 → 正常写入（带表头）
+            new_changes_df.to_excel(writer, sheet_name=sheet_name, index=False)
+            print(f"  → 创建新Sheet '合同变化汇总'，写入 {len(new_changes_df)} 条记录")
 
     # 对所有Sheet应用统一格式化
     wb = load_workbook(output_file)
@@ -668,16 +656,16 @@ def main():
         apply_common_excel_layout(ws, numeric_start_col=3)
     wb.save(output_file)
 
-    print(f"\n✓ 报告已生成: {output_file}")
-    print("\n包含以下Sheet:")
-    print("  0. 项目分包合同汇总   — 最新月份按项目汇总分包合同金额")
-    print("  1. 项目年月合同额汇总  — 项目编码 x 年月 的分包签订合同额汇总")
-    print("  2. 签订金额增量对比   — 按月新增合同额增量（首月留空）")
-    print("  3. 项目分包单位统计   — 项目名称、金额不为0的协作体数量（分包数量）")
-    print("  4. 合同变化汇总       — 精简展示新增合同额与合同额变化")
+    print(f"\n✓ 更新完成！文件路径: {output_file}")
+    print("包含以下Sheet：")
+    print("  • 项目分包合同汇总     （最新快照）")
+    print("  • 项目年月合同额汇总    （透视表）")
+    print("  • 签订金额增量对比      （月度增量）")
+    print("  • 项目分包单位统计      （协作体数量）")
+    print("  • 合同变化汇总          （历史累计 + 本次追加）")
 
     print("\n" + "="*80)
-    print("对比完成！")
+    print("合同逐月对比更新完毕！")
     print("="*80)
 
 
