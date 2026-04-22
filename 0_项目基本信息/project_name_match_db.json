@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-04-22 09:25:48",
+  "updated_at": "2026-04-22 10:22:24",
   "projects": {
     "永强车业项目": {
       "project_code": "THCC-2025-005",
@@ -360,39 +360,27 @@
         "清迈垃圾粉筛"
       ]
     },
-    "中石泰国工厂": {
-      "project_code": "THCC-2025-004",
-      "target_status": "Z_中石",
+    "中石科技": {
+      "project_code": "THCC-2021-002",
+      "target_status": "D_已完工",
       "aliases": [
+        "泰国昂纳新工厂（土建）",
+        "昂纳新工厂项目",
+        "中石伟业科技改造项目",
+        "泰国中石伟业科技改造项目（土建+安装）",
         "泰国中石伟业科技改造项目（土建+安装）",
         "中石伟业",
         "中石项目"
       ]
     },
-    "中石科技": {
-      "project_code": "THCC-2023-007",
-      "target_status": "Z_中石",
-      "aliases": [
-        "中石伟业科技改造项目",
-        "泰国中石伟业科技改造项目（土建+安装）"
-      ]
-    },
-    "泰国工厂": {
-      "project_code": "THCC-2021-002",
-      "target_status": "Z_中石",
-      "aliases": [
-        "泰国昂纳新工厂（土建）",
-        "昂纳新工厂项目"
-      ]
-    },
     "振威特（装修）": {
       "project_code": "THCC-2024-005",
-      "target_status": "需手动核对",
+      "target_status": "",
       "aliases": []
     },
     "TPI技改项目": {
       "project_code": "LSBM-01",
-      "target_status": "需手动核对",
+      "target_status": "",
       "aliases": [
         "TPI项目",
         "TPI"
@@ -400,12 +388,12 @@
     },
     "欣旺达（缓建区）": {
       "project_code": "THCC-2025-009",
-      "target_status": "需手动核对",
+      "target_status": "",
       "aliases": []
     },
     "北新建材": {
       "project_code": "THCC-2023-013",
-      "target_status": "需手动核对",
+      "target_status": "",
       "aliases": []
     },
     "建华一期": {
@@ -425,12 +413,12 @@
     },
     "天盾科技": {
       "project_code": "THCC-2026-004",
-      "target_status": "需手动核对",
+      "target_status": "",
       "aliases": []
     },
     "恰恰二期": {
       "project_code": "THCC-2026-003",
-      "target_status": "需手动核对",
+      "target_status": "",
       "aliases": []
     },
     "东威科技": {

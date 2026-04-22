@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 from datetime import datetime
+from pathlib import Path
 
 # ==================== 配置区 ====================
 ROOT_DIR = "5_合同管理📑"
@@ -34,6 +35,47 @@ EXCLUDE_ROOT_FOLDERS = {
     *CONTRACT_TYPES,
 }
 # ==============================================
+
+
+def resolve_root_dir(root_dir):
+    """解析根目录，兼容不同执行目录。"""
+    root_path = Path(root_dir)
+
+    if root_path.is_absolute():
+        if root_path.exists():
+            return str(root_path)
+        raise FileNotFoundError(f"根目录不存在: {root_path}")
+
+    script_dir = Path(__file__).resolve().parent
+    cwd = Path.cwd()
+
+    candidates = [
+        cwd / root_path,
+        script_dir / root_path,
+        script_dir.parent / root_path,
+        script_dir.parent.parent / root_path,
+        script_dir.parent.parent / "01成本统计" / root_path,
+        script_dir.parent.parent / "邯郸中材" / "01成本统计" / root_path,
+    ]
+
+    seen = set()
+    dedup_candidates = []
+    for candidate in candidates:
+        key = str(candidate)
+        if key not in seen:
+            seen.add(key)
+            dedup_candidates.append(candidate)
+
+    for candidate in dedup_candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    checked = "\n".join(f"- {item}" for item in dedup_candidates)
+    raise FileNotFoundError(
+        "根目录不存在，已尝试以下路径:\n"
+        f"{checked}\n"
+        "请修改 ROOT_DIR 为绝对路径，或在正确目录下运行脚本。"
+    )
 
 
 def map_contract_type(folder_name):
@@ -218,7 +260,10 @@ def main():
     print("=" * 60)
 
     try:
-        plan = build_migration_plan(ROOT_DIR)
+        resolved_root_dir = resolve_root_dir(ROOT_DIR)
+        print(f"扫描目录: {resolved_root_dir}")
+
+        plan = build_migration_plan(resolved_root_dir)
         contract_count = len(plan["contract_moves"])
         other_count = len(plan["other_moves"])
 
@@ -251,7 +296,7 @@ def main():
 
         print("\n🚀 开始迁移...")
         moved_contract, moved_other, failed = execute_plan(plan)
-        log_path = save_log(ROOT_DIR, plan, moved_contract, moved_other, failed)
+        log_path = save_log(resolved_root_dir, plan, moved_contract, moved_other, failed)
 
         print("\n" + "=" * 60)
         print("✅ 迁移完成")

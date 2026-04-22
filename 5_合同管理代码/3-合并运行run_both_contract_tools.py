@@ -28,16 +28,14 @@ def main() -> None:
     script_1 = pick_first_existing(
         base_dir,
         [
-            "03_第三步_合同管理文件层级提取数据.py",
-            "03_第三步_合同管理文件层级提取数据-v14.py",
-            "03_第三步_合同目录重构迁移工具.py",
+            "03_合同管理-汇总.py",
         ],
         "step-1",
     )
     script_2 = pick_first_existing(
         base_dir,
         [
-            "04-汇总_总包分包合同额统计.py",
+            "04-总包分包合同额统计.py",
             "contract_summary.py",
         ],
         "step-2",
