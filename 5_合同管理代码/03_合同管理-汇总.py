@@ -64,8 +64,7 @@ else:
 
 output_dir = root_dir
 keyword_str = "+".join(TARGET_KEYWORDS)
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-output_filename = f"{keyword_str}汇总_{timestamp}.xlsx"
+output_filename = f"{keyword_str}汇总.xlsx"
 output_path = os.path.join(output_dir, output_filename)
 
 if os.path.exists(output_path):

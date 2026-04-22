@@ -238,8 +238,7 @@ def scan_all_projects(base_dir, project_name_by_code, general_contract_dir, subp
 
 def generate_excel_report(projects_data, output_dir):
     """生成Excel报告,含4个Sheet"""
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_file = os.path.join(output_dir, f'合同管理_总包分包汇总_{timestamp}.xlsx')
+    output_file = os.path.join(output_dir, '合同管理_总包分包汇总.xlsx')
     print(f"\n生成Excel报告: {output_file}")
 
     df_all = pd.DataFrame(projects_data)
