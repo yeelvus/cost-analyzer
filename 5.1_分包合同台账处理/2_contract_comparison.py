@@ -22,7 +22,7 @@ DATA_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同
 OUTPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/3_分包合同_sum"
 AMOUNT_TOLERANCE = 1.0  # 金额差异容差（泰铢）
 
-OUTPUT_FILENAME = "合同逐月对比汇总.xlsx"   # ← 固定文件名，无时间戳后缀
+OUTPUT_FILENAME = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report/分包合同汇总逐月对比汇总.xlsx"   # ← 固定文件名，无时间戳后缀
 
 
 def extract_year_month(filename):
