@@ -9,7 +9,7 @@ import pandas as pd
 
 
 INPUT_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_sum")
-OUTPUT_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/C_机具租赁分析报告")
+OUTPUT_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report/C_机具租赁分析报告")
 TARGET_SHEET = "项目汇总机具费"
 OUTPUT_PREFIX = "机具费_项目月度总额与增加量"
 
