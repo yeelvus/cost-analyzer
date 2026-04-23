@@ -27,7 +27,7 @@ excel_path = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_材料欠�
 db_path = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
 
 # 输出目录
-output_dir = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_材料欠款/B_材料欠款_std"
+output_dir = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report"
 os.makedirs(output_dir, exist_ok=True)
 
 sheet_name = "汇总表"

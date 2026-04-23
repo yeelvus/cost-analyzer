@@ -17,13 +17,11 @@ import plotly.graph_objects as go
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-# 脚本位于 19_代码/S_数据分析模块/采购部数据分析代码/，需上三级到达 01成本统计。
-# 注意 SCRIPT_DIR 是目录路径，parents[2] 才是 01成本统计。
-_PROJECT_ROOT = SCRIPT_DIR.parents[2]
-_DATA_ROOT = _PROJECT_ROOT / "9_采购部采购台账"
-SUMMARY_INPUT_ROOT = _DATA_ROOT / "B_汇总数据" / "B_标准化汇总"
-ANALYSIS_OUTPUT_ROOT = _DATA_ROOT / "C_数据分析"
-INPUT_GLOB = "*_材料采购_merged.xlsx"
+_PROJECT_ROOT = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计')
+_DATA_ROOT = _PROJECT_ROOT / "9_采购台账📦"
+SUMMARY_INPUT_ROOT = _DATA_ROOT / "B_采购部采购台账_sum"
+ANALYSIS_OUTPUT_ROOT = _PROJECT_ROOT / "Z_report" / "C_采购数据分析"
+INPUT_GLOB = "*_采购台账_std_merged.xlsx"
 DEFAULT_SHEET_NAME = "合并数据"
 OUTPUT_EXCEL_SUFFIX = "_钢筋价格趋势分析"
 OUTPUT_HTML_SUFFIX = "_钢筋价格趋势分析"

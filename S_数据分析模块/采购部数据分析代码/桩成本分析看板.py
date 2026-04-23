@@ -27,13 +27,11 @@ _excel_formatting_utils = _load_module_from_path("excel_formatting_utils", _PROJ
 apply_common_excel_layout = _excel_formatting_utils.apply_common_excel_layout
 
 
-# 脚本位于 Z_代码/数据分析代码/，需上两级到达 9_采购部采购台账/
-_DATA_ROOT = SCRIPT_DIR.parent.parent
-_PROJECT_ROOT = SCRIPT_DIR.parents[2]
-_DATA_ROOT = _PROJECT_ROOT / "9_采购部采购台账"
-SUMMARY_INPUT_ROOT = _DATA_ROOT / "B_汇总数据" / "B_标准化汇总"
-ANALYSIS_OUTPUT_ROOT = _DATA_ROOT / "C_数据分析"
-INPUT_GLOB = "*_材料采购_merged.xlsx"
+_PROJECT_ROOT = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计')
+_DATA_ROOT = _PROJECT_ROOT / "9_采购台账📦"
+SUMMARY_INPUT_ROOT = _DATA_ROOT / "B_采购部采购台账_sum"
+ANALYSIS_OUTPUT_ROOT = _PROJECT_ROOT / "Z_report" / "C_采购数据分析"
+INPUT_GLOB = "*_采购台账_std_merged.xlsx"
 DEFAULT_SHEET_NAME = "合并数据"
 OUTPUT_SUFFIX = "_桩成本分析看板"
 
