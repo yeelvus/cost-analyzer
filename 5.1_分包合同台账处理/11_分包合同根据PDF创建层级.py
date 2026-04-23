@@ -21,40 +21,35 @@ ContractVault Organizer v3.7
 import os
 import shutil
 import datetime
-import re
 import json
-import tkinter as tk
-from tkinter import filedialog, messagebox
 from typing import Dict
 from collections import OrderedDict
 
 # ==================== 配置区（请在此修改） ====================
 CONFIG = {
-    "sub_contract_pattern": r"^F_[A-Z0-9-]+_分包合同$",   # 分包合同正则
-    "main_contract_pattern": r"^E_[A-Z0-9-]+_总包合同$",  # 总包合同正则（适配 E_THCC-2024-006_总包合同）
+    "default_contract_root": "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑",
+    # 仅处理该结构下“项目目录”的直层 PDF：
+    # 5_合同管理📑/A_总包合同|B_分包合同/项目状态目录/项目目录/*.pdf
+    "contract_group_keywords": ["总包合同", "分包合同"],
     "json_template": OrderedDict([
         ("项目名称", ""),
         ("合同编号", ""),
         ("合同类型", ""),
         ("对方公司名称", ""),
         ("合同签订日期", ""),
-        ("生效日期", ""),
-        ("结束日期", ""),
+        ("预计竣工日期", ""),
         ("工期/交货期", ""),
         ("币种", ""),
         ("合同金额", 0.0),
-        ("含税金额", 0.0),
-        ("不含税金额", 0.0),
-        ("税率", ""),
+        ("汇率", ""),
         ("付款方式", ""),
         ("履约保证金", ""),
-        ("合同状态", ""),
-        ("关联主合同编号", ""),
-        ("联系人及电话", ""),
-        ("PDF文件路径", ""),
-        ("收付款记录", []),
         ("备注", "")
     ]),
+    "remove_fields": [
+        "合同状态", "关联主合同编号", "联系人及电话", "PDF文件路径", "收付款记录",
+        "含税金额", "不含税金额", "生效日期"
+    ],
     "old_txt_files": [  # 需要删除的旧 TXT 文件
         "对方单位公司名称.txt", "合同编号.txt", "合同金额.txt",
         "合同签订日期.txt", "计划竣工时间.txt", "开工日期.txt",
@@ -67,17 +62,6 @@ CONFIG = {
 
 
 # ==================== 工具函数 ====================
-def select_directory(title: str) -> str:
-    root = tk.Tk()
-    root.withdraw()
-    directory = filedialog.askdirectory(title=title)
-    root.destroy()
-    if not directory:
-        messagebox.showerror("错误", f"未选择{title}，程序退出。")
-        exit()
-    return os.path.normpath(directory)
-
-
 def is_hidden(name: str) -> bool:
     return any(name == h or (h.startswith('.') and name.startswith('.')) for h in CONFIG["hidden_items"])
 
@@ -88,45 +72,60 @@ def log_operation(log_file: str, message: str):
         f.write(f"[{timestamp}] {message}\n")
 
 
-def ensure_json_file(folder_path: str, log_file: str) -> tuple[int, int, int]:
-    """确保文件夹中存在合同信息.json，不覆盖已有内容，并删除旧的TXT文件"""
+def normalize_contract_type(folder_type: str) -> str:
+    if "分包" in folder_type:
+        return "分包"
+    if "总包" in folder_type:
+        return "总包"
+    return ""
+
+
+def detect_contract_type_by_path(abs_dir_path: str, base_root: str) -> str:
+    """按路径语义识别合同类型，不依赖目录层级。"""
+    try:
+        rel = os.path.relpath(abs_dir_path, base_root)
+    except Exception:
+        return ""
+
+    parts = rel.split(os.sep) if rel != "." else [os.path.basename(base_root)]
+    for part in reversed(parts):
+        if "分包合同" in part:
+            return "分包"
+        if "总包合同" in part:
+            return "总包"
+    return ""
+
+
+def detect_contract_type_by_group_name(group_name: str) -> str:
+    if "分包合同" in group_name:
+        return "分包"
+    if "总包合同" in group_name:
+        return "总包"
+    return ""
+
+
+def ensure_json_file(folder_path: str, log_file: str, folder_type: str) -> tuple[int, int, int]:
+    """确保文件夹中存在合同信息.json；已有文件保持原样，不做任何字段修改。"""
     json_filename = "合同信息.json"
     json_path = os.path.join(folder_path, json_filename)
     deleted_txt_count = 0
-    
+    contract_type = normalize_contract_type(folder_type)
+
+    def build_template() -> OrderedDict:
+        template = OrderedDict(CONFIG["json_template"])
+        template["合同类型"] = contract_type
+        return template
+
     if os.path.exists(json_path):
-        # 文件已存在，读取并合并字段（保留已有数据）
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                existing_data = json.load(f)
-            
-            # 合并逻辑：保留已有值，只添加缺失字段
-            updated_data = OrderedDict()
-            for key, default_value in CONFIG["json_template"].items():
-                updated_data[key] = existing_data.get(key, default_value)
-            
-            # 保留不在模板中的额外字段
-            for key in existing_data:
-                if key not in updated_data:
-                    updated_data[key] = existing_data[key]
-            
-            # 写回文件（保持标准格式）
-            with open(json_path, 'w', encoding='utf-8') as f:
-                json.dump(updated_data, f, ensure_ascii=False, indent=2)
-            
-            print(f"     └─ 更新: {json_filename}")
-            log_operation(log_file, f"检查-更新: {json_path}")
-            json_result = (0, 1)  # 0个新建，1个更新
-            
-        except Exception as e:
-            print(f"     └─ 更新失败 {json_filename}: {e}")
-            log_operation(log_file, f"检查-失败: {json_path} | {e}")
-            return 0, 0, 0
+        # 已有JSON完全保持原样
+        print(f"     └─ 保留已有: {json_filename}")
+        log_operation(log_file, f"检查-保留: {json_path}")
+        return 0, 0, 0
     else:
         # 文件不存在，创建新文件
         try:
             with open(json_path, 'w', encoding='utf-8') as f:
-                json.dump(CONFIG["json_template"], f, ensure_ascii=False, indent=2)
+                json.dump(build_template(), f, ensure_ascii=False, indent=2)
             print(f"     └─ 创建: {json_filename}")
             log_operation(log_file, f"检查-创建: {json_path}")
             json_result = (1, 0)  # 1个新建，0个更新
@@ -135,58 +134,43 @@ def ensure_json_file(folder_path: str, log_file: str) -> tuple[int, int, int]:
             log_operation(log_file, f"检查-失败: {json_path} | {e}")
             return 0, 0, 0
     
-    # 删除旧的 TXT 文件
-    for txt_file in CONFIG["old_txt_files"]:
-        txt_path = os.path.join(folder_path, txt_file)
-        if os.path.exists(txt_path):
-            try:
-                os.remove(txt_path)
-                deleted_txt_count += 1
-                print(f"     └─ 删除旧文件: {txt_file}")
-                log_operation(log_file, f"删除TXT: {txt_path}")
-            except Exception as e:
-                print(f"     └─ 删除失败 {txt_file}: {e}")
-                log_operation(log_file, f"删除失败: {txt_path} | {e}")
-    
+    # 不主动删除任何旧TXT，避免附带改动
     return json_result[0], json_result[1], deleted_txt_count
 
 
-def find_contract_folders_recursive(root_dir: str) -> list[tuple[str, str]]:
-    """递归查找所有合同文件夹"""
-    contract_folders = []
-    sub_pattern = re.compile(CONFIG["sub_contract_pattern"])
-    main_pattern = re.compile(CONFIG["main_contract_pattern"])
+def iter_project_contract_dirs(root_dir: str):
+    """仅枚举 项目目录（合同组/项目状态/项目名），不递归到更深层。"""
+    print(f"开始扫描项目目录（根目录: {root_dir}）...")
+    for group_name in os.listdir(root_dir):
+        if is_hidden(group_name):
+            continue
+        group_path = os.path.join(root_dir, group_name)
+        if not os.path.isdir(group_path):
+            continue
+        if not any(k in group_name for k in CONFIG["contract_group_keywords"]):
+            continue
 
-    def _walk(current_path: str, depth: int = 0):
-        if depth > CONFIG["max_recursion_depth"]:
-            print(f"   深度超限: {current_path}")
-            return
-        try:
-            items = os.listdir(current_path)
-        except Exception as e:
-            print(f"   无法访问: {current_path} | {e}")
-            return
+        contract_type = detect_contract_type_by_group_name(group_name)
+        if not contract_type:
+            continue
 
-        for item in items:
-            if is_hidden(item):
+        print(f"[组] {group_path}")
+        for status_name in os.listdir(group_path):
+            if is_hidden(status_name):
                 continue
-            full_path = os.path.join(current_path, item)
-            rel_path = os.path.relpath(full_path, root_dir)
-            print(f"   [{'→' if os.path.isdir(full_path) else '·'}] 第 {depth+1} 层: {rel_path}")
+            status_path = os.path.join(group_path, status_name)
+            if not os.path.isdir(status_path):
+                continue
+            print(f"   [状态] {status_path}")
 
-            if os.path.isdir(full_path):
-                if sub_pattern.match(item):
-                    contract_folders.append((full_path, item, "分包合同"))
-                    print(f"   发现分包合同: {rel_path}")
-                elif main_pattern.match(item):
-                    contract_folders.append((full_path, item, "总包合同"))
-                    print(f"   发现总包合同: {rel_path}")
-                else:
-                    _walk(full_path, depth + 1)
-
-    print(f"开始递归搜索（根目录: {root_dir}）...")
-    _walk(root_dir)
-    return contract_folders
+            for project_name in os.listdir(status_path):
+                if is_hidden(project_name):
+                    continue
+                project_path = os.path.join(status_path, project_name)
+                if not os.path.isdir(project_path):
+                    continue
+                print(f"      [项目] {project_path}")
+                yield project_path, contract_type
 
 
 # ==================== 核心处理 ====================
@@ -197,7 +181,15 @@ def process_folder(contract_path: str, folder_type: str, log_path: str, stats: D
 
     filenames = os.listdir(contract_path)
     hidden_files = [f for f in filenames if is_hidden(f)]
-    valid_files = [f for f in filenames if os.path.isfile(os.path.join(contract_path, f)) and not is_hidden(f)]
+    valid_extensions = ('.pdf',)
+    valid_files = [
+        f for f in filenames
+        if os.path.isfile(os.path.join(contract_path, f))
+        and not is_hidden(f)
+        and f.lower().endswith(valid_extensions)
+        and not f.startswith('~$')
+        and f != "合同信息.json"
+    ]
     subfolders = [d for d in filenames if os.path.isdir(os.path.join(contract_path, d)) and not is_hidden(d)]
 
     if hidden_files:
@@ -207,22 +199,15 @@ def process_folder(contract_path: str, folder_type: str, log_path: str, stats: D
         log_operation(log_path, msg)
 
     if subfolders:
-        print(f"  ├─ 检查 {len(subfolders)} 个已有子文件夹")
-        for sub in subfolders:
-            sub_path = os.path.join(contract_path, sub)
-            stats["checked_folders"] += 1
-            print(f"  │ └─ 检查: {sub}")
-            c, s, d = ensure_json_file(sub_path, log_path)
-            stats["json_created"] += c
-            stats["json_updated"] += s
-            stats["deleted_txt"] += d
+        msg = f"  ├─ 已有子文件夹 {len(subfolders)} 个（按需求不处理）"
+        print(msg)
+        log_operation(log_path, msg)
 
     if valid_files:
         print(f"  ├─ 处理 {len(valid_files)} 个直接文件")
         for filename in valid_files:
             print(f"  │ └─ 移动: {filename}")
             log_operation(log_path, f"处理文件: {filename}")
-            stats["moved_files"] += 1
 
             src = os.path.join(contract_path, filename)
             new_folder_name = os.path.splitext(filename)[0]
@@ -230,12 +215,20 @@ def process_folder(contract_path: str, folder_type: str, log_path: str, stats: D
                 new_folder_name += "_file"
             new_folder_path = os.path.join(contract_path, new_folder_name)
 
+            if os.path.exists(new_folder_path):
+                msg = f"跳过（已有同名归档文件夹）: {new_folder_name}"
+                print(f"  │   └─ {msg}")
+                log_operation(log_path, msg)
+                stats["skipped_existing_folder"] += 1
+                continue
+
             os.makedirs(new_folder_path, exist_ok=True)
             stats["created_folders"] += 1
 
             dst = os.path.join(new_folder_path, filename)
             try:
                 shutil.move(src, dst)
+                stats["moved_files"] += 1
                 msg = f"移动: {src} → {dst}"
                 print(f"  │   └─ {msg}")
                 log_operation(log_path, msg)
@@ -247,7 +240,7 @@ def process_folder(contract_path: str, folder_type: str, log_path: str, stats: D
 
             stats["checked_folders"] += 1
             print(f"  │   └─ 检查新文件夹: {new_folder_name}")
-            c, s, d = ensure_json_file(new_folder_path, log_path)
+            c, s, d = ensure_json_file(new_folder_path, log_path, folder_type)
             stats["json_created"] += c
             stats["json_updated"] += s
             stats["deleted_txt"] += d
@@ -257,33 +250,29 @@ def process_folder(contract_path: str, folder_type: str, log_path: str, stats: D
 
 # ==================== 主程序 ====================
 if __name__ == "__main__":
+    log_path = ""
     try:
-        # 1. 选择根目录
-        root_dir = select_directory("请选择【合同根目录】（如 5_合同管理，包含任意层级合同文件夹）")
+        # 1. 固定根目录（无弹窗）
+        default_root = os.path.normpath(CONFIG["default_contract_root"])
+        if not os.path.isdir(default_root):
+            raise FileNotFoundError(f"默认路径不存在: {default_root}")
+        root_dir = default_root
         print(f"根目录: {root_dir}")
 
-        # 2. 查找合同文件夹
-        contract_folders = find_contract_folders_recursive(root_dir)
-
-        # 3. 最终确认
+        # 2. 查找项目目录（固定到 合同组/项目状态/项目名）
+        contract_folders = list(iter_project_contract_dirs(root_dir))
         if not contract_folders:
-            messagebox.showwarning("未找到", "未发现任何合同文件夹！请检查目录/命名。")
-            exit()
+            print("未发现可处理的项目目录（请检查 合同组/项目状态/项目名 结构）。")
+            raise SystemExit(0)
 
-        sample = "\n".join([f"• {name} ({os.path.relpath(path, root_dir)})" for path, name, _ in contract_folders[:5]])
-        more = f"\n... 等 {len(contract_folders)-5} 个" if len(contract_folders) > 5 else ""
-        confirm_msg = f"发现 {len(contract_folders)} 个合同文件夹：{sample}{more}\n\n操作：整理 + 补合同信息.json\n确认执行？"
-        if not messagebox.askyesno("最终确认", confirm_msg):
-            messagebox.showinfo("已取消", "用户取消操作。")
-            exit()
-
-        # 4. 日志路径
+        # 3. 日志路径
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         log_path = os.path.join(root_dir, f"操作日志_{timestamp}.txt")
         log_operation(log_path, "=== 程序开始执行 ===")
         log_operation(log_path, f"根目录: {root_dir}")
+        log_operation(log_path, f"候选目录数: {len(contract_folders)}")
 
-        # 5. 初始化统计
+        # 4. 初始化统计
         stats = {
             "processed_folders": 0,
             "moved_files": 0,
@@ -293,15 +282,16 @@ if __name__ == "__main__":
             "json_updated": 0,
             "deleted_txt": 0,
             "skipped_hidden": 0,
+            "skipped_existing_folder": 0,
         }
 
-        # 6. 处理
+        # 5. 处理
         print("\n开始处理...\n")
         log_operation(log_path, "开始处理...")
-        for path, _, folder_type in contract_folders:
+        for path, folder_type in contract_folders:
             process_folder(path, folder_type, log_path, stats)
 
-        # 7. 总结
+        # 6. 总结
         summary = f"""
 处理完成！（根目录: {root_dir}）
 
@@ -313,17 +303,17 @@ if __name__ == "__main__":
 更新 JSON 文件: {stats["json_updated"]} 个
 删除旧 TXT 文件: {stats["deleted_txt"]} 个
 跳过隐藏文件: {stats["skipped_hidden"]} 个
+跳过已有归档文件夹: {stats["skipped_existing_folder"]} 个
 
 日志文件: {os.path.basename(log_path)}
 """
         print(summary)
         log_operation(log_path, "=== 处理完成 ===")
         log_operation(log_path, summary.strip())
-        messagebox.showinfo("完成", summary + f"\n日志保存至：\n{log_path}")
+        print(f"日志保存至: {log_path}")
 
     except Exception as e:
         error_msg = f"程序异常：{str(e)}"
         print(error_msg)
-        if 'log_path' in locals():
+        if log_path:
             log_operation(log_path, f"异常终止: {error_msg}")
-        messagebox.showerror("错误", error_msg)
