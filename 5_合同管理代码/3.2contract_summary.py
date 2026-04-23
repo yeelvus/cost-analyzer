@@ -1,14 +1,40 @@
 import os
 import json
 import pandas as pd
+from pathlib import Path
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-# 合同数据自动汇总统计”脚本，主要用来把分散在各项目目录里的合同信息做成一份年度统计表。
+# 合同数据自动汇总统计"脚本，主要用来把分散在各项目目录里的合同信息做成一份年度统计表。
 
 
 DEFAULT_OUTPUT_DIR = r'/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report'
 DEFAULT_OUTPUT_FILE = '合同汇总统计.xlsx'
+
+# 自动定位合同根目录
+_BASE_CANDIDATES = [
+    '/Users/wyattsun/Desktop/邯郸中材/01成本统计',
+    os.path.expanduser('~/Desktop/邯郸中材/01成本统计'),
+]
+_DEFAULT_CONTRACT_ROOT = '5_合同管理📑'
+
+
+def _get_contract_root():
+    """自动定位合同根目录"""
+    # 优先尝试候选路径
+    for base in _BASE_CANDIDATES:
+        candidate = os.path.join(base, _DEFAULT_CONTRACT_ROOT)
+        if os.path.isdir(candidate):
+            return candidate
+    # 备用：从脚本位置推导
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(5):
+        candidate = os.path.join(script_dir, _DEFAULT_CONTRACT_ROOT)
+        if os.path.isdir(candidate):
+            return candidate
+        script_dir = os.path.dirname(script_dir)
+    # 最后返回 DEFAULT_OUTPUT_DIR 的父级的合同目录
+    return os.path.join(os.path.dirname(DEFAULT_OUTPUT_DIR), _DEFAULT_CONTRACT_ROOT)
 
 
 def _format_date_get_year(v):
@@ -190,7 +216,9 @@ def export_to_excel(records, out_path):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='合同汇总：按年份与总包/分包统计（金额*汇率）')
-    parser.add_argument('--root', '-r', default='.', help='合同根目录（递归查找 合同信息.json）')
+    
+    default_root = _get_contract_root()
+    parser.add_argument('--root', '-r', default=default_root, help=f'合同根目录（递归查找 合同信息.json）\n默认: {default_root}')
     parser.add_argument(
         '--out',
         '-o',
@@ -199,5 +227,16 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
+    if not os.path.isdir(args.root):
+        print(f'❌ 合同根目录不存在: {args.root}')
+        exit(1)
+
+    print(f'📁 合同根目录: {args.root}')
     records = collect_contracts(args.root)
+    
+    if not records:
+        print('❌ 未找到合同数据。')
+        exit(1)
+    
+    print(f'✅ 找到 {len(records)} 条合同记录')
     export_to_excel(records, args.out)
