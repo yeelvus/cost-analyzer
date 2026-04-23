@@ -22,7 +22,7 @@ HEADER_ROW = 0
 
 # 列名配置
 CODE_COLUMN = "项目编码"
-NAME_COLUMN = "项目全称"
+NAME_COLUMN = "项目名称"
 STATUS_COLUMN = "项目状态"
 
 # 根目录（相对于脚本执行位置）
