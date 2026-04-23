@@ -702,6 +702,13 @@ def process_concrete_data():
             output_path = os.path.join(output_dir, output_name)
             _write_outputs(merged_df, detail_summary, customer_summary, monthly_volume_pivot, monthly_amount_pivot, output_path)
 
+            z_report_dir = '/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report'
+            os.makedirs(z_report_dir, exist_ok=True)
+            z_report_path = os.path.join(z_report_dir, output_name)
+            import shutil
+            shutil.copy2(output_path, z_report_path)
+            print(f"  已同步到 Z_report: {z_report_path}")
+
         print("数据处理成功！")
         print(f"文件保存位置: {data_dir}")
 
