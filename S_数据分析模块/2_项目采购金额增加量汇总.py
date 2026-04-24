@@ -12,13 +12,12 @@ import pandas as pd
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
 DATA_ROOT = PROJECT_ROOT / "9_采购部采购台账"
-EXCEL_FORMATTING_UTILS_PATH = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/excel_formatting_utils.py')
 INPUT_ROOT = DATA_ROOT / "B_汇总数据" / "B_标准化汇总"
 OUTPUT_ROOT = DATA_ROOT / "C_数据分析"
-INPUT_GLOB = "*_材料采购_merged.xlsx"
+INPUT_GLOBS = ["*_材料采购_merged.xlsx", "*_采购台账_std_merged.xlsx"]
 DEFAULT_SHEET = "项目汇总"
 DEFAULT_START_PERIOD = "2025-11"
-DEFAULT_OUTPUT_NAME = "项目采购金额增加量汇总.xlsx"
+DEFAULT_OUTPUT_NAME = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report/项目采购金额增加量汇总.xlsx"
 
 
 def _load_module_from_path(module_name: str, module_path: Path):
@@ -30,8 +29,43 @@ def _load_module_from_path(module_name: str, module_path: Path):
     return module
 
 
-_excel_formatting_utils = _load_module_from_path('excel_formatting_utils', EXCEL_FORMATTING_UTILS_PATH)
-apply_common_excel_layout = _excel_formatting_utils.apply_common_excel_layout
+def _resolve_excel_formatting_utils_path() -> Path | None:
+    candidates = [
+        PROJECT_ROOT / "code" / "0_项目基本信息" / "excel_formatting_utils.py",
+        PROJECT_ROOT / "0_项目基本信息" / "excel_formatting_utils.py",
+        SCRIPT_DIR.parent / "0_项目基本信息" / "excel_formatting_utils.py",
+        Path("/Users/wyattsun/Desktop/code/0_项目基本信息/excel_formatting_utils.py"),
+        Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/excel_formatting_utils.py"),
+    ]
+    for p in candidates:
+        if p.is_file():
+            return p
+    return None
+
+
+def _resolve_default_input_root() -> Path:
+    candidates = [
+        INPUT_ROOT,
+        PROJECT_ROOT / "邯郸中材" / "01成本统计" / "9_采购台账📦" / "B_采购部采购台账_sum",
+        PROJECT_ROOT / "01成本统计" / "9_采购台账📦" / "B_采购部采购台账_sum",
+        Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_sum"),
+    ]
+    for p in candidates:
+        if p.is_dir():
+            return p
+    return INPUT_ROOT
+
+
+_excel_utils_path = _resolve_excel_formatting_utils_path()
+if _excel_utils_path is not None:
+    _excel_formatting_utils = _load_module_from_path("excel_formatting_utils", _excel_utils_path)
+    apply_common_excel_layout = _excel_formatting_utils.apply_common_excel_layout
+else:
+    def apply_common_excel_layout(*args, **kwargs):
+        # 样式模块缺失时仅跳过格式化，不影响数据产出。
+        return None
+
+    print("警告: 未找到 excel_formatting_utils.py，已跳过输出样式设置。")
 
 
 def normalize_col_name(name: str) -> str:
@@ -101,8 +135,8 @@ def build_month_label_map(periods: list[str]) -> dict[str, str]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="按项目统计月度采购金额及增加量（从指定起始月份到最新）")
-    parser.add_argument("--input-root", default=str(INPUT_ROOT), help="输入目录，默认 B_汇总数据/B_标准化汇总")
-    parser.add_argument("--sheet", default=DEFAULT_SHEET, help="工作表名称，默认 合并数据")
+    parser.add_argument("--input-root", default=str(_resolve_default_input_root()), help="输入目录，默认自动识别采购汇总目录")
+    parser.add_argument("--sheet", default=DEFAULT_SHEET, help="工作表名称，默认 项目汇总")
     parser.add_argument("--start-period", default=DEFAULT_START_PERIOD, help="起始月份，格式 YYYY-MM，默认 2025-11")
     parser.add_argument("--output", default=str(OUTPUT_ROOT / DEFAULT_OUTPUT_NAME), help="输出 Excel 路径")
     return parser.parse_args()
@@ -177,9 +211,13 @@ def main() -> None:
     if not input_root.is_dir():
         raise FileNotFoundError(f"输入目录不存在: {input_root}")
 
-    files = sorted([p for p in input_root.glob(INPUT_GLOB) if p.is_file()])
+    files: list[Path] = []
+    for pattern in INPUT_GLOBS:
+        files.extend([p for p in input_root.glob(pattern) if p.is_file() and not p.name.startswith("~$")])
+    files = sorted(set(files))
     if not files:
-        raise FileNotFoundError(f"未找到输入文件: {input_root / INPUT_GLOB}")
+        patterns = ", ".join(INPUT_GLOBS)
+        raise FileNotFoundError(f"未找到输入文件，匹配模式: {patterns}，目录: {input_root}")
 
     print(f"输入目录: {input_root}")
     print(f"命中文件数: {len(files)}")

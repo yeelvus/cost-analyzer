@@ -9,29 +9,60 @@ from openpyxl.utils import get_column_letter
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_INFO_DIR = os.path.join(os.path.dirname(CURRENT_DIR), "0_项目基本信息")
-if PROJECT_INFO_DIR not in sys.path:
+
+
+def _resolve_project_info_dir() -> str | None:
+    """多候选路径探测项目基本信息目录。"""
+    candidates = [
+        os.path.join(CURRENT_DIR, "..", "..", "0_项目基本信息"),  # 向上两级到 code/
+        os.path.join(os.path.dirname(CURRENT_DIR), "..", "0_项目基本信息"),
+        "/Users/wyattsun/Desktop/code/0_项目基本信息",
+    ]
+    for p in candidates:
+        normalized = os.path.normpath(os.path.expanduser(p))
+        if os.path.isdir(normalized):
+            return normalized
+    return None
+
+
+def _resolve_module_path(filename: str, search_dirs: list[str]) -> str | None:
+    """在多个目录中搜索指定模块文件。"""
+    for directory in search_dirs:
+        full_path = os.path.join(directory, filename)
+        if os.path.isfile(full_path):
+            return full_path
+    return None
+
+
+PROJECT_INFO_DIR = _resolve_project_info_dir()
+if PROJECT_INFO_DIR and PROJECT_INFO_DIR not in sys.path:
     sys.path.append(PROJECT_INFO_DIR)
 
 
 def load_apply_common_excel_layout():
-    module_path = os.path.join(PROJECT_INFO_DIR, "excel_formatting_utils.py")
-    if not os.path.exists(module_path):
-        raise FileNotFoundError(f"未找到格式模块: {module_path}")
+    search_dirs = [PROJECT_INFO_DIR] if PROJECT_INFO_DIR else []
+    module_path = _resolve_module_path("excel_formatting_utils.py", search_dirs)
+    if not module_path:
+        print(f"警告: 未找到 excel_formatting_utils.py，已跳过输出样式设置。")
+        return lambda *args, **kwargs: None
 
-    spec = importlib.util.spec_from_file_location("excel_formatting_utils", module_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"无法加载格式模块: {module_path}")
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.apply_common_excel_layout
+    try:
+        spec = importlib.util.spec_from_file_location("excel_formatting_utils", module_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"无法加载格式模块")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.apply_common_excel_layout
+    except Exception as exc:
+        print(f"警告: 加载格式模块失败 {exc}，已跳过样式设置。")
+        return lambda *args, **kwargs: None
 
 
 def load_project_name_matcher_module():
-    module_path = os.path.join(PROJECT_INFO_DIR, "project_name_matcher.py")
-    if not os.path.exists(module_path):
-        raise FileNotFoundError(f"未找到项目匹配模块: {module_path}")
+    search_dirs = [PROJECT_INFO_DIR] if PROJECT_INFO_DIR else []
+    module_path = _resolve_module_path("project_name_matcher.py", search_dirs)
+    if not module_path:
+        raise FileNotFoundError(f"未找到项目匹配模块: project_name_matcher.py")
 
     spec = importlib.util.spec_from_file_location("project_name_matcher", module_path)
     if spec is None or spec.loader is None:
@@ -43,9 +74,10 @@ def load_project_name_matcher_module():
 
 
 def load_subject_mapper_class():
-    module_path = os.path.join(CURRENT_DIR, "subject_mapper.py")
-    if not os.path.exists(module_path):
-        raise FileNotFoundError(f"未找到摘要匹配模块: {module_path}")
+    search_dirs = [CURRENT_DIR]
+    module_path = _resolve_module_path("subject_mapper.py", search_dirs)
+    if not module_path:
+        raise FileNotFoundError(f"未找到摘要匹配模块: subject_mapper.py")
 
     spec = importlib.util.spec_from_file_location("subject_mapper", module_path)
     if spec is None or spec.loader is None:
@@ -63,7 +95,7 @@ SUBJECT_MAPPER_CLASS = load_subject_mapper_class()
 
 INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_财务付款数据/A_财务付款_raw"
 OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_财务付款数据/B_财务付款_std"
-PROJECT_MATCH_DB_PATH = os.path.join(PROJECT_INFO_DIR, "project_name_match_db.json")
+PROJECT_MATCH_DB_PATH = os.path.join(PROJECT_INFO_DIR, "project_name_match_db.json") if PROJECT_INFO_DIR else ""
 SUBJECT_RULES_PATH = os.path.join(CURRENT_DIR, "rules.json")
 
 
@@ -482,14 +514,17 @@ def apply_output_format(output_path):
 
     amount_headers = set(AMOUNT_COLUMNS)
     for ws in wb.worksheets:
-        APPLY_COMMON_EXCEL_LAYOUT(
-            ws,
-            numeric_start_col=1,
-            amount_headers=amount_headers,
-            header_row=1,
-            header_height=40,
-            freeze_panes="A2",
-        )
+        try:
+            APPLY_COMMON_EXCEL_LAYOUT(
+                ws,
+                numeric_start_col=1,
+                amount_headers=amount_headers,
+                header_row=1,
+                header_height=40,
+                freeze_panes="A2",
+            )
+        except Exception as exc:
+            print(f"  ⚠️ 应用样式格式失败: {exc}")
 
     wb.save(output_path)
 

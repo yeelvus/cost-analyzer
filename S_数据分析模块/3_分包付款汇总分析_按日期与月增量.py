@@ -5,20 +5,54 @@ from pathlib import Path
 import importlib.util
 import pandas as pd
 
-INPUT_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务部💰/B_输出汇总文件")
-OUTPUT_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务部💰/C_分析文件")
-FORMAT_UTIL_PATH = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/excel_formatting_utils.py")
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _SCRIPT_DIR.parent.parent  # Desktop 下一层
+
+
+def _resolve_input_dir() -> Path:
+    candidates = [
+        Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_分包对账与付款/B_分包对账与付款_sum"),
+        _PROJECT_ROOT / "邯郸中材" / "01成本统计" / "12-财务数据💰" / "A_分包对账与付款" / "B_分包对账与付款_sum",
+        _PROJECT_ROOT / "01成本统计" / "12-财务数据💰" / "A_分包对账与付款" / "B_分包对账与付款_sum",
+    ]
+    for p in candidates:
+        if p.is_dir():
+            return p
+    return candidates[0]
+
+
+def _resolve_format_util_path() -> Path | None:
+    candidates = [
+        _SCRIPT_DIR.parent / "0_项目基本信息" / "excel_formatting_utils.py",
+        Path("/Users/wyattsun/Desktop/code/0_项目基本信息/excel_formatting_utils.py"),
+        _PROJECT_ROOT / "code" / "0_项目基本信息" / "excel_formatting_utils.py",
+        Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/excel_formatting_utils.py"),
+    ]
+    for p in candidates:
+        if p.is_file():
+            return p
+    return None
+
+
+INPUT_DIR = _resolve_input_dir()
+OUTPUT_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report/财务分包付款_分析文件")
+FORMAT_UTIL_PATH = _resolve_format_util_path()
 
 
 def load_apply_common_excel_layout():
-    """动态加载格式化工具，避免路径中中文/数字目录导致常规import不稳定。"""
+    """动态加载格式化工具，找不到时返回空降级函数。"""
+    if FORMAT_UTIL_PATH is None or not FORMAT_UTIL_PATH.is_file():
+        print(f"警告: 未找到 excel_formatting_utils.py，已跳过输出样式设置。")
+        return lambda *a, **kw: None
     spec = importlib.util.spec_from_file_location("excel_formatting_utils", str(FORMAT_UTIL_PATH))
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"无法加载格式化工具: {FORMAT_UTIL_PATH}")
+        print(f"警告: 无法加载格式化工具: {FORMAT_UTIL_PATH}")
+        return lambda *a, **kw: None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     if not hasattr(module, "apply_common_excel_layout"):
-        raise RuntimeError("格式化工具中未找到 apply_common_excel_layout")
+        print("警告: 格式化工具中未找到 apply_common_excel_layout")
+        return lambda *a, **kw: None
     return module.apply_common_excel_layout
 
 
