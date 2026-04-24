@@ -23,10 +23,21 @@ INPUT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数
 OUTPUT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_分包对账与付款/B_分包对账与付款_sum"
 
 # 后置分析脚本：在分包台账汇总完成后自动执行
-POST_ANALYSIS_SCRIPT = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "3_分包付款汇总分析_按日期与月增量.py"
-)
+def _resolve_post_analysis_script() -> str:
+    current_dir = Path(__file__).resolve().parent
+    candidates = [
+        current_dir / "3_分包付款汇总分析_按日期与月增量.py",
+        current_dir.parent.parent / "S_数据分析模块" / "3_分包付款汇总分析_按日期与月增量.py",
+        Path("/Users/wyattsun/Desktop/code/S_数据分析模块/3_分包付款汇总分析_按日期与月增量.py"),
+    ]
+    for p in candidates:
+        if p.is_file():
+            return str(p)
+    # 返回首选路径用于报错提示
+    return str(candidates[0])
+
+
+POST_ANALYSIS_SCRIPT = _resolve_post_analysis_script()
 
 # 项目名称匹配模块与数据库路径（优先按脚本相对路径自动定位，兼容目录迁移）
 def _resolve_base_info_dir():
@@ -750,16 +761,14 @@ def process_month_folder(folder_path):
     except Exception:
         unique_project_subitems = []
     
-    # 输出到新Excel（文件名带时间戳）
-    from datetime import datetime
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # 输出到新Excel（固定文件名，不带时间后缀）
     
     # 确保输出目录存在
     if not os.path.exists(OUTPUT_FOLDER):
         os.makedirs(OUTPUT_FOLDER)
         print(f"✓ 创建输出目录: {OUTPUT_FOLDER}\n")
     
-    output_path = os.path.join(OUTPUT_FOLDER, f"{month_tag}_分包台账汇总_{ts}.xlsx")
+    output_path = os.path.join(OUTPUT_FOLDER, f"{month_tag}_分包台账汇总.xlsx")
     
     print(f"{'='*60}")
     print(f"正在生成Excel文件...")
