@@ -36,7 +36,7 @@ def main() -> None:
         base_dir,
         [
             "04-总包分包合同额统计.py",
-            "contract_summary.py",
+            "3.2_contract_summary.py",
         ],
         "step-2",
     )
