@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "updated_at": "2026-04-24 14:34:10",
+  "updated_at": "2026-05-02 14:40:06",
   "projects": {
     "永强车业项目": {
       "project_code": "THCC-2025-005",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "永强",
         "永强车行项目",
@@ -14,7 +14,7 @@
     },
     "樱花三期": {
       "project_code": "THCC-2025-018",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "樱花项目",
         "樱花"
@@ -22,7 +22,7 @@
     },
     "融昌项目": {
       "project_code": "THCC-2025-013",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "融昌",
         "融昌一标",
@@ -32,7 +32,7 @@
     },
     "宝诚管道": {
       "project_code": "THCC-2025-016",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "宝诚管道项目",
         "宝诚",
@@ -41,7 +41,7 @@
     },
     "正鑫源项目": {
       "project_code": "THCC-2024-010",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国正鑫源（土建）",
         "正鑫源"
@@ -49,28 +49,28 @@
     },
     "信昌项目": {
       "project_code": "THCC-2025-014",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "信昌"
       ]
     },
     "万源通项目": {
       "project_code": "THCC-2025-017",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "万源通"
       ]
     },
     "糖厂项目": {
       "project_code": "THCC-2025-011",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "糖厂"
       ]
     },
     "腾洋项目": {
       "project_code": "THCC-2025-015",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "腾洋",
         "腾洋光学项目",
@@ -79,7 +79,7 @@
     },
     "伟隆项目": {
       "project_code": "THCC-2025-019",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "伟隆",
         "伟隆阀门项目",
@@ -88,14 +88,14 @@
     },
     "合盈项目": {
       "project_code": "THCC-2025-006",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "合盈"
       ]
     },
     "荣泰项目": {
       "project_code": "THCC-2025-010",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "荣泰项目项目",
         "荣泰"
@@ -103,7 +103,7 @@
     },
     "泰华电子项目": {
       "project_code": "THCC-2025-002",
-      "target_status": "AS_收尾项目",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国泰华（伊顿）",
         "泰华（伊顿）",
@@ -116,7 +116,7 @@
     },
     "正大服务区项目": {
       "project_code": "THCC-2025-020",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "CPE项目",
         "CPE服务区项目",
@@ -126,7 +126,7 @@
     },
     "欣旺达项目": {
       "project_code": "THCC-2024-006",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "欣旺达芒果项目",
         "欣旺达"
@@ -134,7 +134,7 @@
     },
     "裕州项目": {
       "project_code": "THCC-2025-001",
-      "target_status": "AS_收尾项目",
+      "target_status": "需手动核对",
       "aliases": [
         "裕洲",
         "裕洲项目"
@@ -142,7 +142,7 @@
     },
     "新通联项目": {
       "project_code": "THCC-2024-009",
-      "target_status": "AS_收尾项目",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国新通联（安装）",
         "新通联"
@@ -150,7 +150,7 @@
     },
     "双塔项目": {
       "project_code": "THCC-2024-007",
-      "target_status": "AS_收尾项目",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国泰捷（双塔）食品新建项目（土建+安装）",
         "泰捷（双塔）",
@@ -161,7 +161,7 @@
     },
     "伊莱特项目": {
       "project_code": "THCC-2025-003",
-      "target_status": "AS_收尾项目",
+      "target_status": "需手动核对",
       "aliases": [
         "伊莱特",
         "伊莱特、沃森"
@@ -169,7 +169,7 @@
     },
     "沃森项目": {
       "project_code": "THCC-2024-004",
-      "target_status": "AS_收尾项目",
+      "target_status": "需手动核对",
       "aliases": [
         "沃森改造项目",
         "沃森一期改造项目",
@@ -183,19 +183,19 @@
     },
     "泰跃项目": {
       "project_code": "THCC-2025-008",
-      "target_status": "D_1_已完工（已结算、成本已确认）",
+      "target_status": "需手动核对",
       "aliases": [
         "旭创项目"
       ]
     },
     "华谊项目": {
       "project_code": "THCC-2023-001",
-      "target_status": "D_1_已完工（已结算、成本已确认）",
+      "target_status": "需手动核对",
       "aliases": []
     },
     "建滔板材": {
       "project_code": "THCC-2022-002",
-      "target_status": "D_1_已完工（已结算、成本已确认）",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国建滔板材（安装）",
         "建滔板材项目"
@@ -203,7 +203,7 @@
     },
     "阳光城项目": {
       "project_code": "THCC-2023-006",
-      "target_status": "D_1_已完工（已结算、成本已确认）",
+      "target_status": "需手动核对",
       "aliases": [
         "阳光项目",
         "阳光物流",
@@ -212,7 +212,7 @@
     },
     "泰兴项目": {
       "project_code": "THCC-2023-005",
-      "target_status": "D_1_已完工（已结算、成本已确认）",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国泰兴精密厂房（土建+安装）",
         "泰兴",
@@ -221,7 +221,7 @@
     },
     "超颖项目": {
       "project_code": "THCC-2023-010",
-      "target_status": "D_1_已完工（已结算、成本已确认）",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国超颖（土建+安装）",
         "超颖"
@@ -229,7 +229,7 @@
     },
     "联合橱柜": {
       "project_code": "THCC-2023-008",
-      "target_status": "D_1_已完工（已结算、成本已确认）",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国联合橱柜（土建+安装）",
         "联合橱柜项目",
@@ -238,7 +238,7 @@
     },
     "火炬科技": {
       "project_code": "THCC-2023-011",
-      "target_status": "D_2_已完工(未结算、成本已确定）",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国新火炬科技厂房改造项目（土建）",
         "新火炬科技厂房改造项目",
@@ -247,7 +247,7 @@
     },
     "贝克威尔": {
       "project_code": "THCC-2022-001",
-      "target_status": "D_2_已完工(未结算、成本已确定）",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国贝克威尔（土建+安装）",
         "贝克威尔项目"
@@ -255,7 +255,7 @@
     },
     "振威特（土建+装修）": {
       "project_code": "THCC-2023-012",
-      "target_status": "D_2_已完工(未结算、成本已确定）",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国振威特（土建+安装）",
         "振威特",
@@ -264,7 +264,7 @@
     },
     "北新建材大城府": {
       "project_code": "THCC-2024-002",
-      "target_status": "D_2_已完工(未结算、成本已确定）",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国北新项目（土建+安装）",
         "北新",
@@ -274,7 +274,7 @@
     },
     "昂纳科技": {
       "project_code": "THCC-2023-003",
-      "target_status": "D_3_已完工(已结算、成本未确定）",
+      "target_status": "需手动核对",
       "aliases": [
         "昂纳",
         "昂纳项目"
@@ -282,7 +282,7 @@
     },
     "志亿锌业": {
       "project_code": "THCC-2020-001",
-      "target_status": "D_3_已完工(已结算、成本未确定）",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国志亿锌业项目（土建+安装）",
         "志亿锌业项目"
@@ -290,12 +290,12 @@
     },
     "泰国旧工厂改造（0-Net）": {
       "project_code": "THCC-2023-002",
-      "target_status": "D_3_已完工(已结算、成本未确定）",
+      "target_status": "需手动核对",
       "aliases": []
     },
     "建龙项目": {
       "project_code": "THCC-2021-001",
-      "target_status": "D_3_已完工(已结算、成本未确定）",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国建龙维纳项目（安装）",
         "建龙",
@@ -304,12 +304,12 @@
     },
     "SHX酒店": {
       "project_code": "THCC-2024-008",
-      "target_status": "D_3_已完工(已结算、成本未确定）",
+      "target_status": "需手动核对",
       "aliases": []
     },
     "胜途制造": {
       "project_code": "THCC-2024-001",
-      "target_status": "D_3_已完工(已结算、成本未确定）",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国胜途项目（土建+安装）",
         "胜途",
@@ -318,17 +318,17 @@
     },
     "泰国电镀线项目": {
       "project_code": "THCC-2023-004",
-      "target_status": "D_4_已完工(与业主未结算、成本不确定）",
+      "target_status": "需手动核对",
       "aliases": []
     },
     "SCCC": {
       "project_code": "THCC-2025-007",
-      "target_status": "D_4_已完工(与业主未结算、成本不确定）",
+      "target_status": "需手动核对",
       "aliases": []
     },
     "迈思科锐项目": {
       "project_code": "THCC-2024-003",
-      "target_status": "D_已完工",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国迈思科锐项目（土建+安装）",
         "迈思科锐",
@@ -338,7 +338,7 @@
     },
     "TOMAX-METAK": {
       "project_code": "THCC-2023-009",
-      "target_status": "D_已完工",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国TOMAX项目（土建+安装）",
         "TOMAX",
@@ -347,12 +347,12 @@
     },
     "海螺型材": {
       "project_code": "THCC-2019-001",
-      "target_status": "D_已完工",
+      "target_status": "需手动核对",
       "aliases": []
     },
     "垃圾筛分项目": {
       "project_code": "THCC-2025-012",
-      "target_status": "D_已完工",
+      "target_status": "需手动核对",
       "aliases": [
         "清迈项目",
         "清迈垃圾筛分项目",
@@ -362,7 +362,7 @@
     },
     "中石科技": {
       "project_code": "THCC-2021-002",
-      "target_status": "D_已完工",
+      "target_status": "需手动核对",
       "aliases": [
         "泰国昂纳新工厂（土建）",
         "昂纳新工厂项目",
@@ -398,7 +398,7 @@
     },
     "建华一期": {
       "project_code": "THCC-2026-001",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": [
         "建华管桩项目",
         "建华项目",
@@ -423,7 +423,7 @@
     },
     "东威科技": {
       "project_code": "THCC-2026-002",
-      "target_status": "A_在建项目",
+      "target_status": "需手动核对",
       "aliases": []
     },
     "中石泰国工厂": {
@@ -646,6 +646,7 @@
     "飞剑",
     "飞剑项目",
     "龙岩搅拌站项目",
-    "龙炎搅拌站项目"
+    "龙炎搅拌站项目",
+    "恰恰项目"
   ]
 }
