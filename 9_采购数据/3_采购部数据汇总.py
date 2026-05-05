@@ -8,6 +8,7 @@ import re
 import importlib.util
 
 PROJECT_MATCHER_MODULE_PATH = '/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_matcher.py'
+PROCUREMENT_STD_MODULE_PATH = '/Users/wyattsun/Desktop/code/9_采购数据/2_采购部单文件标准化输出.py'
 
 
 def _load_module_from_path(module_name, file_path):
@@ -41,6 +42,8 @@ PROJECT_INFO_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项�
 PROJECT_MATCH_DB_FILE = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
 EXCEL_FORMATTING_UTILS_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/excel_formatting_utils.py"
 STD_MERGED_SUFFIX = 'std_merged.xlsx'
+SIMPLIFY_DATA_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_simplify"
+SIMPLIFY_OUTPUT_FILENAME = "采购台账_simplify最新快照_std_merged.xlsx"
 # ===================================
 
 # 全局匹配库（来自 0_项目基本信息/project_name_matcher.py）
@@ -360,6 +363,120 @@ def preload_project_matches_for_targets(targets, project_config):
             )
 
 
+def process_simplify_folder(project_config):
+    """读取 B_simplify 下的所有原始台账，标准化提取后合并输出到 B_sum。"""
+    if not os.path.isdir(SIMPLIFY_DATA_ROOT):
+        print(f"B_simplify 目录不存在，跳过: {SIMPLIFY_DATA_ROOT}")
+        return
+
+    # 动态加载 script 2 的标准化提取函数
+    try:
+        script2 = _load_module_from_path("_procurement_std", PROCUREMENT_STD_MODULE_PATH)
+    except Exception as exc:
+        print(f"无法加载标准化模块，跳过 simplify 处理: {exc}")
+        return
+
+    # 排除本脚本自身生成的汇总文件和宽表文件
+    EXCLUDE_NAMES = {"采购原始台账_项目月份覆盖宽表.xlsx", SIMPLIFY_OUTPUT_FILENAME}
+    excel_files = []
+    for fname in sorted(os.listdir(SIMPLIFY_DATA_ROOT)):
+        if fname.startswith("~$") or fname in EXCLUDE_NAMES:
+            continue
+        ext = os.path.splitext(fname)[1].lower()
+        if ext in {".xlsx", ".xls", ".xlsm"}:
+            excel_files.append(os.path.join(SIMPLIFY_DATA_ROOT, fname))
+
+    if not excel_files:
+        print("B_simplify 下未找到可处理文件，跳过")
+        return
+
+    print(f"\n处理 B_simplify 下 {len(excel_files)} 个原始台账...")
+
+    all_dfs = []
+    project_totals = defaultdict(float)
+
+    for file_path in excel_files:
+        fname = os.path.basename(file_path)
+        stem = os.path.splitext(fname)[0]
+        raw_name = stem.split("_", 1)[0].strip() if "_" in stem else stem
+
+        hit = match_project(raw_name, PROJECT_MATCH_DB) if PROJECT_MATCH_DB else None
+        if hit:
+            project_code = hit.get("project_code", "")
+            project_name = hit.get("project_name", raw_name)
+        else:
+            project_code = ""
+            project_name = raw_name
+
+        try:
+            rows, reason = script2.extract_rows_from_single_excel(file_path, project_code, project_name)
+        except Exception as exc:
+            print(f"  ✗ {fname}: {exc}")
+            continue
+
+        if not rows:
+            print(f"  ⚠ {fname}: {reason or '无有效数据'}")
+            continue
+
+        df = pd.DataFrame(rows)
+
+        # 处理本文件积累的未知单位（一次弹窗）
+        resolved = script2._unit_map_utils.resolve_pending_unit_mappings()
+        if resolved and "单位" in df.columns:
+            df["单位"] = df["单位"].apply(lambda v: script2.standardize_unit(v, auto_prompt=False))
+
+        # 过滤金额全零行
+        amount_df = df[[c for c in ["单价", "不含税金额", "7%增值税", "含税金额"] if c in df.columns]].apply(
+            pd.to_numeric, errors="coerce"
+        )
+        df = df[amount_df.fillna(0).sum(axis=1).ne(0)]
+        if df.empty:
+            print(f"  ⚠ {fname}: 金额合计均为0，跳过")
+            continue
+
+        df = script2.enrich_dates(df)
+        all_dfs.append(df)
+        print(f"  ✓ {fname}: {len(df)} 行")
+
+    if not all_dfs:
+        print("B_simplify 无有效数据，不输出汇总文件")
+        return
+
+    merged_df = pd.concat(all_dfs, ignore_index=True)
+    for col in FINAL_OUTPUT_COLUMNS:
+        if col not in merged_df.columns:
+            merged_df[col] = ""
+    merged_df = merged_df[FINAL_OUTPUT_COLUMNS]
+
+    # 构建工作簿
+    output_wb = openpyxl.Workbook()
+    merged_ws = output_wb.active
+    merged_ws.title = "合并数据"
+    merged_ws.append(FINAL_OUTPUT_COLUMNS)
+
+    for _, row in merged_df.iterrows():
+        row_data = [row[col] for col in FINAL_OUTPUT_COLUMNS]
+        merged_ws.append(row_data)
+        code = str(row.get("项目编码", "")).strip()
+        name = str(row.get("项目名称", "")).strip()
+        amt = pd.to_numeric(row.get("含税金额", 0), errors="coerce")
+        if pd.notna(amt):
+            project_totals[(code, name)] += float(amt)
+
+    summary_ws = output_wb.create_sheet("项目汇总")
+    summary_ws.append(["项目编码", "项目名称", "总采购金额"])
+    for (code, name), total in sorted(project_totals.items()):
+        summary_ws.append([code, name, total])
+
+    apply_unified_workbook_format(output_wb)
+
+    os.makedirs(SUMMARY_OUTPUT_ROOT, exist_ok=True)
+    output_path = os.path.join(SUMMARY_OUTPUT_ROOT, SIMPLIFY_OUTPUT_FILENAME)
+    output_wb.save(output_path)
+    print(f"\n已输出 B_simplify 汇总: {output_path}")
+    print(f"共 {len(merged_df)} 行，{len(project_totals)} 个项目")
+
+
 def main():
     global PROJECT_MATCH_DB
 
@@ -427,6 +544,12 @@ def main():
     if PROJECT_MATCH_DB is not None:
         save_db(PROJECT_MATCH_DB_FILE, PROJECT_MATCH_DB)
         print(f"共享项目匹配库已保存: {PROJECT_MATCH_DB_FILE}")
+
+    # 处理 B_simplify 下的最新快照文件
+    print("\n" + "=" * 80)
+    print("处理 B_simplify 最新快照文件...")
+    print("=" * 80)
+    process_simplify_folder(project_config)
 
 if __name__ == "__main__":
     main()
