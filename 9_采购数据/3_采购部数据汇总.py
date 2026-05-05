@@ -47,7 +47,7 @@ STD_MERGED_SUFFIX = 'std_merged.xlsx'
 PROJECT_MATCH_DB = None
 
 FINAL_OUTPUT_COLUMNS = [
-    '项目编码', '项目名称', '材料归类', '物品名称', '规格', '标准单位', '数量',
+    '项目编码', '项目名称', '材料归类', '物品名称', '规格', '单位', '数量',
     '单价', '不含税金额', '7%增值税', '含税金额', '货币种类', '汇率', '年月',
     '标准日期', '供货商名称', '备注', '签订日期'
 ]
@@ -210,20 +210,8 @@ def get_month_folders(raw_root):
 
 
 def choose_target_folders(month_folders):
-    """终端选择处理范围：全部或最新（默认最新）。"""
-    print("\n请选择处理范围：")
-    print("  1) 处理 A_原始数据 下所有月份文件夹")
-    print("  2) 仅处理最新月份文件夹（默认）")
-    choice = input("请输入选项 [回车=2]: ").strip()
-
-    if choice == "1":
-        return month_folders
-
-    # 默认最新：优先取最后一个可识别年月的目录
-    with_ym = [x for x in month_folders if x[2] is not None]
-    if with_ym:
-        return [with_ym[-1]]
-    return [month_folders[-1]] if month_folders else []
+    """直接返回全部月份文件夹，不再弹出选择。"""
+    return month_folders
 
 
 def list_source_excel_files(folder_path):
@@ -396,9 +384,6 @@ def main():
         print(f"  {idx}. {name}  [{tag}]")
 
     targets = choose_target_folders(month_folders)
-    if not targets:
-        print("未选择任何待处理文件夹，程序结束。")
-        return
 
     print("\n将处理以下文件夹：")
     for name, folder_path, _ in targets:

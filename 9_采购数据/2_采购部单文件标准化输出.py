@@ -16,6 +16,7 @@ OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台�
 PROJECT_INFO_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
 PROJECT_MATCH_DB_FILE = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
 PROJECT_MATCHER_MODULE_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_matcher.py"
+UNIT_MAP_UTILS_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/unit_map_utils.py"
 
 
 # ============= 标准化流水线配置 =============
@@ -26,38 +27,39 @@ PIPELINE_CONTEXT = None
 
 # ============= 列配置 =============
 STANDARD_COLUMNS = [
-    "材料归类", "物品名称", "规格", "标准单位", "数量",
+    "材料归类", "物品名称", "规格", "单位", "数量",
     "单价", "不含税金额", "7%增值税", "含税金额", "货币种类", "汇率",
     "签订日期", "供货商名称", "备注",
 ]
 
-CORE_REQUIRED_COLUMNS = ["物品名称", "单位", "数量", "单价", "不含税金额", "含税金额"]
+CORE_REQUIRED_COLUMNS = ["物品名称", "单位", "数量"]
 
 FINAL_OUTPUT_COLUMNS = [
-    "项目编码", "项目名称", "材料归类", "物品名称", "规格", "标准单位", "数量",
+    "项目编码", "项目名称", "材料归类", "物品名称", "规格", "单位", "数量",
     "单价", "不含税金额", "7%增值税", "含税金额", "货币种类", "汇率", "年月",
     "标准日期", "供货商名称", "备注", "签订日期",
 ]
 
-CENTER_ALIGN_COLUMNS = {"标准单位", "数量", "货币种类", "汇率"}
+CENTER_ALIGN_COLUMNS = {"单位", "数量", "货币种类", "汇率"}
 LEFT_ALIGN_COLUMNS = {"签订日期"}
 AMOUNT_COLUMNS = {"单价", "不含税金额", "7%增值税", "含税金额"}
 
 
 COLUMN_MAPPINGS = {
+    "材料归类": ["材料归类"],
     "物品名称": ["物品名称", "采购物资名称", "物资名称"],
-}
-
-UNIT_MAPPING = {
-    "m2": "㎡", "M2": "㎡", "平方米": "㎡", "平米": "㎡", "平方": "㎡", "平": "㎡",
-    "KG": "kg", "公斤": "kg", "KG-袋": "kg",
-    "t": "吨", "dun": "吨",
-    "m": "米", "M": "米",
-    "立方": "m³",
-    "PC": "个", "PCS": "个", "(个)": "个", "个)": "个",
-    "(箱)": "箱", "箱)": "箱", "(根)": "根", "根)": "根", "片)": "片",
-    "j卷": "卷", "快": "块",
-    "桶/7KG": "桶", "桶/20KG": "桶", "捆/10KG": "捆",
+    "规格": ["规格", "规格型号", "型号", "规格型号/参数"],
+    "单位": ["标准单位", "单位"],
+    "数量": ["数量"],
+    "单价": ["单价", "不含税单价", "含税单价"],
+    "不含税金额": ["不含税金额", "金额"],
+    "7%增值税": ["7%增值税", "税额", "增值税", "税金"],
+    "含税金额": ["含税金额", "总金额", "价税合计"],
+    "货币种类": ["货币种类", "币种"],
+    "汇率": ["汇率"],
+    "签订日期": ["签订日期", "日期"],
+    "供货商名称": ["供货商名称", "供货单位", "供应商", "供应商名称"],
+    "备注": ["备注"],
 }
 
 
@@ -68,6 +70,10 @@ def _load_module_from_path(module_name, file_path):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+# 加载单位标准化模块（含 Tkinter 交互对话框与 unit_map.json 读写）
+_unit_map_utils = _load_module_from_path("unit_map_utils", UNIT_MAP_UTILS_PATH)
+standardize_unit = _unit_map_utils.standardize_unit
 
 
 def load_project_matcher_funcs():
@@ -157,9 +163,22 @@ def normalize_headers(headers):
 
 
 def find_header_row(sheet):
+    required_header_hits = ["物品名称", "单位", "数量"]
+
     for row_idx, row in enumerate(sheet.iter_rows(values_only=True), start=1):
         if row and row[0] and str(row[0]).strip() in ["序号", "No.", "编号"]:
             row_values = [str(val).strip() for val in row if val is not None]
+
+            # 先判断关键列是否齐全，兼容历史台账表头（如“采购物资名称/规格型号/总金额/日期”）
+            required_matched = []
+            for key in required_header_hits:
+                aliases = COLUMN_MAPPINGS.get(key, [key])
+                if any(alias in row_values for alias in aliases):
+                    required_matched.append(key)
+
+            if len(required_matched) == len(required_header_hits):
+                return row_idx
+
             matched = [
                 col for col in STANDARD_COLUMNS
                 if any(alias in row_values for alias in COLUMN_MAPPINGS.get(col, [col]))
@@ -184,23 +203,6 @@ def is_summary_row(formula_sheet, row_idx, amount_col):
 
     range_pattern = f"\\$?{col_letter}\\$?\\d+:\\$?{col_letter}\\$?\\d+"
     return re.search(range_pattern, formula_str) is not None
-
-
-def standardize_unit(unit_str):
-    if not unit_str or str(unit_str).strip() == "":
-        return ""
-    unit_str = str(unit_str).strip()
-
-    try:
-        float(unit_str)
-        return ""
-    except ValueError:
-        pass
-
-    if unit_str in ["上", "想", "和", "干", "寸"]:
-        return ""
-
-    return UNIT_MAPPING.get(unit_str, unit_str)
 
 
 def parse_date(date_str):
@@ -340,14 +342,16 @@ def extract_rows_from_single_excel(file_path, project_code, project_name):
     formula_sheet = formula_wb.active
     if formula_sheet is None:
         formula_wb.close()
-        print("  ⚠️ 未找到活动工作表，跳过")
-        return []
+        reason = "未找到活动工作表"
+        print(f"  ⚠️ {reason}，跳过")
+        return [], reason
 
     header_row_idx = find_header_row(formula_sheet)
     if header_row_idx is None:
         formula_wb.close()
-        print("  ⚠️ 未识别到表头，跳过")
-        return []
+        reason = "未识别到表头"
+        print(f"  ⚠️ {reason}，跳过")
+        return [], reason
 
     headers = normalize_headers([cell.value for cell in formula_sheet[header_row_idx]])
     header_idx_map = {name: idx for idx, name in enumerate(headers)}
@@ -355,19 +359,22 @@ def extract_rows_from_single_excel(file_path, project_code, project_name):
     missing_core = [col for col in CORE_REQUIRED_COLUMNS if col not in headers]
     if missing_core:
         formula_wb.close()
-        print(f"  ⚠️ 缺少核心列，跳过: {', '.join(missing_core)}")
-        return []
+        reason = f"缺少核心列: {', '.join(missing_core)}"
+        print(f"  ⚠️ {reason}，跳过")
+        return [], reason
 
     try:
         amount_col = header_idx_map["含税金额"] + 1
     except ValueError:
         formula_wb.close()
-        print("  ⚠️ 缺少含税金额列，跳过")
-        return []
+        reason = "缺少含税金额列"
+        print(f"  ⚠️ {reason}，跳过")
+        return [], reason
     except KeyError:
         formula_wb.close()
-        print("  ⚠️ 缺少含税金额列，跳过")
-        return []
+        reason = "缺少含税金额列"
+        print(f"  ⚠️ {reason}，跳过")
+        return [], reason
 
     summary_rows = set()
     for row_idx in range(header_row_idx + 1, formula_sheet.max_row + 1):
@@ -380,10 +387,11 @@ def extract_rows_from_single_excel(file_path, project_code, project_name):
     value_sheet = value_wb.active
     if value_sheet is None:
         value_wb.close()
-        print("  ⚠️ 未找到活动工作表，跳过")
-        return []
+        reason = "未找到活动工作表"
+        print(f"  ⚠️ {reason}，跳过")
+        return [], reason
 
-    key_data_cols = ["物品名称", "规格", "单位", "数量", "单价", "不含税金额"]
+    key_data_cols = ["物品名称", "规格", "标准单位", "数量", "单价", "不含税金额"]
     key_data_indices = [header_idx_map[col] for col in key_data_cols if col in header_idx_map]
 
     valid_rows = []
@@ -417,7 +425,7 @@ def extract_rows_from_single_excel(file_path, project_code, project_name):
         row_obj = {"项目编码": project_code, "项目名称": project_name}
 
         for col_name in STANDARD_COLUMNS:
-            if col_name == "标准单位":
+            if col_name == "单位":
                 unit_idx = header_idx_map.get("单位")
                 if unit_idx is not None and unit_idx < len(row_vals):
                     unit_val = row_vals[unit_idx]
@@ -433,7 +441,7 @@ def extract_rows_from_single_excel(file_path, project_code, project_name):
         rows.append(row_obj)
 
     value_wb.close()
-    return rows
+    return rows, ""
 
 
 def enrich_dates(df):
@@ -521,16 +529,23 @@ def process_single_file(file_path, project_config, matcher_funcs, match_db):
         matcher_funcs["mark_unmatched"](match_db, extracted_name)
 
     try:
-        rows = extract_rows_from_single_excel(file_path, project_code, project_name)
+        rows, extract_reason = extract_rows_from_single_excel(file_path, project_code, project_name)
     except Exception as exc:
         print(f"  ✗ 处理失败: {exc}")
-        return False
+        return False, f"处理异常: {exc}"
 
     if not rows:
         print("  ⚠️ 无有效数据，跳过输出")
-        return False
+        if extract_reason:
+            return False, extract_reason
+        return False, "无有效数据"
 
     df = pd.DataFrame(rows)
+
+    # 统一处理本文件扫描到的未知单位（一次弹窗批量选择），并回填标准单位列。
+    resolved_count = _unit_map_utils.resolve_pending_unit_mappings()
+    if resolved_count and "单位" in df.columns:
+        df["单位"] = df["单位"].apply(lambda v: standardize_unit(v, auto_prompt=False))
 
     # 仅保留金额合计不为0的行。
     amount_df = df[[c for c in ["单价", "不含税金额", "7%增值税", "含税金额"] if c in df.columns]].apply(
@@ -540,7 +555,7 @@ def process_single_file(file_path, project_config, matcher_funcs, match_db):
     df = df[row_sum.ne(0)]
     if df.empty:
         print("  ⚠️ 金额合计均为0，跳过输出")
-        return False
+        return False, "金额合计均为0"
 
     df = enrich_dates(df)
 
@@ -549,7 +564,7 @@ def process_single_file(file_path, project_config, matcher_funcs, match_db):
     apply_standardization_pipeline(output_path)
 
     print(f"  ✓ 已输出: {output_path}")
-    return True
+    return True, ""
 
 
 def main():
@@ -569,20 +584,26 @@ def main():
 
     success_count = 0
     skip_count = 0
+    skipped_details = []
 
     print(f"扫描到 {len(excel_files)} 个Excel文件，开始逐个标准化输出...")
     for file_path in excel_files:
-        ok = process_single_file(file_path, project_config, matcher_funcs, match_db)
+        ok, reason = process_single_file(file_path, project_config, matcher_funcs, match_db)
         if ok:
             success_count += 1
         else:
             skip_count += 1
+            skipped_details.append((file_path, reason or "未知原因"))
 
     matcher_funcs["save_db"](PROJECT_MATCH_DB_FILE, match_db)
 
     print("\n处理完成")
     print(f"成功输出: {success_count} 个")
     print(f"跳过/失败: {skip_count} 个")
+    if skipped_details:
+        print("\n跳过/失败文件明细：")
+        for idx, (path, reason) in enumerate(skipped_details, start=1):
+            print(f"  {idx}. {path}  -> {reason}")
     print(f"输出根目录: {OUTPUT_ROOT}")
 
 
