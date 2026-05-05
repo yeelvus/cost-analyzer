@@ -11,8 +11,12 @@ from openpyxl.utils import get_column_letter
 
 
 # ============= 路径配置 =============
-RAW_DATA_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/A_采购部采购台账_raw"
-OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_std"
+# 文件夹按关键词动态查找，忽略 A_ / B_ 等前缀字母
+_路径_spec = importlib.util.spec_from_file_location("_采购路径", str(Path(__file__).parent / "_采购路径.py"))
+_路径_mod = importlib.util.module_from_spec(_路径_spec)
+_路径_spec.loader.exec_module(_路径_mod)
+RAW_DATA_ROOT = str(_路径_mod.RAW_DIR)
+OUTPUT_ROOT = str(_路径_mod.STD_DIR)
 PROJECT_INFO_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
 PROJECT_MATCH_DB_FILE = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
 PROJECT_MATCHER_MODULE_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_matcher.py"

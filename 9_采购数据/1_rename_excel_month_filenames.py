@@ -1,4 +1,5 @@
 import argparse
+import importlib.util
 import re
 import subprocess
 import sys
@@ -6,7 +7,11 @@ from pathlib import Path
 
 
 EXCEL_EXTENSIONS = {".xlsx", ".xls", ".xlsm"}
-DEFAULT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/A_采购部采购台账_raw"
+# 文件夹按关键词动态查找，忽略 A_ 等前缀字母
+_路径_spec = importlib.util.spec_from_file_location("_采购路径", str(Path(__file__).parent / "_采购路径.py"))
+_路径_mod = importlib.util.module_from_spec(_路径_spec)
+_路径_spec.loader.exec_module(_路径_mod)
+DEFAULT_FOLDER = str(_路径_mod.RAW_DIR)
 
 
 def build_new_stem(stem: str) -> str:

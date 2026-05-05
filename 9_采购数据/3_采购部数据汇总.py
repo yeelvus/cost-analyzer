@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import pandas as pd
 from collections import defaultdict
 import openpyxl
@@ -31,18 +32,19 @@ prompt_unmatched_project_mappings = _project_name_matcher.prompt_unmatched_proje
 save_db = _project_name_matcher.save_db
 
 # ============= 配置区域 =============
-# 原始数据根目录（用于A_合并汇总）
-RAW_DATA_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/A_采购部采购台账_raw"
-# 已标准化数据根目录（用于B_标准化汇总）
-STANDARDIZED_DATA_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_std"
-# 汇总输出根目录
-SUMMARY_OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_sum"
+# 文件夹按关键词动态查找，忽略 A_ / B_ / C_ / D_ 等前缀字母
+_路径_spec = importlib.util.spec_from_file_location("_采购路径", str(Path(__file__).parent / "_采购路径.py"))
+_路径_mod = importlib.util.module_from_spec(_路径_spec)
+_路径_spec.loader.exec_module(_路径_mod)
+RAW_DATA_ROOT = str(_路径_mod.RAW_DIR)
+STANDARDIZED_DATA_ROOT = str(_路径_mod.STD_DIR)
+SUMMARY_OUTPUT_ROOT = str(_路径_mod.SUM_DIR)
 
 PROJECT_INFO_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
 PROJECT_MATCH_DB_FILE = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
 EXCEL_FORMATTING_UTILS_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/excel_formatting_utils.py"
 STD_MERGED_SUFFIX = 'std_merged.xlsx'
-SIMPLIFY_DATA_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_simplify"
+SIMPLIFY_DATA_ROOT = str(_路径_mod.SIMPLIFY_DIR)
 SIMPLIFY_OUTPUT_FILENAME = "采购台账_simplify最新快照_std_merged.xlsx"
 # ===================================
 

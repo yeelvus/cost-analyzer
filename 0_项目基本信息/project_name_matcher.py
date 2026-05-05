@@ -320,8 +320,9 @@ def prompt_unmatched_project_mappings(unmatched_names, db, window_title="手动�
     for raw_name, var in var_map.items():
         selected = var.get().strip()
         if not result["ok"] or selected == blank_option or not selected:
+            # 用户明确选择"保留原名称"：将原名映射到自身，下次运行直接命中，不再弹窗
+            add_mapping(db, raw_name, raw_name)
             selected_map[raw_name] = ""
-            mark_unmatched(db, raw_name)
             continue
 
         std_name = option_to_standard.get(selected, "")
@@ -330,8 +331,8 @@ def prompt_unmatched_project_mappings(unmatched_names, db, window_title="手动�
             add_mapping(db, raw_name, std_name)
             any_mapped = True
 
-    # 如果进行了任何手动映射，并且传入了 db_path，则立即保存到文件
-    if any_mapped and db_path and os.path.exists(os.path.dirname(db_path)):
+    # 如果进行了任何映射（含"保留原名"），并且传入了 db_path，则立即保存到文件
+    if db_path and selected_map and os.path.exists(os.path.dirname(db_path)):
         save_db(db_path, db)
         print(f"✅ 手动匹配结果已自动保存到数据库: {db_path}")
 

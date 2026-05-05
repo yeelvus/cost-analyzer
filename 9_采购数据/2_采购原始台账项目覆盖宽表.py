@@ -11,8 +11,12 @@ from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 
 
-RAW_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/A_采购部采购台账_raw")
-OUTPUT_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_simplify")
+# 文件夹按关键词动态查找，忽略 A_ / C_ 等前缀字母
+_路径_spec = importlib.util.spec_from_file_location("_采购路径", str(Path(__file__).parent / "_采购路径.py"))
+_路径_mod = importlib.util.module_from_spec(_路径_spec)
+_路径_spec.loader.exec_module(_路径_mod)
+RAW_ROOT = _路径_mod.RAW_DIR
+OUTPUT_ROOT = _路径_mod.SIMPLIFY_DIR
 OUTPUT_FILE = OUTPUT_ROOT / "采购原始台账_项目月份覆盖宽表.xlsx"
 PROJECT_INFO_FILE = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx")
 PROJECT_MATCH_DB_FILE = Path("/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json")
