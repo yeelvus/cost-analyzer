@@ -13,6 +13,8 @@ from openpyxl.utils import get_column_letter
 # ============= 路径配置 =============
 # 文件夹按关键词动态查找，忽略 A_ / B_ 等前缀字母
 _路径_spec = importlib.util.spec_from_file_location("_采购路径", str(Path(__file__).parent / "_采购路径.py"))
+if _路径_spec is None or _路径_spec.loader is None:
+    raise ImportError("无法加载路径模块: _采购路径.py")
 _路径_mod = importlib.util.module_from_spec(_路径_spec)
 _路径_spec.loader.exec_module(_路径_mod)
 RAW_DATA_ROOT = str(_路径_mod.RAW_DIR)
@@ -244,6 +246,107 @@ def parse_date(date_str):
     return (None, None, None)
 
 
+def is_numeric_value(value):
+    """判断值是否可视为数值（用于数量列校验）。"""
+    if value is None:
+        return False
+    if isinstance(value, (int, float)) and pd.notna(value):
+        return True
+
+    s = str(value).strip()
+    if not s:
+        return False
+    s = s.replace(",", "")
+    return re.fullmatch(r"[+-]?\d+(?:\.\d+)?", s) is not None
+
+
+def _to_price_key(value):
+    """将单价标准化为可比较的浮点键，无法转换返回 None。"""
+    num = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    if pd.isna(num):
+        return None
+    return round(float(num), 6)
+
+
+def _to_date_ts(date_text):
+    """将标准日期字符串转为时间戳，无法解析返回 None。"""
+    if date_text is None:
+        return None
+    s = str(date_text).strip()
+    if not s:
+        return None
+    ts = pd.to_datetime(s, errors="coerce")
+    if pd.isna(ts):
+        return None
+    return ts
+
+
+def fill_missing_units_by_similarity(df):
+    """按 物品名称+单价 回填空单位；多候选时优先同项目，再按日期最近。"""
+    if df.empty or "单位" not in df.columns:
+        return df, 0
+
+    required_cols = {"物品名称", "单价", "单位", "项目名称", "标准日期"}
+    if not required_cols.issubset(df.columns):
+        return df, 0
+
+    out_df = df.copy()
+    out_df["_name_key"] = out_df["物品名称"].astype(str).str.strip()
+    out_df["_unit_key"] = out_df["单位"].astype(str).str.strip()
+    out_df["_price_key"] = out_df["单价"].apply(_to_price_key)
+    out_df["_date_ts"] = out_df["标准日期"].apply(_to_date_ts)
+
+    # 候选池：有单位 + 有物品名称 + 单价可解析
+    candidate_df = out_df[
+        out_df["_unit_key"].ne("")
+        & out_df["_name_key"].ne("")
+        & out_df["_price_key"].notna()
+    ]
+
+    # 待回填：单位为空 + 有物品名称 + 单价可解析
+    target_idx = out_df[
+        out_df["_unit_key"].eq("")
+        & out_df["_name_key"].ne("")
+        & out_df["_price_key"].notna()
+    ].index
+
+    if candidate_df.empty or len(target_idx) == 0:
+        return df, 0
+
+    filled_count = 0
+    for idx in target_idx:
+        row = out_df.loc[idx]
+        same_pool = candidate_df[
+            (candidate_df["_name_key"] == row["_name_key"])
+            & (candidate_df["_price_key"] == row["_price_key"])
+        ]
+        if same_pool.empty:
+            continue
+
+        target_project = str(row.get("项目名称", "")).strip()
+        target_ts = row.get("_date_ts", None)
+
+        ranked = []
+        for _, c in same_pool.iterrows():
+            same_project_rank = 0 if str(c.get("项目名称", "")).strip() == target_project else 1
+            cand_ts = c.get("_date_ts", None)
+            if target_ts is not None and cand_ts is not None:
+                date_gap = abs((cand_ts - target_ts).days)
+            else:
+                date_gap = 10**9
+            ranked.append((same_project_rank, date_gap, str(c["单位"]).strip()))
+
+        ranked.sort(key=lambda x: (x[0], x[1]))
+        best_unit = ranked[0][2] if ranked else ""
+        if best_unit:
+            out_df.at[idx, "单位"] = best_unit
+            out_df.at[idx, "_unit_key"] = best_unit
+            filled_count += 1
+
+    out_df = out_df.drop(columns=["_name_key", "_unit_key", "_price_key", "_date_ts"], errors="ignore")
+    return out_df, filled_count
+
+
 def infer_date_for_project(project_data):
     result = list(project_data)
 
@@ -442,6 +545,15 @@ def extract_rows_from_single_excel(file_path, project_code, project_name):
             else:
                 row_obj[col_name] = ""
 
+        # 纠错：若数量为非数字且单位为空，将数量内容挪到单位列。
+        qty_val = row_obj.get("数量", "")
+        unit_val = row_obj.get("单位", "")
+        if str(unit_val).strip() == "":
+            qty_text = str(qty_val).strip()
+            if qty_text and not is_numeric_value(qty_val):
+                row_obj["单位"] = qty_text
+                row_obj["数量"] = ""
+
         rows.append(row_obj)
 
     value_wb.close()
@@ -562,6 +674,11 @@ def process_single_file(file_path, project_config, matcher_funcs, match_db):
         return False, "金额合计均为0"
 
     df = enrich_dates(df)
+
+    # 单位补全：单位为空时，按同物品名称+单价回填，优先同项目再按日期最近。
+    df, filled_unit_count = fill_missing_units_by_similarity(df)
+    if filled_unit_count:
+        print(f"  ✓ 单位自动补全: {filled_unit_count} 行")
 
     output_path = build_output_path(file_path)
     write_output(df, output_path)
