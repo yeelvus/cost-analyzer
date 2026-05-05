@@ -9,7 +9,6 @@ import re
 import importlib.util
 
 PROJECT_MATCHER_MODULE_PATH = '/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_matcher.py'
-PROCUREMENT_STD_MODULE_PATH = '/Users/wyattsun/Desktop/code/9_采购数据/2_采购部单文件标准化输出.py'
 
 
 def _load_module_from_path(module_name, file_path):
@@ -45,7 +44,8 @@ PROJECT_MATCH_DB_FILE = "/Users/wyattsun/Desktop/code/0_项目基本信息/proje
 EXCEL_FORMATTING_UTILS_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/excel_formatting_utils.py"
 STD_MERGED_SUFFIX = 'std_merged.xlsx'
 SIMPLIFY_DATA_ROOT = str(_路径_mod.SIMPLIFY_DIR)
-SIMPLIFY_OUTPUT_FILENAME = "采购台账_simplify最新快照_std_merged.xlsx"
+SIMPLIFY_OUTPUT_FILENAME = "采购台账_simplify_std_merged.xlsx"
+PROCUREMENT_STD_MODULE_PATH = str(_路径_mod.find_script("采购部单文件标准化输出"))
 # ===================================
 
 # 全局匹配库（来自 0_项目基本信息/project_name_matcher.py）
@@ -368,7 +368,7 @@ def preload_project_matches_for_targets(targets, project_config):
 def process_simplify_folder(project_config):
     """读取 B_simplify 下的所有原始台账，标准化提取后合并输出到 B_sum。"""
     if not os.path.isdir(SIMPLIFY_DATA_ROOT):
-        print(f"B_simplify 目录不存在，跳过: {SIMPLIFY_DATA_ROOT}")
+        print(f"simplify 目录不存在，跳过: {SIMPLIFY_DATA_ROOT}")
         return
 
     # 动态加载 script 2 的标准化提取函数
@@ -389,7 +389,7 @@ def process_simplify_folder(project_config):
             excel_files.append(os.path.join(SIMPLIFY_DATA_ROOT, fname))
 
     if not excel_files:
-        print("B_simplify 下未找到可处理文件，跳过")
+        print("simplify 下未找到可处理文件，跳过")
         return
 
     print(f"\n处理 B_simplify 下 {len(excel_files)} 个原始台账...")
@@ -441,7 +441,7 @@ def process_simplify_folder(project_config):
         print(f"  ✓ {fname}: {len(df)} 行")
 
     if not all_dfs:
-        print("B_simplify 无有效数据，不输出汇总文件")
+        print("simplify 无有效数据，不输出汇总文件")
         return
 
     merged_df = pd.concat(all_dfs, ignore_index=True)
