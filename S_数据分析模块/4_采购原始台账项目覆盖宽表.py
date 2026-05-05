@@ -4,6 +4,8 @@ import importlib.util
 import re
 from pathlib import Path
 
+import shutil
+
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
@@ -236,6 +238,33 @@ def format_output_excel(path: Path) -> None:
     wb.save(path)
 
 
+def copy_latest_files(detail_df: pd.DataFrame, dest_dir: Path) -> int:
+    """对每个项目取最新月份的文件，复制到 dest_dir，返回复制文件数。"""
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    # 按项目名称分组，每组取月份最大的那行（若有多文件取第一个）
+    detail_df = detail_df.copy()
+    detail_df["_month_key"] = detail_df["月份"].apply(month_key)
+
+    latest_rows = (
+        detail_df.sort_values("_month_key")
+        .groupby("项目名称", as_index=False)
+        .last()
+    )
+
+    copied = 0
+    for _, row in latest_rows.iterrows():
+        src = Path(row["文件路径"])
+        if not src.is_file():
+            print(f"  [跳过] 源文件不存在: {src}")
+            continue
+        dst = dest_dir / src.name
+        shutil.copy2(src, dst)
+        copied += 1
+
+    return copied
+
+
 def main() -> None:
     if not RAW_ROOT.is_dir():
         raise FileNotFoundError(f"输入目录不存在: {RAW_ROOT}")
@@ -254,6 +283,9 @@ def main() -> None:
 
     format_output_excel(OUTPUT_FILE)
 
+    # 复制每个项目最新月份文件到 simplify 目录
+    copied_count = copy_latest_files(detail_df, OUTPUT_ROOT)
+
     month_cols = [c for c in wide_df.columns if re.fullmatch(r"(?:19|20)\d{2}年(?:0[1-9]|1[0-2])月", str(c))]
     print("处理完成")
     print(f"扫描目录: {RAW_ROOT}")
@@ -262,7 +294,8 @@ def main() -> None:
     print(f"月份数: {len(month_cols)}")
     if month_cols:
         print(f"月份范围: {month_cols[0]} ~ {month_cols[-1]}")
-    print(f"输出文件: {OUTPUT_FILE}")
+    print(f"复制最新文件数: {copied_count}")
+    print(f"输出目录: {OUTPUT_ROOT}")
 
 
 if __name__ == "__main__":
