@@ -1,5 +1,7 @@
 import argparse
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -18,14 +20,14 @@ def build_new_stem(stem: str) -> str:
     - Keep names unchanged if already separated (e.g., 项目_3月份...).
     """
     pattern = re.compile(
-        r"^(?P<prefix>.+?项目)(?P<month>(?:[0-9]{1,2}|[一二三四五六七八九十]{1,3})月份?.*)$"
+        r"^(?P<prefix>.+?项目)(?P<zhi>至?)(?P<month>(?:[0-9]{1,2}|[一二三四五六七八九十]{1,3})月份?.*)$"
     )
     m = pattern.match(stem)
     if not m:
         return stem
 
     prefix = m.group("prefix")
-    month_part = m.group("month")
+    month_part = m.group("month")  # "至" 已被单独捕获并丢弃
 
     # If already separated somehow, leave unchanged.
     if prefix.endswith("_") or month_part.startswith(("_", "-", " ")):
