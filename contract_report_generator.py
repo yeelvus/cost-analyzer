@@ -42,7 +42,7 @@ INPUT_PATHS = {
     "材料欠款": BASE_DIR / "9.1_材料欠款/B_材料欠款_std/泰国子公司材料采购欠款汇总_标准化.xlsx",
     "商混混凝土": [BASE_DIR / "9.1_商混站🚛/B_商混站_std/搅拌站混凝土汇总报表_202604.xlsx"],
     "机具使用费": BASE_DIR / "10_机具费🚜/B_机具费_sum/2026年02月租赁机具台账_汇总.xlsx",
-    "人工费汇总": BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std/人工费汇总_20260415_093536.xlsx",
+    "人工费汇总": BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std/人工费汇总.xlsx",
     "财务分包": BASE_DIR / "12-财务数据💰/A_分包对账与付款/B_分包对账与付款_sum/2026-04-08_分包对账与付款统计表_分包台账汇总_20260416_232731.xlsx",
     "分包合同台账": BASE_DIR / "5.1_分包合同/2_分包合同台账_std/分包签订合同汇总_2026-03.xlsx",
     "成本统计": BASE_DIR / "2_成本统计收集/B_成本统计_sum/项目统计数据汇总_全月份.xlsx",
@@ -200,12 +200,23 @@ def resolve_input_paths() -> Dict:
         resolved["人工费汇总"] = labor_default
     else:
         labor_latest = pick_latest_existing([
+            (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费汇总.xlsx", False),
             (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费汇总_*.xlsx", False),
+            (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费汇总*.xlsx", False),
             (BASE_DIR / "11_人工费🙎🏻‍♂️", "综合汇总_*.xlsx", True),
             (BASE_DIR / "11_人工费🙎🏻‍♂️/子公司人力资源发", "综合汇总.xlsx", True),
+            # 兜底：规避 emoji 目录名差异导致的精确路径失效。
+            (BASE_DIR, "11_人工费*/**/人工费汇总_*.xlsx", False),
+            (BASE_DIR, "11_人工费*/**/人工费汇总*.xlsx", False),
+            (BASE_DIR, "11_人工费*/**/综合汇总*.xlsx", False),
+            (BASE_DIR, "**/人工费汇总_*.xlsx", False),
+            (BASE_DIR, "**/人工费汇总*.xlsx", False),
         ])
         if labor_latest:
             resolved["人工费汇总"] = labor_latest
+        else:
+            # 若未匹配到有效文件，移除失效默认值，后续由 run_cli 给出清晰报错。
+            resolved.pop("人工费汇总", None)
 
     procurement_default = INPUT_PATHS.get("采购明细")
     proc_latest = pick_latest_existing([
@@ -313,7 +324,7 @@ def run_cli():
     default_material_arrears = resolved_inputs["材料欠款"]
     default_concrete = resolved_inputs["商混混凝土"]
     default_equipment = resolved_inputs["机具使用费"]
-    default_labor = resolved_inputs["人工费汇总"]
+    default_labor = resolved_inputs.get("人工费汇总")
     default_finance = resolved_inputs["财务分包"]
     default_sub_contract = resolved_inputs.get("分包合同台账", INPUT_PATHS.get("分包合同台账"))
     default_cost_stats = resolved_inputs["成本统计"]
@@ -321,6 +332,11 @@ def run_cli():
     default_budget = resolved_inputs["预算金额"]
     default_responsibility_cost_dir = resolved_inputs["责任成本"]
     default_output = OUTPUT_PATH
+
+    if not isinstance(default_labor, Path) or not default_labor.exists():
+        print("❌ 读取失败：未找到可用的人工费汇总文件。")
+        print("请检查目录：11_人工费*/A_1_人工费台账/B_人工费台账_std/，或确认文件名包含“人工费汇总_*.xlsx”。")
+        return
 
     print("\n=== 当前数据源路径（自动解析） ===")
     for key, value in resolved_inputs.items():
@@ -348,7 +364,7 @@ def run_cli():
         "材料欠款明细": {"文件名": default_material_arrears.name, "统计截止日期": material_arrears_cutoff or "未知"},
         "商混站明细": {"文件名": "; ".join([p.name for p in default_concrete]) if default_concrete else "未知", "统计截止日期": concrete_cutoff or "未知"},
         "机具使用费明细": {"文件名": default_equipment.name, "统计截止日期": equipment_cutoff or "未知"},
-        "人工费汇总": {"文件名": default_labor.name, "统计截止日期": labor_cutoff_by_name or "未知"},
+        "人工费汇总": {"文件名": default_labor.name if isinstance(default_labor, Path) else "未知", "统计截止日期": labor_cutoff_by_name or "未知"},
         "责任成本": {"文件名": default_responsibility_cost_dir.name, "编制日期": responsibility_cutoff or "未知"},
     }
 
