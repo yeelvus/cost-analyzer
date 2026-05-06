@@ -281,8 +281,56 @@ def _to_date_ts(date_text):
     return ts
 
 
-def fill_missing_units_by_similarity(df):
-    """按 物品名称+单价 回填空单位；多候选时优先同项目，再按日期最近。"""
+def _within_price_tolerance(base_price, candidate_price, tolerance=0.50):
+    """候选单价是否在基准单价的允许偏差范围内（默认50%）。"""
+    if base_price is None or candidate_price is None:
+        return False
+    try:
+        base = float(base_price)
+        cand = float(candidate_price)
+    except Exception:
+        return False
+
+    if base == 0:
+        return abs(cand - base) < 1e-9
+
+    return abs(cand - base) / abs(base) <= tolerance
+
+
+# 全局单位参考库：{物品名称: 最常见单位}，跨文件兜底使用
+_GLOBAL_UNIT_REF: dict = {}
+
+
+def build_global_unit_reference(std_root: str) -> dict:
+    """扫描 STD 目录中已输出的 Excel，统计每个物品名称出现最多的单位，返回 {物品名称: 单位} 字典。"""
+    ref: dict = {}
+    from collections import Counter
+    if not os.path.isdir(std_root):
+        return ref
+    for root, _, files in os.walk(std_root):
+        for name in files:
+            if name.startswith("~$") or os.path.splitext(name)[1].lower() not in {".xlsx", ".xls"}:
+                continue
+            fpath = os.path.join(root, name)
+            try:
+                df = pd.read_excel(fpath, sheet_name=0, usecols=["物品名称", "单位"], dtype=str)
+            except Exception:
+                continue
+            df = df.dropna(subset=["物品名称"])
+            df["物品名称"] = df["物品名称"].str.strip()
+            df["单位"] = df["单位"].fillna("").str.strip()
+            for item_name, grp in df[df["单位"].ne("")].groupby("物品名称"):
+                counter = ref.setdefault(item_name, Counter())
+                counter.update(grp["单位"].tolist())
+    # 每个物品名称取出现最多的单位
+    return {k: v.most_common(1)[0][0] for k, v in ref.items()}
+
+
+def fill_missing_units_by_similarity(df, global_unit_ref: dict | None = None):
+    """按 物品名称+单价 回填空单位；多候选时优先同项目，再按日期最近。
+    单价匹配范围：同物品名称所有行的平均单价 ±50%。
+    同文件无候选时，用跨文件全局单位参考库兜底。
+    """
     if df.empty or "单位" not in df.columns:
         return df, 0
 
@@ -295,6 +343,14 @@ def fill_missing_units_by_similarity(df):
     out_df["_unit_key"] = out_df["单位"].astype(str).str.strip()
     out_df["_price_key"] = out_df["单价"].apply(_to_price_key)
     out_df["_date_ts"] = out_df["标准日期"].apply(_to_date_ts)
+
+    # 预计算每个物品名称的平均单价（所有行，排除0和空）
+    avg_price_map: dict = {}
+    for name_key, grp in out_df[out_df["_name_key"].ne("") & out_df["_price_key"].notna()].groupby("_name_key"):
+        valid_prices = grp["_price_key"].dropna()
+        valid_prices = valid_prices[valid_prices != 0]
+        if not valid_prices.empty:
+            avg_price_map[name_key] = float(valid_prices.mean())
 
     # 候选池：有单位 + 有物品名称 + 单价可解析
     candidate_df = out_df[
@@ -310,17 +366,27 @@ def fill_missing_units_by_similarity(df):
         & out_df["_price_key"].notna()
     ].index
 
-    if candidate_df.empty or len(target_idx) == 0:
+    if candidate_df.empty and (not global_unit_ref) and len(target_idx) == 0:
+        return df, 0
+    if len(target_idx) == 0:
         return df, 0
 
     filled_count = 0
     for idx in target_idx:
         row = out_df.loc[idx]
+        avg_price = avg_price_map.get(row["_name_key"])
         same_pool = candidate_df[
             (candidate_df["_name_key"] == row["_name_key"])
-            & (candidate_df["_price_key"] == row["_price_key"])
+            & candidate_df["_price_key"].apply(lambda p: _within_price_tolerance(avg_price, p, 0.50))
         ]
         if same_pool.empty:
+            # 兜底：从全局单位参考库查找
+            if global_unit_ref:
+                fallback_unit = global_unit_ref.get(str(row["_name_key"]).strip(), "")
+                if fallback_unit:
+                    out_df.at[idx, "单位"] = fallback_unit
+                    out_df.at[idx, "_unit_key"] = fallback_unit
+                    filled_count += 1
             continue
 
         target_project = str(row.get("项目名称", "")).strip()
@@ -676,7 +742,7 @@ def process_single_file(file_path, project_config, matcher_funcs, match_db):
     df = enrich_dates(df)
 
     # 单位补全：单位为空时，按同物品名称+单价回填，优先同项目再按日期最近。
-    df, filled_unit_count = fill_missing_units_by_similarity(df)
+    df, filled_unit_count = fill_missing_units_by_similarity(df, global_unit_ref=_GLOBAL_UNIT_REF)
     if filled_unit_count:
         print(f"  ✓ 单位自动补全: {filled_unit_count} 行")
 
@@ -689,6 +755,7 @@ def process_single_file(file_path, project_config, matcher_funcs, match_db):
 
 
 def main():
+    global _GLOBAL_UNIT_REF
     if not os.path.isdir(RAW_DATA_ROOT):
         raise FileNotFoundError(f"输入目录不存在: {RAW_DATA_ROOT}")
 
@@ -697,6 +764,10 @@ def main():
     project_config = load_project_config()
     matcher_funcs = load_project_matcher_funcs()
     match_db = matcher_funcs["load_or_init_db"](PROJECT_MATCH_DB_FILE, project_config)
+
+    # 预先扫描 STD 目录，建立跨文件单位参考库（已有输出结果）
+    _GLOBAL_UNIT_REF = build_global_unit_reference(OUTPUT_ROOT)
+    print(f"全局单位参考库: 已加载 {len(_GLOBAL_UNIT_REF)} 个物品名称")
 
     excel_files = list_excel_files(RAW_DATA_ROOT)
     if not excel_files:
