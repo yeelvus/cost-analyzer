@@ -8,7 +8,6 @@ import shutil
 
 import pandas as pd
 from openpyxl import load_workbook
-from openpyxl.styles import Alignment
 
 
 # 文件夹按关键词动态查找，忽略 A_ / C_ 等前缀字母
@@ -21,6 +20,7 @@ OUTPUT_FILE = OUTPUT_ROOT / "采购原始台账_项目月份覆盖宽表.xlsx"
 PROJECT_INFO_FILE = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx")
 PROJECT_MATCH_DB_FILE = Path("/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json")
 PROJECT_MATCHER_MODULE_PATH = Path("/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_matcher.py")
+EXCEL_FORMATTING_UTILS_PATH = Path("/Users/wyattsun/Desktop/code/0_项目基本信息/excel_formatting_utils.py")
 
 MONTH_PATTERN = re.compile(r"((?:19|20)\d{2})年(0?[1-9]|1[0-2])月")
 
@@ -42,6 +42,9 @@ match_project = _matcher.match_project
 mark_unmatched = _matcher.mark_unmatched
 add_mapping = _matcher.add_mapping
 prompt_unmatched_project_mappings = _matcher.prompt_unmatched_project_mappings
+
+_excel_formatting_utils = _load_module_from_path("excel_formatting_utils", EXCEL_FORMATTING_UTILS_PATH)
+apply_common_excel_layout = _excel_formatting_utils.apply_common_excel_layout
 
 
 def month_key(month_text: str) -> tuple[int, int]:
@@ -214,30 +217,29 @@ def format_output_excel(path: Path) -> None:
     wb = load_workbook(path)
 
     for ws in wb.worksheets:
-        ws.freeze_panes = "D2"
-        ws.row_dimensions[1].height = 28
-
-        max_col = ws.max_column
-        max_row = ws.max_row
-
-        for c in range(1, max_col + 1):
-            cell = ws.cell(1, c)
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-        # 简单列宽
-        for c in range(1, max_col + 1):
-            col_letter = ws.cell(1, c).column_letter
-            if c == 1:
-                ws.column_dimensions[col_letter].width = 18
-            elif c == 2:
-                ws.column_dimensions[col_letter].width = 24
-            elif c <= 6:
-                ws.column_dimensions[col_letter].width = 14
-            else:
-                ws.column_dimensions[col_letter].width = 11
-
-        # 自动筛选
-        ws.auto_filter.ref = f"A1:{ws.cell(1, max_col).column_letter}{max_row}"
+        if ws.title == "项目月份覆盖宽表":
+            apply_common_excel_layout(
+                ws,
+                numeric_start_col=5,
+                header_row=1,
+                header_height=28,
+                freeze_panes="D2",
+                thousand_number_format="#,##0",
+                min_col_width=11,
+                max_col_width=28,
+                extra_padding=2,
+            )
+        else:
+            apply_common_excel_layout(
+                ws,
+                numeric_start_col=ws.max_column + 1,
+                header_row=1,
+                header_height=28,
+                freeze_panes="A2",
+                min_col_width=11,
+                max_col_width=40,
+                extra_padding=2,
+            )
 
     wb.save(path)
 

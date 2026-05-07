@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-06 15:38:48",
+  "updated_at": "2026-05-07 11:31:40",
   "projects": {
     "永强车业项目": {
       "project_code": "THCC-2025-005",
@@ -457,6 +457,11 @@
       "project_code": "需手动核对",
       "target_status": "需手动核对",
       "aliases": []
+    },
+    "晶赛科技": {
+      "project_code": "THCC-2026-005",
+      "target_status": "需手动核对",
+      "aliases": []
     }
   },
   "alias_to_standard": {
@@ -636,7 +641,8 @@
     "洽洽二期项目": "恰恰二期",
     "龙岩搅拌站项目": "龙炎搅拌站",
     "龙炎搅拌站项目": "龙炎搅拌站",
-    "欣强项目": "欣强项目"
+    "欣强项目": "欣强项目",
+    "晶赛科技": "晶赛科技"
   },
   "unmatched_aliases": [
     "SCG客户",
