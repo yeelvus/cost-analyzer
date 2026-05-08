@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import json
+import importlib.util
 from pathlib import Path
 from datetime import datetime
 
@@ -45,7 +46,27 @@ from project_name_matcher import (
     match_project,
     save_db,
 )
-from excel_formatting_utils import apply_common_excel_layout
+
+
+def load_apply_common_excel_layout():
+    """优先从项目固定路径加载格式工具，避免同名模块被环境路径覆盖。"""
+    util_path = MATCHER_DIR / "excel_formatting_utils.py"
+    if util_path.exists():
+        spec = importlib.util.spec_from_file_location("excel_formatting_utils_local", str(util_path))
+        if spec and spec.loader:
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            func = getattr(module, "apply_common_excel_layout", None)
+            if callable(func):
+                print(f"ℹ️ Excel样式工具来源：{util_path}")
+                return func
+    from excel_formatting_utils import apply_common_excel_layout as fallback_func
+
+    print(f"⚠️ Excel样式工具使用sys.path导入：{fallback_func.__module__}")
+    return fallback_func
+
+
+apply_common_excel_layout = load_apply_common_excel_layout()
 
 
 # ====================== 辅助函数 ======================
@@ -128,6 +149,7 @@ def main():
     print("🚀 开始处理人工费台账...")
 
     excel_file = resolve_input_file()
+    base_name = excel_file.stem
     print(f"✅ 使用文件：{excel_file.name}")
 
     df = pd.read_excel(excel_file, sheet_name="基础数据")
@@ -259,10 +281,10 @@ def main():
         Path(Config.OUTPUT_STD) / "人工费汇总.xlsx",
         Path(Config.OUTPUT_Z_REPORT) / "人工费汇总.xlsx"
     ]
+    metrics = money_columns + ['总人工费']
 
     for out_path in output_files:
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        base_name = Path(excel_file).stem
 
         with pd.ExcelWriter(out_path, engine='openpyxl') as writer:
             proj_summary.to_excel(writer, sheet_name='项目求和', index=False)
@@ -273,7 +295,6 @@ def main():
             raw_output_df.to_excel(writer, sheet_name='原始数据', index=False)
 
             # 各指标按月透视表
-            metrics = money_columns + ['总人工费']
             for metric in metrics:
                 pivot = grouped.pivot_table(
                     index=['项目编码', '项目名称'],
