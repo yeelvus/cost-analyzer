@@ -25,10 +25,10 @@ from pathlib import Path
 import pandas as pd
 
 DEFAULT_SOURCE_SCRIPT = Path(
-    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/6_预算部分/5.1_主材汇总（广联达软件导出）/0_代码/11.8_广联达预算人材机文件统计-v2-正常运行.py"
+    "/Users/wyattsun/Desktop/code/6_预算部分代码/广联达预算人材机文件统计.py"
 )
 DEFAULT_OUTPUT_DIR = Path(
-    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/6_预算部分/5.1_主材汇总（广联达软件导出）/2_数据汇总分析"
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/3_预算部分/5.1_主材汇总（广联达软件导出）/2_数据汇总分析"
 )
 SUMMARY_PREFIX = "【总汇总】所有标段_"
 SUMMARY_SHEET = "总汇总"

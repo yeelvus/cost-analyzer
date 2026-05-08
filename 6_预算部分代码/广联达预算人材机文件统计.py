@@ -53,8 +53,8 @@ PROJECT_CODE_MAPPING_PATH = "/Users/wyattsun/Desktop/邯郸中材/01成本统计
 #   AUTO_MODE = True 时不弹窗, 使用下面的 INPUT_DIR / OUTPUT_DIR / SELECTED_COLUMNS
 #   SELECTED_COLUMNS 为列名列表，None 或空列表表示全部保留。
 AUTO_MODE = True  # 修改为 False 可恢复原交互模式
-INPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/6_预算部分/5.1_主材汇总（广联达软件导出）/1_主材汇总-广联达导出文件"  # 请替换为实际输入目录
-OUTPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/6_预算部分/5.1_主材汇总（广联达软件导出）/2_数据汇总分析"      # 请替换为实际输出目录
+INPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/3_预算部分/1_主材汇总-广联达导出文件"  # 请替换为实际输入目录
+OUTPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/3_预算部分/5.1_主材汇总（广联达软件导出）/2_数据汇总分析"      # 请替换为实际输出目录
 SELECTED_COLUMNS = []  # 空列表表示保留全部；可填: ["编码", "类别", "名称", "单位", "含税市场价合计"]
 KEYWORD_IN_SHEETNAME = "标段人材机汇总"
 CODE_COL = "编码"
