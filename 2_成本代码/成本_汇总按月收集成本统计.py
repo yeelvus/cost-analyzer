@@ -23,6 +23,7 @@ FINANCE_COL_KEYWORDS = (
     "分包已付款财务数据（万泰铢）",
     "分包预付款财务数据（万泰铢）",
 )
+SUBCONTRACT_PAID_COL_NAME = "工程部记录分包已付款"
 
 # ==================== 自动化指令编辑区 ====================
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -43,6 +44,7 @@ CONFIG = {
 "tool_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_sum",
 "labor_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std",
 "concrete_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_商混站🚛/B_商混站_std",
+"subcontract_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_分包合同台账_std",
 "finance_payment_date": "2026-03-14",
 "rmb_exchange_rate": 5,
 "items": {
@@ -657,10 +659,8 @@ def process_all_projects():
         print(f"已加载 {len(contract_df)} 条合同管理记录")
         code_col_candidates = ["项目编码", "标准项目编码"]
         amount_col_candidates = ["总包合同额(万泰铢)", "总包合同额（万泰铢）", "总包合同额"]
-        subcontract_amount_col_candidates = ["分包合同额(万泰铢)", "分包合同额（万泰铢）", "分包合同额"]
         code_col = next((c for c in code_col_candidates if c in contract_df.columns), None)
         amount_col = next((c for c in amount_col_candidates if c in contract_df.columns), None)
-        subcontract_amount_col = next((c for c in subcontract_amount_col_candidates if c in contract_df.columns), None)
         if not code_col or not amount_col:
             raise KeyError(f"合同管理sheet缺少必要列，找到列: {list(contract_df.columns)}")
         for _, row in contract_df.iterrows():
@@ -669,13 +669,37 @@ def process_all_projects():
                 continue
             contract_amount = safe_to_float(row.get(amount_col, 0))
             contract_dict_by_code[code] = contract_dict_by_code.get(code, 0.0) + contract_amount
-            if subcontract_amount_col:
-                subcontract_amount = safe_to_float(row.get(subcontract_amount_col, 0))
-                subcontract_contract_dict_by_code[code] = subcontract_contract_dict_by_code.get(code, 0.0) + subcontract_amount
         print(f"已构建 {len(contract_dict_by_code)} 个项目编码的总包合同额索引\n")
     except Exception as e:
         print(f"⚠️ 加载合同管理数据失败: {e}")
+
+    print("正在加载工程部分包合同台账数据（分包合同额 / 分包已付款）...")
+    subcontract_paid_dict_by_code = {}
+    try:
+        sc_dir = CONFIG.get("subcontract_summary_dir", "")
+        sc_file = find_latest_excel_file(sc_dir) if sc_dir else None
+        if not sc_file:
+            raise FileNotFoundError(f"未找到分包合同台账汇总文件: {sc_dir}")
+        sc_df = pd.read_excel(sc_file)
+        sc_code_col = next((c for c in ["项目编码", "标准项目编码"] if c in sc_df.columns), None)
+        sc_amount_col = next((c for c in ["合同额（泰铢）", "合同额(泰铢）", "合同额(泰铢)"] if c in sc_df.columns), None)
+        sc_paid_col = next((c for c in ["分包已付款", "公司实付含税"] if c in sc_df.columns), None)
+        if not sc_code_col or not sc_amount_col:
+            raise KeyError(f"分包台账缺少必要列，找到列: {list(sc_df.columns)}")
+        for _, row in sc_df.iterrows():
+            code = normalize_project_code(row.get(sc_code_col))
+            if not code:
+                continue
+            amt = safe_to_float(row.get(sc_amount_col, 0))
+            subcontract_contract_dict_by_code[code] = subcontract_contract_dict_by_code.get(code, 0.0) + (amt / 10000.0)
+            if sc_paid_col:
+                paid = safe_to_float(row.get(sc_paid_col, 0))
+                subcontract_paid_dict_by_code[code] = subcontract_paid_dict_by_code.get(code, 0.0) + (paid / 10000.0)
+        print(f"已构建 {len(subcontract_contract_dict_by_code)} 个项目编码的分包合同额索引\n")
+    except Exception as e:
+        print(f"⚠️ 加载工程部分包合同台账失败: {e}")
         subcontract_contract_dict_by_code = {}
+        subcontract_paid_dict_by_code = {}
 
     print("正在加载采购数据汇总...")
     procurement_summary_by_code = load_project_amount_map(
@@ -788,6 +812,7 @@ def process_all_projects():
                 row_data[finance_col_name] = finance_payment
                 row_data[CONTRACT_COL_NAME] = contract_amount
                 row_data[SUBCONTRACT_CONTRACT_COL_NAME] = subcontract_contract_amount
+                row_data[SUBCONTRACT_PAID_COL_NAME] = subcontract_paid_dict_by_code.get(project_code, 0.0) if project_code else 0.0
                 row_data[PROCUREMENT_SUMMARY_COL_NAME] = procurement_summary_by_code.get(project_code, 0.0) if project_code else 0.0
                 row_data[CONCRETE_SUMMARY_COL_NAME] = concrete_summary_by_code.get(project_code, 0.0) if project_code else 0.0
                 row_data[TOOL_SUMMARY_COL_NAME] = tool_summary_by_code.get(project_code, 0.0) if project_code else 0.0
@@ -799,6 +824,7 @@ def process_all_projects():
                 row_data[finance_col_name] = 0.0
                 row_data[CONTRACT_COL_NAME] = 0.0
                 row_data[SUBCONTRACT_CONTRACT_COL_NAME] = 0.0
+                row_data[SUBCONTRACT_PAID_COL_NAME] = 0.0
                 row_data[PROCUREMENT_SUMMARY_COL_NAME] = 0.0
                 row_data[CONCRETE_SUMMARY_COL_NAME] = 0.0
                 row_data[TOOL_SUMMARY_COL_NAME] = 0.0
@@ -874,6 +900,7 @@ def process_all_projects():
             subcontract_contract_col_name,
             subcontract_visa_col_name,
             finance_col_name,
+            SUBCONTRACT_PAID_COL_NAME,
             "材料采购实际已发生",
             "采购部采购金额",
             PROCUREMENT_SUMMARY_COL_NAME,
@@ -1087,6 +1114,7 @@ def process_all_projects():
             visa_col_name,
             subcontract_contract_col_name,
             subcontract_visa_col_name,
+            SUBCONTRACT_PAID_COL_NAME,
             PROCUREMENT_SUMMARY_COL_NAME,
             CONCRETE_SUMMARY_COL_NAME,
             TOOL_SUMMARY_COL_NAME,

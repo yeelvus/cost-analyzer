@@ -410,12 +410,12 @@ def smart_process_and_match():
         # 6. 仅保留指定列并导出（一个源文件对应一个输出文件）
         source_columns = [
             '项目编码', '项目名称', '合同结算模式', '协作体名称', '工程范围',
-            '合同额（泰铢）', '合同编号', '统计月份'
+            '合同额（泰铢）', '公司实付含税', '合同编号', '统计月份'
         ]
 
         target_columns = [
             '项目编码', '项目名称', '合同结算模式', '协作体名称', '工程范围',
-            '合同额（泰铢）', '合同编号', '统计月份'
+            '合同额（泰铢）', '分包已付款', '合同编号', '统计月份'
         ]
 
         print("\n" + "-" * 60)
@@ -427,6 +427,7 @@ def smart_process_and_match():
                     source_df[col] = ''
 
             export_df = source_df[source_columns].copy()
+            export_df = export_df.rename(columns={'公司实付含税': '分包已付款'})
             export_df = export_df[target_columns]
 
             # 按项目编码排序，相同项目编码聚合在一起
