@@ -54,6 +54,9 @@ def load_formatter():
 
     try:
         spec = importlib.util.spec_from_file_location("excel_formatting_utils", module_path)
+        if spec is None or spec.loader is None:
+            print(f"⚠️ 无法创建模块加载器: {module_path}")
+            return lambda *a, **k: None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module.apply_common_excel_layout
@@ -72,6 +75,20 @@ def parse_folder_tag(folder_name: str) -> str:
         return match.group(1)
     digits = "".join(ch for ch in folder_name if ch.isdigit())
     return digits[:8] if len(digits) >= 8 else folder_name
+
+
+def ymd_sort_key(value: str) -> int:
+    text = safe_text(value)
+    if re.fullmatch(r"\d{8}", text):
+        return int(text)
+    if re.fullmatch(r"\d{6}", text):
+        return int(f"{text}01")
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if len(digits) >= 8:
+        return int(digits[:8])
+    if len(digits) >= 6:
+        return int(f"{digits[:6]}01")
+    return -1
 
 
 def safe_text(value) -> str:
@@ -120,15 +137,18 @@ def extract_project_summary(file_path: Path, ymd: str) -> Optional[Dict]:
     if not project_name:
         project_name = file_path.stem
 
-    paid = pd.to_numeric(df["实付金额"], errors="coerce").fillna(0)
-    vat = pd.to_numeric(df.get("增值税额", 0), errors="coerce").fillna(0)
+    amount_totals = {}
+    for col in Config.AMOUNT_COLUMNS:
+        source = df[col] if col in df.columns else pd.Series([0] * len(df), index=df.index)
+        amount_totals[col] = float(pd.to_numeric(source, errors="coerce").fillna(0).sum())
 
-    return {
+    row = {
         "项目编码": safe_text(project_code),
         "项目名称": safe_text(project_name),
         "年月日": ymd,
-        "付款总金额": float((paid + vat).sum()),
     }
+    row.update(amount_totals)
+    return row
 
 
 def build_summary_dataframe() -> pd.DataFrame:
@@ -152,63 +172,37 @@ def build_summary_dataframe() -> pd.DataFrame:
                 rows.append(row)
 
     if not rows:
-        return pd.DataFrame(columns=["项目编码", "项目名称"])
+        return pd.DataFrame(columns=["项目编码", "项目名称", "最新月份"] + Config.AMOUNT_COLUMNS)
 
     df = pd.DataFrame(rows)
 
-    # 聚合
+    # 先按项目+月份聚合每月数据
+    agg_map = {col: (col, "sum") for col in Config.AMOUNT_COLUMNS}
     grouped = df.groupby(["项目名称", "年月日"], dropna=False).agg(
         项目编码=("项目编码", lambda s: next((v for v in s if safe_text(v)), "")),
-        付款总金额=("付款总金额", "sum")
+        **agg_map,
     ).reset_index()
 
-    # 项目编码去重
-    code_df = grouped.groupby("项目名称", dropna=False).agg(
-        项目编码=("项目编码", lambda s: next((v for v in s if safe_text(v)), ""))
-    ).reset_index()
+    # 每个项目仅保留最新月份
+    grouped["_ymd_sort"] = grouped["年月日"].astype(str).map(ymd_sort_key)
+    latest = (
+        grouped.sort_values(["项目名称", "_ymd_sort", "年月日"], ascending=[True, True, True])
+        .groupby("项目名称", dropna=False, as_index=False)
+        .tail(1)
+        .drop(columns=["_ymd_sort"])
+        .rename(columns={"年月日": "最新月份"})
+    )
 
-    # 透视表
-    pivot = grouped.pivot_table(
-        index="项目名称", columns="年月日", values="付款总金额", aggfunc="sum"
-    ).reset_index()
-
-    date_cols = sorted(c for c in pivot.columns if c != "项目名称")
-    pivot = pivot[["项目名称"] + date_cols]
-
-    result = code_df.merge(pivot, on="项目名称", how="left")
-    return result[["项目编码", "项目名称"] + date_cols]
-
-
-def build_increase_sheet(df: pd.DataFrame) -> pd.DataFrame:
-    if df.empty:
-        return df.copy()
-
-    inc_df = df.copy()
-    date_cols = [c for c in df.columns if c not in ("项目编码", "项目名称")]
-    if not date_cols:
-        return inc_df
-
-    numeric = {col: pd.to_numeric(df[col], errors="coerce") for col in date_cols}
-
-    for i, col in enumerate(date_cols):
-        if i == 0:
-            inc_df[col] = "-"
-            continue
-        prev = date_cols[i - 1]
-        diff = numeric[col] - numeric[prev]
-        both_valid = numeric[col].notna() & numeric[prev].notna()
-        inc_df[col] = diff.where(both_valid, "-")
-
-    return inc_df
+    return latest[["项目编码", "项目名称", "最新月份"] + Config.AMOUNT_COLUMNS].reset_index(drop=True)
 
 
 def apply_formatting(output_path: str):
     try:
         wb = load_workbook(output_path)
-        for sheet in ["付款总金额汇总", "较上期增加汇总"]:
+        for sheet in ["最新月份汇总"]:
             ws = wb[sheet]
             headers = [cell.value for cell in ws[1]]
-            amount_headers = headers[2:]
+            amount_headers = [h for h in headers if h in Config.AMOUNT_COLUMNS]
 
             APPLY_COMMON_EXCEL_LAYOUT(
                 ws,
@@ -228,7 +222,6 @@ def main():
     print("🚀 开始处理财务付款数据汇总...")
 
     summary_df = build_summary_dataframe()
-    increase_df = build_increase_sheet(summary_df)
 
     # 输出策略：先生成主文件，再复制
     output_paths = [Config.OUTPUT_Z, Config.OUTPUT_ORIGINAL]
@@ -238,15 +231,14 @@ def main():
         path.parent.mkdir(parents=True, exist_ok=True)
 
         with pd.ExcelWriter(path, engine="openpyxl") as writer:
-            summary_df.to_excel(writer, sheet_name="付款总金额汇总", index=False)
-            increase_df.to_excel(writer, sheet_name="较上期增加汇总", index=False)
+            summary_df.to_excel(writer, sheet_name="最新月份汇总", index=False)
 
         apply_formatting(str(path))
         print(f"✅ 输出完成 → {path}")
 
     print("\n🎉 全部处理完成！")
     print(f"项目数量: {len(summary_df)}")
-    print(f"日期列数: {len([c for c in summary_df.columns if c not in ('项目编码','项目名称')])}")
+    print(f"输出列: {', '.join(summary_df.columns)}")
 
 
 if __name__ == "__main__":
