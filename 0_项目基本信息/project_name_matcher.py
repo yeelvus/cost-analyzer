@@ -33,6 +33,54 @@ def _now_text():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _iter_project_alias_pairs(db):
+    """从 projects 结构生成 (alias, standard_name) 对。"""
+    projects = db.get("projects", {}) or {}
+    for std_name, meta in projects.items():
+        std_name = str(std_name).strip()
+        if not std_name:
+            continue
+
+        yield std_name, std_name
+        for alias in meta.get("aliases", []) or []:
+            alias = str(alias).strip()
+            if alias:
+                yield alias, std_name
+
+
+def _build_alias_map(db):
+    """统一别名映射来源：优先使用 projects.aliases，兼容历史 alias_to_standard。"""
+    alias_map = {}
+
+    projects = db.get("projects", {}) or {}
+
+    # 1) 显式 aliases 优先，避免被同名“伪项目”覆盖。
+    for std_name, meta in projects.items():
+        std_name = str(std_name).strip()
+        if not std_name:
+            continue
+        for alias in meta.get("aliases", []) or []:
+            alias = str(alias).strip()
+            if alias:
+                alias_map.setdefault(alias, std_name)
+
+    # 2) 标准名自身兜底映射。
+    for std_name in projects.keys():
+        std_name = str(std_name).strip()
+        if std_name:
+            alias_map.setdefault(std_name, std_name)
+
+    # 兼容历史字段：仅在标准名存在于 projects 时采纳。
+    legacy_map = db.get("alias_to_standard", {}) or {}
+    for alias, std_name in legacy_map.items():
+        alias = str(alias).strip()
+        std_name = str(std_name).strip()
+        if alias and std_name and std_name in projects and alias not in alias_map:
+            alias_map[alias] = std_name
+
+    return alias_map
+
+
 def build_standard_projects_from_dataframe(info_df):
     rows = []
     for _, row in info_df.iterrows():
@@ -54,7 +102,6 @@ def load_or_init_db(db_path, standard_projects=None):
         "version": 1,
         "updated_at": _now_text(),
         "projects": {},
-        "alias_to_standard": {},
         "unmatched_aliases": [],
     }
 
@@ -67,7 +114,6 @@ def load_or_init_db(db_path, standard_projects=None):
                     "version": loaded.get("version", 1),
                     "updated_at": loaded.get("updated_at", _now_text()),
                     "projects": loaded.get("projects", {}) or {},
-                    "alias_to_standard": loaded.get("alias_to_standard", {}) or {},
                     "unmatched_aliases": loaded.get("unmatched_aliases", []) or [],
                 })
         except Exception:
@@ -90,17 +136,30 @@ def load_or_init_db(db_path, standard_projects=None):
         # Keep latest standard code/status from source table.
         db["projects"][std_name]["project_code"] = item.get("project_code", "需手动核对")
         db["projects"][std_name]["target_status"] = item.get("target_status", "需手动核对")
-
-        # Standard name itself is always a direct alias.
-        db["alias_to_standard"][std_name] = std_name
         if std_name in db["unmatched_aliases"]:
             db["unmatched_aliases"].remove(std_name)
+
+    # 迁移旧字段 alias_to_standard 到 projects.aliases（仅迁移有效标准名），然后不再保留该字段。
+    legacy_map = db.get("alias_to_standard", {}) or {}
+    for alias, std_name in legacy_map.items():
+        alias = str(alias).strip()
+        std_name = str(std_name).strip()
+        if not alias or not std_name:
+            continue
+        if std_name not in db["projects"] or alias == std_name:
+            continue
+        aliases = db["projects"][std_name].setdefault("aliases", [])
+        if alias not in aliases:
+            aliases.append(alias)
+
+    db.pop("alias_to_standard", None)
 
     db["updated_at"] = _now_text()
     return db
 
 
 def save_db(db_path, db):
+    db.pop("alias_to_standard", None)
     db["updated_at"] = _now_text()
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     with open(db_path, "w", encoding="utf-8") as f:
@@ -140,8 +199,6 @@ def add_mapping(db, match_name, standard_name):
     aliases = db["projects"][standard_name].setdefault("aliases", [])
     if match_name not in aliases and match_name != standard_name:
         aliases.append(match_name)
-
-    db["alias_to_standard"][match_name] = standard_name
     clear_unmatched_aliases(db, match_name)
 
 
@@ -153,7 +210,7 @@ def mark_unmatched(db, raw_name):
     if not raw_name:
         return
 
-    std_name = db.get("alias_to_standard", {}).get(raw_name)
+    std_name = _build_alias_map(db).get(raw_name)
     if std_name and std_name in db.get("projects", {}):
         return
 
@@ -199,7 +256,7 @@ def match_project(raw_name, db):
         return None
 
     projects = db.get("projects", {})
-    alias_map = db.get("alias_to_standard", {})
+    alias_map = _build_alias_map(db)
 
     # 1) Exact alias map.
     std_name = alias_map.get(raw_name)
@@ -385,7 +442,6 @@ def update_db_from_excel(db_path, excel_path,
                 if name and name != std_name and name not in meta.get("aliases", []):
                     aliases = meta.setdefault("aliases", [])
                     aliases.append(name)
-                    db["alias_to_standard"][name] = std_name
 
                 found = True
                 break
@@ -398,7 +454,6 @@ def update_db_from_excel(db_path, excel_path,
                 "target_status": status,
                 "aliases": [],
             }
-            db["alias_to_standard"][name] = name
             new_count += 1
             print(f"✅ 新增项目: {name} (编码: {code}) 状态: {status or '空'}")
 
