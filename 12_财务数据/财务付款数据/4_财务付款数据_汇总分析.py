@@ -91,6 +91,116 @@ def ymd_sort_key(value: str) -> int:
     return -1
 
 
+def ymd_to_month(value: str) -> str:
+    text = safe_text(value)
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if len(digits) >= 6:
+        return f"{digits[:4]}-{digits[4:6]}"
+    return text
+
+
+def normalize_month_value(value, fallback_year: str = "") -> str:
+    text = safe_text(value)
+    if not text:
+        return ""
+
+    date_match = re.search(r"(20\d{2})[^\d]?(\d{1,2})(?:[^\d]?(\d{1,2}))?", text)
+    if date_match:
+        year = date_match.group(1)
+        month = int(date_match.group(2))
+        if 1 <= month <= 12:
+            return f"{year}{month:02d}"
+
+    pure_digits = "".join(ch for ch in text if ch.isdigit())
+    if len(pure_digits) >= 8:
+        y = pure_digits[:4]
+        m = pure_digits[4:6]
+        if y.startswith("20") and m.isdigit() and 1 <= int(m) <= 12:
+            return f"{y}{int(m):02d}"
+    if len(pure_digits) >= 6:
+        y = pure_digits[:4]
+        m = pure_digits[4:6]
+        if y.startswith("20") and m.isdigit() and 1 <= int(m) <= 12:
+            return f"{y}{int(m):02d}"
+
+    if pure_digits.isdigit() and 1 <= int(pure_digits) <= 12 and fallback_year:
+        return f"{fallback_year}{int(pure_digits):02d}"
+
+    return ""
+
+
+def extract_month_from_dataframe(df: pd.DataFrame, fallback_ymd: str) -> str:
+    fallback_year = ""
+    fallback_digits = "".join(ch for ch in safe_text(fallback_ymd) if ch.isdigit())
+    if len(fallback_digits) >= 4:
+        fallback_year = fallback_digits[:4]
+
+    for col in ["年月", "日期"]:
+        if col not in df.columns:
+            continue
+        for value in df[col].dropna().tolist():
+            ym = normalize_month_value(value, fallback_year=fallback_year)
+            if ym:
+                return ym
+
+    if "年" in df.columns and "月" in df.columns:
+        for _, row in df[["年", "月"]].dropna(how="all").iterrows():
+            year_val = safe_text(row.get("年"))
+            month_val = safe_text(row.get("月"))
+            year_digits = "".join(ch for ch in year_val if ch.isdigit())
+            if len(year_digits) >= 4:
+                year = year_digits[:4]
+            else:
+                year = fallback_year
+            ym = normalize_month_value(month_val, fallback_year=year)
+            if ym:
+                return ym
+
+    if "月" in df.columns:
+        for value in df["月"].dropna().tolist():
+            ym = normalize_month_value(value, fallback_year=fallback_year)
+            if ym:
+                return ym
+
+    ym_fallback = normalize_month_value(fallback_ymd, fallback_year=fallback_year)
+    if ym_fallback:
+        return ym_fallback
+    return fallback_ymd
+
+
+def extract_month_from_row(row: pd.Series, fallback_ymd: str) -> str:
+    fallback_year = ""
+    fallback_digits = "".join(ch for ch in safe_text(fallback_ymd) if ch.isdigit())
+    if len(fallback_digits) >= 4:
+        fallback_year = fallback_digits[:4]
+
+    ym = normalize_month_value(row.get("年月"), fallback_year=fallback_year)
+    if ym:
+        return ym
+
+    ym = normalize_month_value(row.get("日期"), fallback_year=fallback_year)
+    if ym:
+        return ym
+
+    if "年" in row.index and "月" in row.index:
+        year_val = safe_text(row.get("年"))
+        month_val = safe_text(row.get("月"))
+        year_digits = "".join(ch for ch in year_val if ch.isdigit())
+        year = year_digits[:4] if len(year_digits) >= 4 else fallback_year
+        ym = normalize_month_value(month_val, fallback_year=year)
+        if ym:
+            return ym
+
+    ym = normalize_month_value(row.get("月"), fallback_year=fallback_year)
+    if ym:
+        return ym
+
+    ym_fallback = normalize_month_value(fallback_ymd, fallback_year=fallback_year)
+    if ym_fallback:
+        return ym_fallback
+    return fallback_ymd
+
+
 def safe_text(value) -> str:
     if value is None:
         return ""
@@ -98,17 +208,17 @@ def safe_text(value) -> str:
     return "" if text.lower() in {"", "nan", "none"} else text
 
 
-def extract_project_summary(file_path: Path, ymd: str) -> Optional[Dict]:
+def extract_project_monthly_rows(file_path: Path, ymd: str) -> List[Dict]:
     try:
         df = pd.read_excel(file_path)
     except Exception as e:
         print(f"⚠️ 读取失败 {file_path.name}: {e}")
-        return None
+        return []
 
     if df.empty or "实付金额" not in df.columns:
         if "实付金额" not in df.columns and not df.empty:
             print(f"⚠️ 缺少实付金额列: {file_path.name}")
-        return None
+        return []
 
     # 过滤全零金额行
     amt_cols = [c for c in Config.AMOUNT_COLUMNS if c in df.columns]
@@ -117,7 +227,9 @@ def extract_project_summary(file_path: Path, ymd: str) -> Optional[Dict]:
         df = df[numeric.sum(axis=1) > 0]
 
     if df.empty:
-        return None
+        return []
+
+    source_ym = extract_month_from_dataframe(df, ymd)
 
     # 项目编码 & 名称
     project_code = ""
@@ -137,18 +249,29 @@ def extract_project_summary(file_path: Path, ymd: str) -> Optional[Dict]:
     if not project_name:
         project_name = file_path.stem
 
-    amount_totals = {}
     for col in Config.AMOUNT_COLUMNS:
-        source = df[col] if col in df.columns else pd.Series([0] * len(df), index=df.index)
-        amount_totals[col] = float(pd.to_numeric(source, errors="coerce").fillna(0).sum())
+        if col not in df.columns:
+            df[col] = 0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
-    row = {
-        "项目编码": safe_text(project_code),
-        "项目名称": safe_text(project_name),
-        "年月日": ymd,
-    }
-    row.update(amount_totals)
-    return row
+    df["_年月日"] = df.apply(lambda r: extract_month_from_row(r, ymd), axis=1)
+    fallback_month = ymd_to_month(source_ym)
+    df["_月份"] = df["_年月日"].apply(lambda v: ymd_to_month(safe_text(v)) or fallback_month)
+
+    grouped = df.groupby("_月份", dropna=False, as_index=False)[Config.AMOUNT_COLUMNS].sum()
+
+    result_rows: List[Dict] = []
+    for _, g_row in grouped.iterrows():
+        row: Dict[str, object] = {
+            "项目编码": safe_text(project_code),
+            "项目名称": safe_text(project_name),
+            "年月日": safe_text(g_row.get("_月份")),
+        }
+        for col in Config.AMOUNT_COLUMNS:
+            row[col] = float(g_row.get(col, 0) or 0)
+        result_rows.append(row)
+
+    return result_rows
 
 
 def build_summary_dataframe() -> pd.DataFrame:
@@ -167,9 +290,9 @@ def build_summary_dataframe() -> pd.DataFrame:
         for file_path in folder.glob("*.xlsx"):
             if file_path.name.startswith("~$"):
                 continue
-            row = extract_project_summary(file_path, ymd)
-            if row:
-                rows.append(row)
+            file_rows = extract_project_monthly_rows(file_path, ymd)
+            if file_rows:
+                rows.extend(file_rows)
 
     if not rows:
         return pd.DataFrame(columns=["项目编码", "项目名称", "最新月份"] + Config.AMOUNT_COLUMNS)
@@ -196,13 +319,74 @@ def build_summary_dataframe() -> pd.DataFrame:
     return latest[["项目编码", "项目名称", "最新月份"] + Config.AMOUNT_COLUMNS].reset_index(drop=True)
 
 
+def build_monthly_wide_dataframe() -> pd.DataFrame:
+    input_root = Path(Config.INPUT_ROOT)
+    if not input_root.is_dir():
+        raise FileNotFoundError(f"输入目录不存在: {input_root}")
+
+    rows = []
+    for folder in sorted(input_root.iterdir()):
+        if not folder.is_dir():
+            continue
+
+        ymd = parse_folder_tag(folder.name)
+
+        for file_path in folder.glob("*.xlsx"):
+            if file_path.name.startswith("~$"):
+                continue
+            file_rows = extract_project_monthly_rows(file_path, ymd)
+            for row in file_rows:
+                month_key = ymd_to_month(safe_text(row.get("年月日")))
+                rows.append(
+                    {
+                        "项目编码": safe_text(row.get("项目编码")),
+                        "项目名称": safe_text(row.get("项目名称")),
+                        "月份": month_key,
+                        "实付金额": float(row.get("实付金额", 0) or 0),
+                        "增值税额": float(row.get("增值税额", 0) or 0),
+                        "月度金额汇总": float(row.get("实付金额", 0) or 0) + float(row.get("增值税额", 0) or 0),
+                    }
+                )
+
+    if not rows:
+        return pd.DataFrame(columns=["项目编码", "项目名称"])
+
+    monthly_df = pd.DataFrame(rows)
+    monthly_grouped = (
+        monthly_df.groupby(["项目编码", "项目名称", "月份"], dropna=False, as_index=False)[["月度金额汇总"]]
+        .sum()
+    )
+
+    month_order = sorted(monthly_grouped["月份"].dropna().unique(), key=ymd_sort_key)
+
+    summary_wide = monthly_grouped.pivot_table(
+        index=["项目编码", "项目名称"],
+        columns="月份",
+        values="月度金额汇总",
+        aggfunc="sum",
+        fill_value=0,
+    )
+    summary_wide = summary_wide.reindex(columns=month_order, fill_value=0)
+    summary_wide.columns = [f"金额汇总_{m}" for m in summary_wide.columns]
+
+    wide_df = summary_wide.reset_index()
+    return wide_df
+
+
 def apply_formatting(output_path: str):
     try:
         wb = load_workbook(output_path)
-        for sheet in ["最新月份汇总"]:
+        for sheet in ["最新月份汇总", "项目按月宽表"]:
+            if sheet not in wb.sheetnames:
+                continue
             ws = wb[sheet]
             headers = [cell.value for cell in ws[1]]
             amount_headers = [h for h in headers if h in Config.AMOUNT_COLUMNS]
+            if sheet == "项目按月宽表":
+                amount_headers = [
+                    h for h in headers
+                    if isinstance(h, str) and h.startswith("金额汇总_")
+                ]
 
             APPLY_COMMON_EXCEL_LAYOUT(
                 ws,
@@ -222,6 +406,7 @@ def main():
     print("🚀 开始处理财务付款数据汇总...")
 
     summary_df = build_summary_dataframe()
+    monthly_wide_df = build_monthly_wide_dataframe()
 
     # 输出策略：先生成主文件，再复制
     output_paths = [Config.OUTPUT_Z, Config.OUTPUT_ORIGINAL]
@@ -232,6 +417,7 @@ def main():
 
         with pd.ExcelWriter(path, engine="openpyxl") as writer:
             summary_df.to_excel(writer, sheet_name="最新月份汇总", index=False)
+            monthly_wide_df.to_excel(writer, sheet_name="项目按月宽表", index=False)
 
         apply_formatting(str(path))
         print(f"✅ 输出完成 → {path}")
@@ -239,6 +425,7 @@ def main():
     print("\n🎉 全部处理完成！")
     print(f"项目数量: {len(summary_df)}")
     print(f"输出列: {', '.join(summary_df.columns)}")
+    print(f"按月宽表列数: {len(monthly_wide_df.columns)}")
 
 
 if __name__ == "__main__":
