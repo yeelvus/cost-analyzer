@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-09 13:59:11",
+  "updated_at": "2026-05-09 14:03:24",
   "projects": {
     "永强车业项目": {
       "project_code": "THCC-2025-005",
@@ -484,11 +484,6 @@
     },
     "晶赛科技": {
       "project_code": "THCC-2026-005",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "曼谷办公室,北新,伊莱特,中石,糖厂,荣泰, 新通联,正鑫源": {
-      "project_code": "需手动核对",
       "target_status": "需手动核对",
       "aliases": []
     },
