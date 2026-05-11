@@ -508,11 +508,6 @@
       "target_status": "需手动核对",
       "aliases": []
     },
-    "袁总超毅": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
     "INSEE项目": {
       "project_code": "需手动核对",
       "target_status": "需手动核对",
@@ -552,6 +547,7 @@
     "百明宏亿",
     "百明营地",
     "百明超毅",
+    "袁总超毅",
     "百泰",
     "航动科技",
     "袁总搅拌站",

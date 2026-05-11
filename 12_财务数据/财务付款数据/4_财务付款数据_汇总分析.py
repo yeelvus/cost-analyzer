@@ -5,7 +5,7 @@ import shutil
 import importlib.util
 from collections import OrderedDict, defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, cast
 
 import pandas as pd
 from openpyxl import load_workbook
@@ -23,6 +23,7 @@ class Config:
     AMOUNT_COLUMNS = ["应付金额", "预扣税额", "实付金额", "增值税额", "不含税额"]
     SUBJECT_WIDE_SHEET = "一级二级科目宽表"
     SUBJECT_SUMMARY_ROW = "一级科目汇总"
+    PROJECT_LEVEL1_SHEET = "项目一级科目汇总"
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -335,6 +336,48 @@ def build_subject_wide_payload() -> Dict[str, object]:
     }
 
 
+def build_project_level1_summary_dataframe() -> pd.DataFrame:
+    """生成项目维度的一级科目横向汇总表。"""
+    input_root = Path(Config.INPUT_ROOT)
+    if not input_root.is_dir():
+        raise FileNotFoundError(f"输入目录不存在: {input_root}")
+
+    rows: List[Dict[str, object]] = []
+    for folder in sorted(input_root.iterdir()):
+        if not folder.is_dir():
+            continue
+
+        for file_path in folder.glob("*.xlsx"):
+            if file_path.name.startswith("~$"):
+                continue
+            rows.extend(extract_subject_rows(file_path))
+
+    if not rows:
+        return pd.DataFrame(columns=["项目编码", "项目名称"])
+
+    df = pd.DataFrame(rows)
+    grouped = (
+        df.groupby(["项目编码", "项目名称", "一级科目"], dropna=False, as_index=False)["金额汇总"]
+        .sum()
+    )
+
+    level1_order = sorted(grouped["一级科目"].dropna().unique().tolist(), key=subject_sort_key)
+    wide_df = grouped.pivot_table(
+        index=["项目编码", "项目名称"],
+        columns="一级科目",
+        values="金额汇总",
+        aggfunc="sum",
+        fill_value=0,
+    ).reset_index()
+
+    for col in level1_order:
+        if col not in wide_df.columns:
+            wide_df[col] = 0
+
+    wide_df = wide_df[["项目编码", "项目名称"] + level1_order]
+    return wide_df.sort_values(["项目编码", "项目名称"], ascending=[True, True]).reset_index(drop=True)
+
+
 def extract_project_monthly_rows(file_path: Path, ymd: str) -> List[Dict]:
     try:
         df = pd.read_excel(file_path)
@@ -501,10 +544,10 @@ def build_monthly_wide_dataframe() -> pd.DataFrame:
 
 
 def write_subject_wide_sheet(wb, payload: Dict[str, object]):
-    layout = payload.get("layout", OrderedDict())
-    project_order = payload.get("project_order", [])
-    project_map = payload.get("project_map", {})
-    grand_map = payload.get("grand_map", {})
+    layout = cast(OrderedDict[str, List[str]], payload.get("layout", OrderedDict()))
+    project_order = cast(List[str], payload.get("project_order", []))
+    project_map = cast(Dict[str, Dict[str, Dict[str, float]]], payload.get("project_map", {}))
+    grand_map = cast(Dict[str, Dict[str, float]], payload.get("grand_map", {}))
 
     ws = wb.create_sheet(title=Config.SUBJECT_WIDE_SHEET)
     ws.freeze_panes = "C2"
@@ -652,7 +695,7 @@ def write_subject_wide_sheet(wb, payload: Dict[str, object]):
 def apply_formatting(output_path: str):
     try:
         wb = load_workbook(output_path)
-        for sheet in ["最新月份汇总", "项目按月宽表"]:
+        for sheet in ["最新月份汇总", "项目按月宽表", Config.PROJECT_LEVEL1_SHEET]:
             if sheet not in wb.sheetnames:
                 continue
             ws = wb[sheet]
@@ -662,6 +705,11 @@ def apply_formatting(output_path: str):
                 amount_headers = [
                     h for h in headers
                     if isinstance(h, str) and h.startswith("金额汇总_")
+                ]
+            elif sheet == Config.PROJECT_LEVEL1_SHEET:
+                amount_headers = [
+                    h for h in headers
+                    if isinstance(h, str) and h not in {"项目编码", "项目名称"}
                 ]
 
             APPLY_COMMON_EXCEL_LAYOUT(
@@ -684,6 +732,7 @@ def main():
     summary_df = build_summary_dataframe()
     monthly_wide_df = build_monthly_wide_dataframe()
     subject_wide_payload = build_subject_wide_payload()
+    project_level1_df = build_project_level1_summary_dataframe()
 
     # 输出策略：先生成主文件，再复制
     output_paths = [Config.OUTPUT_Z, Config.OUTPUT_ORIGINAL]
@@ -695,6 +744,7 @@ def main():
         with pd.ExcelWriter(path, engine="openpyxl") as writer:
             summary_df.to_excel(writer, sheet_name="最新月份汇总", index=False)
             monthly_wide_df.to_excel(writer, sheet_name="项目按月宽表", index=False)
+            project_level1_df.to_excel(writer, sheet_name=Config.PROJECT_LEVEL1_SHEET, index=False)
             write_subject_wide_sheet(writer.book, subject_wide_payload)
 
         apply_formatting(str(path))

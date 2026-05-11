@@ -49,7 +49,7 @@ def _iter_project_alias_pairs(db):
 
 
 def _build_alias_map(db):
-    """统一别名映射来源：优先使用 projects.aliases，兼容历史 alias_to_standard。"""
+    """统一别名映射来源：使用 projects.aliases。"""
     alias_map = {}
 
     projects = db.get("projects", {}) or {}
@@ -69,14 +69,6 @@ def _build_alias_map(db):
         std_name = str(std_name).strip()
         if std_name:
             alias_map.setdefault(std_name, std_name)
-
-    # 兼容历史字段：仅在标准名存在于 projects 时采纳。
-    legacy_map = db.get("alias_to_standard", {}) or {}
-    for alias, std_name in legacy_map.items():
-        alias = str(alias).strip()
-        std_name = str(std_name).strip()
-        if alias and std_name and std_name in projects and alias not in alias_map:
-            alias_map[alias] = std_name
 
     return alias_map
 
@@ -139,27 +131,11 @@ def load_or_init_db(db_path, standard_projects=None):
         if std_name in db["unmatched_aliases"]:
             db["unmatched_aliases"].remove(std_name)
 
-    # 迁移旧字段 alias_to_standard 到 projects.aliases（仅迁移有效标准名），然后不再保留该字段。
-    legacy_map = db.get("alias_to_standard", {}) or {}
-    for alias, std_name in legacy_map.items():
-        alias = str(alias).strip()
-        std_name = str(std_name).strip()
-        if not alias or not std_name:
-            continue
-        if std_name not in db["projects"] or alias == std_name:
-            continue
-        aliases = db["projects"][std_name].setdefault("aliases", [])
-        if alias not in aliases:
-            aliases.append(alias)
-
-    db.pop("alias_to_standard", None)
-
     db["updated_at"] = _now_text()
     return db
 
 
 def save_db(db_path, db):
-    db.pop("alias_to_standard", None)
     db["updated_at"] = _now_text()
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     with open(db_path, "w", encoding="utf-8") as f:
