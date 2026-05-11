@@ -507,8 +507,10 @@ def write_subject_wide_sheet(wb, payload: Dict[str, object]):
     grand_map = payload.get("grand_map", {})
 
     ws = wb.create_sheet(title=Config.SUBJECT_WIDE_SHEET)
-    ws.freeze_panes = "B3"
+    ws.freeze_panes = "C2"
     ws.sheet_view.showGridLines = False
+    # 让“小计”作为分组汇总行（位于明细行上方）
+    ws.sheet_properties.outlinePr.summaryBelow = False
 
     title_fill = PatternFill("solid", fgColor="DDEFE3")
     header_fill = PatternFill("solid", fgColor="C9E1D1")
@@ -518,104 +520,132 @@ def write_subject_wide_sheet(wb, payload: Dict[str, object]):
     thin = Side(style="thin", color="B7C7BC")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-    ws.cell(1, 1, "项目名称")
-    ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
-    ws.cell(1, 1).fill = title_fill
-    ws.cell(1, 1).font = bold_font
-    ws.cell(1, 1).alignment = center
-    ws.cell(1, 1).border = border
+    ws.cell(1, 1, "一级科目")
+    ws.cell(1, 2, "二级科目")
+    for c in [1, 2]:
+        cell = ws.cell(1, c)
+        cell.fill = title_fill
+        cell.font = bold_font
+        cell.alignment = center
+        cell.border = border
 
-    col = 2
-    group_positions = []
+    start_project_col = 3
+    for idx, project_name in enumerate(project_order):
+        cell = ws.cell(1, start_project_col + idx, project_name)
+        cell.fill = title_fill
+        cell.font = bold_font
+        cell.alignment = center
+        cell.border = border
+
+    summary_col = start_project_col + len(project_order)
+    summary_head = ws.cell(1, summary_col, Config.SUBJECT_SUMMARY_ROW)
+    summary_head.fill = title_fill
+    summary_head.font = bold_font
+    summary_head.alignment = center
+    summary_head.border = border
+
+    row_idx = 2
     for level1, level2_list in layout.items():
-        group_width = 1 + len(level2_list)
-        ws.cell(1, col, level1)
-        if group_width > 1:
-            ws.merge_cells(start_row=1, start_column=col, end_row=1, end_column=col + group_width - 1)
-        group_positions.append((level1, col, group_width))
-        for offset in range(group_width):
-            c = col + offset
-            ws.cell(1, c).fill = title_fill
-            ws.cell(1, c).font = bold_font
-            ws.cell(1, c).alignment = center
-            ws.cell(1, c).border = border
+        subtotal_row = row_idx
+        subtotal_first = ws.cell(subtotal_row, 1, level1)
+        subtotal_second = ws.cell(subtotal_row, 2, "小计")
+        for c in [subtotal_first, subtotal_second]:
+            c.fill = header_fill
+            c.font = bold_font
+            c.alignment = center
+            c.border = border
 
-        ws.cell(2, col, "小计")
-        ws.cell(2, col).fill = header_fill
-        ws.cell(2, col).font = bold_font
-        ws.cell(2, col).alignment = center
-        ws.cell(2, col).border = border
-
-        for idx, level2 in enumerate(level2_list, start=1):
-            cell = ws.cell(2, col + idx, level2)
+        level1_total_all_projects = 0.0
+        for p_idx, project_name in enumerate(project_order):
+            project_level1_map = project_map.get(project_name, {}).get(level1, {})
+            value = sum(float(project_level1_map.get(level2, 0.0) or 0.0) for level2 in level2_list)
+            cell = ws.cell(subtotal_row, start_project_col + p_idx, value)
+            cell.number_format = '#,##0.00'
             cell.fill = header_fill
             cell.font = bold_font
             cell.alignment = center
             cell.border = border
-        col += group_width
+            level1_total_all_projects += value
 
-    row_idx = 3
-    for project_name in project_order:
-        ws.cell(row_idx, 1, project_name)
-        ws.cell(row_idx, 1).alignment = center
-        ws.cell(row_idx, 1).border = border
+        total_cell = ws.cell(subtotal_row, summary_col, level1_total_all_projects)
+        total_cell.number_format = '#,##0.00'
+        total_cell.fill = header_fill
+        total_cell.font = bold_font
+        total_cell.alignment = center
+        total_cell.border = border
+        row_idx += 1
 
-        for level1, start_col, group_width in group_positions:
-            level2_list = layout.get(level1, [])
-            level1_total = 0.0
-            project_level1_map = project_map.get(project_name, {}).get(level1, {})
-            for offset, level2 in enumerate(level2_list, start=1):
-                value = float(project_level1_map.get(level2, 0.0) or 0.0)
-                cell = ws.cell(row_idx, start_col + offset, value)
+        detail_start_row = row_idx
+        for level2 in level2_list:
+            l1_cell = ws.cell(row_idx, 1, level1)
+            l2_cell = ws.cell(row_idx, 2, level2)
+            l1_cell.alignment = center
+            l2_cell.alignment = center
+            l1_cell.border = border
+            l2_cell.border = border
+
+            level2_total_all_projects = 0.0
+            for p_idx, project_name in enumerate(project_order):
+                value = float(project_map.get(project_name, {}).get(level1, {}).get(level2, 0.0) or 0.0)
+                cell = ws.cell(row_idx, start_project_col + p_idx, value)
                 cell.number_format = '#,##0.00'
                 cell.alignment = center
                 cell.border = border
-                level1_total += value
+                level2_total_all_projects += value
 
-            subtotal_cell = ws.cell(row_idx, start_col, level1_total)
-            subtotal_cell.number_format = '#,##0.00'
-            subtotal_cell.alignment = center
-            subtotal_cell.border = border
+            total_cell = ws.cell(row_idx, summary_col, level2_total_all_projects)
+            total_cell.number_format = '#,##0.00'
+            total_cell.alignment = center
+            total_cell.border = border
+            row_idx += 1
 
-        row_idx += 1
+        detail_end_row = row_idx - 1
+        if detail_end_row >= detail_start_row:
+            # 使用Excel组合功能：将二级科目明细行归入“小计”行下
+            ws.row_dimensions.group(
+                detail_start_row,
+                detail_end_row,
+                outline_level=1,
+                hidden=False,
+            )
 
-    if project_order:
-        summary_row = row_idx + 1
-    else:
-        summary_row = row_idx
+    final_row = row_idx
+    ws.cell(final_row, 1, "全部汇总")
+    ws.cell(final_row, 2, "-")
+    for c in [1, 2]:
+        cell = ws.cell(final_row, c)
+        cell.fill = summary_fill
+        cell.font = bold_font
+        cell.alignment = center
+        cell.border = border
 
-    ws.cell(summary_row, 1, Config.SUBJECT_SUMMARY_ROW)
-    ws.cell(summary_row, 1).fill = summary_fill
-    ws.cell(summary_row, 1).font = bold_font
-    ws.cell(summary_row, 1).alignment = center
-    ws.cell(summary_row, 1).border = border
+    grand_total = 0.0
+    for p_idx, project_name in enumerate(project_order):
+        project_total = 0.0
+        for level1, level2_list in layout.items():
+            for level2 in level2_list:
+                project_total += float(project_map.get(project_name, {}).get(level1, {}).get(level2, 0.0) or 0.0)
+        cell = ws.cell(final_row, start_project_col + p_idx, project_total)
+        cell.number_format = '#,##0.00'
+        cell.fill = summary_fill
+        cell.font = bold_font
+        cell.alignment = center
+        cell.border = border
+        grand_total += project_total
 
-    for level1, start_col, group_width in group_positions:
-        level2_list = layout.get(level1, [])
-        level1_total = 0.0
-        for offset, level2 in enumerate(level2_list, start=1):
-            value = float(grand_map.get(level1, {}).get(level2, 0.0) or 0.0)
-            cell = ws.cell(summary_row, start_col + offset, value)
-            cell.number_format = '#,##0.00'
-            cell.fill = summary_fill
-            cell.font = bold_font
-            cell.alignment = center
-            cell.border = border
-            level1_total += value
+    total_cell = ws.cell(final_row, summary_col, grand_total)
+    total_cell.number_format = '#,##0.00'
+    total_cell.fill = summary_fill
+    total_cell.font = bold_font
+    total_cell.alignment = center
+    total_cell.border = border
 
-        subtotal_cell = ws.cell(summary_row, start_col, level1_total)
-        subtotal_cell.number_format = '#,##0.00'
-        subtotal_cell.fill = summary_fill
-        subtotal_cell.font = bold_font
-        subtotal_cell.alignment = center
-        subtotal_cell.border = border
-
-    ws.column_dimensions["A"].width = 28
-    for col_idx in range(2, ws.max_column + 1):
+    ws.column_dimensions["A"].width = 18
+    ws.column_dimensions["B"].width = 22
+    for col_idx in range(start_project_col, ws.max_column + 1):
         ws.column_dimensions[get_column_letter(col_idx)].width = 16
 
-    ws.row_dimensions[1].height = 28
-    ws.row_dimensions[2].height = 34
+    ws.row_dimensions[1].height = 30
     return ws
 
 
