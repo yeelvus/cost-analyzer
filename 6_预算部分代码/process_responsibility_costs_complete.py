@@ -38,8 +38,8 @@ def parse_amount(value):
     except ValueError:
         return None
 
-RAW_INPUT_PATH = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/3_预算部分/6.1_责任成本书/1_责任成本_raw")
-TARGET_BASE_PATH = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/3_预算部分/6.1_责任成本书")
+RAW_INPUT_PATH = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/3.1_责任成本/1_责任成本_raw")
+TARGET_BASE_PATH = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/3.1_责任成本")
 OUTPUT_FOLDER = TARGET_BASE_PATH / "2_责任成本_std"
 REPORT_FILE = OUTPUT_FOLDER / "完整处理报告.xlsx"
 LOG_FILE = Path.home() / ".project_cache" / "process_log.txt"
@@ -478,11 +478,7 @@ def write_excel_output(data_rows, project_name, output_file, project_code, heade
         ws = cast(Worksheet, wb.active)
         
         row_num = 1
-        ws.cell(row=row_num, column=1).value = project_name
-        row_num += 1
-        
-        row_num += 1
-        
+        # 首行直接写表头
         ws.cell(row=row_num, column=1).value = header_info.get("seq_header", "序号")
         ws.cell(row=row_num, column=2).value = header_info.get("name_header", "名称")
         ws.cell(row=row_num, column=3).value = header_info.get("amount_header", "金额（人民币）")
@@ -491,8 +487,18 @@ def write_excel_output(data_rows, project_name, output_file, project_code, heade
         for row_data in data_rows:
             ws.cell(row=row_num, column=1).value = row_data.get("序号")
             ws.cell(row=row_num, column=2).value = row_data.get("名称")
-            ws.cell(row=row_num, column=3).value = row_data.get("金额")
+
+            amount_raw = row_data.get("金额")
+            amount_num = parse_amount(amount_raw)
+            if amount_num is not None:
+                ws.cell(row=row_num, column=3).value = amount_num
+            else:
+                ws.cell(row=row_num, column=3).value = amount_raw
             row_num += 1
+
+        # C列金额统一设置为带千分位逗号格式
+        for r in range(2, row_num):
+            ws.cell(row=r, column=3).number_format = "#,##0.00"
         
         ws.column_dimensions["A"].width = 12
         ws.column_dimensions["B"].width = 30
