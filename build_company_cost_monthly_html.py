@@ -337,6 +337,12 @@ def make_html(project_data: Dict[str, List[ProjectMonthlyRecord]], months: List[
     td.num {{ text-align: center; font-variant-numeric: tabular-nums; }}
     td.metric-cell {{ font-size: 12px; }}
     td.remark-cell {{ font-size: 12px; line-height: 1.45; }}
+    /* 前5列为核心指标列，保持单行显示，避免标题和数值被折行 */
+    th:nth-child(1), td:nth-child(1) {{ white-space: nowrap; min-width: 86px; }}
+    th:nth-child(2), td:nth-child(2) {{ white-space: nowrap; min-width: 150px; }}
+    th:nth-child(3), td:nth-child(3) {{ white-space: nowrap; min-width: 110px; }}
+    th:nth-child(4), td:nth-child(4) {{ white-space: nowrap; min-width: 108px; }}
+    th:nth-child(5), td:nth-child(5) {{ white-space: nowrap; min-width: 96px; }}
     .card-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }}
     .card-header h2 {{ margin: 4px 0; flex: 1; }}
     .export-btn, .export-all-btn {{
@@ -360,6 +366,8 @@ def make_html(project_data: Dict[str, List[ProjectMonthlyRecord]], months: List[
       .chart-grid {{ grid-template-columns: 1fr; }}
       .chart-wrap {{ height: 260px; }}
       .chart-grid {{ margin-bottom: 24px; }}
+      .project-card {{ overflow-x: auto; }}
+      table {{ min-width: 760px; }}
       table {{ font-size: 12px; }}
       td.metric-cell {{ font-size: 11px; }}
       td.remark-cell {{ font-size: 11px; }}

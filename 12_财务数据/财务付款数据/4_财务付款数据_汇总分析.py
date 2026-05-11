@@ -465,28 +465,18 @@ def build_summary_dataframe() -> pd.DataFrame:
                 rows.extend(file_rows)
 
     if not rows:
-        return pd.DataFrame(columns=["项目编码", "项目名称", "最新月份"] + Config.AMOUNT_COLUMNS)
+        return pd.DataFrame(columns=["项目编码", "项目名称"] + Config.AMOUNT_COLUMNS)
 
     df = pd.DataFrame(rows)
 
-    # 先按项目+月份聚合每月数据
+    # 按项目聚合全部月份数据（总体汇总）
     agg_map = {col: (col, "sum") for col in Config.AMOUNT_COLUMNS}
-    grouped = df.groupby(["项目名称", "年月日"], dropna=False).agg(
+    overall = df.groupby(["项目名称"], dropna=False).agg(
         项目编码=("项目编码", lambda s: next((v for v in s if safe_text(v)), "")),
         **agg_map,
     ).reset_index()
 
-    # 每个项目仅保留最新月份
-    grouped["_ymd_sort"] = grouped["年月日"].astype(str).map(ymd_sort_key)
-    latest = (
-        grouped.sort_values(["项目名称", "_ymd_sort", "年月日"], ascending=[True, True, True])
-        .groupby("项目名称", dropna=False, as_index=False)
-        .tail(1)
-        .drop(columns=["_ymd_sort"])
-        .rename(columns={"年月日": "最新月份"})
-    )
-
-    return latest[["项目编码", "项目名称", "最新月份"] + Config.AMOUNT_COLUMNS].reset_index(drop=True)
+    return overall[["项目编码", "项目名称"] + Config.AMOUNT_COLUMNS].reset_index(drop=True)
 
 
 def build_monthly_wide_dataframe() -> pd.DataFrame:
@@ -695,7 +685,7 @@ def write_subject_wide_sheet(wb, payload: Dict[str, object]):
 def apply_formatting(output_path: str):
     try:
         wb = load_workbook(output_path)
-        for sheet in ["最新月份汇总", "项目按月宽表", Config.PROJECT_LEVEL1_SHEET]:
+        for sheet in ["总体汇总", "项目按月宽表", Config.PROJECT_LEVEL1_SHEET]:
             if sheet not in wb.sheetnames:
                 continue
             ws = wb[sheet]
@@ -742,7 +732,7 @@ def main():
         path.parent.mkdir(parents=True, exist_ok=True)
 
         with pd.ExcelWriter(path, engine="openpyxl") as writer:
-            summary_df.to_excel(writer, sheet_name="最新月份汇总", index=False)
+            summary_df.to_excel(writer, sheet_name="总体汇总", index=False)
             monthly_wide_df.to_excel(writer, sheet_name="项目按月宽表", index=False)
             project_level1_df.to_excel(writer, sheet_name=Config.PROJECT_LEVEL1_SHEET, index=False)
             write_subject_wide_sheet(writer.book, subject_wide_payload)

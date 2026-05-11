@@ -2,9 +2,11 @@ import os
 import re
 import sys
 import json
+import html
 import importlib.util
 from pathlib import Path
-from datetime import datetime
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 import pandas as pd
 from openpyxl import load_workbook
@@ -24,9 +26,6 @@ class Config:
     # 输出
     OUTPUT_STD = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std"
     OUTPUT_Z_REPORT = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report"
-    
-    # HTML
-    HTML_TEMPLATE_PATH = SCRIPT_DIR / "人工费汇总_template.html"
     
     MONEY_COLUMNS = ['中方正式工铢', '中方劳务工铢', '子公司属地工铢', '劳务公司铢', '签证费']
 
@@ -135,13 +134,521 @@ def parse_money(series: pd.Series) -> pd.Series:
     return cleaned.apply(to_num)
 
 
-def render_html_from_template(template_path: Path, replacements: dict) -> str:
-    if not template_path.exists():
-        raise FileNotFoundError(f"HTML模板不存在：{template_path}")
-    html = template_path.read_text(encoding='utf-8')
-    for key, value in replacements.items():
-        html = html.replace(key, value)
-    return html
+@dataclass
+class LaborMonthlyRecord:
+        month: str
+        zh_formal: Optional[float]
+        zh_labor: Optional[float]
+        local_labor: Optional[float]
+        outsourcing_labor: Optional[float]
+        visa_fee: Optional[float]
+        total_labor: Optional[float]
+        status: str
+
+
+def _fmt_number(val: Optional[float], digits: int = 2) -> str:
+        if val is None:
+                return "-"
+        return f"{val:,.{digits}f}"
+
+
+def _fmt_text(val: str) -> str:
+        return html.escape(val) if val else "-"
+
+
+def make_labor_html(project_data: Dict[str, List[LaborMonthlyRecord]], months: List[str]) -> str:
+        sections: List[str] = []
+        toc_items: List[str] = []
+        chart_data: Dict[str, Dict[str, List[Optional[float]]]] = {}
+
+        def missing_count(project: str) -> int:
+                records_by_month = {r.month: r for r in project_data[project]}
+                miss = 0
+                for m in months:
+                        rec = records_by_month.get(m)
+                        if rec is None:
+                                miss += 6
+                                continue
+                        miss += int(rec.zh_formal is None)
+                        miss += int(rec.zh_labor is None)
+                        miss += int(rec.local_labor is None)
+                        miss += int(rec.outsourcing_labor is None)
+                        miss += int(rec.visa_fee is None)
+                        miss += int(rec.total_labor is None)
+                return miss
+
+        ordered_projects = sorted(project_data.keys(), key=lambda p: (missing_count(p) > 0, missing_count(p), p))
+
+        for idx, project in enumerate(ordered_projects, start=1):
+                records_by_month = {r.month: r for r in project_data[project]}
+
+                rows: List[str] = []
+                zh_formal_series: List[Optional[float]] = []
+                zh_labor_series: List[Optional[float]] = []
+                local_labor_series: List[Optional[float]] = []
+                outsourcing_labor_series: List[Optional[float]] = []
+                visa_fee_series: List[Optional[float]] = []
+                total_labor_series: List[Optional[float]] = []
+                status_text = ""
+
+                for month in months:
+                        rec = records_by_month.get(month)
+                        zh_formal_series.append(None if rec is None else rec.zh_formal)
+                        zh_labor_series.append(None if rec is None else rec.zh_labor)
+                        local_labor_series.append(None if rec is None else rec.local_labor)
+                        outsourcing_labor_series.append(None if rec is None else rec.outsourcing_labor)
+                        visa_fee_series.append(None if rec is None else rec.visa_fee)
+                        total_labor_series.append(None if rec is None else rec.total_labor)
+
+                        if rec and rec.status:
+                                status_text = rec.status
+
+                        rows.append(
+                                "<tr>"
+                                f"<td class='metric-cell'>{month}</td>"
+                                f"<td class='num metric-cell'>{_fmt_number(None if rec is None else rec.zh_formal)}</td>"
+                                f"<td class='num metric-cell'>{_fmt_number(None if rec is None else rec.zh_labor)}</td>"
+                                f"<td class='num metric-cell'>{_fmt_number(None if rec is None else rec.local_labor)}</td>"
+                                f"<td class='num metric-cell'>{_fmt_number(None if rec is None else rec.outsourcing_labor)}</td>"
+                                f"<td class='num metric-cell'>{_fmt_number(None if rec is None else rec.visa_fee)}</td>"
+                                f"<td class='num metric-cell strong-cell'>{_fmt_number(None if rec is None else rec.total_labor)}</td>"
+                                f"<td class='remark-cell'>{_fmt_text('' if rec is None else rec.status)}</td>"
+                                "</tr>"
+                        )
+
+                chart_key = f"project_{idx}"
+                chart_data[chart_key] = {
+                        "zh_formal": zh_formal_series,
+                        "zh_labor": zh_labor_series,
+                        "local_labor": local_labor_series,
+                        "outsourcing_labor": outsourcing_labor_series,
+                        "visa_fee": visa_fee_series,
+                        "total_labor": total_labor_series,
+                }
+
+                chart_amount_id = f"chart_amount_{idx}"
+                chart_detail_id = f"chart_detail_{idx}"
+                card_id = f"card_{idx}"
+                toc_items.append(f"<a class='toc-link' href='#{card_id}'>{html.escape(project)}</a>")
+
+                section = (
+                        f"<section class='project-card' id='{card_id}'>"
+                        f"<div class='card-header'><h2>{html.escape(project)}</h2><span class='status-tag'>{_fmt_text(status_text)}</span>"
+                        f"<button class='export-btn' onclick='exportCardPDF(\"{card_id}\", \"{html.escape(project)}\")'>导出PDF</button></div>"
+                        "<div class='chart-grid'>"
+                        "<div class='chart-wrap'><h3>累计趋势</h3><canvas id='" + chart_amount_id + "'></canvas></div>"
+                        "<div class='chart-wrap'><h3>构成趋势</h3><canvas id='" + chart_detail_id + "'></canvas></div>"
+                        "</div>"
+                        "<table>"
+                        "<thead><tr>"
+                        "<th>月份</th><th>中方正式工(万泰铢)</th><th>中方劳务工(万泰铢)</th><th>子公司属地工(万泰铢)</th><th>劳务公司(万泰铢)</th><th>签证费(万泰铢)</th><th>总人工费(万泰铢)</th><th>项目状态</th>"
+                        "</tr></thead>"
+                        "<tbody>"
+                        + "".join(rows)
+                        + "</tbody></table></section>"
+                )
+                sections.append(section)
+
+        export_all_btn = (
+                "<div style='text-align: center; margin: 20px 0;'>"
+                "<button class='export-all-btn' onclick='exportAllCardsPDF()'>导出所有项目</button>"
+                "</div>"
+        )
+        all_sections = export_all_btn + ''.join(sections)
+        toc_html = "".join(toc_items)
+
+        months_json = json.dumps(months, ensure_ascii=False)
+        chart_data_json = json.dumps(chart_data, ensure_ascii=False)
+
+        return f"""<!doctype html>
+<html lang=\"zh-CN\">
+<head>
+    <meta charset=\"utf-8\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+    <title>人工费汇总分析</title>
+    <script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js\"></script>
+
+    <style>
+        :root {{
+            --bg1: #f3f7f2;
+            --bg2: #f9efe4;
+            --card: rgba(255,255,255,0.9);
+            --line: #dde6dc;
+            --txt: #21322a;
+            --muted: #5e7167;
+            --accent: #2f7d61;
+            --accent2: #c46a2f;
+        }}
+        * {{ box-sizing: border-box; }}
+        body {{
+            margin: 0;
+            color: var(--txt);
+            font-family: \"PingFang SC\", \"Noto Sans SC\", \"Microsoft YaHei\", sans-serif;
+            background:
+                radial-gradient(circle at 20% 0%, #e8f2e3 0%, transparent 40%),
+                radial-gradient(circle at 80% 0%, #f8e6d6 0%, transparent 35%),
+                linear-gradient(160deg, var(--bg1), var(--bg2));
+            min-height: 100vh;
+            scroll-behavior: smooth;
+        }}
+        .container {{ width: min(1400px, 97vw); margin: 28px auto 48px; }}
+        .layout {{ display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; align-items: start; }}
+        .toc {{
+            position: sticky;
+            top: 14px;
+            max-height: calc(100vh - 28px);
+            overflow: auto;
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            box-shadow: 0 10px 20px rgba(36, 48, 41, 0.06);
+            padding: 12px;
+        }}
+        .toc-title {{ margin: 0 0 8px; font-size: 14px; color: #2f4338; font-weight: 700; }}
+        .toc-links {{ display: grid; gap: 6px; }}
+        .toc-link {{
+            display: block;
+            padding: 6px 8px;
+            border-radius: 8px;
+            color: #2a473c;
+            text-decoration: none;
+            font-size: 12px;
+            line-height: 1.35;
+            background: rgba(227, 237, 230, 0.4);
+        }}
+        .toc-link:hover {{ background: rgba(196, 106, 47, 0.18); }}
+        .hero {{
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 18px 22px;
+            box-shadow: 0 12px 24px rgba(36, 48, 41, 0.08);
+            margin-bottom: 16px;
+        }}
+        h1 {{ margin: 4px 0 8px; font-size: clamp(22px, 3vw, 32px); }}
+        .hint {{ color: var(--muted); margin: 0; }}
+        .project-card {{
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 18px;
+            margin: 14px 0;
+            box-shadow: 0 10px 20px rgba(36, 48, 41, 0.06);
+        }}
+        .card-header {{ display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }}
+        .card-header h2 {{ margin: 4px 0; flex: 1; font-size: clamp(18px, 2.2vw, 24px); }}
+        .status-tag {{
+            padding: 4px 10px;
+            font-size: 12px;
+            border-radius: 999px;
+            background: rgba(47, 125, 97, 0.12);
+            color: #285846;
+            white-space: nowrap;
+        }}
+        h3 {{ margin: 0 0 8px; font-size: 14px; color: #2f4338; }}
+        .chart-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 32px; }}
+        .chart-wrap {{ width: 100%; height: 320px; margin-bottom: 0; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }}
+        th, td {{ border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: center; vertical-align: middle; }}
+        th {{ color: #31453a; background: rgba(227, 237, 230, 0.55); }}
+        td.num {{ text-align: center; font-variant-numeric: tabular-nums; }}
+        td.metric-cell {{ font-size: 12px; }}
+        td.remark-cell {{ font-size: 12px; line-height: 1.45; }}
+        td.strong-cell {{ font-weight: 700; color: #244d3e; }}
+
+        th:nth-child(1), td:nth-child(1) {{ white-space: nowrap; min-width: 88px; }}
+        th:nth-child(2), td:nth-child(2) {{ white-space: nowrap; min-width: 116px; }}
+        th:nth-child(3), td:nth-child(3) {{ white-space: nowrap; min-width: 116px; }}
+        th:nth-child(4), td:nth-child(4) {{ white-space: nowrap; min-width: 128px; }}
+        th:nth-child(5), td:nth-child(5) {{ white-space: nowrap; min-width: 102px; }}
+        th:nth-child(6), td:nth-child(6) {{ white-space: nowrap; min-width: 88px; }}
+        th:nth-child(7), td:nth-child(7) {{ white-space: nowrap; min-width: 96px; }}
+        th:nth-child(8), td:nth-child(8) {{ white-space: nowrap; min-width: 90px; }}
+
+        .export-btn, .export-all-btn {{
+            padding: 6px 12px;
+            font-size: 12px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }}
+        .export-btn:hover, .export-all-btn:hover {{ background: #1f6348; }}
+        .export-btn:active, .export-all-btn:active {{ transform: scale(0.98); }}
+
+        @media (max-width: 768px) {{
+            .layout {{ grid-template-columns: 1fr; }}
+            .toc {{ position: static; max-height: none; }}
+            .toc-links {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+            .chart-grid {{ grid-template-columns: 1fr; margin-bottom: 24px; }}
+            .chart-wrap {{ height: 270px; }}
+            .project-card {{ overflow-x: auto; }}
+            table {{ min-width: 980px; font-size: 12px; }}
+            td.metric-cell {{ font-size: 11px; }}
+            td.remark-cell {{ font-size: 11px; }}
+            th, td {{ padding: 6px 4px; }}
+        }}
+
+        @media print {{
+            body {{ background: white; }}
+            .hero, .project-card {{ box-shadow: none; border: 1px solid #ccc; margin: 0; page-break-inside: avoid; }}
+            .export-btn, .export-all-btn {{ display: none !important; }}
+            .project-card {{ break-inside: avoid; page-break-inside: avoid; }}
+        }}
+    </style>
+</head>
+<body>
+    <div class=\"container\">
+        <div class=\"layout\">
+            <aside class=\"toc\">
+                <h3 class=\"toc-title\">项目目录</h3>
+                <div class=\"toc-links\">{toc_html}</div>
+            </aside>
+            <main>
+                <section class=\"hero\">
+                    <h1>人工费汇总分析</h1>
+                    <p class=\"hint\">按项目展示人工费月度趋势与构成明细（单位：万泰铢）</p>
+                </section>
+                {all_sections}
+            </main>
+        </div>
+    </div>
+
+    <script>
+        const months = {months_json};
+        const allData = {chart_data_json};
+        const amountFormatter = (v) => v == null ? '-' : Number(v).toLocaleString('zh-CN', {{maximumFractionDigits: 2}});
+        const labelFormatter = (v) => v == null ? '' : Number(v).toLocaleString('zh-CN', {{maximumFractionDigits: 0}});
+
+        const inlineDataLabelPlugin = {{
+            id: 'inlineDataLabelPlugin',
+            afterDatasetsDraw(chart) {{
+                const ctx = chart.ctx;
+                chart.data.datasets.forEach((dataset, datasetIndex) => {{
+                    const meta = chart.getDatasetMeta(datasetIndex);
+                    if (meta.hidden) return;
+
+                    meta.data.forEach((element, index) => {{
+                        const raw = dataset.data[index];
+                        if (raw == null) return;
+
+                        const text = labelFormatter(raw);
+                        if (!text) return;
+
+                        const pos = element.tooltipPosition();
+                        ctx.save();
+                        ctx.fillStyle = '#24352d';
+                        ctx.font = '600 10px "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(text, pos.x, pos.y - 6);
+                        ctx.restore();
+                    }});
+                }});
+            }}
+        }};
+
+        Chart.register(inlineDataLabelPlugin);
+
+        const computeAmountBounds = (...seriesList) => {{
+            const values = seriesList.flat().filter(v => v != null);
+            if (!values.length) return {{ min: 0, max: 1 }};
+            const minVal = Math.min(...values);
+            const maxVal = Math.max(...values);
+            if (minVal >= 0) {{
+                return {{ min: 0, max: maxVal * 1.15 + 1 }};
+            }}
+            const span = maxVal - minVal;
+            const pad = Math.max(span * 0.12, 1);
+            return {{ min: minVal - pad, max: maxVal + pad }};
+        }};
+
+        const toCumulative = (arr) => {{
+            let sum = 0;
+            return (arr || []).map(v => {{
+                if (v != null) sum += Number(v);
+                return sum;
+            }});
+        }};
+
+        Object.entries(allData).forEach(([chartKey, series]) => {{
+            const idx = chartKey.split('_')[1];
+            const amountEl = document.getElementById(`chart_amount_${{idx}}`);
+            const detailEl = document.getElementById(`chart_detail_${{idx}}`);
+            if (!amountEl || !detailEl) return;
+
+            const cumZhFormal = toCumulative(series.zh_formal);
+            const cumZhLabor = toCumulative(series.zh_labor);
+            const cumLocalLabor = toCumulative(series.local_labor);
+            const cumOutsourcingLabor = toCumulative(series.outsourcing_labor);
+            const cumTotalLabor = toCumulative(series.total_labor);
+
+            const amountBounds = computeAmountBounds(
+                cumZhFormal,
+                cumZhLabor,
+                cumLocalLabor,
+                cumOutsourcingLabor,
+                cumTotalLabor,
+            );
+            new Chart(amountEl, {{
+                type: 'line',
+                data: {{
+                    labels: months,
+                    datasets: [
+                        {{
+                            label: '中方正式工累计',
+                            data: cumZhFormal,
+                            borderColor: '#2c7fb8',
+                            backgroundColor: 'rgba(44,127,184,0.12)',
+                            pointRadius: 3,
+                            borderWidth: 2,
+                            tension: 0.25,
+                            spanGaps: true,
+                        }},
+                        {{
+                            label: '中方劳务工累计',
+                            data: cumZhLabor,
+                            borderColor: '#3fae72',
+                            backgroundColor: 'rgba(63,174,114,0.12)',
+                            pointRadius: 3,
+                            borderWidth: 2,
+                            tension: 0.25,
+                            spanGaps: true,
+                        }},
+                        {{
+                            label: '子公司属地工累计',
+                            data: cumLocalLabor,
+                            borderColor: '#d08b2f',
+                            backgroundColor: 'rgba(208,139,47,0.12)',
+                            pointRadius: 3,
+                            borderWidth: 2,
+                            tension: 0.25,
+                            spanGaps: true,
+                        }},
+                        {{
+                            label: '劳务公司累计',
+                            data: cumOutsourcingLabor,
+                            borderColor: '#8f5ccf',
+                            backgroundColor: 'rgba(143,92,207,0.12)',
+                            pointRadius: 3,
+                            borderWidth: 2,
+                            tension: 0.25,
+                            spanGaps: true,
+                        }},
+                        {{
+                            label: '总人工费累计',
+                            data: cumTotalLabor,
+                            borderColor: '#245f4b',
+                            backgroundColor: 'rgba(36,95,75,0.15)',
+                            pointRadius: 4,
+                            borderWidth: 2.5,
+                            tension: 0.25,
+                            spanGaps: true,
+                        }}
+                    ]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {{ mode: 'index', intersect: false }},
+                    plugins: {{
+                        legend: {{ position: 'top' }},
+                        inlineDataLabelPlugin: {{}},
+                        tooltip: {{
+                            callbacks: {{
+                                label: (ctx) => `${{ctx.dataset.label || ''}}: ${{amountFormatter(ctx.raw)}} 万泰铢`
+                            }}
+                        }}
+                    }},
+                    scales: {{
+                        y: {{
+                            min: amountBounds.min,
+                            max: amountBounds.max,
+                            ticks: {{ callback: (v) => amountFormatter(v) }}
+                        }}
+                    }}
+                }}
+            }});
+
+            const detailBounds = computeAmountBounds(
+                series.zh_formal,
+                series.zh_labor,
+                series.local_labor,
+                series.outsourcing_labor,
+            );
+            new Chart(detailEl, {{
+                type: 'line',
+                data: {{
+                    labels: months,
+                    datasets: [
+                        {{ label: '中方正式工铢', data: series.zh_formal, borderColor: '#2c7fb8', backgroundColor: 'rgba(44,127,184,0.12)', pointRadius: 3, borderWidth: 2, tension: 0.25, spanGaps: true }},
+                        {{ label: '中方劳务工铢', data: series.zh_labor, borderColor: '#3fae72', backgroundColor: 'rgba(63,174,114,0.12)', pointRadius: 3, borderWidth: 2, tension: 0.25, spanGaps: true }},
+                        {{ label: '子公司属地工铢', data: series.local_labor, borderColor: '#d08b2f', backgroundColor: 'rgba(208,139,47,0.12)', pointRadius: 3, borderWidth: 2, tension: 0.25, spanGaps: true }},
+                        {{ label: '劳务公司铢', data: series.outsourcing_labor, borderColor: '#8f5ccf', backgroundColor: 'rgba(143,92,207,0.12)', pointRadius: 3, borderWidth: 2, tension: 0.25, spanGaps: true }}
+                    ]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {{ mode: 'index', intersect: false }},
+                    plugins: {{
+                        legend: {{ position: 'top' }},
+                        tooltip: {{
+                            callbacks: {{
+                                label: (ctx) => `${{ctx.dataset.label || ''}}: ${{amountFormatter(ctx.raw)}} 万泰铢`
+                            }}
+                        }}
+                    }},
+                    scales: {{
+                        y: {{
+                            min: detailBounds.min,
+                            max: detailBounds.max,
+                            ticks: {{ callback: (v) => amountFormatter(v) }}
+                        }}
+                    }}
+                }}
+            }});
+        }});
+
+        function exportCardPDF(cardId, projectName) {{
+            const element = document.getElementById(cardId);
+            if (!element) return;
+
+            const allCards = document.querySelectorAll('.project-card');
+            allCards.forEach(card => {{
+                card.style.display = card.id === cardId ? 'block' : 'none';
+            }});
+            const heroSection = document.querySelector('.hero');
+            const exportAllBtn = document.querySelector('.export-all-btn').parentElement;
+            heroSection.style.display = 'none';
+            exportAllBtn.style.display = 'none';
+
+            setTimeout(() => {{
+                window.print();
+                allCards.forEach(card => {{
+                    card.style.display = 'block';
+                }});
+                heroSection.style.display = 'block';
+                exportAllBtn.style.display = 'block';
+            }}, 100);
+        }}
+
+        function exportAllCardsPDF() {{
+            const exportAllBtn = document.querySelector('.export-all-btn').parentElement;
+            exportAllBtn.style.display = 'none';
+
+            setTimeout(() => {{
+                window.print();
+                exportAllBtn.style.display = 'block';
+            }}, 100);
+        }}
+    </script>
+</body>
+</html>
+"""
 
 
 # ====================== 主程序 ======================
@@ -324,37 +831,37 @@ def main():
         print(f"✅ 已输出：{out_path}")
 
     # ====================== HTML 报告 ======================
-    print("\n📊 生成交互式 HTML 图表...")
+    print("\n📊 生成人工费项目月度 HTML 报告...")
     months_sorted = sorted(grouped['年-月'].unique(), key=lambda s: (int(s.split('-')[0]), int(s.split('-')[1])))
-    project_status_map = df.groupby('项目名称')['项目状态'].first().fillna('未知').to_dict()
-    project_list = sorted(str(k) for k in project_status_map.keys())
+    project_data: Dict[str, List[LaborMonthlyRecord]] = {}
+    grouped_for_html = grouped.copy()
+    grouped_for_html['项目状态'] = grouped_for_html['项目名称'].map(
+        df.groupby('项目名称')['项目状态'].first().to_dict()
+    ).fillna('未知')
 
-    html_metrics = [m for m in metrics if m != '签证费']
-    metrics_data = {}
-    for metric in html_metrics:
-        pivot = grouped.pivot_table(index='年-月', columns='项目名称', values=metric, aggfunc='sum', fill_value=0)
-        pivot = pivot.reindex(index=months_sorted, fill_value=0)
-        metric_data = {}
-        for project in project_list:
-            series = pivot.get(project, pd.Series([0] * len(months_sorted), index=months_sorted))
-            metric_data[project] = {
-                'x': list(series.index),
-                'y': [float(v) if pd.notna(v) else 0.0 for v in series.values]
-            }
-        metrics_data[metric] = metric_data
+    for _, row in grouped_for_html.iterrows():
+        project = str(row.get('项目名称', '')).strip()
+        if not project:
+            continue
+        project_data.setdefault(project, []).append(
+            LaborMonthlyRecord(
+                month=str(row['年-月']),
+                zh_formal=(float(row['中方正式工铢']) / 10000.0) if pd.notna(row['中方正式工铢']) else None,
+                zh_labor=(float(row['中方劳务工铢']) / 10000.0) if pd.notna(row['中方劳务工铢']) else None,
+                local_labor=(float(row['子公司属地工铢']) / 10000.0) if pd.notna(row['子公司属地工铢']) else None,
+                outsourcing_labor=(float(row['劳务公司铢']) / 10000.0) if pd.notna(row['劳务公司铢']) else None,
+                visa_fee=(float(row['签证费']) / 10000.0) if pd.notna(row['签证费']) else None,
+                total_labor=(float(row['总人工费']) / 10000.0) if pd.notna(row['总人工费']) else None,
+                status=str(row.get('项目状态', '') or ''),
+            )
+        )
+
+    for project in project_data:
+        project_data[project].sort(key=lambda x: x.month)
 
     html_file = Path(Config.OUTPUT_Z_REPORT) / f'人工费汇总分析_{base_name}.html'
-    html_template = render_html_from_template(
-        Config.HTML_TEMPLATE_PATH,
-        {
-            '__METRICS__': json.dumps(html_metrics, ensure_ascii=False),
-            '__METRICS_DATA__': json.dumps(metrics_data, ensure_ascii=False),
-            '__PROJECT_STATUS__': json.dumps(project_status_map, ensure_ascii=False),
-            '__MONTHS__': json.dumps(months_sorted, ensure_ascii=False),
-            '__PROJECTS__': json.dumps(project_list, ensure_ascii=False),
-        }
-    )
-    html_file.write_text(html_template, encoding='utf-8')
+    html_content = make_labor_html(project_data, months_sorted)
+    html_file.write_text(html_content, encoding='utf-8')
     print(f"✅ HTML 图表生成完成：{html_file}")
 
     print("\n🎉 处理完成！")
