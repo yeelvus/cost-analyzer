@@ -3,11 +3,14 @@ import re
 import sys
 import shutil
 import importlib.util
+from collections import OrderedDict, defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 
 # ====================== 配置区 ======================
 class Config:
@@ -18,6 +21,8 @@ class Config:
     OUTPUT_ORIGINAL = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_财务付款数据/C_财务付款_sum/财务付款数据汇总.xlsx"
     
     AMOUNT_COLUMNS = ["应付金额", "预扣税额", "实付金额", "增值税额", "不含税额"]
+    SUBJECT_WIDE_SHEET = "一级二级科目宽表"
+    SUBJECT_SUMMARY_ROW = "一级科目汇总"
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -208,6 +213,128 @@ def safe_text(value) -> str:
     return "" if text.lower() in {"", "nan", "none"} else text
 
 
+def subject_sort_key(value: str):
+    text = safe_text(value)
+    match = re.match(r"^(\d+)[_\-\.、\s]*(.*)$", text)
+    if match:
+        return (0, int(match.group(1)), match.group(2))
+    return (1, text)
+
+
+def extract_subject_rows(file_path: Path) -> List[Dict[str, object]]:
+    try:
+        df = pd.read_excel(file_path)
+    except Exception as e:
+        print(f"⚠️ 读取失败 {file_path.name}: {e}")
+        return []
+
+    if df.empty:
+        return []
+
+    if "实付金额" not in df.columns and "增值税额" not in df.columns:
+        print(f"⚠️ 缺少金额列: {file_path.name}")
+        return []
+
+    amount_df = pd.DataFrame()
+    for col in ["实付金额", "增值税额"]:
+        if col in df.columns:
+            amount_df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+        else:
+            amount_df[col] = 0.0
+
+    df["金额汇总"] = amount_df.sum(axis=1)
+    df = df[df["金额汇总"] != 0].copy()
+    if df.empty:
+        return []
+
+    project_code = ""
+    if "项目编码" in df.columns:
+        codes = df["项目编码"].dropna().astype(str).str.strip()
+        codes = codes[~codes.str.lower().isin(["", "nan", "none"])]
+        if not codes.empty:
+            project_code = codes.iloc[0]
+
+    project_name = ""
+    if "项目名称" in df.columns:
+        names = df["项目名称"].dropna().astype(str).str.strip()
+        names = names[~names.str.lower().isin(["", "nan", "none"])]
+        if not names.empty:
+            project_name = names.iloc[0]
+    if not project_name:
+        project_name = file_path.stem
+
+    rows: List[Dict[str, object]] = []
+    for _, row in df.iterrows():
+        level1 = safe_text(row.get("一级科目")) or safe_text(row.get("科目")) or "未分类一级科目"
+        level2 = safe_text(row.get("二级科目")) or safe_text(row.get("科目")) or "未分类二级科目"
+        rows.append(
+            {
+                "项目编码": safe_text(project_code),
+                "项目名称": safe_text(project_name),
+                "一级科目": level1,
+                "二级科目": level2,
+                "金额汇总": float(row.get("金额汇总", 0) or 0),
+            }
+        )
+    return rows
+
+
+def build_subject_wide_payload() -> Dict[str, object]:
+    input_root = Path(Config.INPUT_ROOT)
+    if not input_root.is_dir():
+        raise FileNotFoundError(f"输入目录不存在: {input_root}")
+
+    rows: List[Dict[str, object]] = []
+    for folder in sorted(input_root.iterdir()):
+        if not folder.is_dir():
+            continue
+
+        print(f"\n处理科目目录: {folder.name}")
+        for file_path in folder.glob("*.xlsx"):
+            if file_path.name.startswith("~$"):
+                continue
+            rows.extend(extract_subject_rows(file_path))
+
+    if not rows:
+        return {
+            "project_order": [],
+            "layout": OrderedDict(),
+            "project_map": {},
+            "grand_map": {},
+        }
+
+    df = pd.DataFrame(rows)
+    grouped = (
+        df.groupby(["项目名称", "一级科目", "二级科目"], dropna=False, as_index=False)["金额汇总"]
+        .sum()
+    )
+
+    level1_order = sorted(grouped["一级科目"].dropna().unique().tolist(), key=subject_sort_key)
+    layout: "OrderedDict[str, List[str]]" = OrderedDict()
+    for level1 in level1_order:
+        level2_values = grouped.loc[grouped["一级科目"] == level1, "二级科目"].dropna().unique().tolist()
+        layout[level1] = sorted(level2_values, key=subject_sort_key)
+
+    project_order = sorted(grouped["项目名称"].dropna().unique().tolist(), key=subject_sort_key)
+
+    project_map: Dict[str, Dict[str, Dict[str, float]]] = defaultdict(lambda: defaultdict(dict))
+    grand_map: Dict[str, Dict[str, float]] = defaultdict(dict)
+    for _, row in grouped.iterrows():
+        project_name = safe_text(row.get("项目名称"))
+        level1 = safe_text(row.get("一级科目"))
+        level2 = safe_text(row.get("二级科目"))
+        amount = float(row.get("金额汇总", 0) or 0)
+        project_map[project_name][level1][level2] = amount
+        grand_map[level1][level2] = grand_map[level1].get(level2, 0.0) + amount
+
+    return {
+        "project_order": project_order,
+        "layout": layout,
+        "project_map": project_map,
+        "grand_map": grand_map,
+    }
+
+
 def extract_project_monthly_rows(file_path: Path, ymd: str) -> List[Dict]:
     try:
         df = pd.read_excel(file_path)
@@ -373,6 +500,125 @@ def build_monthly_wide_dataframe() -> pd.DataFrame:
     return wide_df
 
 
+def write_subject_wide_sheet(wb, payload: Dict[str, object]):
+    layout = payload.get("layout", OrderedDict())
+    project_order = payload.get("project_order", [])
+    project_map = payload.get("project_map", {})
+    grand_map = payload.get("grand_map", {})
+
+    ws = wb.create_sheet(title=Config.SUBJECT_WIDE_SHEET)
+    ws.freeze_panes = "B3"
+    ws.sheet_view.showGridLines = False
+
+    title_fill = PatternFill("solid", fgColor="DDEFE3")
+    header_fill = PatternFill("solid", fgColor="C9E1D1")
+    summary_fill = PatternFill("solid", fgColor="EAF4EC")
+    bold_font = Font(bold=True, color="1F3A2E")
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin = Side(style="thin", color="B7C7BC")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    ws.cell(1, 1, "项目名称")
+    ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
+    ws.cell(1, 1).fill = title_fill
+    ws.cell(1, 1).font = bold_font
+    ws.cell(1, 1).alignment = center
+    ws.cell(1, 1).border = border
+
+    col = 2
+    group_positions = []
+    for level1, level2_list in layout.items():
+        group_width = 1 + len(level2_list)
+        ws.cell(1, col, level1)
+        if group_width > 1:
+            ws.merge_cells(start_row=1, start_column=col, end_row=1, end_column=col + group_width - 1)
+        group_positions.append((level1, col, group_width))
+        for offset in range(group_width):
+            c = col + offset
+            ws.cell(1, c).fill = title_fill
+            ws.cell(1, c).font = bold_font
+            ws.cell(1, c).alignment = center
+            ws.cell(1, c).border = border
+
+        ws.cell(2, col, "小计")
+        ws.cell(2, col).fill = header_fill
+        ws.cell(2, col).font = bold_font
+        ws.cell(2, col).alignment = center
+        ws.cell(2, col).border = border
+
+        for idx, level2 in enumerate(level2_list, start=1):
+            cell = ws.cell(2, col + idx, level2)
+            cell.fill = header_fill
+            cell.font = bold_font
+            cell.alignment = center
+            cell.border = border
+        col += group_width
+
+    row_idx = 3
+    for project_name in project_order:
+        ws.cell(row_idx, 1, project_name)
+        ws.cell(row_idx, 1).alignment = center
+        ws.cell(row_idx, 1).border = border
+
+        for level1, start_col, group_width in group_positions:
+            level2_list = layout.get(level1, [])
+            level1_total = 0.0
+            project_level1_map = project_map.get(project_name, {}).get(level1, {})
+            for offset, level2 in enumerate(level2_list, start=1):
+                value = float(project_level1_map.get(level2, 0.0) or 0.0)
+                cell = ws.cell(row_idx, start_col + offset, value)
+                cell.number_format = '#,##0.00'
+                cell.alignment = center
+                cell.border = border
+                level1_total += value
+
+            subtotal_cell = ws.cell(row_idx, start_col, level1_total)
+            subtotal_cell.number_format = '#,##0.00'
+            subtotal_cell.alignment = center
+            subtotal_cell.border = border
+
+        row_idx += 1
+
+    if project_order:
+        summary_row = row_idx + 1
+    else:
+        summary_row = row_idx
+
+    ws.cell(summary_row, 1, Config.SUBJECT_SUMMARY_ROW)
+    ws.cell(summary_row, 1).fill = summary_fill
+    ws.cell(summary_row, 1).font = bold_font
+    ws.cell(summary_row, 1).alignment = center
+    ws.cell(summary_row, 1).border = border
+
+    for level1, start_col, group_width in group_positions:
+        level2_list = layout.get(level1, [])
+        level1_total = 0.0
+        for offset, level2 in enumerate(level2_list, start=1):
+            value = float(grand_map.get(level1, {}).get(level2, 0.0) or 0.0)
+            cell = ws.cell(summary_row, start_col + offset, value)
+            cell.number_format = '#,##0.00'
+            cell.fill = summary_fill
+            cell.font = bold_font
+            cell.alignment = center
+            cell.border = border
+            level1_total += value
+
+        subtotal_cell = ws.cell(summary_row, start_col, level1_total)
+        subtotal_cell.number_format = '#,##0.00'
+        subtotal_cell.fill = summary_fill
+        subtotal_cell.font = bold_font
+        subtotal_cell.alignment = center
+        subtotal_cell.border = border
+
+    ws.column_dimensions["A"].width = 28
+    for col_idx in range(2, ws.max_column + 1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = 16
+
+    ws.row_dimensions[1].height = 28
+    ws.row_dimensions[2].height = 34
+    return ws
+
+
 def apply_formatting(output_path: str):
     try:
         wb = load_workbook(output_path)
@@ -407,6 +653,7 @@ def main():
 
     summary_df = build_summary_dataframe()
     monthly_wide_df = build_monthly_wide_dataframe()
+    subject_wide_payload = build_subject_wide_payload()
 
     # 输出策略：先生成主文件，再复制
     output_paths = [Config.OUTPUT_Z, Config.OUTPUT_ORIGINAL]
@@ -418,6 +665,7 @@ def main():
         with pd.ExcelWriter(path, engine="openpyxl") as writer:
             summary_df.to_excel(writer, sheet_name="最新月份汇总", index=False)
             monthly_wide_df.to_excel(writer, sheet_name="项目按月宽表", index=False)
+            write_subject_wide_sheet(writer.book, subject_wide_payload)
 
         apply_formatting(str(path))
         print(f"✅ 输出完成 → {path}")
