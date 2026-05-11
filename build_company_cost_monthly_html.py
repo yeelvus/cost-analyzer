@@ -279,7 +279,7 @@ def make_html(project_data: Dict[str, List[ProjectMonthlyRecord]], months: List[
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
   <title>项目月度进度汇总</title>
   <script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js\"></script>
-  <script src=\"https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js\"></script>
+
   <style>
     :root {{
       --bg1: #f3f7f2;
@@ -364,6 +364,12 @@ def make_html(project_data: Dict[str, List[ProjectMonthlyRecord]], months: List[
       td.metric-cell {{ font-size: 11px; }}
       td.remark-cell {{ font-size: 11px; }}
       th, td {{ padding: 6px 4px; }}
+    }}
+    @media print {{
+      body {{ background: white; }}
+      .hero, .project-card {{ box-shadow: none; border: 1px solid #ccc; margin: 0; page-break-inside: avoid; }}
+      .export-btn, .export-all-btn {{ display: none !important; }}
+      .project-card {{ break-inside: avoid; page-break-inside: avoid; }}
     }}
   </style>
 </head>
@@ -580,83 +586,41 @@ def make_html(project_data: Dict[str, List[ProjectMonthlyRecord]], months: List[
       }});
     }});
 
-    async function exportCardPDF(cardId, projectName) {{
+    function exportCardPDF(cardId, projectName) {{
       const element = document.getElementById(cardId);
       if (!element) return;
       
-      // 隐藏导出按钮
-      const btns = element.querySelectorAll('.export-btn');
-      btns.forEach(btn => btn.style.display = 'none');
+      const allCards = document.querySelectorAll('.project-card');
+      allCards.forEach(card => {{
+        card.style.display = card.id === cardId ? 'block' : 'none';
+      }});
+      const heroSection = document.querySelector('.hero');
+      const exportAllBtn = document.querySelector('.export-all-btn').parentElement;
+      heroSection.style.display = 'none';
+      exportAllBtn.style.display = 'none';
       
-      try {{
-        const canvas = await html2canvas(element, {{
-          scale: 3,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff'
+      setTimeout(() => {{
+        window.print();
+        
+        // 恢复显示
+        allCards.forEach(card => {{
+          card.style.display = 'block';
         }});
-        
-        const imgData = canvas.toDataURL('image/jpeg', 0.98);
-        const pdf = new jsPDF({{
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4'
-        }});
-        
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const margin = 10;
-        const contentWidth = pageWidth - 2 * margin;
-        const contentHeight = (canvas.height * contentWidth) / canvas.width;
-        
-        pdf.addImage(imgData, 'JPEG', margin, margin, contentWidth, contentHeight);
-        pdf.save(projectName + '.pdf');
-      }} catch(err) {{
-        console.error('PDF导出失败:', err);
-        alert('PDF导出失败，请稍后重试');
-      }} finally {{
-        btns.forEach(btn => btn.style.display = 'inline-block');
-      }}
+        heroSection.style.display = 'block';
+        exportAllBtn.style.display = 'block';
+      }}, 100);
     }}
 
-    async function exportAllCardsPDF() {{
-      const cards = document.querySelectorAll('.project-card');
-      if (!cards.length) return;
+    function exportAllCardsPDF() {{
+      const exportAllBtn = document.querySelector('.export-all-btn').parentElement;
+      exportAllBtn.style.display = 'none';
       
-      // 隐藏所有导出按钮
-      document.querySelectorAll('.export-btn, .export-all-btn').forEach(btn => {{
-        btn.style.display = 'none';
-      }});
-      
-      const opt = {{
-        margin: 10,
-        image: {{ type: 'jpeg', quality: 0.98 }},
-        html2canvas: {{ scale: 2, useCORS: true, logging: false }},
-        jsPDF: {{ orientation: 'portrait', unit: 'mm', format: 'a4' }}
-      }};
-      
-      const doc = new jsPDF(opt.jsPDF);
-      let isFirstPage = true;
-      
-      for (let i = 0; i < cards.length; i++) {{
-        const card = cards[i];
-        const canvas = await html2canvas(card, opt.html2canvas);
-        const imgData = canvas.toDataURL('image/jpeg', opt.image.quality);
-        const imgWidth = 190; // A4宽度-边距
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      setTimeout(() => {{
+        window.print();
         
-        if (!isFirstPage) {{
-          doc.addPage();
-        }}
-        doc.addImage(imgData, 'JPEG', 10, 10, imgWidth, imgHeight);
-        isFirstPage = false;
-      }}
-      
-      doc.save('\u9879\u76ee\u6708\u5ea6\u8fdb\u5ea6\u6c47\u603b.pdf');
-      
-      // 恢复按钮显示
-      document.querySelectorAll('.export-btn, .export-all-btn').forEach(btn => {{
-        btn.style.display = 'inline-block';
-      }});
+        // 恢复显示
+        exportAllBtn.style.display = 'block';
+      }}, 100);
     }}
   </script>
 </body>
