@@ -1,6 +1,4 @@
-import os
 import re
-import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import cast
@@ -40,11 +38,9 @@ def parse_amount(value):
     except ValueError:
         return None
 
-SOURCE_PATH = Path("/Volumes/工作文件临时存放包/1.成本梳理（新）")
-TARGET_BASE_PATH = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/6_预算部分/6.1_责任成本书")
-PROJECT_INFO_FILE = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目编码名称汇总.xlsx")
-SECONDARY_FOLDER = TARGET_BASE_PATH / "副文件集合"
-OUTPUT_FOLDER = TARGET_BASE_PATH / "汇总版"
+RAW_INPUT_PATH = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/3_预算部分/6.1_责任成本书/1_责任成本_raw")
+TARGET_BASE_PATH = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/3_预算部分/6.1_责任成本书")
+OUTPUT_FOLDER = TARGET_BASE_PATH / "2_责任成本_std"
 REPORT_FILE = OUTPUT_FOLDER / "完整处理报告.xlsx"
 LOG_FILE = Path.home() / ".project_cache" / "process_log.txt"
 AMOUNT_THRESHOLD = 100  # 金额阈值，≤100 为异常
@@ -63,94 +59,7 @@ def log_message(msg):
         f.write(log_entry + "\n")
 
 # ============================================================================
-# 第一部分：文件提取和组织
-# ============================================================================
-def load_project_info_map():
-    """从项目编码名称汇总.xlsx 中读取项目编码 -> 项目名称（合同管理）的映射"""
-    project_map = {}
-    try:
-        df = pd.read_excel(PROJECT_INFO_FILE)
-        if "项目编码" in df.columns and "项目名称（合同管理）" in df.columns:
-            for _, row in df.iterrows():
-                code = normalize_text(row["项目编码"])
-                name = normalize_text(row["项目名称（合同管理）"])
-                if code:
-                    project_map[code] = name
-            log_message(f"✓ 已加载项目映射表，共 {len(project_map)} 个项目")
-        else:
-            log_message("⚠ 项目映射表缺少必要列（项目编码 或 项目名称（合同管理））")
-    except Exception as e:
-        log_message(f"✗ 读取项目映射表失败: {e}")
-    
-    return project_map
-
-def extract_project_code(folder_name):
-    """从文件夹名称中提取项目编码"""
-    if "_" in folder_name:
-        return folder_name.split("_")[0]
-    return None
-
-def find_responsibility_cost_files(project_folder):
-    """
-    在项目文件夹的 1.责任成本/ 目录中查找所有 Excel 文件
-    返回 (主文件, [副文件列表])
-    """
-    cost_folder = project_folder / "1.责任成本"
-    
-    if not cost_folder.exists():
-        return None, []
-    
-    excel_files = []
-    for file in cost_folder.glob("*.xlsx"):
-        if not file.name.startswith("~"):
-            mtime = file.stat().st_mtime
-            excel_files.append((file, mtime))
-    
-    if not excel_files:
-        return None, []
-    
-    excel_files.sort(key=lambda x: x[1], reverse=True)
-    
-    primary_file = None
-    for file, _ in excel_files:
-        if "最终版" in file.name:
-            primary_file = file
-            break
-    
-    if primary_file is None and excel_files:
-        primary_file = excel_files[0][0]
-    
-    secondary_files = []
-    if primary_file:
-        secondary_files = [f[0] for f in excel_files if f[0] != primary_file]
-    else:
-        secondary_files = [f[0] for f in excel_files]
-    
-    return primary_file, secondary_files
-
-def copy_and_rename_file(source_file, target_folder, project_code, project_name, sequence=None):
-    """复制文件到目标文件夹并重命名"""
-    if not source_file.exists():
-        log_message(f"✗ 源文件不存在: {source_file}")
-        return False
-    
-    if sequence is None:
-        new_filename = f"{project_code}_{project_name}.xlsx"
-    else:
-        new_filename = f"{project_code}_{project_name}_{sequence}.xlsx"
-    
-    target_file = target_folder / new_filename
-    
-    try:
-        shutil.copy2(source_file, target_file)
-        log_message(f"✓ 复制文件: {source_file.name} -> {new_filename}")
-        return True
-    except Exception as e:
-        log_message(f"✗ 复制文件失败 ({source_file.name}): {e}")
-        return False
-
-# ============================================================================
-# 第二部分：数据处理和汇总
+# 第一部分：数据处理和汇总
 # ============================================================================
 def is_major_category(seq_str):
     """判断序号是否为大类（首级分类）"""
@@ -176,8 +85,7 @@ def is_subtotal_row(name):
     exclude_keywords = [
         "小计", "合计", "合同金额",
         "预计成本合计", "预计收入合计",
-        "预计利润", "毛利",
-        "增值税", "印花税", "预扣"
+        "预计利润", "毛利"
     ]
     return any(kw in name for kw in exclude_keywords)
 
@@ -246,7 +154,35 @@ def read_excel_data(excel_file):
                     amount_cols.append(col_idx)
 
             if amount_cols:
-                amount_col = amount_cols[-1]
+                # 多金额列时智能选择：优先 THB/泰铢、综合列，并结合有效数值行数
+                best_col = None
+                best_score = None
+                for candidate_col in amount_cols:
+                    header_text = str(header_row[candidate_col]) if header_row[candidate_col] is not None else ""
+                    non_null_count = 0
+                    non_zero_count = 0
+                    for data_row in rows[header_row_idx + 1:]:
+                        cell_val = data_row[candidate_col].value if candidate_col < len(data_row) else None
+                        num_val = parse_amount(cell_val)
+                        if num_val is not None:
+                            non_null_count += 1
+                            if abs(num_val) > 1e-9:
+                                non_zero_count += 1
+
+                    preference_score = 0
+                    if "综合" in header_text:
+                        preference_score += 50
+                    if "THB" in header_text.upper() or "泰铢" in header_text:
+                        preference_score += 30
+                    if "CNY" in header_text.upper() or "人民币" in header_text:
+                        preference_score -= 20
+
+                    score = preference_score + non_zero_count * 2 + non_null_count
+                    if best_score is None or score > best_score:
+                        best_score = score
+                        best_col = candidate_col
+
+                amount_col = best_col
             
             if seq_col is None or name_col is None or amount_col is None:
                 continue
@@ -300,13 +236,14 @@ def read_excel_data(excel_file):
         return None, [], None
 
 def process_and_summarize(data_rows):
-    """处理数据行，仅提取前两个大类及其所有子项"""
+    """处理数据行，提取所有成本大类及其子项（遇到收入/利润类大类时停止）"""
     result_rows = []
     category_totals = {}
-    processed_categories = []
     
     current_major_category = None
     current_category_sum = 0
+    
+    INCOME_STOP_KEYWORDS = ["收入", "利润", "毛利"]
     
     for row in data_rows:
         seq = row["序号"]
@@ -323,15 +260,16 @@ def process_and_summarize(data_rows):
             if current_major_category:
                 category_totals[current_major_category] = current_category_sum
             
-            if len(processed_categories) >= 2:
+            # 遇到收入/利润类大类时停止
+            name_str = str(name) if name else ""
+            if any(kw in name_str for kw in INCOME_STOP_KEYWORDS):
                 break
-            
+
             current_major_category = seq
-            processed_categories.append(seq)
             current_category_sum = 0
             result_rows.append(row)
         
-        elif current_major_category and len(processed_categories) <= 2:
+        elif current_major_category:
             if seq is None or (isinstance(seq, str) and not seq.strip()):
                 # 无序号但有名称/金额的行，视为当前大类的子项
                 if name or amount is not None:
@@ -343,8 +281,6 @@ def process_and_summarize(data_rows):
                 result_rows.append(row)
                 if amount and isinstance(amount, (int, float)):
                     current_category_sum += amount
-            elif is_major_category(seq):
-                break
     
     if current_major_category:
         category_totals[current_major_category] = current_category_sum
@@ -620,7 +556,7 @@ def write_complete_report(report_data, report_file):
         # 冻结首行、设置行高、筛选、自动换行
         ws.freeze_panes = "A2"
         ws.row_dimensions[1].height = 40
-        ws.auto_filter.ref = f"A1:T{ws.max_row}"
+        ws.auto_filter.ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
         header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         header_font = Font(bold=True)
         for cell in ws[1]:  # type: ignore
@@ -667,102 +603,36 @@ def write_complete_report(report_data, report_file):
 def main():
     log_message("=" * 70)
     log_message("开始完整处理责任成本文件")
-    log_message(f"步骤1: 从源路径提取 Excel 文件")
+    log_message(f"步骤1: 从 raw 目录读取 Excel 文件")
     log_message(f"步骤2: 处理并生成汇总版本")
     log_message(f"步骤3: 生成完整报告")
     log_message("=" * 70)
     
     # 创建目标文件夹
     TARGET_BASE_PATH.mkdir(parents=True, exist_ok=True)
-    SECONDARY_FOLDER.mkdir(parents=True, exist_ok=True)
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
     
-    # 加载项目映射表
-    project_map = load_project_info_map()
-    
     # ========================================================================
-    # 步骤1: 扫描源路径并提取 Excel 文件
+    # 步骤1: 从 raw 目录读取 Excel 文件
     # ========================================================================
     log_message("\n" + "=" * 70)
-    log_message("步骤1: 扫描源路径并提取 Excel 文件")
+    log_message("步骤1: 从 raw 目录读取 Excel 文件")
     log_message("=" * 70)
     
     report_data = []
-    
-    if not SOURCE_PATH.exists():
-        log_message(f"✗ 源路径不存在: {SOURCE_PATH}")
-        log_message("⚠ 将只处理已存在的目标文件")
-    else:
-        # 扫描所有项目文件夹
-        project_folders = []
-        try:
-            for item in SOURCE_PATH.iterdir():
-                if item.is_dir() and "_" in item.name:
-                    project_code = extract_project_code(item.name)
-                    if project_code:
-                        project_folders.append((item, project_code))
-        except (TimeoutError, OSError) as e:
-            log_message(f"✗ 扫描源路径失败: {e}")
-            log_message("⚠ 将跳过源路径扫描，仅处理已存在的目标文件")
-        
-        log_message(f"找到 {len(project_folders)} 个项目文件夹")
-        
-        for project_folder, project_code in project_folders:
-            log_message("-" * 70)
-            log_message(f"处理项目: {project_folder.name} (编码: {project_code})")
-            
-            project_name = project_map.get(project_code, "未知项目")
-            
-            # 查找责任成本 Excel 文件
-            primary_file, secondary_files = find_responsibility_cost_files(project_folder)
-            
-            total_files = 0
-            if primary_file:
-                total_files += 1
-            total_files += len(secondary_files)
-            
-            if total_files == 0:
-                log_message(f"⚠ 未找到责任成本 Excel 文件")
-                report_data.append({
-                    "项目编码": project_code,
-                    "项目名称": project_name,
-                    "A类总计": "", "B类总计": "", "合计金额": "", "合同金额汇总": "",
-                    "源文件夹存在": "是", "Excel文件数量": 0, "主文件名": "",
-                    "副文件数量": 0, "复制状态": "无Excel文件", "异常标记": "", "输出状态": "",
-                    "原始名称": "", "汇总名称": ""
-                })
-                continue
-            
-            # 复制主文件
-            copy_success = True
-            if primary_file:
-                if not copy_and_rename_file(primary_file, TARGET_BASE_PATH, project_code, project_name):
-                    copy_success = False
-            
-            # 复制副文件
-            for idx, secondary_file in enumerate(secondary_files, start=2):
-                if not copy_and_rename_file(secondary_file, SECONDARY_FOLDER, project_code, project_name, sequence=idx):
-                    copy_success = False
-            
-            report_data.append({
-                "项目编码": project_code,
-                "项目名称": project_name,
-                "A类总计": "", "B类总计": "", "合计金额": "", "合同金额汇总": "",
-                "源文件夹存在": "是", "Excel文件数量": total_files, "主文件名": primary_file.name if primary_file else "",
-                "副文件数量": len(secondary_files), "复制状态": "成功" if copy_success else "部分失败",
-                "异常标记": "", "输出状态": "",
-                "原始名称": "", "汇总名称": ""
-            })
+    if not RAW_INPUT_PATH.exists():
+        log_message(f"✗ raw 输入目录不存在: {RAW_INPUT_PATH}")
+        return
     
     # ========================================================================
-    # 步骤2: 处理目标文件夹中的 Excel 文件
+    # 步骤2: 处理 raw 目录中的 Excel 文件
     # ========================================================================
     log_message("\n" + "=" * 70)
-    log_message("步骤2: 处理目标文件夹中的 Excel 文件")
+    log_message("步骤2: 处理 raw 目录中的 Excel 文件")
     log_message("=" * 70)
     
-    # 扫描目标文件夹中的所有 Excel 文件
-    excel_files = list(TARGET_BASE_PATH.glob("*.xlsx"))
+    # 扫描 raw 目录中的所有 Excel 文件
+    excel_files = list(RAW_INPUT_PATH.glob("*.xlsx"))
     excel_files = [f for f in excel_files if not f.name.startswith("~") and "_汇总版" not in f.name and "_责任成本.xlsx" not in f.name]
     
     log_message(f"找到 {len(excel_files)} 个待处理的 Excel 文件")
@@ -801,8 +671,8 @@ def main():
                 report_dict[project_code] = {
                     "项目编码": project_code, "项目名称": project_name_from_file or "未知",
                     "A类总计": "", "B类总计": "", "合计金额": "", "合同金额汇总": "",
-                    "源文件夹存在": "否", "Excel文件数量": 1, "主文件名": excel_file.name,
-                    "副文件数量": 0, "复制状态": "已存在", "异常标记": "无数据", "输出状态": "跳过",
+                    "源文件夹存在": "是", "Excel文件数量": 1, "主文件名": excel_file.name,
+                    "副文件数量": 0, "复制状态": "raw直读", "异常标记": "无数据", "输出状态": "跳过",
                     "原始名称": "", "汇总名称": ""
                 }
             elif project_code and project_code in report_dict:
@@ -837,6 +707,8 @@ def main():
         log_message(f"✓ 删除行数: {deleted_rows}")
         
         for cat, total in category_totals.items():
+            if str(cat).upper() == "C":
+                continue
             log_message(f"  {cat} 类总计: {total}")
         
         # 计算合计金额
@@ -872,8 +744,8 @@ def main():
             report_dict[project_code] = {
                 "项目编码": project_code, "项目名称": final_project_name,
                 "A类总计": "", "B类总计": "", "合计金额": "", "合同金额汇总": "",
-                "源文件夹存在": "否", "Excel文件数量": 1, "主文件名": excel_file.name,
-                "副文件数量": 0, "复制状态": "已存在", "异常标记": "", "输出状态": "",
+                "源文件夹存在": "是", "Excel文件数量": 1, "主文件名": excel_file.name,
+                "副文件数量": 0, "复制状态": "raw直读", "异常标记": "", "输出状态": "",
                 "原始名称": "", "汇总名称": ""
             }
         
@@ -941,7 +813,7 @@ def main():
     # 总结
     log_message("\n" + "=" * 70)
     log_message("处理完成总结:")
-    log_message(f"  扫描项目数: {len(report_dict)}")
+    log_message(f"  处理项目数: {len(report_dict)}")
     log_message(f"  有Excel文件: {sum(1 for d in final_report_data if d.get('Excel文件数量', 0) > 0)}")
     log_message(f"  无Excel文件: {sum(1 for d in final_report_data if d.get('Excel文件数量', 0) == 0)}")
     log_message(f"  成功输出汇总: {processed_count} 个文件")
