@@ -1,0 +1,4157 @@
+Traceback (most recent call last):
+  File "/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py", line 164, in load_unified_project_mapping
+    df = pd.read_excel(PROJECT_CODE_NAME_MAPPING_FILE, sheet_name="汇总")
+         ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/anaconda3/envs/marker/lib/python3.14/site-packages/pandas/io/excel/_base.py", line 508, in read_excel
+    data = io.parse(
+        sheet_name=sheet_name,
+    ...<21 lines>...
+        dtype_backend=dtype_backend,
+    )
+  File "/opt/anaconda3/envs/marker/lib/python3.14/site-packages/pandas/io/excel/_base.py", line 1616, in parse
+    return self._reader.parse(
+           ~~~~~~~~~~~~~~~~~~^
+        sheet_name=sheet_name,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    ...<17 lines>...
+        **kwds,
+        ^^^^^^^
+    )
+    ^
+  File "/opt/anaconda3/envs/marker/lib/python3.14/site-packages/pandas/io/excel/_base.py", line 773, in parse
+    sheet = self.get_sheet_by_name(asheetname)
+  File "/opt/anaconda3/envs/marker/lib/python3.14/site-packages/pandas/io/excel/_openpyxl.py", line 582, in get_sheet_by_name
+    self.raise_if_bad_sheet_by_name(name)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/anaconda3/envs/marker/lib/python3.14/site-packages/pandas/io/excel/_base.py", line 624, in raise_if_bad_sheet_by_name
+    raise ValueError(f"Worksheet named '{name}' not found")
+ValueError: Worksheet named '汇总' not found
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '16100.000000000002' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '6900.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '239200.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1120: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '17864.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "结算费用_泰铢"] = str(settlement)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '5722.500000000001' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '2452.5' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '85020.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1120: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '8000.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "结算费用_泰铢"] = str(settlement)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '6744.7747500000005' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '2890.61775' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '100208.082' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '3176.2500000000005' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '1361.25' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '47190.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '3657.5000000000005' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '1567.5' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '54340.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '1365.0000000000002' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '585.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '20280.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '6188.4529' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '2652.1941' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '91942.72880000001' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '2992.5000000000005' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '1282.5' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '44460.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '22075.1104' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '9460.761599999998' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '327973.0688' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '6300.000000000001' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '2700.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '48672.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '938.0000000000001' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '402.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '13936.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '4970.000000000001' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '2130.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '73840.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '700.0000000000001' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '300.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '10400.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '847.0000000000001' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '363.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '12584.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '577.3194000000001' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '247.4226' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '8577.3168' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '2546.6000000000004' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '1091.3999999999999' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '189766.72' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1120: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '80000.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "结算费用_泰铢"] = str(settlement)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '14145.828200000002' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '6062.4978' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '210166.5904' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '1624.0000000000002' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '696.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '24128.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '13813.329600000001' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '5919.9983999999995' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '205226.61119999998' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '1674.7500000000002' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '717.75' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '24882.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '14874.999300000001' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '6374.999699999999' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '220999.9896' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '5250.000000000001' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '2250.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '78000.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '9776.662000000002' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '4189.998' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '145253.26400000002' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '1960.0000000000002' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '840.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '29120.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '7546.875000000001' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '3234.375' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '112125.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1127: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '3150.0000000000005' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "增值税7%"] = str(calc_vat)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1135: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '1350.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
+/Users/wyattsun/Desktop/code/10_机具费/2_机具使用汇总.py:1144: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '46800.0' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+  df.at[idx, "本次费用合计"] = str(calculated_fee)
+自动发现标准化文件 1 个，开始逐个汇总...
+
+[1/1] 2026年03月租赁机具台账_标准化.xlsx
+批量模式-当前处理文件: 2026年03月租赁机具台账_标准化.xlsx
+保存区域映射JSON失败：[Errno 2] No such file or directory: '/Users/wyattsun/Desktop/code/10_机具费汇总代码/区域映射表.json'
+已创建项目区域映射JSON模板：/Users/wyattsun/Desktop/code/10_机具费汇总代码/区域映射表.json
+保存机具映射JSON失败：[Errno 2] No such file or directory: '/Users/wyattsun/Desktop/code/10_机具费汇总代码/机具映射表.json'
+已创建机具映射JSON模板：/Users/wyattsun/Desktop/code/10_机具费汇总代码/机具映射表.json
+警告：读取统一项目映射表失败: Worksheet named '汇总' not found
+统一映射表加载失败或为空，回退到旧项目配置
+警告：无法加载项目配置文件 /Users/wyattsun/Desktop/code/5_合同管理/0_合同管理代码/migration_config.json: [Errno 2] No such file or directory: '/Users/wyattsun/Desktop/code/5_合同管理/0_合同管理代码/migration_config.json'
+✅ 共享匹配库已加载：标准项目 0 个，别名 0 个，未匹配留痕 38 个
+项目匹配已切换为统一匹配库模式（不再使用本地缓存/重新匹配弹窗）
+
+=== 第一遍扫描：提取项目名称与匹配 ===
+  Sheet: 超颖 (内容提取: '超颖')
+    ✓ 匹配成功: THCC-2023-010 - 超颖项目
+  Sheet: 双塔 (内容提取: '双塔')
+    ✓ 匹配成功: THCC-2024-007 - 双塔项目
+  Sheet: 伊顿 (内容提取: '泰华电子')
+    ✓ 匹配成功: THCC-2025-002 - 泰华电子项目
+  Sheet: 糖厂 (内容提取: '糖厂')
+    ✓ 匹配成功: THCC-2025-011 - 糖厂项目
+  Sheet: 万源通 (内容提取: '万源通')
+    ✓ 匹配成功: THCC-2025-017 - 万源通项目
+  Sheet: 裕洲 (内容提取: '裕洲')
+    ✓ 匹配成功: THCC-2025-001 - 裕州项目
+  Sheet: 昂纳 (内容提取: '昂纳')
+    ✓ 匹配成功: THCC-2023-003 - 昂纳科技
+  Sheet: 迈思科锐 (内容提取: '迈思科锐')
+    ✓ 匹配成功: THCC-2024-003 - 迈思科锐项目
+  Sheet: 联合橱柜 (内容提取: '联合橱柜')
+    ✓ 匹配成功: THCC-2023-008 - 联合橱柜
+  Sheet: 阳光物流 (内容提取: '阳光物流')
+    ✓ 匹配成功: THCC-2023-006 - 阳光城项目
+  Sheet: 北新建材 (内容提取: '北新建材')
+    ✓ 匹配成功: THCC-2023-013 - 北新建材
+  Sheet: TOMAX+BK、沃森一期 (内容提取: 'TONAX及BK、沃森一期')
+    ✓ 匹配成功: THCC-2024-004 - 沃森项目
+  Sheet: 欣旺达 (内容提取: '欣旺达')
+    ✓ 匹配成功: THCC-2024-006 - 欣旺达项目
+  Sheet: 胜图-沃森 (内容提取: '胜图-沃森')
+    ✓ 匹配成功: THCC-2024-004 - 沃森项目
+  Sheet: 伊莱特、沃森 (内容提取: '伊莱特-沃森')
+    ✓ 匹配成功: THCC-2025-003 - 伊莱特项目
+  Sheet: 振威特 (内容提取: '振威特')
+    ✓ 匹配成功: THCC-2023-012 - 振威特（土建+装修）
+  Sheet: 正鑫源 (内容提取: '正鑫源')
+    ✓ 匹配成功: THCC-2024-010 - 正鑫源项目
+  Sheet: 搅拌站 (内容提取: '搅拌站')
+    ✗ 未找到匹配
+  Sheet: 新通联 (内容提取: '新通联')
+    ✓ 匹配成功: THCC-2024-009 - 新通联项目
+  Sheet: 荣泰 (内容提取: '荣泰')
+    ✓ 匹配成功: THCC-2025-010 - 荣泰项目
+  Sheet: 伟隆 (内容提取: '伟隆')
+    ✓ 匹配成功: THCC-2025-019 - 伟隆项目
+  Sheet: 信昌 (内容提取: '信昌')
+    ✓ 匹配成功: THCC-2025-014 - 信昌项目
+  Sheet: 永强 (内容提取: '永强')
+    ✓ 匹配成功: THCC-2025-005 - 永强车业项目
+  Sheet: 腾洋 (内容提取: '腾洋')
+    ✓ 匹配成功: THCC-2025-015 - 腾洋项目
+  Sheet: 樱花 (内容提取: '樱花')
+    ✓ 匹配成功: THCC-2025-018 - 樱花三期
+  Sheet: 合盈 (内容提取: '樱花')
+    ✓ 匹配成功: THCC-2025-006 - 合盈项目
+统一匹配结果数量：25
+
+正在处理 sheet：超颖
+  项目名称: 超颖
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用7行, 增值税48行, 预扣税48行, 费用合计48行
+  有效数据行数: 52
+  匹配结果: [THCC-2023-010] 超颖项目 (D_1_已完工（已结算、成本已确认）)
+
+正在处理 sheet：双塔
+  项目名称: 双塔
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用3行, 增值税397行, 预扣税397行, 费用合计372行
+  有效数据行数: 397
+  匹配结果: [THCC-2024-007] 双塔项目 (AS_收尾项目)
+
+正在处理 sheet：伊顿
+  项目名称: 泰华电子
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税605行, 预扣税605行, 费用合计598行
+  有效数据行数: 608
+  匹配结果: [THCC-2025-002] 泰华电子项目 (AS_收尾项目)
+
+正在处理 sheet：糖厂
+  项目名称: 糖厂
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税148行, 预扣税148行, 费用合计145行
+  有效数据行数: 151
+  匹配结果: [THCC-2025-011] 糖厂项目 (A_在建项目)
+
+正在处理 sheet：万源通
+  项目名称: 万源通
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税17行, 预扣税17行, 费用合计17行
+  有效数据行数: 17
+  匹配结果: [THCC-2025-017] 万源通项目 (A_在建项目)
+
+正在处理 sheet：裕洲
+  项目名称: 裕洲
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税67行, 预扣税67行, 费用合计67行
+  有效数据行数: 67
+  匹配结果: [THCC-2025-001] 裕州项目 (AS_收尾项目)
+
+正在处理 sheet：昂纳
+  项目名称: 昂纳
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税8行, 预扣税8行, 费用合计8行
+  有效数据行数: 8
+  匹配结果: [THCC-2023-003] 昂纳科技 (D_3_已完工(已结算、成本未确定）)
+
+正在处理 sheet：迈思科锐
+  项目名称: 迈思科锐
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税63行, 预扣税63行, 费用合计55行
+  有效数据行数: 71
+  匹配结果: [THCC-2024-003] 迈思科锐项目 (D_已完工)
+
+正在处理 sheet：联合橱柜
+  项目名称: 联合橱柜
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税91行, 预扣税91行, 费用合计101行
+  有效数据行数: 101
+  匹配结果: [THCC-2023-008] 联合橱柜 (D_1_已完工（已结算、成本已确认）)
+
+正在处理 sheet：阳光物流
+  项目名称: 阳光物流
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税2行, 预扣税2行, 费用合计1行
+  有效数据行数: 2
+  匹配结果: [THCC-2023-006] 阳光城项目 (D_1_已完工（已结算、成本已确认）)
+
+正在处理 sheet：北新建材
+  项目名称: 北新建材
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税107行, 预扣税107行, 费用合计107行
+  有效数据行数: 109
+  匹配结果: [THCC-2023-013] 北新建材 (需手动核对)
+
+正在处理 sheet：TOMAX+BK、沃森一期
+  项目名称: TONAX及BK、沃森一期
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税47行, 预扣税47行, 费用合计46行
+  有效数据行数: 47
+  匹配结果: [THCC-2024-004] 沃森项目 (AS_收尾项目)
+
+正在处理 sheet：欣旺达
+  项目名称: 欣旺达
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税569行, 预扣税569行, 费用合计512行
+  有效数据行数: 569
+  匹配结果: [THCC-2024-006] 欣旺达项目 (A_在建项目)
+
+正在处理 sheet：胜图-沃森
+  项目名称: 胜图-沃森
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税52行, 预扣税52行, 费用合计52行
+  有效数据行数: 52
+  匹配结果: [THCC-2024-004] 沃森项目 (AS_收尾项目)
+
+正在处理 sheet：伊莱特、沃森
+  项目名称: 伊莱特-沃森
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '项目说明' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税200行, 预扣税200行, 费用合计200行
+  有效数据行数: 200
+  匹配结果: [THCC-2025-003] 伊莱特项目 (AS_收尾项目)
+
+正在处理 sheet：振威特
+  项目名称: 振威特
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用4行, 增值税33行, 预扣税33行, 费用合计30行
+  有效数据行数: 33
+  匹配结果: [THCC-2023-012] 振威特（土建+装修） (D_2_已完工(未结算、成本已确定）)
+
+正在处理 sheet：正鑫源
+  项目名称: 正鑫源
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税47行, 预扣税47行, 费用合计47行
+  有效数据行数: 47
+  匹配结果: [THCC-2024-010] 正鑫源项目 (A_在建项目)
+
+正在处理 sheet：搅拌站
+  项目名称: 搅拌站
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税14行, 预扣税14行, 费用合计14行
+  有效数据行数: 14
+  ⚠️  未找到匹配 (Sheet: '搅拌站')
+
+正在处理 sheet：新通联
+  项目名称: 新通联
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班 （小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '运费＋拆装费' -> '进出场费运费'
+    '运费＋拆装费' -> '移动费拆装费'
+    '本次结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预 扣税' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '费用合计' -> '本次费用合计'
+    '使用时间' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税62行, 预扣税62行, 费用合计62行
+  有效数据行数: 62
+  匹配结果: [THCC-2024-009] 新通联项目 (AS_收尾项目)
+
+正在处理 sheet：荣泰
+  项目名称: 荣泰
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班（小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '进出场费/运费' -> '进出场费运费'
+    '移动费＋拆装费' -> '移动费拆装费'
+    '结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预扣税3%' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '本次费用合计（泰铢）' -> '本次费用合计'
+    '使用日期' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税161行, 预扣税161行, 费用合计161行
+  有效数据行数: 161
+  匹配结果: [THCC-2025-010] 荣泰项目 (A_在建项目)
+
+正在处理 sheet：伟隆
+  项目名称: 伟隆
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班（小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '进出场费/运费' -> '进出场费运费'
+    '移动费＋拆装费' -> '移动费拆装费'
+    '结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预扣税3%' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '本次费用合计（泰铢）' -> '本次费用合计'
+    '使用日期' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税16行, 预扣税16行, 费用合计16行
+  有效数据行数: 16
+  匹配结果: [THCC-2025-019] 伟隆项目 (A_在建项目)
+
+正在处理 sheet：信昌
+  项目名称: 信昌
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班（小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '进出场费/运费' -> '进出场费运费'
+    '移动费＋拆装费' -> '移动费拆装费'
+    '结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预扣税3%' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '本次费用合计（泰铢）' -> '本次费用合计'
+    '使用日期' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税36行, 预扣税36行, 费用合计36行
+  有效数据行数: 36
+  匹配结果: [THCC-2025-014] 信昌项目 (A_在建项目)
+
+正在处理 sheet：永强
+  项目名称: 永强
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班（小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '进出场费/运费' -> '进出场费运费'
+    '移动费＋拆装费' -> '移动费拆装费'
+    '结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预扣税3%' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '本次费用合计（泰铢）' -> '本次费用合计'
+    '使用日期' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税9行, 预扣税9行, 费用合计9行
+  有效数据行数: 9
+  匹配结果: [THCC-2025-005] 永强车业项目 (A_在建项目)
+
+正在处理 sheet：腾洋
+  项目名称: 腾洋
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班（小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '进出场费/运费' -> '进出场费运费'
+    '移动费＋拆装费' -> '移动费拆装费'
+    '结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预扣税3%' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '本次费用合计（泰铢）' -> '本次费用合计'
+    '使用日期' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税13行, 预扣税13行, 费用合计13行
+  有效数据行数: 13
+  匹配结果: [THCC-2025-015] 腾洋项目 (A_在建项目)
+
+正在处理 sheet：樱花
+  项目名称: 樱花
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班（小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '进出场费/运费' -> '进出场费运费'
+    '移动费＋拆装费' -> '移动费拆装费'
+    '结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预扣税3%' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '本次费用合计（泰铢）' -> '本次费用合计'
+    '使用日期' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税2行, 预扣税2行, 费用合计2行
+  有效数据行数: 2
+  匹配结果: [THCC-2025-018] 樱花三期 (A_在建项目)
+
+正在处理 sheet：合盈
+  项目名称: 樱花
+  开始月份: 未找到
+  表头位于第 3 行
+    '序号' -> '序号'
+    '机具种类' -> '机具种类'
+    '型号规格' -> '型号规格'
+    '台班费 泰铢' -> '台班费_泰铢'
+    '本次结算台班（小时、天、月)' -> '本次结算台班'
+    '加班 (小时)' -> '加班小时'
+    '加班费' -> '加班费'
+    '进出场费/运费' -> '进出场费运费'
+    '移动费＋拆装费' -> '移动费拆装费'
+    '结算费用 (泰铢)' -> '结算费用_泰铢'
+    '增值税7%' -> '增值税7%'
+    '机具租赁预扣税3%' -> '机具租赁预扣税3%'
+    '机具租赁预扣税5%' -> '机具租赁预扣税5%'
+    '本次费用合计（泰铢）' -> '本次费用合计'
+    '使用日期' -> '使用日期'
+    '出租单位' -> '出租单位'
+    '月份' -> '月份'
+    '备注' -> '备注'
+  正在检查并重新计算费用...
+  ✓ 重新计算: 结算费用0行, 增值税27行, 预扣税27行, 费用合计27行
+  有效数据行数: 27
+  匹配结果: [THCC-2025-006] 合盈项目 (A_在建项目)
+
+发现新数据：
+  新项目（26个）：
+    TOMAX+BK、沃森一期
+    万源通
+    伊莱特、沃森
+    伊顿
+    伟隆
+    信昌
+    北新建材
+    双塔
+    合盈
+    振威特
+    搅拌站
+    新通联
+    昂纳
+    樱花
+    欣旺达
+    正鑫源
+    永强
+    糖厂
+    联合橱柜
+    胜图-沃森
+    腾洋
+    荣泰
+    裕洲
+    超颖
+    迈思科锐
+    阳光物流
+  新机具种类（164个）：
+    1#叉车 -> 叉车 (智能映射)
+    1#发电机 -> 发电机 (智能映射)
+    1#塔吊 -> 塔吊 (智能映射)
+    1#挖机 -> 挖掘机 (智能映射)
+    10#挖机 -> 挖掘机 (智能映射)
+    11#挖机 -> 挖掘机 (智能映射)
+    12轮平板车 -> 平板车 (智能映射)
+    13米平板车 -> 平板车 (智能映射)
+    1T压路机 -> 压路机 (智能映射)
+    1吨压路机 -> 压路机 (智能映射)
+    2#叉车 -> 叉车 (智能映射)
+    2#发电机 -> 发电机 (智能映射)
+    2#塔吊 -> 塔吊 (智能映射)
+    2#挖机 -> 挖掘机 (智能映射)
+    25吨汽车吊 -> 汽车吊 (智能映射)
+    3#叉车 -> 叉车 (智能映射)
+    3#发电机 -> 发电机 (智能映射)
+    3#发电机运费 -> 发电机 (智能映射)
+    3#塔吊 -> 塔吊 (智能映射)
+    3#塔吊检测费 -> 塔吊 (智能映射)
+    3#挖机 -> 挖掘机 (智能映射)
+    4#叉车 -> 叉车 (智能映射)
+    4#挖机 -> 挖掘机 (智能映射)
+    5#挖机 -> 挖掘机 (智能映射)
+    5T自卸吊 -> 随车吊 (智能映射)
+    5吨/运输费 (未匹配规则，保持原名)
+    6#挖机 -> 挖掘机 (智能映射)
+    6轮胎拉土车 -> 自卸车 (智能映射)
+    6轴地板车 -> 平板车 (智能映射)
+    7#挖机 -> 挖掘机 (智能映射)
+    8#挖机 -> 挖掘机 (智能映射)
+    81-1222 (未匹配规则，保持原名)
+    82-6887 (未匹配规则，保持原名)
+    9#挖机 -> 挖掘机 (智能映射)
+    CAT320挖机 -> 挖掘机 (智能映射)
+    JCB -> 挖铲 (智能映射)
+    JCB挖铲 -> 挖铲 (智能映射)
+    PC200挖机 -> 挖掘机 (智能映射)
+    jcb -> 挖铲 (智能映射)
+    一个月预付款 -> 费用类 (智能映射)
+    三台塔吊 -> 塔吊 (智能映射)
+    三台塔吊50%运输，安装拆卸费 -> 塔吊 (智能映射)
+    三台塔吊一个月预付租金，押金 -> 塔吊 (智能映射)
+    三台塔吊检测费 -> 塔吊 (智能映射)
+    三台塔吊预埋件费 -> 塔吊 (智能映射)
+    两头忙 (未匹配规则，保持原名)
+    临租吊车 -> 汽车吊 (智能映射)
+    临租随车吊 -> 随车吊 (智能映射)
+    二台塔吊检测费用 -> 塔吊 (智能映射)
+    信号工 (未匹配规则，保持原名)
+    六轮平板车 -> 平板车 (智能映射)
+    六轮汽车 (未匹配规则，保持原名)
+    切断机 -> 钢筋切断机 (智能映射)
+    切缝机 (未匹配规则，保持原名)
+    加长管费 (未匹配规则，保持原名)
+    十轮拉土车 -> 自卸车 (智能映射)
+    升降车 -> 升降车 (智能映射)
+    压路机 -> 压路机 (智能映射)
+    压路机搬迁费 -> 压路机 (智能映射)
+    叉车 -> 叉车 (智能映射)
+    反铲轮式小挖机 -> 挖掘机 (智能映射)
+    发电机 -> 发电机 (智能映射)
+    吊车 -> 汽车吊 (智能映射)
+    吸尘器 (未匹配规则，保持原名)
+    地泵 -> 地泵 (智能映射)
+    塔吊 -> 塔吊 (智能映射)
+    塔吊安装拆卸费 -> 塔吊 (智能映射)
+    塔吊检测费 -> 塔吊 (智能映射)
+    塔吊运费 -> 塔吊 (智能映射)
+    外运自卸车 -> 自卸车 (智能映射)
+    大板车 -> 平板车 (智能映射)
+    天泵 (未匹配规则，保持原名)
+    安装费 -> 费用类 (智能映射)
+    小压路机 -> 压路机 (智能映射)
+    小挖掘机 -> 挖掘机 (智能映射)
+    小挖机 -> 挖掘机 (智能映射)
+    小推土机 -> 推土机 (智能映射)
+    履带吊 -> 履带吊 (智能映射)
+    履带吊检测费 -> 履带吊 (智能映射)
+    履带式挖机 -> 挖掘机 (智能映射)
+    平地机 -> 平地机 (智能映射)
+    平板车 -> 平板车 (智能映射)
+    延时费 -> 费用类 (智能映射)
+    托运小挖机运费 -> 挖掘机 (智能映射)
+    抽泥车 (未匹配规则，保持原名)
+    抽粪车 -> 抽粪车 (智能映射)
+    抽粪车
+70-1328 -> 抽粪车 (智能映射)
+    拆除运费（扣除一个月租金） -> 费用类 (智能映射)
+    拉上车 (未匹配规则，保持原名)
+    拉土车 -> 自卸车 (智能映射)
+    拖拉机 (未匹配规则，保持原名)
+    拖板车 -> 平板车 (智能映射)
+    拖车 -> 平板车 (智能映射)
+    挖掘机 -> 挖掘机 (智能映射)
+    挖掘机（夜班） -> 挖掘机 (智能映射)
+    挖机 -> 挖掘机 (智能映射)
+    挖机200 -> 挖掘机 (智能映射)
+    挖机进出场费 -> 挖掘机 (智能映射)
+    挖机（夜班） -> 挖掘机 (智能映射)
+    挖铲 -> 挖铲 (智能映射)
+    挪泵费 (未匹配规则，保持原名)
+    接管费 (未匹配规则，保持原名)
+    推土机 -> 推土机 (智能映射)
+    推土机运费 -> 推土机 (智能映射)
+    曲柄车 -> 升降车 (智能映射)
+    曲臂升降车 -> 升降车 (智能映射)
+    曲臂车 -> 升降车 (智能映射)
+    最后50%运输，安装，拆卸 -> 费用类 (智能映射)
+    服务费 -> 费用类 (智能映射)
+    机具进场费 -> 费用类 (智能映射)
+    板车 -> 平板车 (智能映射)
+    板车73-9597 -> 平板车 (智能映射)
+    板车80-6250 -> 平板车 (智能映射)
+    板车出场费 -> 平板车 (智能映射)
+    板车进场费 -> 平板车 (智能映射)
+    柴油发电机 -> 发电机 (智能映射)
+    检测费用 -> 费用类 (智能映射)
+    水平管安装费 -> 费用类 (智能映射)
+    水车 -> 洒水车 (智能映射)
+    汽车吊 -> 汽车吊 (智能映射)
+    汽车吊检测费 -> 汽车吊 (智能映射)
+    汽车泵 -> 混凝土泵车 (智能映射)
+    汽车泵车 -> 混凝土泵车 (智能映射)
+    泵管运输费 (未匹配规则，保持原名)
+    泵车 -> 混凝土泵车 (智能映射)
+    泵车运输费 -> 混凝土泵车 (智能映射)
+    洒水车 -> 洒水车 (智能映射)
+    洒水车82-6887 -> 洒水车 (智能映射)
+    混凝土泵车 -> 混凝土泵车 (智能映射)
+    渣土车 -> 自卸车 (智能映射)
+    炮机 -> 破碎锤 (智能映射)
+    登高车 (未匹配规则，保持原名)
+    皮卡 (未匹配规则，保持原名)
+    皮卡车 (未匹配规则，保持原名)
+    破碎锤 (未匹配规则，保持原名)
+    破锤机 -> 破碎锤 (智能映射)
+    移泵费 -> 费用类 (智能映射)
+    移车费 -> 费用类 (智能映射)
+    移车费用 -> 费用类 (智能映射)
+    管道运输费 (未匹配规则，保持原名)
+    翻斗车 -> 自卸车 (智能映射)
+    自卸吊 -> 随车吊 (智能映射)
+    自卸车 -> 自卸车 (智能映射)
+    自卸车运费 -> 自卸车 (智能映射)
+    装载机 -> 装载机 (智能映射)
+    起重机 (未匹配规则，保持原名)
+    超出50方 (未匹配规则，保持原名)
+    超时费 -> 费用类 (智能映射)
+    轮式小挖机 -> 挖掘机 (智能映射)
+    轮胎维修费 (未匹配规则，保持原名)
+    运费 -> 费用类 (智能映射)
+    运输安装及拆卸费 -> 费用类 (智能映射)
+    运输安装费 -> 费用类 (智能映射)
+    运输桩材的费用按每趟计算 (未匹配规则，保持原名)
+    运输费 (未匹配规则，保持原名)
+    进出场及加长管费 -> 费用类 (智能映射)
+    进出场费 -> 费用类 (智能映射)
+    钢筋剪断机 -> 钢筋切断机 (智能映射)
+    铲挖 (未匹配规则，保持原名)
+    铲车 -> 装载机 (智能映射)
+    随车吊 -> 随车吊 (智能映射)
+    震动压路机 -> 压路机 (智能映射)
+    预埋件费 (未匹配规则，保持原名)
+    高栏车 -> 高栏车 (智能映射)
+  ✅ 智能映射成功 136/164 个机具种类
+  💡 已自动更新机具映射表，建议人工复核调整
+  新型号规格（799个）：
+    [1#叉车]
+      3T
+    [1#发电机]
+      150KVA
+      220Kva
+      G150-28T
+    [1#塔吊]
+      C7030-1
+    [1#挖机]
+      CAT320
+      PC210
+    [10#挖机]
+      CATD-200
+      PC30
+      SY135C
+    [11#挖机]
+      E130-13T
+    [12轮平板车]
+      挖机倒运
+    [13米平板车]
+      70-4355
+      73-9597
+      82-5542
+      北新昂纳调转物资
+      项目部物资搬迁
+    [1吨压路机]
+      1吨
+    [2#叉车]
+      3T
+    [2#发电机]
+      150kva
+      220KVA
+      G150-06
+    [2#塔吊]
+      C7030-2
+    [2#挖机]
+      KOMATSU PC200
+      PC30
+    [25吨汽车吊]
+      #35/21
+      #35/31
+      #35/42
+    [3#叉车]
+      3T
+    [3#发电机]
+      13GEN00020
+      150Kva
+    [3#发电机运费]
+      G150-06
+    [3#塔吊]
+      C7030-3
+    [3#塔吊检测费]
+      C7030-3
+    [3#挖机]
+      CAT320-B
+    [4#叉车]
+      3T
+    [4#挖机]
+      CAT320-D
+    [5#挖机]
+      CAT320-D2
+    [5T自卸吊]
+      82-6399
+    [5吨/运输费]
+      随车吊
+    [6#挖机]
+      VOLVO200
+    [6轮胎拉土车]
+      71-3299
+      80-6585-2489-8035
+      82-2489-8035-8922
+      82-3943
+      82-3943 4#
+      82-6585 3#
+      82-8035
+      82-8922 2#
+      83-1369
+      83-1369 1#
+      84-2120
+      84-3884
+      84-3884 5#
+    [6轴地板车]
+      55吨履带吊倒运
+    [7#挖机]
+      KOBELCO200
+      SANY-ST-200
+    [8#挖机]
+      KOMATSU
+PC-200
+      SK200-8
+    [81-1222]
+      80-8816
+    [82-6887]
+      81-3872
+    [9#挖机]
+      CAT-320
+      KOMATSU
+PC-200
+      SY135C-1
+    [JCB]
+      C3220
+      破锤机
+    [JCB挖铲]
+      3CX
+      C3220
+    [一个月预付款]
+      C7030（TC-2）
+      C7030（TC-3）
+    [三台塔吊]
+      MC310(1-2-3)
+    [三台塔吊50%运输，安装拆卸费]
+      MC310
+    [三台塔吊一个月预付租金，押金]
+      MC310
+    [三台塔吊检测费]
+      MC310
+    [三台塔吊预埋件费]
+      MC310
+    [临租吊车]
+      130T
+      25t
+      50t
+    [临租随车吊]
+      5T
+      5t
+    [二台塔吊检测费用]
+      C7030tc-1 TC-2
+    [六轮平板车]
+      挖机倒运
+    [六轮汽车]
+      10-0696
+    [十轮拉土车]
+      70-3915
+      81-0287
+      81-0629
+      81-4628
+      81-4629
+      82-0443
+      82-0622
+      82-1713
+      82-2829
+      82-6560
+      82-7157
+      84-7980
+      87-0672
+      87-1104
+      87-2067
+      90-1647
+    [压路机]
+      #10
+      #4
+      10 吨
+      10#
+      10T
+      10t
+      10吨
+      1T
+      1t
+      1吨
+      2#
+      200
+      20T
+      3#
+      4#
+      4吨
+      CAT1OT
+      SAKAI
+      SAKAI-10吨
+      SV520TF
+    [叉车]
+      10吨
+      3T
+      3吨
+      5T
+    [反铲轮式小挖机]
+      JCB
+    [发电机]
+      100KW
+      120KW
+      120Kw
+      125kw
+      60kw
+      60w
+      G150-06
+      G150-28T
+    [吊车]
+      25T
+      25t
+      25吨
+      26吨
+      50T
+      50吨
+      5吨
+    [地泵]
+      1--7
+      1-7
+      38米
+      42米
+    [塔吊]
+      C7030
+      C7030TC-3
+      C7030tc-1
+      C7030tc-2
+      C7030tc-3
+      C7030（TC-1）
+      C7030（TC-2）
+      C7030（TC-3）
+      GT-187
+      J240
+      J240N
+      MC310(TC-1)
+      MC310(TC-2)
+      MC310(TC-3)
+      MK-100
+      MK-110
+      XCP330(7525)
+      c7030
+      扣押金费
+    [塔吊安装拆卸费]
+      C7030
+      J240N
+    [塔吊检测费]
+      C7030
+      GT-187
+      J240N
+    [塔吊运费]
+      C7030（TC-2）
+      C7030（TC-3）
+    [外运自卸车]
+      临租车牌#75-5340
+      临租车牌#81-0287
+      临租车牌#81-9078
+      临租车牌#82-6768
+      临租车牌#83-0257
+      临租车牌#84-1166
+      临租车牌#85-4075
+      临租车牌#86-0969
+      临租车牌#86-2718
+      临租车牌#86-7125
+      临租车牌#86-8661
+      临租车牌#87-0760
+      临租车牌#87-1685
+      临租车牌#87-3661
+      临租车牌#90-3607
+    [大板车]
+      52-9129
+      53-3577
+      70-4110
+      70-4175
+      71-8138
+      73-3990
+      73-9597
+    [天泵]
+      42米
+    [小挖掘机]
+      30
+    [小挖机]
+      1#
+      1#/5T-40
+      1#/ViO50
+      2#
+      2#/5T-40
+      2#/KX161-3
+      3#
+      3#/U55S
+      4#
+      4#/U55S
+      5#
+      5T-40
+      PC30
+      PC65
+    [履带吊]
+      55T
+    [履带吊检测费]
+      55吨
+    [履带式挖机]
+      pc130
+    [平板车]
+      13.5米
+      700-8788
+      700-9258
+      74-5584/70-6278
+      80-6250
+      82-6657
+    [抽粪车]
+      20230
+    [拆除运费（扣除一个月租金）]
+      XCP330(7525)
+    [拉上车]
+      81-0287
+      83-0257
+    [拉土车]
+      10轮
+      10轮/0760/6844
+      10轮/4427-2
+9778-1/8399
+      10轮/4552/0094
+      10轮/6234
+      10轮/81-1629
+      10轮/81-3339
+      10轮/81-3397
+      10轮/81-6234
+      10轮/81-6625、86-9816
+      10轮/81-7239
+      10轮/81-8839
+      10轮/81-8841
+      10轮/82-0801
+      10轮/82-0801 
+ 81-7644
+      10轮/82-0801            84-0094
+      10轮/82-1200  81-9778
+      10轮/82-2140、86-8399
+      10轮/82-7682
+      10轮/82-7882
+      10轮/83-8823
+      10轮/83-8833
+      10轮/8399/8561
+      10轮/87-4427
+      10轮/8823
+      10轮/9778/1898
+      10轮/9816/8561
+      10轮3742/0801   /9393
+      10轮7682/6625   /9778 /9343
+      10轮81-6234
+      10轮83-8823
+      10轮9343-2/1629-2
+      11#/18立方
+      11#/86-8399
+      12#/18立方
+      12#/86-9816
+      13#/18立方
+      13#/81-7239
+      13#/82-1898
+      14#/18立方
+      14#/81-1629
+      15#/87-1690
+      16#/81-7239
+      17#
+      17#/85-3015
+      18#
+      18#/85-0313
+      20吨
+      54-1881
+      58-9556
+      6234/7682
+      6轮
+      6轮/86-5122
+      6轮/86-5722
+      6轮车
+      70-1459
+      70-3448
+      70-3488
+      70-3525
+      70-3839
+      70-3915
+      70-6104
+      72-0387
+      72-4450
+      72-7988
+      72-9058
+      73-3579
+      74-2770
+      74-9288
+      75-1793
+      75-3081
+      75-3567
+      80-0023
+      80-0923
+      80-3427
+      80-3496
+      80-3647
+      80-7013
+      80-8019
+      80-8253
+      80-8482
+      80-8816
+      80-9143
+      80-9150
+      80-9510
+      81-0629
+      81-1061
+      81-1222
+      81-1629/14#
+      81-3290
+      81-4733
+      81-6125
+      81-6430
+      81-6431
+      81-6437
+      81-6731
+      81-6823
+      81-7239/13#
+      81-7836/16#
+      81-8277
+      81-8329
+      81-8698
+      81-8861
+      81-9080
+      81-9419
+      82-0370
+      82-0512
+      82-0523
+      82-0526
+      82-0562
+      82-0608
+      82-0622
+      82-0817
+      82-0923
+      82-1067
+      82-1200
+      82-1222
+      82-1552
+      82-1647
+      82-1713
+      82-1713 82-7053 81-5797 82-6557
+      82-2041
+      82-2067
+      82-2184
+      82-2512
+      82-2515
+      82-2805
+      82-3470
+      82-3949
+      82-4088
+      82-4733
+      82-4839
+      82-4867
+      82-4869
+      82-4923
+      82-4940
+      82-4940 82-5442 81-5638 82-9904
+      82-4940 82-5442 81-5640
+      82-4969
+      82-5503
+      82-5510
+      82-5730
+      82-6431
+      82-6573
+      82-6768
+      82-6887
+      82-7041
+      82-7167
+      82-7253
+      82-7272
+      82-7426
+      82-7674
+      82-7736
+      82-8024
+      82-8025
+      82-8356
+      82-9929
+      83-0257
+      83-0279
+      83-1200
+      83-1440
+      83-4025
+      83-4242
+      83-4300
+      83-5683
+      83-6078
+      83-6192
+      83-6443
+      83-6475
+      83-7198
+      83-8822
+      83-9141
+      84-2203
+      84-2698
+      84-4529
+      84-5958
+      84-7909
+      84-7980
+      84-8448
+      85-0606
+      85-2358
+      85-3387
+      85-4075
+      85-4291
+      85-5422
+      85-7787
+      85-7797
+      85-8068
+      85-8155
+      85-9556
+      8561/4427/4568
+      86-0862
+      86-1331
+      86-2552
+      86-2718
+      86-4485
+      86-4628
+      86-4727
+      86-6926
+      86-7061
+      86-7275
+      86-8125
+      86-8339
+      86-8399/11#
+      86-8661
+      86-8685
+      86-8772
+      86-9084
+      86-9816/12#
+      87*2067
+      87-0119
+      87-0370
+      87-0672
+      87-0797
+      87-0859
+      87-1212
+      87-1344
+      87-1414
+      87-1539
+      87-1690/15#
+      87-1806
+      87-2067
+      87-2321
+      87-2350
+      87-2726
+      87-2776
+      87-2962
+      87-3661
+      87-3805
+      87-3959
+      87-4016
+      87-4047
+      87-4485
+      87-4739
+      87-4810
+      87-4988
+      87-5191
+      87-5350
+      87-5453
+      88-0476
+      88-8990
+      90-3078
+      90-3655
+      99-3636
+      99-3936
+      B7
+      十轮
+      十轮车
+      后八轮
+    [拖板车]
+      70-4175
+      86-4568
+      运费
+    [拖车]
+      12m
+      12轮
+    [挖掘机]
+      10#/SK200
+      11#/SK200
+      12#/SK200
+      13#/PC200
+      130
+      135
+      14#/SY200C
+      140
+      140.0
+      15#/SK200
+      16#/SK200
+      17#/FR220E2
+      18#/SY215C
+      19#/SY215C
+      20#/SK200
+      200
+      3#/SK200
+      4#/SK200
+      5#/SY215C
+      6#/PC200
+      7#/SK200
+      8#/SY215C
+      9#/SK200
+      KOBE200
+      PC135
+      PC200
+      SK140
+      pc-200
+      pc130
+      sk-140
+      sk-200
+      sk130
+      sk140
+      sk200
+    [挖掘机（夜班）]
+      11#/SK200
+      12#/SK200
+      14#/SY200C
+      17#/FR220E2
+    [挖机]
+      11#/SK200
+      12#
+      12#/SK200
+      13#/pc200
+      130
+      14#
+      14#/SY200C
+      140
+      15#/SK200
+      16#/SK200
+      17#
+      17#/FR220E2
+      19#/SY215C
+      20#/SK200
+      200
+      21#/PC200
+      21t/12#
+      21t/14#
+      21t/17#
+      22#/PC140
+      23#/PC200
+      24#
+      26#
+      3#挖掘机
+      320
+      4#/SK200
+      4#挖掘机
+      5#/SK200
+      5#挖掘机
+      5吨
+      6#/PC200
+      6#挖掘机
+      7#/PC200
+      7#/SK200
+      7#挖掘机
+      8#/SK200
+      8#/SY215C
+      9#/PC200
+      CAT 320
+      CAT-200
+      CAT120
+      CAT200
+      CAT320
+      CAT320B
+      CAT320D
+      CAT320D-2
+      CO130
+      HITACHI 130
+      JCB 422F
+      JCB4*4
+      KOBECO
+      KOBELCO SK130
+      KOBELCO-PC130
+      KOMATSU 130
+      KOMATSU 135
+      KOMATSU 200
+      KOMATSU-130
+      KOMATSU-130(2)
+      KOMATSU-200
+      KOMATSU-PC130
+      KOMATSU-PC135
+      KOMATSU-PC200
+      KOMATSUPC200
+      MCMG-135
+      MCMG-PC135
+      PC 200
+      PC 30
+      PC 30(1)
+      PC 30(2)
+      PC 30（2）
+      PC 60
+      PC 75
+      PC-200
+      PC-30
+      PC130
+      PC130 2#
+      PC130 3#
+      PC130 4#
+      PC130 5#
+      PC130-140
+      PC130-8
+      PC130/7
+      PC130/8 1#
+      PC135
+      PC135 3#
+      PC135 5#
+      PC140
+      PC150 4#
+      PC150/8
+      PC200
+      PC200(1)
+      PC200(2)
+      PC200/13#
+      PC200/15#
+      PC200/16#
+      PC200/23#
+      PC200/8#
+      PC200/9#
+      PC200（1#）
+      PC200（2#)
+      PC210
+      PC30
+      PC35
+      PC35/有皮带
+      PC45
+      PC60
+      PC70
+      PC75
+      SANNY 135
+      SANY215
+      SK-200
+      SK-60
+      SK10
+      SK130
+      SK135
+      SK140
+      SK200
+      SK210
+      ST200
+      SUNNY215
+      SUNY-135
+      SUNY-PC130
+      SUNY-PC135
+      SUNY-PC215
+      SUNY135(1)
+      SUNY135(2)
+      SUNY215
+      TSU130
+      Zy215
+      pc130
+      pc30
+      sk-140
+      sk-200
+      sk140
+    [挖机（夜班）]
+      11#/SK200
+      12#/SK200
+    [挖铲]
+      JCB
+    [接管费]
+      米
+    [推土机]
+      2567
+      4x4
+      D4
+    [曲柄车]
+      20米
+    [曲臂车]
+      14m
+      16-18m
+      16m
+      18m
+      19-21m
+      19m
+      20m
+      24m
+    [板车]
+      32t
+      70-1459
+      70-4110
+      71-1459
+      87-3807
+      运费
+    [柴油发电机]
+      G125-15T
+      G150-28T
+      G300-111T
+    [检测费用]
+      C7030（TC-1）
+    [水车]
+      73-8300
+      80-6729
+      87-3001
+      87-5351
+    [汽车吊]
+      1# 25吨
+      10526
+      2# 25吨
+      2# 50吨
+      200t
+      25T
+      25T-1
+      25T-2
+      25t
+      25吨
+      3# 25吨
+      35吨
+      50
+      50T
+      STC25
+    [汽车吊检测费]
+      50吨
+    [汽车泵]
+      32米
+    [汽车泵车]
+      37米
+    [泵车]
+      38米
+      42
+      42米
+      43米
+    [洒水车]
+      10轮
+      10轮/87-0452
+      20000l
+      5000l
+      6轮
+      6轮/85-5632
+      6轮车
+      82-6887
+      85-5632
+      9立方
+      替班月租车，牌#73-8300
+      替班月租车，牌#80-6729
+      车牌#87-3001
+    [混凝土泵车]
+      32米
+      37米
+      40米
+      43米
+    [渣土车]
+      10轮
+      6方
+      81-7239
+      81-8839
+      83-4552
+      83-8823
+      84-4552
+      十轮
+    [登高车]
+      26m
+    [皮卡]
+      ฉข4248
+    [皮卡车]
+      ฉข4248
+    [破碎锤]
+      PC135
+    [破锤机]
+      PC30
+    [翻斗车]
+      10轮场外运输费
+      10轮车
+      6轮
+      6轮车
+      六轮车
+      十轮车
+    [自卸吊]
+      50-8946
+      5T
+      70-1459
+      72-5671
+      82-3257
+      82-6399
+      82-8122
+      86-0280
+      86-6280
+    [自卸车]
+      10吨
+      11#/18立方
+      12#/18立方
+      13#/18立方
+      14#/18立方
+      86-0280
+      十轮
+    [装载机]
+      50
+      JCBC2200
+      ZW140
+    [起重机]
+      10吨
+      25吨
+      30吨
+      50吨
+      55吨
+    [轮式小挖机]
+      JCB 3CX
+    [运费]
+      板车
+    [运输安装及拆卸费]
+      JASD J240
+    [运输安装费]
+      GT-187
+    [钢筋剪断机]
+      32mm
+    [铲挖]
+      JCB
+      JCBC2200
+      jcb
+      农用
+    [随车吊]
+      10CB
+      10T
+      10m
+      10吨
+      10轮
+      10轮/74-4498
+      3T
+      50-8946
+      5T
+      5t
+      5吨
+      5吨/运输费
+      5吨\场外运输费
+      5吨场外运输费
+      6吨
+      6轮
+      70-1459
+      70-6045
+      70-8226
+      71-9277
+      72-5785
+      72-9223
+      82-3257
+      82-6399
+      82-8122
+      89-6359
+      压路机斑布恩
+      拉集装箱CPE
+      运费
+    [震动压路机]
+      1T
+    [预埋件费]
+      GT-187
+      JASD J240
+保存区域映射JSON失败：[Errno 2] No such file or directory: '/Users/wyattsun/Desktop/code/10_机具费汇总代码/区域映射表.json'
+保存机具映射JSON失败：[Errno 2] No such file or directory: '/Users/wyattsun/Desktop/code/10_机具费汇总代码/机具映射表.json'
+已自动补充新数据到映射表，请人工检查/修改！
+
+
+合并 26 个sheet的数据...
+第一个sheet的列: ['序号', '机具种类', '型号规格', '台班费_泰铢', '本次结算台班', '加班小时', '加班费', '进出场费运费', '移动费拆装费', '结算费用_泰铢', '增值税7%', '机具租赁预扣税3%', '机具租赁预扣税5%', '本次费用合计', '使用日期', '出租单位', '月份', '备注', 'sheet名称', '项目编码', '项目名称', '开始月份', '区域', '标准机具种类', '标准型号规格']
+合并后的列: ['序号', '机具种类', '型号规格', '台班费_泰铢', '本次结算台班', '加班小时', '加班费', '进出场费运费', '移动费拆装费', '结算费用_泰铢', '增值税7%', '机具租赁预扣税3%', '机具租赁预扣税5%', '本次费用合计', '使用日期', '出租单位', '月份', '备注', 'sheet名称', '项目编码', '项目名称', '开始月份', '区域', '标准机具种类', '标准型号规格']
+
+清理数据格式...
+  ✅ 已清理型号规格列的换行符
+  ✅ 已清理备注列的空格
+  ✅ 已清理使用日期列的连续空白
+  ✅ 已从备注中提取月租金额：160/2871 行
+  ✅ 已从备注中提取日租金额：312/2871 行
+  ✅ 已从备注中提取加班费单价：447/2871 行
+  ✅ 已生成年月列，成功解析 815/2871 行
+
+检测数据填反情况...
+    ⚠️  第 180 行数据已自动交换：台班费 1.00 ↔ 结算台班 5000.00
+    ⚠️  第 181 行数据已自动交换：台班费 1.00 ↔ 结算台班 5000.00
+    ⚠️  第 182 行数据已自动交换：台班费 1.00 ↔ 结算台班 5000.00
+    ⚠️  第 183 行数据已自动交换：台班费 1.00 ↔ 结算台班 5000.00
+    ⚠️  第 184 行数据已自动交换：台班费 1.00 ↔ 结算台班 5000.00
+    ⚠️  第 185 行数据已自动交换：台班费 1.00 ↔ 结算台班 5000.00
+    ⚠️  第 186 行数据已自动交换：台班费 0.50 ↔ 结算台班 4500.00
+    ⚠️  第 187 行数据已自动交换：台班费 0.50 ↔ 结算台班 4500.00
+    ⚠️  第 188 行数据已自动交换：台班费 1.00 ↔ 结算台班 4500.00
+    ⚠️  第 189 行数据已自动交换：台班费 4.00 ↔ 结算台班 4500.00
+    ⚠️  第 475 行数据已自动交换：台班费 14.00 ↔ 结算台班 5000.00
+    ⚠️  第 476 行数据已自动交换：台班费 21.00 ↔ 结算台班 5000.00
+    ⚠️  第 477 行数据已自动交换：台班费 18.00 ↔ 结算台班 5000.00
+    ⚠️  第 478 行数据已自动交换：台班费 20.00 ↔ 结算台班 5000.00
+    ⚠️  第 479 行数据已自动交换：台班费 18.00 ↔ 结算台班 5000.00
+    ⚠️  第 480 行数据已自动交换：台班费 10.00 ↔ 结算台班 5000.00
+    ⚠️  第 481 行数据已自动交换：台班费 3.00 ↔ 结算台班 5000.00
+    ⚠️  第 482 行数据已自动交换：台班费 15.00 ↔ 结算台班 8333.33
+    ⚠️  第 483 行数据已自动交换：台班费 29.50 ↔ 结算台班 8333.33
+    ⚠️  第 484 行数据已自动交换：台班费 29.50 ↔ 结算台班 8333.33
+    ⚠️  第 485 行数据已自动交换：台班费 26.00 ↔ 结算台班 8333.33
+    ⚠️  第 486 行数据已自动交换：台班费 11.00 ↔ 结算台班 8333.33
+    ⚠️  第 487 行数据已自动交换：台班费 1.00 ↔ 结算台班 11000.00
+    ⚠️  第 488 行数据已自动交换：台班费 26.00 ↔ 结算台班 8333.33
+    ⚠️  第 489 行数据已自动交换：台班费 3.00 ↔ 结算台班 10000.00
+    ⚠️  第 490 行数据已自动交换：台班费 1.00 ↔ 结算台班 14000.00
+    ⚠️  第 1059 行数据已自动交换：台班费 4.00 ↔ 结算台班 11000.00
+    ⚠️  第 1060 行数据已自动交换：台班费 2.00 ↔ 结算台班 6000.00
+    ⚠️  第 1061 行数据已自动交换：台班费 2.00 ↔ 结算台班 4000.00
+    ⚠️  第 1073 行数据已自动交换：台班费 2.00 ↔ 结算台班 5000.00
+    ⚠️  第 1074 行数据已自动交换：台班费 2.00 ↔ 结算台班 5500.00
+    ⚠️  第 1075 行数据已自动交换：台班费 1.00 ↔ 结算台班 6500.00
+    ⚠️  第 1076 行数据已自动交换：台班费 2.00 ↔ 结算台班 15000.00
+    ⚠️  第 1077 行数据已自动交换：台班费 1.00 ↔ 结算台班 250000.00
+    ⚠️  第 1078 行数据已自动交换：台班费 7.50 ↔ 结算台班 11000.00
+    ⚠️  第 1079 行数据已自动交换：台班费 22.00 ↔ 结算台班 4666.67
+    ⚠️  第 1080 行数据已自动交换：台班费 1.50 ↔ 结算台班 5000.00
+    ⚠️  第 1081 行数据已自动交换：台班费 4.50 ↔ 结算台班 5000.00
+    ⚠️  第 1082 行数据已自动交换：台班费 6.00 ↔ 结算台班 5000.00
+    ⚠️  第 1083 行数据已自动交换：台班费 25.00 ↔ 结算台班 8333.33
+    ⚠️  第 1084 行数据已自动交换：台班费 4.00 ↔ 结算台班 1041.66
+    ⚠️  第 1087 行数据已自动交换：台班费 11.00 ↔ 结算台班 8333.33
+    ⚠️  第 1088 行数据已自动交换：台班费 2.00 ↔ 结算台班 11000.00
+    ⚠️  第 1089 行数据已自动交换：台班费 1.00 ↔ 结算台班 140000.00
+    ⚠️  第 1090 行数据已自动交换：台班费 2.00 ↔ 结算台班 7500.00
+    ⚠️  第 1091 行数据已自动交换：台班费 11.00 ↔ 结算台班 4666.66
+    ⚠️  第 1092 行数据已自动交换：台班费 2.00 ↔ 结算台班 15000.00
+    ⚠️  第 1093 行数据已自动交换：台班费 2.00 ↔ 结算台班 6000.00
+    ⚠️  第 1094 行数据已自动交换：台班费 2.00 ↔ 结算台班 11000.00
+    ⚠️  第 1095 行数据已自动交换：台班费 7.00 ↔ 结算台班 5000.00
+    ⚠️  第 1114 行数据已自动交换：台班费 10.00 ↔ 结算台班 11000.00
+    ⚠️  第 1115 行数据已自动交换：台班费 1.00 ↔ 结算台班 140000.00
+    ⚠️  第 1116 行数据已自动交换：台班费 20.00 ↔ 结算台班 4666.66
+    ⚠️  第 1117 行数据已自动交换：台班费 1.00 ↔ 结算台班 250000.00
+    ⚠️  第 1118 行数据已自动交换：台班费 3.00 ↔ 结算台班 11000.00
+    ⚠️  第 1119 行数据已自动交换：台班费 2.00 ↔ 结算台班 9500.00
+    ⚠️  第 1120 行数据已自动交换：台班费 5.50 ↔ 结算台班 6000.00
+    ⚠️  第 1121 行数据已自动交换：台班费 0.50 ↔ 结算台班 5500.00
+    ⚠️  第 1122 行数据已自动交换：台班费 13.50 ↔ 结算台班 5000.00
+    ⚠️  第 1123 行数据已自动交换：台班费 25.50 ↔ 结算台班 5000.00
+    ⚠️  第 1124 行数据已自动交换：台班费 23.50 ↔ 结算台班 5000.00
+    ⚠️  第 1125 行数据已自动交换：台班费 16.50 ↔ 结算台班 5000.00
+    ⚠️  第 1126 行数据已自动交换：台班费 8.00 ↔ 结算台班 5000.00
+    ⚠️  第 1127 行数据已自动交换：台班费 3.50 ↔ 结算台班 5000.00
+    ⚠️  第 1128 行数据已自动交换：台班费 1.00 ↔ 结算台班 3000.00
+    ⚠️  第 1129 行数据已自动交换：台班费 2.00 ↔ 结算台班 3000.00
+    ⚠️  第 1149 行数据已自动交换：台班费 1.00 ↔ 结算台班 140000.00
+    ⚠️  第 1150 行数据已自动交换：台班费 1.00 ↔ 结算台班 97000.00
+    ⚠️  第 1151 行数据已自动交换：台班费 6.00 ↔ 结算台班 11000.00
+    ⚠️  第 1152 行数据已自动交换：台班费 4.00 ↔ 结算台班 11000.00
+    ⚠️  第 1153 行数据已自动交换：台班费 2.50 ↔ 结算台班 11000.00
+    ⚠️  第 1154 行数据已自动交换：台班费 1.00 ↔ 结算台班 140000.00
+    ⚠️  第 1155 行数据已自动交换：台班费 16.50 ↔ 结算台班 6000.00
+    ⚠️  第 1156 行数据已自动交换：台班费 1.00 ↔ 结算台班 6000.00
+    ⚠️  第 1166 行数据已自动交换：台班费 1.00 ↔ 结算台班 140000.00
+    ⚠️  第 1167 行数据已自动交换：台班费 2.00 ↔ 结算台班 10000.00
+    ⚠️  第 1168 行数据已自动交换：台班费 1.00 ↔ 结算台班 97000.00
+    ⚠️  第 1169 行数据已自动交换：台班费 1.00 ↔ 结算台班 140000.00
+    ⚠️  第 1170 行数据已自动交换：台班费 9.00 ↔ 结算台班 11000.00
+    ⚠️  第 1171 行数据已自动交换：台班费 2.00 ↔ 结算台班 4500.00
+    ⚠️  第 1172 行数据已自动交换：台班费 1.00 ↔ 结算台班 6000.00
+    ⚠️  第 1173 行数据已自动交换：台班费 28.00 ↔ 结算台班 4666.67
+    ⚠️  第 1174 行数据已自动交换：台班费 3.00 ↔ 结算台班 10000.00
+    ⚠️  第 1175 行数据已自动交换：台班费 4.00 ↔ 结算台班 10000.00
+    ⚠️  第 1176 行数据已自动交换：台班费 2.00 ↔ 结算台班 10000.00
+    ⚠️  第 1177 行数据已自动交换：台班费 1.00 ↔ 结算台班 11000.00
+    ⚠️  第 1178 行数据已自动交换：台班费 8.00 ↔ 结算台班 11000.00
+    ⚠️  第 1179 行数据已自动交换：台班费 5.00 ↔ 结算台班 10000.00
+    ⚠️  第 1180 行数据已自动交换：台班费 10.00 ↔ 结算台班 6000.00
+    ⚠️  第 1181 行数据已自动交换：台班费 5.00 ↔ 结算台班 4500.00
+    ⚠️  第 1182 行数据已自动交换：台班费 1.00 ↔ 结算台班 1300.00
+    ⚠️  第 1195 行数据已自动交换：台班费 26.50 ↔ 结算台班 4666.67
+    ⚠️  第 1196 行数据已自动交换：台班费 8.50 ↔ 结算台班 10000.00
+    ⚠️  第 1197 行数据已自动交换：台班费 3.00 ↔ 结算台班 10000.00
+    ⚠️  第 1198 行数据已自动交换：台班费 1.00 ↔ 结算台班 5000.00
+    ⚠️  第 1199 行数据已自动交换：台班费 1.00 ↔ 结算台班 1300.00
+    ⚠️  第 1200 行数据已自动交换：台班费 1.00 ↔ 结算台班 2500.00
+    ⚠️  第 1207 行数据已自动交换：台班费 1.00 ↔ 结算台班 7500.00
+    ⚠️  第 1208 行数据已自动交换：台班费 10.00 ↔ 结算台班 5000.00
+    ⚠️  第 1209 行数据已自动交换：台班费 1.50 ↔ 结算台班 5000.00
+    ⚠️  第 1227 行数据已自动交换：台班费 3.00 ↔ 结算台班 6500.00
+    ⚠️  第 1228 行数据已自动交换：台班费 1.00 ↔ 结算台班 7000.00
+    ⚠️  第 1229 行数据已自动交换：台班费 2.00 ↔ 结算台班 12500.00
+    ⚠️  第 1230 行数据已自动交换：台班费 11.00 ↔ 结算台班 13500.00
+    ⚠️  第 1231 行数据已自动交换：台班费 15.00 ↔ 结算台班 6500.00
+    ⚠️  第 1250 行数据已自动交换：台班费 3.00 ↔ 结算台班 13500.00
+    ⚠️  第 1251 行数据已自动交换：台班费 16.00 ↔ 结算台班 9500.00
+    ⚠️  第 1252 行数据已自动交换：台班费 2.00 ↔ 结算台班 6000.00
+    ⚠️  第 1253 行数据已自动交换：台班费 1.00 ↔ 结算台班 7000.00
+    ⚠️  第 1254 行数据已自动交换：台班费 6.00 ↔ 结算台班 6500.00
+    ⚠️  第 1255 行数据已自动交换：台班费 2.00 ↔ 结算台班 5500.00
+    ⚠️  第 1274 行数据已自动交换：台班费 1.00 ↔ 结算台班 230000.00
+    ⚠️  第 1275 行数据已自动交换：台班费 19.00 ↔ 结算台班 5500.00
+    ⚠️  第 1276 行数据已自动交换：台班费 11.00 ↔ 结算台班 11000.00
+    ⚠️  第 1277 行数据已自动交换：台班费 2.00 ↔ 结算台班 6500.00
+    ⚠️  第 1282 行数据已自动交换：台班费 21.00 ↔ 结算台班 9500.00
+    ⚠️  第 1283 行数据已自动交换：台班费 4.00 ↔ 结算台班 5500.00
+    ⚠️  第 1284 行数据已自动交换：台班费 6.00 ↔ 结算台班 11000.00
+    ⚠️  第 1288 行数据已自动交换：台班费 1.00 ↔ 结算台班 17500.00
+    ⚠️  第 1289 行数据已自动交换：台班费 1.00 ↔ 结算台班 13500.00
+    ⚠️  第 1293 行数据已自动交换：台班费 1.00 ↔ 结算台班 5500.00
+    ⚠️  第 1825 行数据已自动交换：台班费 28.00 ↔ 结算台班 8333.33
+    ⚠️  第 1826 行数据已自动交换：台班费 30.00 ↔ 结算台班 8333.33
+    ⚠️  第 1827 行数据已自动交换：台班费 30.00 ↔ 结算台班 8333.33
+    ⚠️  第 1828 行数据已自动交换：台班费 28.00 ↔ 结算台班 8333.33
+    ⚠️  第 2039 行数据已自动交换：台班费 4.00 ↔ 结算台班 4000.00
+    ⚠️  第 2040 行数据已自动交换：台班费 4.00 ↔ 结算台班 4000.00
+    ⚠️  第 2041 行数据已自动交换：台班费 4.00 ↔ 结算台班 4000.00
+    ⚠️  第 2042 行数据已自动交换：台班费 2.00 ↔ 结算台班 4000.00
+✅ 已自动修正 129 行台班费/结算台班填反的数据，将用浅蓝色标注
+
+检测出租单位和月份填反情况...
+✅ 未发现出租单位/月份填反的数据
+重新排序后的列: ['sheet名称', '项目编码', '项目名称', '机具种类', '型号规格', '序号', '台班费_泰铢', '本次结算台班', '加班小时', '加班费', '进出场费运费', '移动费拆装费', '结算费用_泰铢', '增值税7%', '机具租赁预扣税3%', '机具租赁预扣税5%', '本次费用合计', '使用日期', '出租单位', '月份', '备注', '月租金额_泰铢', '日租金额_泰铢', '备注加班费单价']
+
+============================================================
+金额验证：
+  各sheet费用合计: 222,169,546.90 泰铢
+  汇总表费用合计: 222,169,546.92 泰铢
+  ⚠️  金额存在差异: 0.02 泰铢
+============================================================
+
+
+验证费用计算...
+
+1. 验证加班费...
+  ⚠️  第 19 行加班费错误：实际=15937.50，应为=0.00，差异=15937.50
+  ⚠️  第 164 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 165 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 206 行加班费错误：实际=230000.00，应为=0.00，差异=230000.00
+  ⚠️  第 207 行加班费错误：实际=-140000.00，应为=0.00，差异=140000.00
+  ⚠️  第 208 行加班费错误：实际=230000.00，应为=0.00，差异=230000.00
+  ⚠️  第 209 行加班费错误：实际=-140000.00，应为=0.00，差异=140000.00
+  ⚠️  第 214 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 218 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 221 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 244 行加班费错误：实际=4000.00，应为=0.00，差异=4000.00
+  ⚠️  第 245 行加班费错误：实际=13000.00，应为=0.00，差异=13000.00
+  ⚠️  第 246 行加班费错误：实际=4000.00，应为=0.00，差异=4000.00
+  ⚠️  第 272 行加班费错误：实际=5000.00，应为=0.00，差异=5000.00
+  ⚠️  第 294 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 296 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 300 行加班费错误：实际=12500.00，应为=0.00，差异=12500.00
+  ⚠️  第 332 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 334 行加班费错误：实际=9000.00，应为=0.00，差异=9000.00
+  ⚠️  第 339 行加班费错误：实际=10000.00，应为=0.00，差异=10000.00
+  ⚠️  第 345 行加班费错误：实际=9000.00，应为=0.00，差异=9000.00
+  ⚠️  第 349 行加班费错误：实际=6000.00，应为=0.00，差异=6000.00
+  ⚠️  第 357 行加班费错误：实际=6000.00，应为=0.00，差异=6000.00
+  ⚠️  第 365 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 369 行加班费错误：实际=15000.00，应为=0.00，差异=15000.00
+  ⚠️  第 395 行加班费错误：实际=9000.00，应为=0.00，差异=9000.00
+  ⚠️  第 405 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 409 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 413 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 417 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 422 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 426 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 430 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 434 行加班费错误：实际=5000.00，应为=0.00，差异=5000.00
+  ⚠️  第 435 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 439 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 469 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 470 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 471 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 472 行加班费错误：实际=13000.00，应为=0.00，差异=13000.00
+  ⚠️  第 531 行加班费错误：实际=6000.00，应为=0.00，差异=6000.00
+  ⚠️  第 582 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 609 行加班费错误：实际=2000.00，应为=0.00，差异=2000.00
+  ⚠️  第 618 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 647 行加班费错误：实际=9000.00，应为=0.00，差异=9000.00
+  ⚠️  第 653 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 676 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 678 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 680 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 683 行加班费错误：实际=4000.00，应为=0.00，差异=4000.00
+  ⚠️  第 701 行加班费错误：实际=17500.00，应为=0.00，差异=17500.00
+  ⚠️  第 715 行加班费错误：实际=5000.00，应为=0.00，差异=5000.00
+  ⚠️  第 720 行加班费错误：实际=5000.00，应为=0.00，差异=5000.00
+  ⚠️  第 726 行加班费错误：实际=22500.00，应为=0.00，差异=22500.00
+  ⚠️  第 748 行加班费错误：实际=25000.00，应为=0.00，差异=25000.00
+  ⚠️  第 799 行加班费错误：实际=17500.00，应为=0.00，差异=17500.00
+  ⚠️  第 806 行加班费错误：实际=15000.00，应为=0.00，差异=15000.00
+  ⚠️  第 819 行加班费错误：实际=5000.00，应为=0.00，差异=5000.00
+  ⚠️  第 829 行加班费错误：实际=16822.44，应为=0.00，差异=16822.44
+  ⚠️  第 863 行加班费错误：实际=25000.00，应为=0.00，差异=25000.00
+  ⚠️  第 886 行加班费错误：实际=20000.00，应为=0.00，差异=20000.00
+  ⚠️  第 920 行加班费错误：实际=22500.00，应为=0.00，差异=22500.00
+  ⚠️  第 939 行加班费错误：实际=5000.00，应为=0.00，差异=5000.00
+  ⚠️  第 963 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1061 行加班费错误：实际=4000.00，应为=0.00，差异=4000.00
+  ⚠️  第 1068 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1069 行加班费错误：实际=15000.00，应为=0.00，差异=15000.00
+  ⚠️  第 1071 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1072 行加班费错误：实际=4000.00，应为=0.00，差异=4000.00
+  ⚠️  第 1098 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1101 行加班费错误：实际=6000.00，应为=0.00，差异=6000.00
+  ⚠️  第 1107 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1110 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1113 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 1132 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 1135 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 1138 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1141 行加班费错误：实际=6000.00，应为=0.00，差异=6000.00
+  ⚠️  第 1146 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 1148 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 1160 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 1185 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 1187 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 1203 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 1206 行加班费错误：实际=2500.00，应为=0.00，差异=2500.00
+  ⚠️  第 1230 行加班费错误：实际=12000.00，应为=10125.00，差异=1875.00
+  ⚠️  第 1236 行加班费错误：实际=24000.00，应为=18562.50，差异=5437.50
+  ⚠️  第 1245 行加班费错误：实际=2940.00，应为=0.00，差异=2940.00
+  ⚠️  第 1248 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1252 行加班费错误：实际=6000.00，应为=0.00，差异=6000.00
+  ⚠️  第 1260 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1264 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1267 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1268 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1270 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1274 行加班费错误：实际=6000.00，应为=761875.00，差异=755875.00
+  ⚠️  第 1276 行加班费错误：实际=12000.00，应为=0.00，差异=12000.00
+  ⚠️  第 1278 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1280 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1289 行加班费错误：实际=12000.00，应为=6750.00，差异=5250.00
+  ⚠️  第 1293 行加班费错误：实际=1000.00，应为=0.00，差异=1000.00
+  ⚠️  第 1294 行加班费错误：实际=11739.67，应为=11739.60，差异=0.07
+  ⚠️  第 1295 行加班费错误：实际=8677.17，应为=8677.10，差异=0.07
+  ⚠️  第 1298 行加班费错误：实际=6000.00，应为=0.00，差异=6000.00
+  ⚠️  第 1370 行加班费错误：实际=3000.00，应为=9937.50，差异=6937.50
+  ⚠️  第 1371 行加班费错误：实际=4000.00，应为=0.00，差异=4000.00
+  ⚠️  第 1373 行加班费错误：实际=66625.20，应为=0.00，差异=66625.20
+  ⚠️  第 1374 行加班费错误：实际=34833.48，应为=0.00，差异=34833.48
+  ⚠️  第 1375 行加班费错误：实际=60477.76，应为=0.00，差异=60477.76
+  ⚠️  第 1376 行加班费错误：实际=44985.92，应为=0.00，差异=44985.92
+  ⚠️  第 1377 行加班费错误：实际=58392.32，应为=0.00，差异=58392.32
+  ⚠️  第 1378 行加班费错误：实际=19125.00，应为=0.00，差异=19125.00
+  ⚠️  第 1379 行加班费错误：实际=3500.00，应为=0.00，差异=3500.00
+  ⚠️  第 1380 行加班费错误：实际=3375.00，应为=0.00，差异=3375.00
+  ⚠️  第 1381 行加班费错误：实际=11083.38，应为=0.00，差异=11083.38
+  ⚠️  第 1382 行加班费错误：实际=10500.00，应为=0.00，差异=10500.00
+  ⚠️  第 1383 行加班费错误：实际=13749.90，应为=0.00，差异=13749.90
+  ⚠️  第 1384 行加班费错误：实际=1500.00，应为=0.00，差异=1500.00
+  ⚠️  第 1385 行加班费错误：实际=40498.49，应为=0.00，差异=40498.49
+  ⚠️  第 1386 行加班费错误：实际=53300.16，应为=0.00，差异=53300.16
+  ⚠️  第 1387 行加班费错误：实际=72990.40，应为=0.00，差异=72990.40
+  ⚠️  第 1388 行加班费错误：实际=22344.00，应为=0.00，差异=22344.00
+  ⚠️  第 1389 行加班费错误：实际=83715.52，应为=0.00，差异=83715.52
+  ⚠️  第 1390 行加班费错误：实际=8312.50，应为=0.00，差异=8312.50
+  ⚠️  第 1391 行加班费错误：实际=27430.76，应为=0.00，差异=27430.76
+  ⚠️  第 1392 行加班费错误：实际=16500.00，应为=0.00，差异=16500.00
+  ⚠️  第 1393 行加班费错误：实际=11000.00，应为=0.00，差异=11000.00
+  ⚠️  第 1394 行加班费错误：实际=8437.50，应为=0.00，差异=8437.50
+  ⚠️  第 1395 行加班费错误：实际=22687.33，应为=0.00，差异=22687.33
+  ⚠️  第 1396 行加班费错误：实际=19818.41，应为=0.00，差异=19818.41
+  ⚠️  第 1397 行加班费错误：实际=1560.00，应为=0.00，差异=1560.00
+  ⚠️  第 1398 行加班费错误：实际=1959.34，应为=0.00，差异=1959.34
+  ⚠️  第 1399 行加班费错误：实际=74480.00，应为=0.00，差异=74480.00
+  ⚠️  第 1400 行加班费错误：实际=75671.68，应为=0.00，差异=75671.68
+  ⚠️  第 1401 行加班费错误：实际=3575.04，应为=0.00，差异=3575.04
+  ⚠️  第 1402 行加班费错误：实际=10687.50，应为=0.00，差异=10687.50
+  ⚠️  第 1403 行加班费错误：实际=17500.00，应为=0.00，差异=17500.00
+  ⚠️  第 1404 行加班费错误：实际=8437.50，应为=0.00，差异=8437.50
+  ⚠️  第 1406 行加班费错误：实际=2000.00，应为=12915.64，差异=10915.64
+  ⚠️  第 1461 行加班费错误：实际=7500.00，应为=0.00，差异=7500.00
+  ⚠️  第 1478 行加班费错误：实际=8250.00，应为=0.00，差异=8250.00
+  ⚠️  第 1479 行加班费错误：实际=1500.00，应为=0.00，差异=1500.00
+  ⚠️  第 1480 行加班费错误：实际=47103.94，应为=0.00，差异=47103.94
+  ⚠️  第 1481 行加班费错误：实际=2000.00，应为=0.00，差异=2000.00
+  ⚠️  第 1482 行加班费错误：实际=40020.64，应为=0.00，差异=40020.64
+  ⚠️  第 1483 行加班费错误：实际=28687.37，应为=0.00，差异=28687.37
+  ⚠️  第 1484 行加班费错误：实际=26208.21，应为=0.00，差异=26208.21
+  ⚠️  第 1485 行加班费错误：实际=36833.16，应为=0.00，差异=36833.16
+  ⚠️  第 1486 行加班费错误：实际=14875.00，应为=0.00，差异=14875.00
+  ⚠️  第 1493 行加班费错误：实际=19500.00，应为=0.00，差异=19500.00
+  ⚠️  第 1498 行加班费错误：实际=37895.66，应为=0.00，差异=37895.66
+  ⚠️  第 1499 行加班费错误：实际=38249.82，应为=0.00，差异=38249.82
+  ⚠️  第 1500 行加班费错误：实际=36833.16，应为=0.00，差异=36833.16
+  ⚠️  第 1501 行加班费错误：实际=36833.16，应为=0.00，差异=36833.16
+  ⚠️  第 1502 行加班费错误：实际=36124.83，应为=0.00，差异=36124.83
+  ⚠️  第 1503 行加班费错误：实际=39666.48，应为=0.00，差异=39666.48
+  ⚠️  第 1504 行加班费错误：实际=9833.24，应为=0.00，差异=9833.24
+  ⚠️  第 1505 行加班费错误：实际=11333.22，应为=0.00，差异=11333.22
+  ⚠️  第 1506 行加班费错误：实际=9999.90，应为=0.00，差异=9999.90
+  ⚠️  第 1507 行加班费错误：实际=10333.23，应为=0.00，差异=10333.23
+  ⚠️  第 1508 行加班费错误：实际=11333.22，应为=0.00，差异=11333.22
+  ⚠️  第 1512 行加班费错误：实际=20833.33，应为=0.00，差异=20833.33
+  ⚠️  第 1560 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1570 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1572 行加班费错误：实际=3500.00，应为=0.00，差异=3500.00
+  ⚠️  第 1574 行加班费错误：实际=1500.00，应为=0.00，差异=1500.00
+  ⚠️  第 1585 行加班费错误：实际=15000.00，应为=0.00，差异=15000.00
+  ⚠️  第 1586 行加班费错误：实际=21175.00，应为=0.00，差异=21175.00
+  ⚠️  第 1587 行加班费错误：实际=375.00，应为=0.00，差异=375.00
+  ⚠️  第 1589 行加班费错误：实际=375.00，应为=0.00，差异=375.00
+  ⚠️  第 1613 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 1616 行加班费错误：实际=20000.00，应为=0.00，差异=20000.00
+  ⚠️  第 1854 行加班费错误：实际=16000.00，应为=20187.50，差异=4187.50
+  ⚠️  第 1855 行加班费错误：实际=16000.00，应为=16468.75，差异=468.75
+  ⚠️  第 2049 行加班费错误：实际=6000.00，应为=0.00，差异=6000.00
+  ⚠️  第 2196 行加班费错误：实际=8000.00，应为=0.00，差异=8000.00
+  ⚠️  第 2200 行加班费错误：实际=3000.00，应为=0.00，差异=3000.00
+  ⚠️  第 2252 行加班费错误：实际=7000.00，应为=0.00，差异=7000.00
+  ⚠️  第 2308 行加班费错误：实际=2000.00，应为=0.00，差异=2000.00
+  ⚠️  第 2311 行加班费错误：实际=2000.00，应为=0.00，差异=2000.00
+  ⚠️  第 2333 行加班费错误：实际=4000.00，应为=0.00，差异=4000.00
+  ⚠️  第 2336 行加班费错误：实际=4000.00，应为=1500.00，差异=2500.00
+  ⚠️  第 2350 行加班费错误：实际=2000.00，应为=0.00，差异=2000.00
+  ⚠️  第 2352 行加班费错误：实际=6000.00，应为=0.00，差异=6000.00
+  ⚠️  第 2370 行加班费错误：实际=2000.00，应为=0.00，差异=2000.00
+  ⚠️  第 2372 行加班费错误：实际=5000.00，应为=125.00，差异=4875.00
+  ⚠️  第 2464 行加班费错误：实际=8500.00，应为=6375.00，差异=2125.00
+  ⚠️  第 2466 行加班费错误：实际=560.00，应为=1250.00，差异=690.00
+  ⚠️  第 2467 行加班费错误：实际=1000.00，应为=2250.00，差异=1250.00
+  ⚠️  第 2555 行加班费错误：实际=8000.00，应为=0.00，差异=8000.00
+  ⚠️  第 2558 行加班费错误：实际=4000.00，应为=0.00，差异=4000.00
+  ⚠️  第 2617 行加班费错误：实际=15625.05，应为=468750.00，差异=453124.95
+  ⚠️  第 2640 行加班费错误：实际=83333.60，应为=80645.16，差异=2688.44
+  ⚠️  第 2641 行加班费错误：实际=72625.00，应为=70282.26，差异=2342.74
+  ⚠️  第 2642 行加班费错误：实际=57312.50，应为=55463.71，差异=1848.79
+  ⚠️  第 2643 行加班费错误：实际=57750.00，应为=55887.10，差异=1862.90
+  ⚠️  第 2660 行加班费错误：实际=57291.85，应为=55443.55，差异=1848.30
+  ⚠️  第 2662 行加班费错误：实际=49000.00，应为=47419.35，差异=1580.65
+  ⚠️  第 2663 行加班费错误：实际=25299.00，应为=25312.50，差异=13.50
+  ⚠️  第 2669 行加班费错误：实际=7187.50，应为=6955.65，差异=231.85
+  ⚠️  第 2693 行加班费错误：实际=18750.06，应为=18145.16，差异=604.90
+  ⚠️  第 2701 行加班费错误：实际=3750.00，应为=3629.03，差异=120.97
+  ⚠️  第 2732 行加班费错误：实际=15625.00，应为=15120.97，差异=504.03
+  ⚠️  第 2742 行加班费错误：实际=3125.00，应为=4125.00，差异=1000.00
+  ⚠️  第 2770 行加班费错误：实际=20833.40，应为=20833.33，差异=0.08
+  ⚠️  第 2775 行加班费错误：实际=1500.00，应为=95625.00，差异=94125.00
+  ⚠️  第 2790 行加班费错误：实际=65000.00，应为=0.00，差异=65000.00
+  ⚠️  第 2797 行加班费错误：实际=16875.00，应为=45000.00，差异=28125.00
+  ⚠️  第 2799 行加班费错误：实际=5687.50，应为=4375.00，差异=1312.50
+  ⚠️  第 2810 行加班费错误：实际=29820.00，应为=434875.00，差异=405055.00
+  ⚠️  第 2820 行加班费错误：实际=5652.00，应为=0.00，差异=5652.00
+  ⚠️  第 2822 行加班费错误：实际=666.67，应为=3666.66，差异=2999.99
+  ⚠️  第 2823 行加班费错误：实际=666.67，应为=1666.67，差异=1000.00
+  ⚠️  第 2841 行加班费错误：实际=7666.66，应为=0.00，差异=7666.66
+  ⚠️  第 2846 行加班费错误：实际=9000.00，应为=6000.00，差异=3000.00
+  ⚠️  第 2847 行加班费错误：实际=24375.00，应为=13000.00，差异=11375.00
+  ⚠️  第 2857 行加班费错误：实际=2250.00，应为=1500.00，差异=750.00
+发现 217 行加班费计算错误，将用金色标注
+
+2. 验证结算费用...
+  ⚠️  第 6 行结算费用错误：实际=230000.00，方式1=1.00，方式2=460001.00
+  ⚠️  第 7 行结算费用错误：实际=230000.00，方式1=1.00，方式2=460001.00
+  ⚠️  第 18 行结算费用错误：实际=32000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 19 行结算费用错误：实际=105937.50，方式1=15937.50，方式2=0.00
+  ⚠️  第 20 行结算费用错误：实际=5800.00，方式1=0.00，方式2=0.00
+  ⚠️  第 21 行结算费用错误：实际=139562.50，方式1=0.00，方式2=0.00
+  ⚠️  第 22 行结算费用错误：实际=5075.00，方式1=0.00，方式2=0.00
+  ⚠️  第 23 行结算费用错误：实际=174000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 25 行结算费用错误：实际=68749.86，方式1=49999.98，方式2=27083.32
+  ⚠️  第 26 行结算费用错误：实际=69437.50，方式1=44000.00，方式2=36437.50
+  ⚠️  第 27 行结算费用错误：实际=53645.69，方式1=33333.32，方式2=28645.82
+  ⚠️  第 28 行结算费用错误：实际=61979.02，方式1=41666.65，方式2=28645.82
+  ⚠️  第 29 行结算费用错误：实际=57291.52，方式1=37499.99，方式2=28124.99
+  ⚠️  第 30 行结算费用错误：实际=33125.00，方式1=20000.00，方式2=23125.00
+  ⚠️  第 33 行结算费用错误：实际=31562.50，方式1=25000.00，方式2=11562.50
+  ⚠️  第 34 行结算费用错误：实际=31562.50，方式1=25000.00，方式2=11562.50
+  ⚠️  第 35 行结算费用错误：实际=31562.50，方式1=25000.00，方式2=11562.50
+  ⚠️  第 36 行结算费用错误：实际=31562.50，方式1=25000.00，方式2=11562.50
+  ⚠️  第 37 行结算费用错误：实际=31562.50，方式1=25000.00，方式2=11562.50
+  ⚠️  第 38 行结算费用错误：实际=26562.50，方式1=20000.00，方式2=11562.50
+  ⚠️  第 39 行结算费用错误：实际=26562.50，方式1=20000.00，方式2=11562.50
+  ⚠️  第 40 行结算费用错误：实际=31562.50，方式1=25000.00，方式2=11562.50
+  ⚠️  第 41 行结算费用错误：实际=31562.50，方式1=25000.00，方式2=11562.50
+  ⚠️  第 42 行结算费用错误：实际=31562.50，方式1=25000.00，方式2=11562.50
+  ⚠️  第 43 行结算费用错误：实际=20625.00，方式1=15000.00，方式2=10625.00
+  ⚠️  第 45 行结算费用错误：实际=11875.00，方式1=10000.00，方式2=6875.00
+  ⚠️  第 46 行结算费用错误：实际=20625.00，方式1=15000.00，方式2=10625.00
+  ⚠️  第 47 行结算费用错误：实际=20625.00，方式1=15000.00，方式2=10625.00
+  ⚠️  第 48 行结算费用错误：实际=13750.00，方式1=10000.00，方式2=8750.00
+  ⚠️  第 49 行结算费用错误：实际=13750.00，方式1=10000.00，方式2=8750.00
+  ⚠️  第 52 行结算费用错误：实际=36812.50，方式1=28500.00，方式2=17812.50
+  ⚠️  第 54 行结算费用错误：实际=81750.00，方式1=0.00，方式2=21750.00
+  ⚠️  第 55 行结算费用错误：实际=70625.00，方式1=60000.00，方式2=15625.00
+  ⚠️  第 56 行结算费用错误：实际=18125.00，方式1=15000.00，方式2=8125.00
+  ⚠️  第 57 行结算费用错误：实际=40625.00，方式1=35000.00，方式2=10625.00
+  ⚠️  第 58 行结算费用错误：实际=94375.00，方式1=82500.00，方式2=16875.00
+  ⚠️  第 59 行结算费用错误：实际=88125.00，方式1=77500.00，方式2=15625.00
+  ⚠️  第 60 行结算费用错误：实际=76875.00，方式1=67500.00，方式2=14375.00
+  ⚠️  第 61 行结算费用错误：实际=70000.00，方式1=62500.00，方式2=12500.00
+  ⚠️  第 62 行结算费用错误：实际=27500.00，方式1=22500.00，方式2=10000.00
+  ⚠️  第 63 行结算费用错误：实际=18125.00，方式1=15000.00，方式2=8125.00
+  ⚠️  第 64 行结算费用错误：实际=21250.00，方式1=17500.00，方式2=8750.00
+  ⚠️  第 73 行结算费用错误：实际=283817.50，方式1=241657.00，方式2=50518.81
+  ⚠️  第 74 行结算费用错误：实际=109875.00，方式1=0.00，方式2=6000.00
+  ⚠️  第 79 行结算费用错误：实际=166666.40，方式1=133333.28，方式2=41666.65
+  ⚠️  第 80 行结算费用错误：实际=168749.72，方式1=133333.28，方式2=43749.98
+  ⚠️  第 81 行结算费用错误：实际=144791.44，方式1=116666.62，方式2=36458.32
+  ⚠️  第 82 行结算费用错误：实际=140624.75，方式1=108333.29，方式2=40624.98
+  ⚠️  第 83 行结算费用错误：实际=57500.00，方式1=40000.00，方式2=27500.00
+  ⚠️  第 84 行结算费用错误：实际=131770.61，方式1=104166.62，方式2=35937.49
+  ⚠️  第 85 行结算费用错误：实际=310937.11，方式1=250000.00，方式2=2078125.00
+  ⚠️  第 86 行结算费用错误：实际=317186.94，方式1=245833.23，方式2=79687.47
+  ⚠️  第 87 行结算费用错误：实际=142499.77，方式1=113333.22，方式2=35833.30
+  ⚠️  第 88 行结算费用错误：实际=129166.47，方式1=106666.56，方式2=29166.64
+  ⚠️  第 89 行结算费用错误：实际=52499.92，方式1=43333.29，方式2=15833.32
+  ⚠️  第 90 行结算费用错误：实际=31770.77，方式1=29166.62，方式2=6770.82
+  ⚠️  第 91 行结算费用错误：实际=33250.00，方式1=28500.00，方式2=14250.00
+  ⚠️  第 92 行结算费用错误：实际=120750.00，方式1=105000.00，方式2=21750.00
+  ⚠️  第 93 行结算费用错误：实际=45375.00，方式1=44000.00，方式2=6875.00
+  ⚠️  第 94 行结算费用错误：实际=212625.00，方式1=168000.00，方式2=58625.00
+  ⚠️  第 95 行结算费用错误：实际=50312.50，方式1=40000.00，方式2=15312.50
+  ⚠️  第 96 行结算费用错误：实际=31250.00，方式1=25000.00，方式2=11250.00
+  ⚠️  第 97 行结算费用错误：实际=181250.00，方式1=142500.00，方式2=43750.00
+  ⚠️  第 98 行结算费用错误：实际=181875.00，方式1=145000.00，方式2=41875.00
+  ⚠️  第 99 行结算费用错误：实际=150625.00，方式1=117500.00，方式2=38125.00
+  ⚠️  第 100 行结算费用错误：实际=80625.00，方式1=65000.00，方式2=20625.00
+  ⚠️  第 101 行结算费用错误：实际=63750.00，方式1=50000.00，方式2=18750.00
+  ⚠️  第 102 行结算费用错误：实际=115937.50，方式1=92500.00，方式2=28437.50
+  ⚠️  第 103 行结算费用错误：实际=49062.50，方式1=37500.00，方式2=16562.50
+  ⚠️  第 105 行结算费用错误：实际=35000.00，方式1=41000.00，方式2=41000.00
+  ⚠️  第 107 行结算费用错误：实际=322337.00，方式1=245823.50，方式2=84892.44
+  ⚠️  第 108 行结算费用错误：实际=299999.63，方式1=258333.23，方式2=49999.98
+  ⚠️  第 109 行结算费用错误：实际=292708.01，方式1=258333.23，方式2=42708.32
+  ⚠️  第 110 行结算费用错误：实际=163000.00，方式1=143000.00，方式2=33000.00
+  ⚠️  第 111 行结算费用错误：实际=93749.90，方式1=83333.30，方式2=18749.99
+  ⚠️  第 112 行结算费用错误：实际=93749.90，方式1=83333.30，方式2=18749.99
+  ⚠️  第 113 行结算费用错误：实际=236666.52，方式1=200000.00，方式2=1300000.00
+  ⚠️  第 114 行结算费用错误：实际=218333.00，方式1=179999.82，方式2=44999.96
+  ⚠️  第 115 行结算费用错误：实际=219582.98，方式1=173333.16，方式2=52916.61
+  ⚠️  第 116 行结算费用错误：实际=108000.00，方式1=93000.00，方式2=21000.00
+  ⚠️  第 118 行结算费用错误：实际=55625.00，方式1=40000.00，方式2=25625.00
+  ⚠️  第 119 行结算费用错误：实际=4062.50，方式1=2500.00，方式2=6562.50
+  ⚠️  第 120 行结算费用错误：实际=107500.00，方式1=90000.00，方式2=22500.00
+  ⚠️  第 121 行结算费用错误：实际=131250.00，方式1=112500.00，方式2=23750.00
+  ⚠️  第 122 行结算费用错误：实际=16875.00，方式1=15000.00，方式2=6875.00
+  ⚠️  第 123 行结算费用错误：实际=24062.50，方式1=17500.00，方式2=11562.50
+  ⚠️  第 124 行结算费用错误：实际=133750.00，方式1=112500.00，方式2=26250.00
+  ⚠️  第 125 行结算费用错误：实际=69375.00，方式1=57500.00，方式2=16875.00
+  ⚠️  第 126 行结算费用错误：实际=88375.21，方式1=70000.00，方式2=621250.00
+  ⚠️  第 130 行结算费用错误：实际=6000.00，方式1=12000.00，方式2=12000.00
+  ⚠️  第 131 行结算费用错误：实际=291666.20，方式1=233333.24，方式2=66666.64
+  ⚠️  第 132 行结算费用错误：实际=97183.39，方式1=79333.39，方式2=34416.69
+  ⚠️  第 133 行结算费用错误：实际=190925.00，方式1=140000.00，方式2=2686250.00
+  ⚠️  第 134 行结算费用错误：实际=70116.71，方式1=60666.71，方式2=20416.68
+  ⚠️  第 135 行结算费用错误：实际=168525.00，方式1=140000.00，方式2=1566250.00
+  ⚠️  第 136 行结算费用错误：实际=106983.40，方式1=93333.40，方式2=27416.69
+  ⚠️  第 138 行结算费用错误：实际=25750.00，方式1=22000.00，方式2=15125.00
+  ⚠️  第 139 行结算费用错误：实际=41224.84，方式1=33949.96，方式2=10508.32
+  ⚠️  第 140 行结算费用错误：实际=247499.81，方式1=200000.00，方式2=1625000.00
+  ⚠️  第 141 行结算费用错误：实际=34437.50，方式1=28500.00，方式2=15437.50
+  ⚠️  第 143 行结算费用错误：实际=36562.50，方式1=30000.00，方式2=11562.50
+  ⚠️  第 144 行结算费用错误：实际=11250.00，方式1=10000.00，方式2=6250.00
+  ⚠️  第 145 行结算费用错误：实际=38125.00，方式1=30000.00，方式2=13125.00
+  ⚠️  第 146 行结算费用错误：实际=55625.00，方式1=45000.00，方式2=15625.00
+  ⚠️  第 147 行结算费用错误：实际=102521.21，方式1=70000.00，方式2=1045625.00
+  ⚠️  第 150 行结算费用错误：实际=57458.18，方式1=41999.94，方式2=20124.97
+  ⚠️  第 151 行结算费用错误：实际=190050.00，方式1=140000.00，方式2=2642500.00
+  ⚠️  第 152 行结算费用错误：实际=162750.00，方式1=140000.00，方式2=1277500.00
+  ⚠️  第 153 行结算费用错误：实际=171500.00，方式1=140000.00，方式2=1715000.00
+  ⚠️  第 155 行结算费用错误：实际=151958.01，方式1=128333.15，方式2=28291.63
+  ⚠️  第 157 行结算费用错误：实际=213333.02，方式1=179999.82，方式2=39999.96
+  ⚠️  第 158 行结算费用错误：实际=98212.18，方式1=84066.58，方式2=17379.15
+  ⚠️  第 163 行结算费用错误：实际=9375.00，方式1=7500.00，方式2=6875.00
+  ⚠️  第 166 行结算费用错误：实际=93625.27，方式1=70000.00，方式2=778750.00
+  ⚠️  第 168 行结算费用错误：实际=167300.00，方式1=140000.00，方式2=1505000.00
+  ⚠️  第 169 行结算费用错误：实际=159600.00，方式1=140000.00，方式2=1120000.00
+  ⚠️  第 170 行结算费用错误：实际=161000.00，方式1=140000.00，方式2=1190000.00
+  ⚠️  第 171 行结算费用错误：实际=72626.11，方式1=70000.00，方式2=358750.00
+  ⚠️  第 172 行结算费用错误：实际=282291.26，方式1=233333.24，方式2=57291.64
+  ⚠️  第 173 行结算费用错误：实际=162166.54，方式1=140000.00，方式2=805000.00
+  ⚠️  第 186 行结算费用错误：实际=2531.25，方式1=2250.00，方式2=4781.25
+  ⚠️  第 187 行结算费用错误：实际=2531.25，方式1=2250.00，方式2=4781.25
+  ⚠️  第 189 行结算费用错误：实际=20812.50，方式1=18000.00，方式2=7312.50
+  ⚠️  第 190 行结算费用错误：实际=236666.52，方式1=200000.00，方式2=1300000.00
+  ⚠️  第 191 行结算费用错误：实际=168093.75，方式1=145750.00，方式2=27843.75
+  ⚠️  第 193 行结算费用错误：实际=108333.18，方式1=93333.24，方式2=21666.65
+  ⚠️  第 194 行结算费用错误：实际=31250.00，方式1=30000.00，方式2=11250.00
+  ⚠️  第 197 行结算费用错误：实际=16031.25，方式1=14250.00，方式2=11281.25
+  ⚠️  第 203 行结算费用错误：实际=169400.00，方式1=140000.00，方式2=1610000.00
+  ⚠️  第 204 行结算费用错误：实际=119116.74，方式1=102666.74，方式2=32083.36
+  ⚠️  第 205 行结算费用错误：实际=90533.39，方式1=79333.39，方式2=23333.35
+  ⚠️  第 206 行结算费用错误：实际=230000.00，方式1=460000.00，方式2=460000.00
+  ⚠️  第 208 行结算费用错误：实际=230000.00，方式1=460000.00，方式2=460000.00
+  ⚠️  第 215 行结算费用错误：实际=11500.00，方式1=34500.00，方式2=23050.00
+  ⚠️  第 221 行结算费用错误：实际=20000.00，方式1=22500.00，方式2=2500.00
+  ⚠️  第 236 行结算费用错误：实际=800.00，方式1=2400.00，方式2=2400.00
+  ⚠️  第 237 行结算费用错误：实际=1450.00，方式1=4350.00，方式2=2950.00
+  ⚠️  第 247 行结算费用错误：实际=27187.50，方式1=25000.00，方式2=7187.50
+  ⚠️  第 248 行结算费用错误：实际=15625.00，方式1=15000.00，方式2=5625.00
+  ⚠️  第 250 行结算费用错误：实际=3125.00，方式1=2500.00，方式2=5625.00
+  ⚠️  第 252 行结算费用错误：实际=11875.00，方式1=10000.00，方式2=6875.00
+  ⚠️  第 253 行结算费用错误：实际=177333.12，方式1=140000.00，方式2=1260000.00
+  ⚠️  第 254 行结算费用错误：实际=199478.89，方式1=166666.60，方式2=41145.82
+  ⚠️  第 256 行结算费用错误：实际=56250.00，方式1=48000.00，方式2=14250.00
+  ⚠️  第 257 行结算费用错误：实际=19687.50，方式1=18000.00，方式2=6187.50
+  ⚠️  第 260 行结算费用错误：实际=10125.00，方式1=9000.00，方式2=5625.00
+  ⚠️  第 261 行结算费用错误：实际=241666.50，方式1=200000.00，方式2=1450000.00
+  ⚠️  第 262 行结算费用错误：实际=195250.00，方式1=167750.00，方式2=33000.00
+  ⚠️  第 263 行结算费用错误：实际=49500.00，方式1=44000.00，方式2=16500.00
+  ⚠️  第 264 行结算费用错误：实际=71666.54，方式1=53333.28，方式2=24999.97
+  ⚠️  第 265 行结算费用错误：实际=118749.81，方式1=96666.57，方式2=28749.97
+  ⚠️  第 266 行结算费用错误：实际=40000.00，方式1=35000.00，方式2=15000.00
+  ⚠️  第 267 行结算费用错误：实际=39875.00，方式1=33000.00，方式2=17875.00
+  ⚠️  第 268 行结算费用错误：实际=167650.00，方式1=140000.00，方式2=1522500.00
+  ⚠️  第 272 行结算费用错误：实际=5000.00，方式1=10000.00，方式2=2500.00
+  ⚠️  第 275 行结算费用错误：实际=1450.00，方式1=4350.00，方式2=2950.00
+  ⚠️  第 278 行结算费用错误：实际=230416.54，方式1=200000.00，方式2=1112500.00
+  ⚠️  第 279 行结算费用错误：实际=188718.75，方式1=162250.00，方式2=31968.75
+  ⚠️  第 280 行结算费用错误：实际=297916.82，方式1=250000.00，方式2=1687500.00
+  ⚠️  第 281 行结算费用错误：实际=234166.53，方式1=200000.00，方式2=1225000.00
+  ⚠️  第 282 行结算费用错误：实际=53750.00，方式1=50000.00，方式2=13750.00
+  ⚠️  第 283 行结算费用错误：实际=130812.21，方式1=114833.24，方式2=20312.48
+  ⚠️  第 284 行结算费用错误：实际=169750.00，方式1=140000.00，方式2=1032500.00
+  ⚠️  第 285 行结算费用错误：实际=16250.00，方式1=15000.00，方式2=11250.00
+  ⚠️  第 287 行结算费用错误：实际=37750.00，方式1=32000.00，方式2=9750.00
+  ⚠️  第 288 行结算费用错误：实际=40500.00，方式1=36000.00，方式2=8500.00
+  ⚠️  第 289 行结算费用错误：实际=13500.00，方式1=12000.00，方式2=7500.00
+  ⚠️  第 290 行结算费用错误：实际=45562.50，方式1=40500.00，方式2=9562.50
+  ⚠️  第 291 行结算费用错误：实际=75937.50，方式1=67500.00，方式2=12937.50
+  ⚠️  第 292 行结算费用错误：实际=21093.75，方式1=18000.00，方式2=7593.75
+  ⚠️  第 293 行结算费用错误：实际=82125.00，方式1=72000.00，方式2=14625.00
+  ⚠️  第 295 行结算费用错误：实际=5310.60，方式1=7560.60，方式2=4653.03
+  ⚠️  第 297 行结算费用错误：实际=3630.00，方式1=4180.00，方式2=1240.00
+  ⚠️  第 300 行结算费用错误：实际=12500.00，方式1=25000.00，方式2=2500.00
+  ⚠️  第 307 行结算费用错误：实际=79770.95，方式1=70000.00，方式2=363125.00
+  ⚠️  第 308 行结算费用错误：实际=82499.89，方式1=73333.26，方式2=15833.32
+  ⚠️  第 309 行结算费用错误：实际=110337.28，方式1=97000.00，方式2=497125.00
+  ⚠️  第 310 行结算费用错误：实际=43312.50，方式1=38500.00，方式2=10312.50
+  ⚠️  第 311 行结算费用错误：实际=298437.65，方式1=250000.00，方式2=1703125.00
+  ⚠️  第 312 行结算费用错误：实际=231249.87，方式1=200000.00，方式2=1137500.00
+  ⚠️  第 313 行结算费用错误：实际=121250.00，方式1=115000.00，方式2=16250.00
+  ⚠️  第 314 行结算费用错误：实际=79895.67，方式1=71499.94，方式2=12729.16
+  ⚠️  第 316 行结算费用错误：实际=172083.15，方式1=140000.00，方式2=1102500.00
+  ⚠️  第 317 行结算费用错误：实际=140250.00，方式1=120000.00，方式2=727500.00
+  ⚠️  第 318 行结算费用错误：实际=140000.00，方式1=120000.00，方式2=720000.00
+  ⚠️  第 320 行结算费用错误：实际=145950.00，方式1=140000.00，方式2=437500.00
+  ⚠️  第 321 行结算费用错误：实际=140350.00，方式1=140000.00，方式2=157500.00
+  ⚠️  第 322 行结算费用错误：实际=271249.72，方式1=200000.00，方式2=2337500.00
+  ⚠️  第 323 行结算费用错误：实际=127716.16，方式1=97000.00，方式2=1018500.00
+  ⚠️  第 324 行结算费用错误：实际=343229.47，方式1=250000.00，方式2=3046875.00
+  ⚠️  第 325 行结算费用错误：实际=142624.95，方式1=119000.09，方式2=28291.69
+  ⚠️  第 326 行结算费用错误：实际=161500.00，方式1=120000.00，方式2=1365000.00
+  ⚠️  第 327 行结算费用错误：实际=161000.00，方式1=120000.00，方式2=1350000.00
+  ⚠️  第 328 行结算费用错误：实际=277500.00，方式1=255000.00，方式2=32500.00
+  ⚠️  第 332 行结算费用错误：实际=25629.00，方式1=28329.00，方式2=5553.30
+  ⚠️  第 334 行结算费用错误：实际=24281.70，方式1=32051.70，方式2=15693.30
+  ⚠️  第 336 行结算费用错误：实际=6365.50，方式1=7365.50，方式2=2153.30
+  ⚠️  第 339 行结算费用错误：实际=52700.00，方式1=85400.00，方式2=75400.00
+  ⚠️  第 342 行结算费用错误：实际=6840.00，方式1=840.00，方式2=140.00
+  ⚠️  第 345 行结算费用错误：实际=23525.00，方式1=26735.00，方式2=17735.00
+  ⚠️  第 356 行结算费用错误：实际=6930.00，方式1=20790.00，方式2=13890.00
+  ⚠️  第 357 行结算费用错误：实际=6000.00，方式1=12000.00，方式2=3000.00
+  ⚠️  第 360 行结算费用错误：实际=82104.31，方式1=70000.00，方式2=433125.00
+  ⚠️  第 363 行结算费用错误：实际=5100.00，方式1=15300.00，方式2=10230.00
+  ⚠️  第 364 行结算费用错误：实际=1000.00，方式1=3000.00，方式2=3000.00
+  ⚠️  第 368 行结算费用错误：实际=3750.00，方式1=11250.00，方式2=7550.00
+  ⚠️  第 369 行结算费用错误：实际=15000.00，方式1=30000.00，方式2=2500.00
+  ⚠️  第 379 行结算费用错误：实际=224999.90，方式1=200000.00，方式2=950000.00
+  ⚠️  第 380 行结算费用错误：实际=178125.00，方式1=155000.00，方式2=33125.00
+  ⚠️  第 381 行结算费用错误：实际=115156.25，方式1=101750.00，方式2=18906.25
+  ⚠️  第 382 行结算费用错误：实际=113437.50，方式1=99000.00，方式2=25437.50
+  ⚠️  第 383 行结算费用错误：实际=50000.00，方式1=40000.00，方式2=20000.00
+  ⚠️  第 384 行结算费用错误：实际=169458.16，方式1=140000.00，方式2=1023750.00
+  ⚠️  第 385 行结算费用错误：实际=190625.00，方式1=185000.00，方式2=15625.00
+  ⚠️  第 387 行结算费用错误：实际=105000.00，方式1=95000.00，方式2=15000.00
+  ⚠️  第 388 行结算费用错误：实际=57812.50，方式1=52500.00，方式2=10312.50
+  ⚠️  第 389 行结算费用错误：实际=33437.50，方式1=27500.00，方式2=10937.50
+  ⚠️  第 390 行结算费用错误：实际=10937.50，方式1=10000.00，方式2=5937.50
+  ⚠️  第 394 行结算费用错误：实际=3000.00，方式1=9000.00，方式2=6030.00
+  ⚠️  第 395 行结算费用错误：实际=9000.00，方式1=18000.00，方式2=3000.00
+  ⚠️  第 398 行结算费用错误：实际=180.00，方式1=540.00，方式2=390.00
+  ⚠️  第 401 行结算费用错误：实际=3480.00，方式1=10440.00，方式2=6990.00
+  ⚠️  第 404 行结算费用错误：实际=2160.00，方式1=6480.00，方式2=4350.00
+  ⚠️  第 408 行结算费用错误：实际=3300.00，方式1=9900.00，方式2=6630.00
+  ⚠️  第 412 行结算费用错误：实际=4950.00，方式1=14850.00，方式2=9930.00
+  ⚠️  第 416 行结算费用错误：实际=5400.00，方式1=16200.00，方式2=10830.00
+  ⚠️  第 418 行结算费用错误：实际=81520.97，方式1=70000.00，方式2=415625.00
+  ⚠️  第 421 行结算费用错误：实际=6550.00，方式1=19650.00，方式2=13150.00
+  ⚠️  第 425 行结算费用错误：实际=4500.00，方式1=13500.00，方式2=9030.00
+  ⚠️  第 429 行结算费用错误：实际=1890.00，方式1=5670.00，方式2=3810.00
+  ⚠️  第 433 行结算费用错误：实际=8370.00，方式1=25110.00，方式2=16770.00
+  ⚠️  第 438 行结算费用错误：实际=700.00，方式1=2100.00，方式2=2100.00
+  ⚠️  第 440 行结算费用错误：实际=89396.05，方式1=70000.00，方式2=651875.00
+  ⚠️  第 441 行结算费用错误：实际=168874.83，方式1=140000.00，方式2=1006250.00
+  ⚠️  第 442 行结算费用错误：实际=79750.00，方式1=71500.00，方式2=13750.00
+  ⚠️  第 443 行结算费用错误：实际=111375.00，方式1=99000.00，方式2=23375.00
+  ⚠️  第 444 行结算费用错误：实际=30375.00，方式1=27000.00，方式2=7875.00
+  ⚠️  第 445 行结算费用错误：实际=22500.00，方式1=20000.00，方式2=12500.00
+  ⚠️  第 447 行结算费用错误：实际=98312.50，方式1=88000.00，方式2=21312.50
+  ⚠️  第 448 行结算费用错误：实际=37812.50，方式1=35750.00，方式2=7562.50
+  ⚠️  第 451 行结算费用错误：实际=96353.93，方式1=62499.97，方式2=42187.48
+  ⚠️  第 452 行结算费用错误：实际=62499.90，方式1=49999.98，方式2=20833.32
+  ⚠️  第 453 行结算费用错误：实际=122916.51，方式1=104166.62，方式2=27083.32
+  ⚠️  第 454 行结算费用错误：实际=105208.16，方式1=83333.30，方式2=30208.32
+  ⚠️  第 455 行结算费用错误：实际=161458.08，方式1=129166.62，方式2=40624.98
+  ⚠️  第 456 行结算费用错误：实际=27500.00，方式1=22000.00，方式2=16500.00
+  ⚠️  第 462 行结算费用错误：实际=105000.00，方式1=80000.00，方式2=35000.00
+  ⚠️  第 463 行结算费用错误：实际=34375.00，方式1=27500.00，方式2=11875.00
+  ⚠️  第 464 行结算费用错误：实际=28125.00，方式1=22500.00，方式2=10625.00
+  ⚠️  第 465 行结算费用错误：实际=18750.00，方式1=15000.00，方式2=8750.00
+  ⚠️  第 466 行结算费用错误：实际=15625.00，方式1=12500.00，方式2=8125.00
+  ⚠️  第 467 行结算费用错误：实际=18750.00，方式1=15000.00，方式2=8750.00
+  ⚠️  第 468 行结算费用错误：实际=25000.00，方式1=20000.00，方式2=10000.00
+  ⚠️  第 470 行结算费用错误：实际=6000.00，方式1=3000.00，方式2=0.00
+  ⚠️  第 475 行结算费用错误：实际=83437.50，方式1=70000.00，方式2=18437.50
+  ⚠️  第 476 行结算费用错误：实际=122187.50，方式1=105000.00，方式2=22187.50
+  ⚠️  第 477 行结算费用错误：实际=105937.50，方式1=90000.00，方式2=20937.50
+  ⚠️  第 478 行结算费用错误：实际=114375.00，方式1=100000.00，方式2=19375.00
+  ⚠️  第 479 行结算费用错误：实际=105937.50，方式1=90000.00，方式2=20937.50
+  ⚠️  第 480 行结算费用错误：实际=57187.50，方式1=50000.00，方式2=12187.50
+  ⚠️  第 481 行结算费用错误：实际=16875.00，方式1=15000.00，方式2=6875.00
+  ⚠️  第 482 行结算费用错误：实际=150520.62，方式1=124999.95，方式2=33854.15
+  ⚠️  第 483 行结算费用错误：实际=278645.52，方式1=245833.23，方式2=41145.82
+  ⚠️  第 484 行结算费用错误：实际=281249.67，方式1=245833.23，方式2=43749.98
+  ⚠️  第 485 行结算费用错误：实际=266145.43，方式1=216666.58，方式2=57812.48
+  ⚠️  第 486 行结算费用错误：实际=103645.72，方式1=91666.63，方式2=20312.49
+  ⚠️  第 488 行结算费用错误：实际=256770.49，方式1=216666.58，方式2=48437.48
+  ⚠️  第 491 行结算费用错误：实际=177083.10，方式1=149999.94，方式2=35416.65
+  ⚠️  第 492 行结算费用错误：实际=263020.47，方式1=220833.24，方式2=50520.81
+  ⚠️  第 493 行结算费用错误：实际=291666.40，方式1=250000.00，方式2=1500000.00
+  ⚠️  第 494 行结算费用错误：实际=144791.44，方式1=116666.62，方式2=36458.32
+  ⚠️  第 495 行结算费用错误：实际=110937.34，方式1=91666.63，方式2=27604.16
+  ⚠️  第 496 行结算费用错误：实际=130208.17，方式1=112499.96，方式2=26041.66
+  ⚠️  第 497 行结算费用错误：实际=105833.18，方式1=89999.91，方式2=22499.98
+  ⚠️  第 498 行结算费用错误：实际=15833.31，方式1=13333.32，方式2=9166.66
+  ⚠️  第 499 行结算费用错误：实际=209166.35，方式1=173333.16，方式2=42499.96
+  ⚠️  第 500 行结算费用错误：实际=204166.36，方式1=169999.83，方式2=40833.29
+  ⚠️  第 501 行结算费用错误：实际=68333.23，方式1=56666.61，方式2=18333.31
+  ⚠️  第 502 行结算费用错误：实际=170833.08，方式1=143333.19，方式2=34166.63
+  ⚠️  第 503 行结算费用错误：实际=37083.27，方式1=29999.97，方式2=13749.99
+  ⚠️  第 504 行结算费用错误：实际=144583.11，方式1=119999.88，方式2=31249.97
+  ⚠️  第 505 行结算费用错误：实际=15833.31，方式1=13333.32，方式2=9166.66
+  ⚠️  第 507 行结算费用错误：实际=160000.00，方式1=135000.00，方式2=30000.00
+  ⚠️  第 508 行结算费用错误：实际=166875.00，方式1=140000.00，方式2=31875.00
+  ⚠️  第 509 行结算费用错误：实际=132187.50，方式1=112500.00，方式2=24687.50
+  ⚠️  第 510 行结算费用错误：实际=37812.50，方式1=32500.00，方式2=10312.50
+  ⚠️  第 511 行结算费用错误：实际=29062.50，方式1=25000.00，方式2=9062.50
+  ⚠️  第 512 行结算费用错误：实际=134687.50，方式1=115000.00，方式2=24687.50
+  ⚠️  第 513 行结算费用错误：实际=163125.00，方式1=135000.00，方式2=33125.00
+  ⚠️  第 514 行结算费用错误：实际=117500.00，方式1=100000.00，方式2=22500.00
+  ⚠️  第 516 行结算费用错误：实际=145625.00，方式1=120000.00，方式2=30625.00
+  ⚠️  第 517 行结算费用错误：实际=111562.50，方式1=95000.00，方式2=21562.50
+  ⚠️  第 518 行结算费用错误：实际=11875.00，方式1=10000.00，方式2=6875.00
+  ⚠️  第 519 行结算费用错误：实际=11875.00，方式1=10000.00，方式2=6875.00
+  ⚠️  第 520 行结算费用错误：实际=23750.00，方式1=20000.00，方式2=8750.00
+  ⚠️  第 521 行结算费用错误：实际=17812.50，方式1=15000.00，方式2=7812.50
+  ⚠️  第 522 行结算费用错误：实际=11875.00，方式1=10000.00，方式2=6875.00
+  ⚠️  第 523 行结算费用错误：实际=49375.00，方式1=40000.00，方式2=14375.00
+  ⚠️  第 524 行结算费用错误：实际=41562.50，方式1=35000.00，方式2=11562.50
+  ⚠️  第 525 行结算费用错误：实际=22500.00，方式1=20000.00，方式2=12500.00
+  ⚠️  第 526 行结算费用错误：实际=63593.75，方式1=52250.00，方式2=16843.75
+  ⚠️  第 527 行结算费用错误：实际=105625.00，方式1=90000.00，方式2=25625.00
+  ⚠️  第 528 行结算费用错误：实际=121624.74，方式1=102666.52，方式2=23624.97
+  ⚠️  第 532 行结算费用错误：实际=180000.00，方式1=0.00，方式2=60000.00
+  ⚠️  第 533 行结算费用错误：实际=690000.00，方式1=0.00，方式2=230000.00
+  ⚠️  第 534 行结算费用错误：实际=420000.00，方式1=0.00，方式2=140000.00
+  ⚠️  第 535 行结算费用错误：实际=110483.40，方式1=93333.40，方式2=33250.02
+  ⚠️  第 536 行结算费用错误：实际=65100.04，方式1=56000.04，方式2=19833.35
+  ⚠️  第 537 行结算费用错误：实际=208250.00，方式1=140000.00，方式2=3552500.00
+  ⚠️  第 538 行结算费用错误：实际=206150.00，方式1=140000.00，方式2=3447500.00
+  ⚠️  第 539 行结算费用错误：实际=176166.76，方式1=130666.76，方式2=80500.06
+  ⚠️  第 543 行结算费用错误：实际=88375.21，方式1=70000.00，方式2=621250.00
+  ⚠️  第 544 行结算费用错误：实际=81812.63，方式1=70000.00，方式2=424375.00
+  ⚠️  第 545 行结算费用错误：实际=17187.50，方式1=15000.00，方式2=7187.50
+  ⚠️  第 546 行结算费用错误：实际=47500.00，方式1=40000.00，方式2=12500.00
+  ⚠️  第 547 行结算费用错误：实际=130937.50，方式1=107500.00，方式2=28437.50
+  ⚠️  第 548 行结算费用错误：实际=63750.00，方式1=52500.00，方式2=16250.00
+  ⚠️  第 549 行结算费用错误：实际=70625.00，方式1=60000.00，方式2=15625.00
+  ⚠️  第 550 行结算费用错误：实际=77187.50，方式1=65000.00，方式2=17187.50
+  ⚠️  第 551 行结算费用错误：实际=77187.50，方式1=65000.00，方式2=17187.50
+  ⚠️  第 552 行结算费用错误：实际=175583.13，方式1=140000.00，方式2=1207500.00
+  ⚠️  第 553 行结算费用错误：实际=95374.79，方式1=79333.22，方式2=20708.30
+  ⚠️  第 554 行结算费用错误：实际=33750.00，方式1=30000.00，方式2=13750.00
+  ⚠️  第 555 行结算费用错误：实际=122395.56，方式1=106249.83，方式2=20312.47
+  ⚠️  第 556 行结算费用错误：实际=141405.88，方式1=112499.82，方式2=33072.86
+  ⚠️  第 557 行结算费用错误：实际=49062.50，方式1=40000.00，方式2=14062.50
+  ⚠️  第 558 行结算费用错误：实际=11875.00，方式1=10000.00，方式2=6875.00
+  ⚠️  第 559 行结算费用错误：实际=29687.50，方式1=25000.00，方式2=9687.50
+  ⚠️  第 560 行结算费用错误：实际=53437.50，方式1=45000.00，方式2=13437.50
+  ⚠️  第 563 行结算费用错误：实际=41562.50，方式1=35000.00，方式2=11562.50
+  ⚠️  第 564 行结算费用错误：实际=140624.83，方式1=120833.29，方式2=28124.99
+  ⚠️  第 565 行结算费用错误：实际=108854.02，方式1=91666.63，方式2=1727082.64
+  ⚠️  第 566 行结算费用错误：实际=29687.46，方式1=24999.99，方式2=13020.83
+  ⚠️  第 567 行结算费用错误：实际=139583.14，方式1=116666.62，方式2=31249.99
+  ⚠️  第 568 行结算费用错误：实际=130625.00，方式1=110000.00，方式2=31625.00
+  ⚠️  第 569 行结算费用错误：实际=82916.54，方式1=69999.93，方式2=19583.31
+  ⚠️  第 570 行结算费用错误：实际=87083.20，方式1=73333.26，方式2=20416.65
+  ⚠️  第 571 行结算费用错误：实际=114583.15，方式1=93333.24，方式2=27916.64
+  ⚠️  第 572 行结算费用错误：实际=180728.83，方式1=137499.95，方式2=51562.48
+  ⚠️  第 573 行结算费用错误：实际=194270.56，方式1=162499.93，方式2=40104.15
+  ⚠️  第 574 行结算费用错误：实际=31968.75，方式1=27500.00，方式2=9968.75
+  ⚠️  第 575 行结算费用错误：实际=63250.00，方式1=44000.00，方式2=24750.00
+  ⚠️  第 576 行结算费用错误：实际=101875.00，方式1=90000.00，方式2=21875.00
+  ⚠️  第 577 行结算费用错误：实际=61531.25，方式1=52250.00，方式2=14781.25
+  ⚠️  第 578 行结算费用错误：实际=61750.00，方式1=57000.00，方式2=14250.00
+  ⚠️  第 579 行结算费用错误：实际=71250.00，方式1=60000.00，方式2=16250.00
+  ⚠️  第 582 行结算费用错误：实际=40000.00，方式1=42500.00，方式2=2500.00
+  ⚠️  第 583 行结算费用错误：实际=2400.00，方式1=2448.00，方式2=848.00
+  ⚠️  第 618 行结算费用错误：实际=12500.00，方式1=15000.00，方式2=2500.00
+  ⚠️  第 621 行结算费用错误：实际=1600.00，方式1=1632.00，方式2=832.00
+  ⚠️  第 630 行结算费用错误：实际=175874.56，方式1=132999.81，方式2=47541.60
+  ⚠️  第 631 行结算费用错误：实际=44333.21，方式1=30333.29，方式2=18666.64
+  ⚠️  第 632 行结算费用错误：实际=60666.54，方式1=51333.26，方式2=13999.98
+  ⚠️  第 633 行结算费用错误：实际=17812.50，方式1=15000.00，方式2=10312.50
+  ⚠️  第 634 行结算费用错误：实际=160156.02，方式1=125000.00，方式2=1179687.50
+  ⚠️  第 635 行结算费用错误：实际=169270.55，方式1=125000.00，方式2=1453125.00
+  ⚠️  第 636 行结算费用错误：实际=135676.65，方式1=91666.52，方式2=48177.01
+  ⚠️  第 638 行结算费用错误：实际=2187.50，方式1=0.00，方式2=0.00
+  ⚠️  第 639 行结算费用错误：实际=36250.00，方式1=30000.00，方式2=16250.00
+  ⚠️  第 640 行结算费用错误：实际=91875.00，方式1=70000.00，方式2=31875.00
+  ⚠️  第 645 行结算费用错误：实际=270.00，方式1=810.00，方式2=570.00
+  ⚠️  第 646 行结算费用错误：实际=700.00，方式1=2100.00，方式2=2100.00
+  ⚠️  第 647 行结算费用错误：实际=9000.00，方式1=18000.00，方式2=3000.00
+  ⚠️  第 650 行结算费用错误：实际=5000.00，方式1=15000.00，方式2=15000.00
+  ⚠️  第 651 行结算费用错误：实际=1400.00，方式1=4200.00，方式2=3500.00
+  ⚠️  第 654 行结算费用错误：实际=198916.33，方式1=140000.00，方式2=1907500.00
+  ⚠️  第 655 行结算费用错误：实际=205916.29，方式1=140000.00，方式2=2117500.00
+  ⚠️  第 656 行结算费用错误：实际=178499.78，方式1=140000.00，方式2=1295000.00
+  ⚠️  第 657 行结算费用错误：实际=173697.60，方式1=125000.00，方式2=1585937.50
+  ⚠️  第 658 行结算费用错误：实际=159374.78，方式1=125000.00，方式2=1156250.00
+  ⚠️  第 659 行结算费用错误：实际=155468.29，方式1=112499.82，方式2=47135.34
+  ⚠️  第 665 行结算费用错误：实际=12187.50，方式1=11250.00，方式2=8437.50
+  ⚠️  第 666 行结算费用错误：实际=42500.00，方式1=40000.00，方式2=12500.00
+  ⚠️  第 667 行结算费用错误：实际=120000.00，方式1=97500.00，方式2=37500.00
+  ⚠️  第 670 行结算费用错误：实际=10937.50，方式1=10000.00，方式2=5937.50
+  ⚠️  第 671 行结算费用错误：实际=10937.50，方式1=10000.00，方式2=5937.50
+  ⚠️  第 672 行结算费用错误：实际=10937.50，方式1=10000.00，方式2=5937.50
+  ⚠️  第 673 行结算费用错误：实际=217350.00，方式1=140000.00，方式2=4007500.00
+  ⚠️  第 674 行结算费用错误：实际=218050.00，方式1=140000.00，方式2=4042500.00
+  ⚠️  第 675 行结算费用错误：实际=191625.00，方式1=140000.00，方式2=2721250.00
+  ⚠️  第 677 行结算费用错误：实际=19984.30，方式1=20344.30，方式2=914.30
+  ⚠️  第 679 行结算费用错误：实际=2643.00，方式1=3343.00，方式2=1594.30
+  ⚠️  第 681 行结算费用错误：实际=22149.30，方式1=25749.30，方式2=7353.30
+  ⚠️  第 683 行结算费用错误：实际=4000.00，方式1=8000.00，方式2=2000.00
+  ⚠️  第 686 行结算费用错误：实际=2550.00，方式1=7650.00，方式2=5150.00
+  ⚠️  第 687 行结算费用错误：实际=15000.00，方式1=45000.00，方式2=32500.00
+  ⚠️  第 700 行结算费用错误：实际=3900.00，方式1=11700.00，方式2=7850.00
+  ⚠️  第 701 行结算费用错误：实际=17500.00，方式1=35000.00，方式2=2500.00
+  ⚠️  第 715 行结算费用错误：实际=5000.00，方式1=10000.00，方式2=2500.00
+  ⚠️  第 720 行结算费用错误：实际=5000.00，方式1=10000.00，方式2=2500.00
+  ⚠️  第 726 行结算费用错误：实际=22500.00，方式1=45000.00，方式2=2500.00
+  ⚠️  第 731 行结算费用错误：实际=600.00，方式1=1800.00，方式2=1250.00
+  ⚠️  第 742 行结算费用错误：实际=750.00，方式1=2250.00，方式2=1550.00
+  ⚠️  第 745 行结算费用错误：实际=3000.00，方式1=9000.00，方式2=6050.00
+  ⚠️  第 748 行结算费用错误：实际=25000.00，方式1=50000.00，方式2=2500.00
+  ⚠️  第 767 行结算费用错误：实际=127875.00，方式1=99000.00，方式2=39875.00
+  ⚠️  第 769 行结算费用错误：实际=65656.25，方式1=55000.00，方式2=16156.25
+  ⚠️  第 770 行结算费用错误：实际=40906.25，方式1=33000.00，方式2=13406.25
+  ⚠️  第 772 行结算费用错误：实际=36749.91，方式1=27999.96，方式2=13416.65
+  ⚠️  第 773 行结算费用错误：实际=174999.80，方式1=140000.00，方式2=1190000.00
+  ⚠️  第 774 行结算费用错误：实际=179083.11，方式1=140000.00，方式2=1312500.00
+  ⚠️  第 775 行结算费用错误：实际=83333.12，方式1=66666.56，方式2=20833.30
+  ⚠️  第 776 行结算费用错误：实际=156249.80，方式1=125000.00，方式2=1062500.00
+  ⚠️  第 777 行结算费用错误：实际=10416.64，方式1=8333.32，方式2=6249.99
+  ⚠️  第 778 行结算费用错误：实际=16500.00，方式1=9000.00，方式2=13500.00
+  ⚠️  第 779 行结算费用错误：实际=21562.50，方式1=15000.00，方式2=11562.50
+  ⚠️  第 780 行结算费用错误：实际=72500.00，方式1=57500.00，方式2=20000.00
+  ⚠️  第 781 行结算费用错误：实际=15625.00，方式1=10000.00，方式2=10625.00
+  ⚠️  第 782 行结算费用错误：实际=82187.50，方式1=65000.00，方式2=22187.50
+  ⚠️  第 783 行结算费用错误：实际=13750.00，方式1=7500.00，方式2=11250.00
+  ⚠️  第 784 行结算费用错误：实际=13750.00，方式1=7500.00，方式2=11250.00
+  ⚠️  第 785 行结算费用错误：实际=70937.50，方式1=52500.00，方式2=23437.50
+  ⚠️  第 786 行结算费用错误：实际=11875.00，方式1=10000.00，方式2=6875.00
+  ⚠️  第 793 行结算费用错误：实际=13005.00，方式1=13455.00，方式2=1055.00
+  ⚠️  第 800 行结算费用错误：实际=167650.00，方式1=140000.00，方式2=1522500.00
+  ⚠️  第 801 行结算费用错误：实际=169400.00，方式1=140000.00，方式2=1610000.00
+  ⚠️  第 802 行结算费用错误：实际=198100.00，方式1=140000.00，方式2=3045000.00
+  ⚠️  第 806 行结算费用错误：实际=15000.00，方式1=30000.00，方式2=2500.00
+  ⚠️  第 818 行结算费用错误：实际=2400.00，方式1=7200.00，方式2=5600.00
+  ⚠️  第 819 行结算费用错误：实际=5000.00，方式1=10000.00，方式2=2500.00
+  ⚠️  第 822 行结算费用错误：实际=208250.00，方式1=140000.00，方式2=3552500.00
+  ⚠️  第 823 行结算费用错误：实际=210700.00，方式1=140000.00，方式2=3675000.00
+  ⚠️  第 824 行结算费用错误：实际=187600.00，方式1=140000.00，方式2=2520000.00
+  ⚠️  第 830 行结算费用错误：实际=19062.50，方式1=17500.00，方式2=6562.50
+  ⚠️  第 831 行结算费用错误：实际=12812.50，方式1=10000.00，方式2=7812.50
+  ⚠️  第 832 行结算费用错误：实际=21562.50，方式1=17500.00，方式2=9062.50
+  ⚠️  第 833 行结算费用错误：实际=23125.00，方式1=20000.00，方式2=8125.00
+  ⚠️  第 834 行结算费用错误：实际=23125.00，方式1=20000.00，方式2=8125.00
+  ⚠️  第 835 行结算费用错误：实际=31625.00，方式1=24750.00，方式2=12375.00
+  ⚠️  第 836 行结算费用错误：实际=12031.25，方式1=11000.00，方式2=6531.25
+  ⚠️  第 837 行结算费用错误：实际=178499.78，方式1=140000.00，方式2=1295000.00
+  ⚠️  第 838 行结算费用错误：实际=183166.42，方式1=140000.00，方式2=1435000.00
+  ⚠️  第 839 行结算费用错误：实际=55312.50，方式1=52500.00，方式2=10312.50
+  ⚠️  第 840 行结算费用错误：实际=176166.46，方式1=140000.00，方式2=1225000.00
+  ⚠️  第 841 行结算费用错误：实际=138187.50，方式1=115500.00，方式2=33687.50
+  ⚠️  第 842 行结算费用错误：实际=29562.50，方式1=22000.00，方式2=18562.50
+  ⚠️  第 843 行结算费用错误：实际=51250.00，方式1=40000.00，方式2=21250.00
+  ⚠️  第 844 行结算费用错误：实际=174650.00，方式1=140000.00，方式2=1872500.00
+  ⚠️  第 845 行结算费用错误：实际=194250.00，方式1=140000.00，方式2=2852500.00
+  ⚠️  第 846 行结算费用错误：实际=190750.00，方式1=140000.00，方式2=2677500.00
+  ⚠️  第 847 行结算费用错误：实际=49156.25，方式1=44000.00，方式2=10656.25
+  ⚠️  第 848 行结算费用错误：实际=25125.00，方式1=24000.00，方式2=7125.00
+  ⚠️  第 850 行结算费用错误：实际=44437.50，方式1=40500.00，方式2=8437.50
+  ⚠️  第 852 行结算费用错误：实际=190458.04，方式1=140000.00，方式2=1653750.00
+  ⚠️  第 853 行结算费用错误：实际=191916.37，方式1=140000.00，方式2=1697500.00
+  ⚠️  第 854 行结算费用错误：实际=177916.45，方式1=140000.00，方式2=1277500.00
+  ⚠️  第 855 行结算费用错误：实际=56375.00，方式1=44000.00，方式2=23375.00
+  ⚠️  第 858 行结算费用错误：实际=4375.00，方式1=2500.00，方式2=6875.00
+  ⚠️  第 859 行结算费用错误：实际=4375.00，方式1=2500.00，方式2=6875.00
+  ⚠️  第 863 行结算费用错误：实际=25000.00，方式1=50000.00，方式2=2500.00
+  ⚠️  第 866 行结算费用错误：实际=43950.00，方式1=131850.00，方式2=87950.00
+  ⚠️  第 885 行结算费用错误：实际=36700.00，方式1=110100.00，方式2=73450.00
+  ⚠️  第 886 行结算费用错误：实际=20000.00，方式1=40000.00，方式2=2500.00
+  ⚠️  第 901 行结算费用错误：实际=142450.00，方式1=140000.00，方式2=262500.00
+  ⚠️  第 902 行结算费用错误：实际=166600.00，方式1=140000.00，方式2=1470000.00
+  ⚠️  第 903 行结算费用错误：实际=181650.00，方式1=140000.00，方式2=2222500.00
+  ⚠️  第 904 行结算费用错误：实际=25093.75，方式1=22000.00，方式2=8593.75
+  ⚠️  第 905 行结算费用错误：实际=30656.25，方式1=27000.00，方式2=8156.25
+  ⚠️  第 906 行结算费用错误：实际=173833.14，方式1=140000.00，方式2=1155000.00
+  ⚠️  第 907 行结算费用错误：实际=174416.47，方式1=140000.00，方式2=1172500.00
+  ⚠️  第 908 行结算费用错误：实际=164791.52，方式1=140000.00，方式2=883750.00
+  ⚠️  第 909 行结算费用错误：实际=123750.00，方式1=104500.00，方式2=30250.00
+  ⚠️  第 910 行结算费用错误：实际=75625.00，方式1=66000.00，方式2=20625.00
+  ⚠️  第 912 行结算费用错误：实际=4812.50，方式1=4500.00，方式2=4781.25
+  ⚠️  第 914 行结算费用错误：实际=15000.00，方式1=12500.00，方式2=7500.00
+  ⚠️  第 915 行结算费用错误：实际=12812.50，方式1=10000.00，方式2=7812.50
+  ⚠️  第 919 行结算费用错误：实际=12600.00，方式1=37800.00，方式2=25250.00
+  ⚠️  第 920 行结算费用错误：实际=22500.00，方式1=45000.00，方式2=2500.00
+  ⚠️  第 927 行结算费用错误：实际=16000.00，方式1=48000.00，方式2=36000.00
+  ⚠️  第 938 行结算费用错误：实际=9150.00，方式1=27450.00，方式2=18350.00
+  ⚠️  第 939 行结算费用错误：实际=5000.00，方式1=10000.00，方式2=2500.00
+  ⚠️  第 946 行结算费用错误：实际=26875.00，方式1=22500.00，方式2=9375.00
+  ⚠️  第 948 行结算费用错误：实际=23750.00，方式1=20000.00，方式2=8750.00
+  ⚠️  第 949 行结算费用错误：实际=30937.50，方式1=25000.00，方式2=10937.50
+  ⚠️  第 950 行结算费用错误：实际=3750.00，方式1=2500.00，方式2=6250.00
+  ⚠️  第 951 行结算费用错误：实际=4687.50，方式1=2500.00，方式2=7187.50
+  ⚠️  第 952 行结算费用错误：实际=3375.00，方式1=2250.00，方式2=5625.00
+  ⚠️  第 953 行结算费用错误：实际=177624.79，方式1=140000.00，方式2=1268750.00
+  ⚠️  第 954 行结算费用错误：实际=177916.45，方式1=140000.00，方式2=1277500.00
+  ⚠️  第 955 行结算费用错误：实际=61187.50，方式1=49500.00，方式2=22687.50
+  ⚠️  第 956 行结算费用错误：实际=189062.50，方式1=165000.00，方式2=35062.50
+  ⚠️  第 957 行结算费用错误：实际=59375.01，方式1=49999.98，方式2=17708.33
+  ⚠️  第 958 行结算费用错误：实际=90000.00，方式1=75000.00，方式2=25000.00
+  ⚠️  第 959 行结算费用错误：实际=86249.88，方式1=68999.94，方式2=24916.65
+  ⚠️  第 960 行结算费用错误：实际=9968.75，方式1=8250.00，方式2=7218.75
+  ⚠️  第 962 行结算费用错误：实际=42600.00，方式1=127800.00，方式2=85250.00
+  ⚠️  第 963 行结算费用错误：实际=30000.00，方式1=33000.00，方式2=2500.00
+  ⚠️  第 968 行结算费用错误：实际=16000.00，方式1=48000.00，方式2=36000.00
+  ⚠️  第 988 行结算费用错误：实际=8000.00，方式1=10000.00，方式2=5000.00
+  ⚠️  第 990 行结算费用错误：实际=99749.77，方式1=79333.22，方式2=25083.30
+  ⚠️  第 991 行结算费用错误：实际=141749.67，方式1=111999.84，方式2=34416.62
+  ⚠️  第 992 行结算费用错误：实际=257291.77，方式1=199999.92，方式2=65624.97
+  ⚠️  第 993 行结算费用错误：实际=297562.04，方式1=222333.14，方式2=82895.76
+  ⚠️  第 994 行结算费用错误：实际=9000.00，方式1=8000.00，方式2=5000.00
+  ⚠️  第 995 行结算费用错误：实际=153000.00，方式1=116000.00，方式2=41000.00
+  ⚠️  第 996 行结算费用错误：实际=92812.50，方式1=66000.00，方式2=37812.50
+  ⚠️  第 997 行结算费用错误：实际=28875.00，方式1=22000.00，方式2=17875.00
+  ⚠️  第 998 行结算费用错误：实际=4218.75，方式1=2250.00，方式2=6468.75
+  ⚠️  第 999 行结算费用错误：实际=61250.00，方式1=47500.00，方式2=18750.00
+  ⚠️  第 1000 行结算费用错误：实际=13437.50，方式1=10000.00，方式2=8437.50
+  ⚠️  第 1001 行结算费用错误：实际=28437.50，方式1=20000.00，方式2=13437.50
+  ⚠️  第 1002 行结算费用错误：实际=15937.50，方式1=10000.00，方式2=10937.50
+  ⚠️  第 1004 行结算费用错误：实际=33437.50，方式1=25000.00，方式2=13437.50
+  ⚠️  第 1005 行结算费用错误：实际=19062.50，方式1=15000.00，方式2=9062.50
+  ⚠️  第 1006 行结算费用错误：实际=19687.50，方式1=15000.00，方式2=9687.50
+  ⚠️  第 1008 行结算费用错误：实际=142500.00，方式1=105000.00，方式2=47500.00
+  ⚠️  第 1009 行结算费用错误：实际=190625.00，方式1=145000.00，方式2=55625.00
+  ⚠️  第 1011 行结算费用错误：实际=171250.00，方式1=130000.00，方式2=51250.00
+  ⚠️  第 1012 行结算费用错误：实际=40000.00，方式1=20000.00，方式2=30000.00
+  ⚠️  第 1013 行结算费用错误：实际=27500.00，方式1=22000.00，方式2=11000.00
+  ⚠️  第 1014 行结算费用错误：实际=47500.00，方式1=40000.00，方式2=17500.00
+  ⚠️  第 1016 行结算费用错误：实际=90562.74，方式1=70000.00，方式2=686875.00
+  ⚠️  第 1017 行结算费用错误：实际=54016.70，方式1=46666.70，方式2=16916.68
+  ⚠️  第 1018 行结算费用错误：实际=19950.01，方式1=14000.01，方式2=14583.34
+  ⚠️  第 1019 行结算费用错误：实际=100800.06，方式1=84000.06，方式2=32666.69
+  ⚠️  第 1020 行结算费用错误：实际=163450.00，方式1=140000.00，方式2=1312500.00
+  ⚠️  第 1021 行结算费用错误：实际=183050.00，方式1=140000.00，方式2=2292500.00
+  ⚠️  第 1036 行结算费用错误：实际=89687.73，方式1=70000.00，方式2=660625.00
+  ⚠️  第 1037 行结算费用错误：实际=167000.00，方式1=112000.00，方式2=63000.00
+  ⚠️  第 1038 行结算费用错误：实际=31250.00，方式1=20000.00，方式2=16250.00
+  ⚠️  第 1039 行结算费用错误：实际=129500.00，方式1=96000.00，方式2=37500.00
+  ⚠️  第 1041 行结算费用错误：实际=48125.00，方式1=33000.00，方式2=26125.00
+  ⚠️  第 1043 行结算费用错误：实际=123750.00，方式1=100000.00，方式2=27750.00
+  ⚠️  第 1044 行结算费用错误：实际=12718.75，方式1=11000.00，方式2=7218.75
+  ⚠️  第 1045 行结算费用错误：实际=37500.00，方式1=30000.00，方式2=15000.00
+  ⚠️  第 1046 行结算费用错误：实际=43875.00，方式1=39000.00，方式2=11375.00
+  ⚠️  第 1047 行结算费用错误：实际=15468.75，方式1=13750.00，方式2=7218.75
+  ⚠️  第 1048 行结算费用错误：实际=64218.75，方式1=52500.00，方式2=19218.75
+  ⚠️  第 1049 行结算费用错误：实际=48125.00，方式1=33000.00，方式2=26125.00
+  ⚠️  第 1050 行结算费用错误：实际=37406.25，方式1=29250.00，方式2=12656.25
+  ⚠️  第 1051 行结算费用错误：实际=12500.00，方式1=10000.00，方式2=7500.00
+  ⚠️  第 1055 行结算费用错误：实际=83270.98，方式1=70000.00，方式2=568750.00
+  ⚠️  第 1058 行结算费用错误：实际=4750.00，方式1=0.00，方式2=14250.00
+  ⚠️  第 1059 行结算费用错误：实际=45375.00，方式1=44000.00，方式2=12375.00
+  ⚠️  第 1060 行结算费用错误：实际=15375.00，方式1=12000.00，方式2=9375.00
+  ⚠️  第 1061 行结算费用错误：实际=8000.00，方式1=12000.00，方式2=4000.00
+  ⚠️  第 1063 行结算费用错误：实际=125125.00，方式1=121000.00，方式2=15125.00
+  ⚠️  第 1064 行结算费用错误：实际=125812.50，方式1=121000.00，方式2=15812.50
+  ⚠️  第 1065 行结算费用错误：实际=133375.00，方式1=132000.00，方式2=12375.00
+  ⚠️  第 1066 行结算费用错误：实际=29166.67，方式1=24999.99，方式2=12499.99
+  ⚠️  第 1067 行结算费用错误：实际=116250.00，方式1=115000.00，方式2=11250.00
+  ⚠️  第 1069 行结算费用错误：实际=15000.00，方式1=30000.00，方式2=3000.00
+  ⚠️  第 1073 行结算费用错误：实际=12187.50，方式1=10000.00，方式2=7187.50
+  ⚠️  第 1074 行结算费用错误：实际=12718.75，方式1=11000.00，方式2=7218.75
+  ⚠️  第 1076 行结算费用错误：实际=42187.50，方式1=30000.00，方式2=27187.50
+  ⚠️  第 1077 行结算费用错误：实际=295833.48，方式1=250000.00，方式2=1625000.00
+  ⚠️  第 1078 行结算费用错误：实际=97625.00，方式1=82500.00，方式2=26125.00
+  ⚠️  第 1079 行结算费用错误：实际=123958.29，方式1=102666.74，方式2=25958.35
+  ⚠️  第 1080 行结算费用错误：实际=8437.50，方式1=7500.00，方式2=5937.50
+  ⚠️  第 1081 行结算费用错误：实际=30000.00，方式1=22500.00，方式2=12500.00
+  ⚠️  第 1082 行结算费用错误：实际=37812.50，方式1=30000.00，方式2=12812.50
+  ⚠️  第 1083 行结算费用错误：实际=243749.69，方式1=208333.25，方式2=43749.98
+  ⚠️  第 1085 行结算费用错误：实际=230000.00，方式1=690000.00，方式2=4485000.00
+  ⚠️  第 1087 行结算费用错误：实际=118228.96，方式1=91666.63，方式2=34895.82
+  ⚠️  第 1088 行结算费用错误：实际=29562.50，方式1=22000.00，方式2=18562.50
+  ⚠️  第 1089 行结算费用错误：实际=186083.07，方式1=140000.00，方式2=1522500.00
+  ⚠️  第 1090 行结算费用错误：实际=16875.00，方式1=15000.00，方式2=9375.00
+  ⚠️  第 1091 行结算费用错误：实际=64166.52，方式1=51333.26，方式2=17499.97
+  ⚠️  第 1092 行结算费用错误：实际=45000.00，方式1=30000.00，方式2=30000.00
+  ⚠️  第 1093 行结算费用错误：实际=13125.00，方式1=12000.00，方式2=7125.00
+  ⚠️  第 1094 行结算费用错误：实际=26125.00，方式1=22000.00，方式2=15125.00
+  ⚠️  第 1095 行结算费用错误：实际=39687.50，方式1=35000.00，方式2=9687.50
+  ⚠️  第 1101 行结算费用错误：实际=6000.00，方式1=12000.00，方式2=3000.00
+  ⚠️  第 1102 行结算费用错误：实际=700.00，方式1=2100.00，方式2=2100.00
+  ⚠️  第 1114 行结算费用错误：实际=127187.50，方式1=110000.00，方式2=28187.50
+  ⚠️  第 1115 行结算费用错误：实际=183166.42，方式1=140000.00，方式2=1435000.00
+  ⚠️  第 1116 行结算费用错误：实际=100624.82，方式1=93333.20，方式2=11958.32
+  ⚠️  第 1117 行结算费用错误：实际=270833.20，方式1=250000.00，方式2=875000.00
+  ⚠️  第 1118 行结算费用错误：实际=35062.50，方式1=33000.00，方式2=13062.50
+  ⚠️  第 1120 行结算费用错误：实际=35250.00，方式1=33000.00，方式2=8250.00
+  ⚠️  第 1121 行结算费用错误：实际=4125.00，方式1=2750.00，方式2=6875.00
+  ⚠️  第 1122 行结算费用错误：实际=75312.50，方式1=67500.00，方式2=12812.50
+  ⚠️  第 1123 行结算费用错误：实际=146250.00，方式1=127500.00，方式2=23750.00
+  ⚠️  第 1124 行结算费用错误：实际=131875.00，方式1=117500.00，方式2=19375.00
+  ⚠️  第 1125 行结算费用错误：实际=89375.00，方式1=82500.00，方式2=11875.00
+  ⚠️  第 1127 行结算费用错误：实际=18125.00，方式1=17500.00，方式2=5625.00
+  ⚠️  第 1141 行结算费用错误：实际=6000.00，方式1=12000.00，方式2=3000.00
+  ⚠️  第 1142 行结算费用错误：实际=188375.00，方式1=135000.00，方式2=2708437.50
+  ⚠️  第 1143 行结算费用错误：实际=188200.00，方式1=135000.00，方式2=2700000.00
+  ⚠️  第 1149 行结算费用错误：实际=160124.89，方式1=140000.00，方式2=743750.00
+  ⚠️  第 1150 行结算费用错误：实际=98818.72，方式1=97000.00，方式2=151562.50
+  ⚠️  第 1151 行结算费用错误：实际=70125.00，方式1=66000.00，方式2=15125.00
+  ⚠️  第 1152 行结算费用错误：实际=48125.00，方式1=44000.00，方式2=15125.00
+  ⚠️  第 1153 行结算费用错误：实际=35750.00，方式1=27500.00，方式2=19250.00
+  ⚠️  第 1154 行结算费用错误：实际=174708.14，方式1=140000.00，方式2=1181250.00
+  ⚠️  第 1155 行结算费用错误：实际=101625.00，方式1=99000.00，方式2=8625.00
+  ⚠️  第 1159 行结算费用错误：实际=7500.00，方式1=22500.00，方式2=15150.00
+  ⚠️  第 1166 行结算费用错误：实际=146416.63，方式1=140000.00，方式2=332500.00
+  ⚠️  第 1168 行结算费用错误：实际=99627.10，方式1=97000.00，方式2=175812.50
+  ⚠️  第 1169 行结算费用错误：实际=175583.13，方式1=140000.00，方式2=1207500.00
+  ⚠️  第 1170 行结算费用错误：实际=111375.00，方式1=99000.00，方式2=23375.00
+  ⚠️  第 1173 行结算费用错误：实际=144666.68，方式1=130666.76，方式2=18666.68
+  ⚠️  第 1174 行结算费用错误：实际=41250.00，方式1=30000.00，方式2=21250.00
+  ⚠️  第 1175 行结算费用错误：实际=45000.00，方式1=40000.00，方式2=15000.00
+  ⚠️  第 1176 行结算费用错误：实际=22500.00，方式1=20000.00，方式2=12500.00
+  ⚠️  第 1178 行结算费用错误：实际=112062.50，方式1=88000.00，方式2=35062.50
+  ⚠️  第 1179 行结算费用错误：实际=52500.00，方式1=50000.00，方式2=12500.00
+  ⚠️  第 1180 行结算费用错误：实际=74250.00，方式1=60000.00，方式2=20250.00
+  ⚠️  第 1181 行结算费用错误：实际=25937.50，方式1=22500.00，方式2=7593.75
+  ⚠️  第 1188 行结算费用错误：实际=126291.70，方式1=116666.75，方式2=14291.68
+  ⚠️  第 1189 行结算费用错误：实际=21250.00，方式1=20000.00，方式2=11250.00
+  ⚠️  第 1190 行结算费用错误：实际=46250.00，方式1=40000.00，方式2=16250.00
+  ⚠️  第 1191 行结算费用错误：实际=20718.75，方式1=19500.00，方式2=7718.75
+  ⚠️  第 1192 行结算费用错误：实际=18218.75，方式1=13750.00，方式2=9968.75
+  ⚠️  第 1193 行结算费用错误：实际=51562.50，方式1=47500.00，方式2=9062.50
+  ⚠️  第 1195 行结算费用错误：实际=147583.28，方式1=123666.76，方式2=28583.35
+  ⚠️  第 1196 行结算费用错误：实际=101875.00，方式1=85000.00，方式2=26875.00
+  ⚠️  第 1197 行结算费用错误：实际=32500.00，方式1=30000.00，方式2=12500.00
+  ⚠️  第 1208 行结算费用错误：实际=61875.00，方式1=50000.00，方式2=16875.00
+  ⚠️  第 1209 行结算费用错误：实际=8750.00，方式1=7500.00，方式2=6250.00
+  ⚠️  第 1210 行结算费用错误：实际=52250.00，方式1=44000.00，方式2=19250.00
+  ⚠️  第 1211 行结算费用错误：实际=24062.50，方式1=20000.00，方式2=9062.50
+  ⚠️  第 1212 行结算费用错误：实际=18125.00，方式1=15000.00，方式2=8125.00
+  ⚠️  第 1213 行结算费用错误：实际=106562.50，方式1=93500.00，方式2=24062.50
+  ⚠️  第 1214 行结算费用错误：实际=33125.00，方式1=30000.00，方式2=13125.00
+  ⚠️  第 1215 行结算费用错误：实际=2812.50，方式1=2500.00，方式2=5312.50
+  ⚠️  第 1216 行结算费用错误：实际=23812.50，方式1=21000.01，方式2=7291.67
+  ⚠️  第 1217 行结算费用错误：实际=39062.50，方式1=35000.00，方式2=9062.50
+  ⚠️  第 1218 行结算费用错误：实际=16562.50，方式1=15000.00，方式2=6562.50
+  ⚠️  第 1219 行结算费用错误：实际=16875.00，方式1=15000.00，方式2=6875.00
+  ⚠️  第 1223 行结算费用错误：实际=37812.50，方式1=33000.00，方式2=15812.50
+  ⚠️  第 1224 行结算费用错误：实际=11250.00，方式1=10000.00，方式2=6250.00
+  ⚠️  第 1225 行结算费用错误：实际=7812.50，方式1=7500.00，方式2=5312.50
+  ⚠️  第 1230 行结算费用错误：实际=170625.00，方式1=160500.00，方式2=23625.00
+  ⚠️  第 1231 行结算费用错误：实际=106437.50，方式1=97500.00，方式2=15437.50
+  ⚠️  第 1234 行结算费用错误：实际=30187.50，方式1=28000.00，方式2=9187.50
+  ⚠️  第 1235 行结算费用错误：实际=84500.00，方式1=78000.00，方式2=13000.00
+  ⚠️  第 1236 行结算费用错误：实际=204562.50，方式1=186000.00，方式2=32062.50
+  ⚠️  第 1237 行结算费用错误：实际=65225.00，方式1=64000.00，方式2=5750.00
+  ⚠️  第 1240 行结算费用错误：实际=125250.00，方式1=120000.00，方式2=345000.00
+  ⚠️  第 1250 行结算费用错误：实际=42187.50，方式1=40500.00，方式2=15187.50
+  ⚠️  第 1251 行结算费用错误：实际=169718.75，方式1=152000.00，方式2=21968.75
+  ⚠️  第 1252 行结算费用错误：实际=12000.00，方式1=18000.00，方式2=6000.00
+  ⚠️  第 1254 行结算费用错误：实际=42250.00，方式1=39000.00，方式2=9750.00
+  ⚠️  第 1255 行结算费用错误：实际=12375.00，方式1=11000.00，方式2=6875.00
+  ⚠️  第 1256 行结算费用错误：实际=121225.00，方式1=120000.00，方式2=172500.00
+  ⚠️  第 1259 行结算费用错误：实际=6210.00，方式1=18630.00，方式2=12450.00
+  ⚠️  第 1261 行结算费用错误：实际=3000.00，方式1=9000.00，方式2=9000.00
+  ⚠️  第 1271 行结算费用错误：实际=51632.00，方式1=51272.00，方式2=197.20
+  ⚠️  第 1272 行结算费用错误：实际=127350.00，方式1=120000.00，方式2=435000.00
+  ⚠️  第 1274 行结算费用错误：实际=261387.00，方式1=236000.00，方式2=991875.00
+  ⚠️  第 1275 行结算费用错误：实际=112406.25，方式1=104500.00，方式2=13406.25
+  ⚠️  第 1276 行结算费用错误：实际=157000.00，方式1=133000.00，方式2=11000.00
+  ⚠️  第 1281 行结算费用错误：实际=120700.00，方式1=120000.00，方式2=150000.00
+  ⚠️  第 1282 行结算费用错误：实际=235125.00，方式1=199500.00，方式2=45125.00
+  ⚠️  第 1283 行结算费用错误：实际=27156.25，方式1=22000.00，方式2=10656.25
+  ⚠️  第 1284 行结算费用错误：实际=70125.00，方式1=66000.00，方式2=15125.00
+  ⚠️  第 1285 行结算费用错误：实际=122275.00，方式1=120000.00，方式2=217500.00
+  ⚠️  第 1289 行结算费用错误：实际=32250.00，方式1=25500.00，方式2=20250.00
+  ⚠️  第 1290 行结算费用错误：实际=122275.00，方式1=120000.00，方式2=217500.00
+  ⚠️  第 1294 行结算费用错误：实际=88406.47，方式1=11739.67，方式2=15572.94
+  ⚠️  第 1295 行结算费用错误：实际=68177.31，方式1=8677.17，方式2=11510.44
+  ⚠️  第 1296 行结算费用错误：实际=26000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1297 行结算费用错误：实际=18000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1301 行结算费用错误：实际=82000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1302 行结算费用错误：实际=42750.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1303 行结算费用错误：实际=77500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1304 行结算费用错误：实际=4000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1305 行结算费用错误：实际=4000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1306 行结算费用错误：实际=119250.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1307 行结算费用错误：实际=128500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1308 行结算费用错误：实际=117750.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1309 行结算费用错误：实际=88750.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1310 行结算费用错误：实际=175000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1311 行结算费用错误：实际=287000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1312 行结算费用错误：实际=123000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1313 行结算费用错误：实际=24500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1314 行结算费用错误：实际=200625.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1315 行结算费用错误：实际=315500.00，方式1=0.00，方式2=8000.00
+  ⚠️  第 1317 行结算费用错误：实际=12000.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1318 行结算费用错误：实际=12000.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1320 行结算费用错误：实际=144500.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1321 行结算费用错误：实际=127250.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1322 行结算费用错误：实际=40000.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1323 行结算费用错误：实际=69500.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1324 行结算费用错误：实际=32000.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1326 行结算费用错误：实际=22500.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1327 行结算费用错误：实际=11875.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1328 行结算费用错误：实际=9375.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1329 行结算费用错误：实际=31562.50，方式1=0.00，方式2=5000.00
+  ⚠️  第 1330 行结算费用错误：实际=9375.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1331 行结算费用错误：实际=11875.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1332 行结算费用错误：实际=8437.50，方式1=0.00，方式2=5000.00
+  ⚠️  第 1333 行结算费用错误：实际=39062.50，方式1=0.00，方式2=5000.00
+  ⚠️  第 1334 行结算费用错误：实际=20312.50，方式1=0.00，方式2=5000.00
+  ⚠️  第 1335 行结算费用错误：实际=20312.50，方式1=0.00，方式2=5000.00
+  ⚠️  第 1336 行结算费用错误：实际=20312.50，方式1=0.00，方式2=5000.00
+  ⚠️  第 1337 行结算费用错误：实际=101812.50，方式1=0.00，方式2=3000.00
+  ⚠️  第 1338 行结算费用错误：实际=9300.00，方式1=0.00，方式2=300.00
+  ⚠️  第 1339 行结算费用错误：实际=102750.00，方式1=0.00，方式2=3000.00
+  ⚠️  第 1340 行结算费用错误：实际=90000.00，方式1=0.00，方式2=3000.00
+  ⚠️  第 1341 行结算费用错误：实际=9000.00，方式1=0.00，方式2=300.00
+  ⚠️  第 1342 行结算费用错误：实际=200625.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1343 行结算费用错误：实际=315500.00，方式1=0.00，方式2=8000.00
+  ⚠️  第 1345 行结算费用错误：实际=12000.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1346 行结算费用错误：实际=12000.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1348 行结算费用错误：实际=144500.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1349 行结算费用错误：实际=127250.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1350 行结算费用错误：实际=40000.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1351 行结算费用错误：实际=69500.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1352 行结算费用错误：实际=32000.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1362 行结算费用错误：实际=188750.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1363 行结算费用错误：实际=79500.00，方式1=0.00，方式2=8000.00
+  ⚠️  第 1364 行结算费用错误：实际=137000.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1365 行结算费用错误：实际=32250.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1366 行结算费用错误：实际=38625.00，方式1=37500.00，方式2=3000.00
+  ⚠️  第 1368 行结算费用错误：实际=63500.00，方式1=62000.00，方式2=4000.00
+  ⚠️  第 1369 行结算费用错误：实际=82187.50，方式1=82500.00，方式2=5000.00
+  ⚠️  第 1370 行结算费用错误：实际=87588.30，方式1=90000.00，方式2=12937.50
+  ⚠️  第 1371 行结算费用错误：实际=20000.00，方式1=44000.00，方式2=8000.00
+  ⚠️  第 1372 行结算费用错误：实际=87588.30，方式1=0.00，方式2=0.00
+  ⚠️  第 1373 行结算费用错误：实际=315358.72，方式1=66625.20，方式2=0.00
+  ⚠️  第 1374 行结算费用错误：实际=227707.00，方式1=34833.48，方式2=0.00
+  ⚠️  第 1375 行结算费用错误：实际=184411.18，方式1=60477.76，方式2=0.00
+  ⚠️  第 1376 行结算费用错误：实际=173686.01，方式1=44985.92，方式2=0.00
+  ⚠️  第 1377 行结算费用错误：实际=187092.41，方式1=58392.32，方式2=0.00
+  ⚠️  第 1378 行结算费用错误：实际=100125.00，方式1=19125.00，方式2=0.00
+  ⚠️  第 1379 行结算费用错误：实际=31500.00，方式1=3500.00，方式2=0.00
+  ⚠️  第 1380 行结算费用错误：实际=111375.00，方式1=3375.00，方式2=0.00
+  ⚠️  第 1381 行结算费用错误：实际=120750.14，方式1=11083.38，方式2=0.00
+  ⚠️  第 1382 行结算费用错误：实际=136500.00，方式1=10500.00，方式2=0.00
+  ⚠️  第 1383 行结算费用错误：实际=107249.99，方式1=13749.90，方式2=0.00
+  ⚠️  第 1384 行结算费用错误：实际=13500.00，方式1=1500.00，方式2=0.00
+  ⚠️  第 1385 行结算费用错误：实际=254037.03，方式1=40498.49，方式2=0.00
+  ⚠️  第 1386 行结算费用错误：实际=328683.70，方式1=53300.16，方式2=0.00
+  ⚠️  第 1387 行结算费用错误：实际=215990.50，方式1=72990.40，方式2=0.00
+  ⚠️  第 1388 行结算费用错误：实际=170110.77，方式1=22344.00，方式2=0.00
+  ⚠️  第 1389 行结算费用错误：实际=231482.29，方式1=83715.52，方式2=0.00
+  ⚠️  第 1390 行结算费用错误：实际=46312.50，方式1=8312.50，方式2=0.00
+  ⚠️  第 1391 行结算费用错误：实际=270264.30，方式1=27430.76，方式2=0.00
+  ⚠️  第 1392 行结算费用错误：实际=148500.00，方式1=16500.00，方式2=0.00
+  ⚠️  第 1393 行结算费用错误：实际=83000.00，方式1=11000.00，方式2=0.00
+  ⚠️  第 1394 行结算费用错误：实际=156437.50，方式1=8437.50，方式2=0.00
+  ⚠️  第 1395 行结算费用错误：实际=129020.77，方式1=22687.33，方式2=0.00
+  ⚠️  第 1396 行结算费用错误：实际=233356.95，方式1=19818.41，方式2=0.00
+  ⚠️  第 1397 行结算费用错误：实际=276943.54，方式1=1560.00，方式2=0.00
+  ⚠️  第 1398 行结算费用错误：实际=236959.54，方式1=1959.34，方式2=0.00
+  ⚠️  第 1399 行结算费用错误：实际=222246.77，方式1=74480.00，方式2=0.00
+  ⚠️  第 1400 行结算费用错误：实际=223438.45，方式1=75671.68，方式2=0.00
+  ⚠️  第 1401 行结算费用错误：实际=146575.14，方式1=3575.04，方式2=0.00
+  ⚠️  第 1402 行结算费用错误：实际=86687.50，方式1=10687.50，方式2=0.00
+  ⚠️  第 1403 行结算费用错误：实际=129500.00，方式1=17500.00，方式2=0.00
+  ⚠️  第 1404 行结算费用错误：实际=38437.50，方式1=8437.50，方式2=0.00
+  ⚠️  第 1405 行结算费用错误：实际=56000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1406 行结算费用错误：实际=221575.25，方式1=208650.20，方式2=19803.98
+  ⚠️  第 1407 行结算费用错误：实际=299257.27，方式1=262058.53，方式2=46082.33
+  ⚠️  第 1408 行结算费用错误：实际=209734.18，方式1=143000.10，方式2=71500.05
+  ⚠️  第 1409 行结算费用错误：实际=204073.75，方式1=138233.43，方式2=70606.30
+  ⚠️  第 1410 行结算费用错误：实际=148362.66，方式1=143000.10，方式2=10129.17
+  ⚠️  第 1411 行结算费用错误：实际=216406.57，方式1=195833.50，方式2=28395.86
+  ⚠️  第 1412 行结算费用错误：实际=93812.50，方式1=85500.00，方式2=17812.50
+  ⚠️  第 1413 行结算费用错误：实际=37031.25，方式1=30000.00，方式2=14531.25
+  ⚠️  第 1416 行结算费用错误：实际=29687.50，方式1=28500.00，方式2=10687.50
+  ⚠️  第 1417 行结算费用错误：实际=307585.07，方式1=222083.50，方式2=94385.49
+  ⚠️  第 1418 行结算费用错误：实际=214202.93，方式1=147766.77，方式2=71202.13
+  ⚠️  第 1419 行结算费用错误：实际=214798.77，方式1=147766.77，方式2=71797.97
+  ⚠️  第 1420 行结算费用错误：实际=254589.58，方式1=242833.54，方式2=19583.35
+  ⚠️  第 1421 行结算费用错误：实际=51750.00，方式1=45000.00，方式2=15750.00
+  ⚠️  第 1422 行结算费用错误：实际=48125.00，方式1=42000.00，方式2=20125.00
+  ⚠️  第 1423 行结算费用错误：实际=54687.50，方式1=49000.00，方式2=12687.50
+  ⚠️  第 1425 行结算费用错误：实际=130250.00，方式1=123500.00，方式2=16625.00
+  ⚠️  第 1427 行结算费用错误：实际=140479.02，方式1=106333.43，方式2=37812.53
+  ⚠️  第 1428 行结算费用错误：实际=358109.03，方式1=266500.20，方式2=8883.34
+  ⚠️  第 1429 行结算费用错误：实际=295370.86，方式1=266500.20，方式2=8883.34
+  ⚠️  第 1430 行结算费用错误：实际=146873.06，方式1=143000.10，方式2=4766.67
+  ⚠️  第 1431 行结算费用错误：实际=146575.14，方式1=143000.10，方式2=4766.67
+  ⚠️  第 1432 行结算费用错误：实际=261941.12，方式1=235000.20，方式2=7833.34
+  ⚠️  第 1433 行结算费用错误：实际=59500.00，方式1=56000.00，方式2=14000.00
+  ⚠️  第 1436 行结算费用错误：实际=137750.00，方式1=109250.00，方式2=9500.00
+  ⚠️  第 1437 行结算费用错误：实际=138416.56，方式1=110000.10，方式2=3666.67
+  ⚠️  第 1438 行结算费用错误：实际=291484.36，方式1=257616.86，方式2=42751.07
+  ⚠️  第 1439 行结算费用错误：实际=223253.40，方式1=219333.52，方式2=11750.01
+  ⚠️  第 1440 行结算费用错误：实际=142106.39，方式1=138233.43，方式2=8639.59
+  ⚠️  第 1441 行结算费用错误：实际=141808.47，方式1=138233.43，方式2=8341.67
+  ⚠️  第 1442 行结算费用错误：实际=210000.00，方式1=168000.00，方式2=56000.00
+  ⚠️  第 1443 行结算费用错误：实际=21375.00，方式1=19000.00，方式2=11875.00
+  ⚠️  第 1444 行结算费用错误：实际=123979.15，方式1=108166.76，方式2=19479.18
+  ⚠️  第 1445 行结算费用错误：实际=27906.25，方式1=9500.00，方式2=9500.00
+  ⚠️  第 1449 行结算费用错误：实际=83187.49，方式1=73333.40，方式2=13520.85
+  ⚠️  第 1450 行结算费用错误：实际=40218.75，方式1=33000.00，方式2=12718.75
+  ⚠️  第 1451 行结算费用错误：实际=55687.50，方式1=40500.00，方式2=4500.00
+  ⚠️  第 1456 行结算费用错误：实际=30750.00，方式1=30000.00，方式2=6750.00
+  ⚠️  第 1459 行结算费用错误：实际=42187.50，方式1=40500.00，方式2=6187.50
+  ⚠️  第 1462 行结算费用错误：实际=72526.50，方式1=66000.00，方式2=13125.00
+  ⚠️  第 1463 行结算费用错误：实际=23812.50，方式1=21000.00，方式2=5812.50
+  ⚠️  第 1464 行结算费用错误：实际=39531.25，方式1=38500.00，方式2=6531.25
+  ⚠️  第 1465 行结算费用错误：实际=28125.00，方式1=27000.00，方式2=5625.00
+  ⚠️  第 1467 行结算费用错误：实际=17437.50，方式1=13500.00，方式2=8437.50
+  ⚠️  第 1469 行结算费用错误：实际=38508.00，方式1=38500.00，方式2=5500.00
+  ⚠️  第 1470 行结算费用错误：实际=4505.00，方式1=4500.00，方式2=4500.00
+  ⚠️  第 1474 行结算费用错误：实际=90000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1475 行结算费用错误：实际=46800.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1476 行结算费用错误：实际=13400.00，方式1=4400.00，方式2=4400.00
+  ⚠️  第 1477 行结算费用错误：实际=53000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1478 行结算费用错误：实际=18750.00，方式1=8250.00，方式2=0.00
+  ⚠️  第 1479 行结算费用错误：实际=21500.00，方式1=1500.00，方式2=0.00
+  ⚠️  第 1480 行结算费用错误：实际=211437.38，方式1=47103.94，方式2=0.00
+  ⚠️  第 1481 行结算费用错误：实际=14000.00，方式1=2000.00，方式2=0.00
+  ⚠️  第 1482 行结算费用错误：实际=204354.08，方式1=40020.64，方式2=0.00
+  ⚠️  第 1483 行结算费用错误：实际=187354.12，方式1=28687.37，方式2=0.00
+  ⚠️  第 1484 行结算费用错误：实际=108541.59，方式1=32208.21，方式2=6000.00
+  ⚠️  第 1485 行结算费用错误：实际=201166.59，方式1=36833.16，方式2=0.00
+  ⚠️  第 1486 行结算费用错误：实际=65875.03，方式1=14875.00，方式2=0.00
+  ⚠️  第 1487 行结算费用错误：实际=69166.60，方式1=0.00，方式2=0.00
+  ⚠️  第 1488 行结算费用错误：实际=80833.27，方式1=0.00，方式2=0.00
+  ⚠️  第 1489 行结算费用错误：实际=78499.93，方式1=0.00，方式2=0.00
+  ⚠️  第 1490 行结算费用错误：实际=83666.61，方式1=0.00，方式2=0.00
+  ⚠️  第 1491 行结算费用错误：实际=53333.28，方式1=0.00，方式2=0.00
+  ⚠️  第 1492 行结算费用错误：实际=20065.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1493 行结算费用错误：实际=139500.00，方式1=19500.00，方式2=0.00
+  ⚠️  第 1494 行结算费用错误：实际=29120.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1495 行结算费用错误：实际=14130.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1496 行结算费用错误：实际=89467.50，方式1=0.00，方式2=0.00
+  ⚠️  第 1497 行结算费用错误：实际=10600.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1498 行结算费用错误：实际=213562.43，方式1=37895.66，方式2=0.00
+  ⚠️  第 1499 行结算费用错误：实际=213916.59，方式1=38249.82，方式2=0.00
+  ⚠️  第 1500 行结算费用错误：实际=212499.93，方式1=36833.16，方式2=0.00
+  ⚠️  第 1501 行结算费用错误：实际=189833.25，方式1=36833.16，方式2=0.00
+  ⚠️  第 1502 行结算费用错误：实际=189124.92，方式1=36124.83，方式2=0.00
+  ⚠️  第 1503 行结算费用错误：实际=209666.58，方式1=39666.48，方式2=0.00
+  ⚠️  第 1504 行结算费用错误：实际=91166.67，方式1=9833.24，方式2=0.00
+  ⚠️  第 1505 行结算费用错误：实际=93999.99，方式1=11333.22，方式2=0.00
+  ⚠️  第 1506 行结算费用错误：实际=87333.33，方式1=9999.90，方式2=0.00
+  ⚠️  第 1507 行结算费用错误：实际=93000.00，方式1=10333.23，方式2=0.00
+  ⚠️  第 1508 行结算费用错误：实际=88666.65，方式1=11333.22，方式2=0.00
+  ⚠️  第 1509 行结算费用错误：实际=6000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1510 行结算费用错误：实际=3000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1511 行结算费用错误：实际=3000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1512 行结算费用错误：实际=120833.51，方式1=20833.33，方式2=0.00
+  ⚠️  第 1513 行结算费用错误：实际=125825.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1514 行结算费用错误：实际=11500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1515 行结算费用错误：实际=4375.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1516 行结算费用错误：实际=16500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1517 行结算费用错误：实际=9400.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1518 行结算费用错误：实际=16500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1519 行结算费用错误：实际=1175.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1520 行结算费用错误：实际=16500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1521 行结算费用错误：实际=13395.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1522 行结算费用错误：实际=16500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1523 行结算费用错误：实际=38775.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1524 行结算费用错误：实际=16500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1525 行结算费用错误：实际=15980.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1526 行结算费用错误：实际=129750.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1527 行结算费用错误：实际=117708.48，方式1=0.00，方式2=0.00
+  ⚠️  第 1528 行结算费用错误：实际=152645.77，方式1=0.00，方式2=0.00
+  ⚠️  第 1529 行结算费用错误：实际=211084.27，方式1=0.00，方式2=0.00
+  ⚠️  第 1530 行结算费用错误：实际=217458.24，方式1=0.00，方式2=0.00
+  ⚠️  第 1531 行结算费用错误：实际=86770.82，方式1=0.00，方式2=0.00
+  ⚠️  第 1532 行结算费用错误：实际=90333.36，方式1=0.00，方式2=0.00
+  ⚠️  第 1533 行结算费用错误：实际=90333.36，方式1=0.00，方式2=0.00
+  ⚠️  第 1534 行结算费用错误：实际=5333.34，方式1=0.00，方式2=0.00
+  ⚠️  第 1535 行结算费用错误：实际=90333.36，方式1=0.00，方式2=0.00
+  ⚠️  第 1536 行结算费用错误：实际=15750.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1537 行结算费用错误：实际=3000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1538 行结算费用错误：实际=136500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1539 行结算费用错误：实际=114166.78，方式1=0.00，方式2=0.00
+  ⚠️  第 1540 行结算费用错误：实际=171416.62，方式1=0.00，方式2=0.00
+  ⚠️  第 1541 行结算费用错误：实际=134582.32，方式1=0.00，方式2=0.00
+  ⚠️  第 1542 行结算费用错误：实际=178499.94，方式1=0.00，方式2=0.00
+  ⚠️  第 1543 行结算费用错误：实际=89916.63，方式1=0.00，方式2=0.00
+  ⚠️  第 1544 行结算费用错误：实际=12000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1545 行结算费用错误：实际=86999.93，方式1=0.00，方式2=0.00
+  ⚠️  第 1546 行结算费用错误：实际=12000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1547 行结算费用错误：实际=126500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1548 行结算费用错误：实际=12900.00，方式1=2800.00，方式2=2800.00
+  ⚠️  第 1549 行结算费用错误：实际=4025.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1550 行结算费用错误：实际=11500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1551 行结算费用错误：实际=11500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1552 行结算费用错误：实际=875.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1553 行结算费用错误：实际=200458.46，方式1=0.00，方式2=0.00
+  ⚠️  第 1554 行结算费用错误：实际=103250.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1555 行结算费用错误：实际=160083.43，方式1=0.00，方式2=0.00
+  ⚠️  第 1556 行结算费用错误：实际=88333.45，方式1=0.00，方式2=0.00
+  ⚠️  第 1557 行结算费用错误：实际=17280.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1558 行结算费用错误：实际=123500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1559 行结算费用错误：实际=104583.43，方式1=0.00，方式2=0.00
+  ⚠️  第 1560 行结算费用错误：实际=169458.44，方式1=3000.00，方式2=0.00
+  ⚠️  第 1561 行结算费用错误：实际=3000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1562 行结算费用错误：实际=3000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1563 行结算费用错误：实际=153708.42，方式1=0.00，方式2=0.00
+  ⚠️  第 1564 行结算费用错误：实际=107291.73，方式1=0.00，方式2=0.00
+  ⚠️  第 1565 行结算费用错误：实际=40000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1566 行结算费用错误：实际=124000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1567 行结算费用错误：实际=40000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1568 行结算费用错误：实际=70000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1569 行结算费用错误：实际=19500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1570 行结算费用错误：实际=6500.00，方式1=3000.00，方式2=0.00
+  ⚠️  第 1571 行结算费用错误：实际=12000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1572 行结算费用错误：实际=80666.71，方式1=3500.00，方式2=0.00
+  ⚠️  第 1573 行结算费用错误：实际=120500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1574 行结算费用错误：实际=14000.00，方式1=1500.00，方式2=0.00
+  ⚠️  第 1575 行结算费用错误：实际=42000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1576 行结算费用错误：实际=148395.92，方式1=4420000.00，方式2=201875.00
+  ⚠️  第 1577 行结算费用错误：实际=103333.29，方式1=0.00，方式2=0.00
+  ⚠️  第 1578 行结算费用错误：实际=120500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1579 行结算费用错误：实际=30000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1580 行结算费用错误：实际=128208.39，方式1=0.00，方式2=0.00
+  ⚠️  第 1581 行结算费用错误：实际=102500.10，方式1=0.00，方式2=0.00
+  ⚠️  第 1582 行结算费用错误：实际=150000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1583 行结算费用错误：实际=113333.44，方式1=0.00，方式2=0.00
+  ⚠️  第 1584 行结算费用错误：实际=35000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1585 行结算费用错误：实际=71000.00，方式1=15000.00，方式2=0.00
+  ⚠️  第 1586 行结算费用错误：实际=171175.00，方式1=21175.00，方式2=0.00
+  ⚠️  第 1587 行结算费用错误：实际=47625.00，方式1=375.00，方式2=0.00
+  ⚠️  第 1588 行结算费用错误：实际=9000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1589 行结算费用错误：实际=15375.00，方式1=375.00，方式2=0.00
+  ⚠️  第 1590 行结算费用错误：实际=600.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1591 行结算费用错误：实际=10000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1595 行结算费用错误：实际=94875.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1596 行结算费用错误：实际=9300.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1597 行结算费用错误：实际=95625.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1598 行结算费用错误：实际=9300.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1599 行结算费用错误：实际=4400.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1600 行结算费用错误：实际=173625.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1601 行结算费用错误：实际=113312.50，方式1=106750.00，方式2=10062.50
+  ⚠️  第 1604 行结算费用错误：实际=109375.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1605 行结算费用错误：实际=112425.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1606 行结算费用错误：实际=70000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1607 行结算费用错误：实际=97500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1608 行结算费用错误：实际=9300.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1609 行结算费用错误：实际=88875.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1610 行结算费用错误：实际=9300.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1612 行结算费用错误：实际=17500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1613 行结算费用错误：实际=15000.00，方式1=3000.00，方式2=0.00
+  ⚠️  第 1614 行结算费用错误：实际=125625.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1615 行结算费用错误：实际=13000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1616 行结算费用错误：实际=140000.00，方式1=20000.00，方式2=0.00
+  ⚠️  第 1618 行结算费用错误：实际=5700.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1619 行结算费用错误：实际=78000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1620 行结算费用错误：实际=9600.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1621 行结算费用错误：实际=7000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1622 行结算费用错误：实际=7000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1623 行结算费用错误：实际=13812.50，方式1=0.00，方式2=0.00
+  ⚠️  第 1624 行结算费用错误：实际=5000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1625 行结算费用错误：实际=7000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1626 行结算费用错误：实际=5000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1627 行结算费用错误：实际=7000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1628 行结算费用错误：实际=30880.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1629 行结算费用错误：实际=70125.00，方式1=0.00，方式2=0.00
+  ⚠️  第 1631 行结算费用错误：实际=51750.00，方式1=51000.00，方式2=3750.00
+  ⚠️  第 1632 行结算费用错误：实际=10000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1633 行结算费用错误：实际=20000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1634 行结算费用错误：实际=15000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1635 行结算费用错误：实际=15000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1636 行结算费用错误：实际=15000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1637 行结算费用错误：实际=15000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1638 行结算费用错误：实际=20000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1639 行结算费用错误：实际=20000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1640 行结算费用错误：实际=15000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1641 行结算费用错误：实际=15000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1643 行结算费用错误：实际=165937.50，方式1=0.00，方式2=5000.00
+  ⚠️  第 1644 行结算费用错误：实际=165625.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1645 行结算费用错误：实际=152500.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1646 行结算费用错误：实际=155000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1647 行结算费用错误：实际=24000.00，方式1=0.00，方式2=12000.00
+  ⚠️  第 1648 行结算费用错误：实际=27700.00，方式1=0.00，方式2=1800.00
+  ⚠️  第 1651 行结算费用错误：实际=14400.00，方式1=0.00，方式2=1800.00
+  ⚠️  第 1653 行结算费用错误：实际=18333.33，方式1=0.00，方式2=9000.00
+  ⚠️  第 1654 行结算费用错误：实际=18000.00，方式1=0.00，方式2=9000.00
+  ⚠️  第 1655 行结算费用错误：实际=45333.28，方式1=0.00，方式2=2666.67
+  ⚠️  第 1656 行结算费用错误：实际=217500.00，方式1=0.00，方式2=8000.00
+  ⚠️  第 1657 行结算费用错误：实际=213000.00，方式1=0.00，方式2=8000.00
+  ⚠️  第 1658 行结算费用错误：实际=180000.00，方式1=0.00，方式2=10000.00
+  ⚠️  第 1659 行结算费用错误：实际=75000.00，方式1=0.00，方式2=10000.00
+  ⚠️  第 1660 行结算费用错误：实际=33500.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1661 行结算费用错误：实际=18083.38，方式1=0.00，方式2=2333.34
+  ⚠️  第 1662 行结算费用错误：实际=30000.00，方式1=0.00，方式2=10000.00
+  ⚠️  第 1663 行结算费用错误：实际=42500.00，方式1=0.00，方式2=10000.00
+  ⚠️  第 1664 行结算费用错误：实际=10312.50，方式1=0.00，方式2=5000.00
+  ⚠️  第 1665 行结算费用错误：实际=247999.91，方式1=0.00，方式2=7333.33
+  ⚠️  第 1666 行结算费用错误：实际=17000.00，方式1=0.00，方式2=9000.00
+  ⚠️  第 1667 行结算费用错误：实际=93500.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1668 行结算费用错误：实际=62750.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1669 行结算费用错误：实际=47250.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1670 行结算费用错误：实际=104166.43，方式1=0.00，方式2=80000.00
+  ⚠️  第 1671 行结算费用错误：实际=26515.75，方式1=0.00，方式2=8333.00
+  ⚠️  第 1672 行结算费用错误：实际=285000.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1673 行结算费用错误：实际=116500.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1674 行结算费用错误：实际=292000.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1675 行结算费用错误：实际=122000.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1676 行结算费用错误：实际=264791.40，方式1=0.00，方式2=8333.00
+  ⚠️  第 1677 行结算费用错误：实际=289500.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1678 行结算费用错误：实际=129000.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1679 行结算费用错误：实际=294457.00，方式1=0.00，方式2=8333.00
+  ⚠️  第 1680 行结算费用错误：实际=263525.00，方式1=0.00，方式2=8333.00
+  ⚠️  第 1681 行结算费用错误：实际=169500.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1682 行结算费用错误：实际=34500.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1683 行结算费用错误：实际=250500.00，方式1=0.00，方式2=12000.00
+  ⚠️  第 1684 行结算费用错误：实际=179166.70，方式1=0.00，方式2=8333.33
+  ⚠️  第 1685 行结算费用错误：实际=169265.08，方式1=0.00，方式2=8333.00
+  ⚠️  第 1686 行结算费用错误：实际=48000.00，方式1=0.00，方式2=8000.00
+  ⚠️  第 1687 行结算费用错误：实际=291500.00，方式1=0.00，方式2=8000.00
+  ⚠️  第 1688 行结算费用错误：实际=94375.00，方式1=0.00，方式2=10000.00
+  ⚠️  第 1689 行结算费用错误：实际=302790.00，方式1=0.00，方式2=8333.00
+  ⚠️  第 1690 行结算费用错误：实际=299000.00，方式1=0.00，方式2=8000.00
+  ⚠️  第 1691 行结算费用错误：实际=317723.00，方式1=0.00，方式2=8333.00
+  ⚠️  第 1692 行结算费用错误：实际=298948.85，方式1=0.00，方式2=8333.00
+  ⚠️  第 1694 行结算费用错误：实际=2500.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1695 行结算费用错误：实际=75000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1696 行结算费用错误：实际=70000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1697 行结算费用错误：实际=25000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1698 行结算费用错误：实际=60000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1699 行结算费用错误：实际=70000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1700 行结算费用错误：实际=55000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1701 行结算费用错误：实际=60000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1702 行结算费用错误：实际=10000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1703 行结算费用错误：实际=55000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1704 行结算费用错误：实际=55000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1705 行结算费用错误：实际=45000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1706 行结算费用错误：实际=40000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1707 行结算费用错误：实际=10000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1708 行结算费用错误：实际=21000.00，方式1=0.00，方式2=600.00
+  ⚠️  第 1709 行结算费用错误：实际=103750.00，方式1=0.00，方式2=500.00
+  ⚠️  第 1710 行结算费用错误：实际=86750.00，方式1=0.00，方式2=500.00
+  ⚠️  第 1711 行结算费用错误：实际=82500.00，方式1=0.00，方式2=500.00
+  ⚠️  第 1712 行结算费用错误：实际=64600.00，方式1=0.00，方式2=500.00
+  ⚠️  第 1713 行结算费用错误：实际=160000.00，方式1=0.00，方式2=625.00
+  ⚠️  第 1714 行结算费用错误：实际=75000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1716 行结算费用错误：实际=165937.50，方式1=0.00，方式2=5000.00
+  ⚠️  第 1717 行结算费用错误：实际=165625.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1718 行结算费用错误：实际=152500.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1719 行结算费用错误：实际=155000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1720 行结算费用错误：实际=106750.00，方式1=0.00，方式2=3500.00
+  ⚠️  第 1721 行结算费用错误：实际=151875.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1722 行结算费用错误：实际=160000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1723 行结算费用错误：实际=138125.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1724 行结算费用错误：实际=149375.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1725 行结算费用错误：实际=53125.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1726 行结算费用错误：实际=49687.50，方式1=0.00，方式2=5000.00
+  ⚠️  第 1727 行结算费用错误：实际=88600.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1728 行结算费用错误：实际=89800.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 1729 行结算费用错误：实际=102708.17，方式1=0.00，方式2=5000.00
+  ⚠️  第 1730 行结算费用错误：实际=123541.47，方式1=0.00，方式2=5000.00
+  ⚠️  第 1731 行结算费用错误：实际=127708.13，方式1=0.00，方式2=5000.00
+  ⚠️  第 1732 行结算费用错误：实际=127708.13，方式1=0.00，方式2=5000.00
+  ⚠️  第 1733 行结算费用错误：实际=98541.51，方式1=0.00，方式2=5000.00
+  ⚠️  第 1734 行结算费用错误：实际=54166.58，方式1=0.00，方式2=5000.00
+  ⚠️  第 1735 行结算费用错误：实际=126666.46，方式1=0.00，方式2=5000.00
+  ⚠️  第 1736 行结算费用错误：实际=127708.13，方式1=0.00，方式2=5000.00
+  ⚠️  第 1737 行结算费用错误：实际=98541.51，方式1=0.00，方式2=5000.00
+  ⚠️  第 1738 行结算费用错误：实际=116499.81，方式1=0.00，方式2=5000.00
+  ⚠️  第 1739 行结算费用错误：实际=95833.18，方式1=0.00，方式2=5000.00
+  ⚠️  第 1740 行结算费用错误：实际=123541.47，方式1=0.00，方式2=5000.00
+  ⚠️  第 1741 行结算费用错误：实际=116666.48，方式1=0.00，方式2=5000.00
+  ⚠️  第 1742 行结算费用错误：实际=99999.84，方式1=0.00，方式2=5000.00
+  ⚠️  第 1743 行结算费用错误：实际=125624.80，方式1=0.00，方式2=5000.00
+  ⚠️  第 1744 行结算费用错误：实际=127708.13，方式1=0.00，方式2=5000.00
+  ⚠️  第 1745 行结算费用错误：实际=29166.62，方式1=0.00，方式2=5000.00
+  ⚠️  第 1746 行结算费用错误：实际=265833.50，方式1=0.00，方式2=220000.00
+  ⚠️  第 1747 行结算费用错误：实际=171000.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1748 行结算费用错误：实际=7500.00，方式1=0.00，方式2=4000.00
+  ⚠️  第 1749 行结算费用错误：实际=95166.51，方式1=0.00，方式2=80000.00
+  ⚠️  第 1750 行结算费用错误：实际=194500.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1751 行结算费用错误：实际=285500.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1752 行结算费用错误：实际=270599.91，方式1=0.00，方式2=8333.33
+  ⚠️  第 1753 行结算费用错误：实际=172000.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1754 行结算费用错误：实际=135500.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1755 行结算费用错误：实际=292666.57，方式1=0.00，方式2=8333.33
+  ⚠️  第 1756 行结算费用错误：实际=315999.90，方式1=0.00，方式2=8333.33
+  ⚠️  第 1757 行结算费用错误：实际=196000.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1758 行结算费用错误：实际=283333.37，方式1=0.00，方式2=8333.33
+  ⚠️  第 1759 行结算费用错误：实际=278645.84，方式1=0.00，方式2=8333.33
+  ⚠️  第 1760 行结算费用错误：实际=223500.00，方式1=0.00，方式2=12000.00
+  ⚠️  第 1761 行结算费用错误：实际=261250.00，方式1=0.00，方式2=10000.00
+  ⚠️  第 1762 行结算费用错误：实际=301041.83，方式1=0.00，方式2=250000.00
+  ⚠️  第 1764 行结算费用错误：实际=295266.57，方式1=0.00，方式2=8333.33
+  ⚠️  第 1765 行结算费用错误：实际=280500.00，方式1=0.00，方式2=8000.00
+  ⚠️  第 1766 行结算费用错误：实际=261933.23，方式1=0.00，方式2=8333.33
+  ⚠️  第 1767 行结算费用错误：实际=309375.12，方式1=0.00，方式2=8333.33
+  ⚠️  第 1768 行结算费用错误：实际=147500.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1769 行结算费用错误：实际=146500.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 1770 行结算费用错误：实际=122000.00，方式1=0.00，方式2=500.00
+  ⚠️  第 1771 行结算费用错误：实际=31500.00，方式1=0.00，方式2=500.00
+  ⚠️  第 1772 行结算费用错误：实际=41750.00，方式1=0.00，方式2=500.00
+  ⚠️  第 1773 行结算费用错误：实际=113750.00，方式1=0.00，方式2=500.00
+  ⚠️  第 1774 行结算费用错误：实际=147187.50，方式1=0.00，方式2=625.00
+  ⚠️  第 1775 行结算费用错误：实际=65749.81，方式1=0.00，方式2=2166.66
+  ⚠️  第 1779 行结算费用错误：实际=298958.42，方式1=241666.57，方式2=65624.97
+  ⚠️  第 1780 行结算费用错误：实际=271649.91，方式1=230249.91，方式2=44270.82
+  ⚠️  第 1781 行结算费用错误：实际=307233.23，方式1=247833.23，方式2=59895.81
+  ⚠️  第 1783 行结算费用错误：实际=256299.92，方式1=212499.92，方式2=46354.15
+  ⚠️  第 1784 行结算费用错误：实际=304166.84，方式1=250000.00，方式2=1875000.00
+  ⚠️  第 1787 行结算费用错误：实际=86300.50，方式1=75000.00，方式2=11875.00
+  ⚠️  第 1788 行结算费用错误：实际=75900.50，方式1=65000.00，方式2=11562.50
+  ⚠️  第 1789 行结算费用错误：实际=63750.00，方式1=60000.00，方式2=8750.00
+  ⚠️  第 1790 行结算费用错误：实际=149687.50，方式1=135000.00，方式2=19687.50
+  ⚠️  第 1791 行结算费用错误：实际=152500.00，方式1=130000.00，方式2=27500.00
+  ⚠️  第 1792 行结算费用错误：实际=149375.00，方式1=135000.00，方式2=19375.00
+  ⚠️  第 1812 行结算费用错误：实际=153250.00，方式1=124000.00，方式2=33250.00
+  ⚠️  第 1813 行结算费用错误：实际=106531.25，方式1=105000.00，方式2=360937.50
+  ⚠️  第 1814 行结算费用错误：实际=240166.77，方式1=220000.00，方式2=1045000.00
+  ⚠️  第 1815 行结算费用错误：实际=81333.32，方式1=80000.00，方式2=265000.00
+  ⚠️  第 1820 行结算费用错误：实际=132500.00，方式1=120000.00，方式2=16500.00
+  ⚠️  第 1825 行结算费用错误：实际=276533.24，方式1=233333.24，方式2=45833.32
+  ⚠️  第 1826 行结算费用错误：实际=323199.90，方式1=249999.90，方式2=71874.97
+  ⚠️  第 1828 行结算费用错误：实际=284333.24，方式1=233333.24，方式2=52604.15
+  ⚠️  第 1849 行结算费用错误：实际=209687.50，方式1=150000.00，方式2=64687.50
+  ⚠️  第 1850 行结算费用错误：实际=195937.50，方式1=145000.00，方式2=55937.50
+  ⚠️  第 1851 行结算费用错误：实际=177187.50，方式1=140000.00，方式2=42187.50
+  ⚠️  第 1852 行结算费用错误：实际=324479.41，方式1=250000.00，方式2=2484375.00
+  ⚠️  第 1853 行结算费用错误：实际=313021.03，方式1=250000.00，方式2=2140625.00
+  ⚠️  第 1854 行结算费用错误：实际=201407.17，方式1=211500.00，方式2=28687.50
+  ⚠️  第 1855 行结算费用错误：实际=194276.60，方式1=207675.00，方式2=24968.75
+  ⚠️  第 1860 行结算费用错误：实际=10114.18，方式1=10625.00，方式2=625.00
+  ⚠️  第 1861 行结算费用错误：实际=10114.18，方式1=10625.00，方式2=625.00
+  ⚠️  第 1866 行结算费用错误：实际=192599.94，方式1=149999.94，方式2=45312.48
+  ⚠️  第 1867 行结算费用错误：实际=310066.57，方式1=241666.57，方式2=67708.31
+  ⚠️  第 1868 行结算费用错误：实际=119799.96，方式1=99999.96，方式2=25520.82
+  ⚠️  第 1887 行结算费用错误：实际=81562.50，方式1=70000.00，方式2=16562.50
+  ⚠️  第 1888 行结算费用错误：实际=128125.00，方式1=110000.00，方式2=23125.00
+  ⚠️  第 1889 行结算费用错误：实际=125625.00，方式1=110000.00，方式2=20625.00
+  ⚠️  第 1890 行结算费用错误：实际=271527.90，方式1=250750.00，方式2=31875.00
+  ⚠️  第 1891 行结算费用错误：实际=238472.38，方式1=212500.00，方式2=37718.75
+  ⚠️  第 1892 行结算费用错误：实际=124500.00，方式1=120000.00，方式2=8500.00
+  ⚠️  第 1893 行结算费用错误：实际=102166.45，方式1=80000.00，方式2=795000.00
+  ⚠️  第 1894 行结算费用错误：实际=124687.50，方式1=105000.00，方式2=846562.50
+  ⚠️  第 1897 行结算费用错误：实际=31937.50，方式1=28000.00，方式2=10937.50
+  ⚠️  第 1898 行结算费用错误：实际=98000.00，方式1=84000.00，方式2=21000.00
+  ⚠️  第 1915 行结算费用错误：实际=295500.00，方式1=252000.00，方式2=55500.00
+  ⚠️  第 1916 行结算费用错误：实际=117000.00，方式1=116000.00，方式2=5000.00
+  ⚠️  第 1919 行结算费用错误：实际=247999.92，方式1=199999.92，方式2=49999.98
+  ⚠️  第 1921 行结算费用错误：实际=102833.07，方式1=80000.00，方式2=865000.00
+  ⚠️  第 1922 行结算费用错误：实际=129937.50，方式1=105000.00，方式2=899062.50
+  ⚠️  第 1923 行结算费用错误：实际=88305.57，方式1=85000.00，方式2=12218.75
+  ⚠️  第 1924 行结算费用错误：实际=112500.00，方式1=112000.00，方式2=4500.00
+  ⚠️  第 1939 行结算费用错误：实际=149187.50，方式1=105000.00，方式2=1430625.00
+  ⚠️  第 1940 行结算费用错误：实际=110999.69，方式1=80000.00，方式2=1010000.00
+  ⚠️  第 1956 行结算费用错误：实际=120750.00，方式1=120000.00，方式2=4750.00
+  ⚠️  第 1961 行结算费用错误：实际=148750.00，方式1=105000.00，方式2=1417500.00
+  ⚠️  第 1962 行结算费用错误：实际=102333.18，方式1=2320000.00，方式2=830000.00
+  ⚠️  第 1963 行结算费用错误：实际=70833.33，方式1=0.00，方式2=125000.00
+  ⚠️  第 1966 行结算费用错误：实际=229500.05，方式1=221000.00，方式2=18062.50
+  ⚠️  第 1967 行结算费用错误：实际=210138.92，方式1=204000.00，方式2=15406.25
+  ⚠️  第 1990 行结算费用错误：实际=30875.00，方式1=26000.00，方式2=11375.00
+  ⚠️  第 1991 行结算费用错误：实际=108833.04，方式1=80000.10，方式2=31500.04
+  ⚠️  第 1992 行结算费用错误：实际=124687.50，方式1=98000.00，方式2=30187.50
+  ⚠️  第 2008 行结算费用错误：实际=76250.00，方式1=68000.00，方式2=12250.00
+  ⚠️  第 2009 行结算费用错误：实际=99500.00，方式1=98000.00，方式2=5500.00
+  ⚠️  第 2010 行结算费用错误：实际=101500.00，方式1=100000.00，方式2=5500.00
+  ⚠️  第 2011 行结算费用错误：实际=97000.00，方式1=94000.00，方式2=7000.00
+  ⚠️  第 2012 行结算费用错误：实际=64500.00，方式1=62000.00，方式2=6500.00
+  ⚠️  第 2013 行结算费用错误：实际=68750.00，方式1=64000.00，方式2=8750.00
+  ⚠️  第 2015 行结算费用错误：实际=73500.00，方式1=72000.00，方式2=5500.00
+  ⚠️  第 2018 行结算费用错误：实际=94166.49，方式1=80000.00，方式2=585000.00
+  ⚠️  第 2022 行结算费用错误：实际=124500.00，方式1=124000.00，方式2=4500.00
+  ⚠️  第 2023 行结算费用错误：实际=272395.92，方式1=216666.58，方式2=64062.47
+  ⚠️  第 2035 行结算费用错误：实际=255208.31，方式1=233333.24，方式2=30208.32
+  ⚠️  第 2039 行结算费用错误：实际=18250.00，方式1=16000.00，方式2=6250.00
+  ⚠️  第 2040 行结算费用错误：实际=18250.00，方式1=16000.00，方式2=6250.00
+  ⚠️  第 2041 行结算费用错误：实际=18250.00，方式1=16000.00，方式2=6250.00
+  ⚠️  第 2046 行结算费用错误：实际=116593.75，方式1=98000.00，方式2=22093.75
+  ⚠️  第 2047 行结算费用错误：实际=91166.57，方式1=72000.09，方式2=21833.36
+  ⚠️  第 2048 行结算费用错误：实际=80833.56，方式1=70000.14，方式2=14166.69
+  ⚠️  第 2049 行结算费用错误：实际=6000.00，方式1=12000.00，方式2=3000.00
+  ⚠️  第 2082 行结算费用错误：实际=128625.00，方式1=105000.00，方式2=813750.00
+  ⚠️  第 2083 行结算费用错误：实际=89333.24，方式1=80000.00，方式2=360000.00
+  ⚠️  第 2084 行结算费用错误：实际=113333.62，方式1=103333.54，方式2=13333.36
+  ⚠️  第 2086 行结算费用错误：实际=115062.50，方式1=105000.00，方式2=511875.00
+  ⚠️  第 2087 行结算费用错误：实际=83833.29，方式1=80000.00，方式2=235000.00
+  ⚠️  第 2088 行结算费用错误：实际=127750.00，方式1=124000.00，方式2=7750.00
+  ⚠️  第 2103 行结算费用错误：实际=112708.62，方式1=103333.54，方式2=12708.36
+  ⚠️  第 2104 行结算费用错误：实际=115718.75，方式1=105000.00，方式2=557812.50
+  ⚠️  第 2105 行结算费用错误：实际=84499.96，方式1=80000.00，方式2=250000.00
+  ⚠️  第 2107 行结算费用错误：实际=110250.00，方式1=108000.00，方式2=6250.00
+  ⚠️  第 2127 行结算费用错误：实际=94583.53，方式1=93333.52，方式2=4583.34
+  ⚠️  第 2129 行结算费用错误：实际=124500.00，方式1=124000.00，方式2=4500.00
+  ⚠️  第 2154 行结算费用错误：实际=110031.25，方式1=105000.00，方式2=393750.00
+  ⚠️  第 2155 行结算费用错误：实际=65999.93，方式1=80000.00，方式2=220000.00
+  ⚠️  第 2156 行结算费用错误：实际=84583.51，方式1=83333.50，方式2=4583.34
+  ⚠️  第 2159 行结算费用错误：实际=40906.25，方式1=38500.00，方式2=5906.25
+  ⚠️  第 2160 行结算费用错误：实际=124500.00，方式1=124000.00，方式2=4500.00
+  ⚠️  第 2161 行结算费用错误：实际=50875.00，方式1=49500.00，方式2=6875.00
+  ⚠️  第 2162 行结算费用错误：实际=18562.50，方式1=16500.00，方式2=7562.50
+  ⚠️  第 2178 行结算费用错误：实际=83333.30，方式1=80000.00，方式2=180000.00
+  ⚠️  第 2179 行结算费用错误：实际=132000.00，方式1=120000.00，方式2=16000.00
+  ⚠️  第 2181 行结算费用错误：实际=101499.79，方式1=80000.00，方式2=725000.00
+  ⚠️  第 2201 行结算费用错误：实际=12100.00，方式1=10500.00，方式2=23625.00
+  ⚠️  第 2203 行结算费用错误：实际=3600.00，方式1=0.00，方式2=50.00
+  ⚠️  第 2208 行结算费用错误：实际=130990.12，方式1=125000.00，方式2=304687.50
+  ⚠️  第 2209 行结算费用错误：实际=5100.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2211 行结算费用错误：实际=127083.32，方式1=125000.00，方式2=187500.00
+  ⚠️  第 2212 行结算费用错误：实际=152500.00，方式1=150000.00，方式2=225000.00
+  ⚠️  第 2213 行结算费用错误：实际=76250.00，方式1=75000.00，方式2=112500.00
+  ⚠️  第 2214 行结算费用错误：实际=129167.00，方式1=125000.00，方式2=250000.00
+  ⚠️  第 2215 行结算费用错误：实际=3600.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2216 行结算费用错误：实际=39541.64，方式1=130000.00，方式2=146250.00
+  ⚠️  第 2217 行结算费用错误：实际=136500.04，方式1=130000.00，方式2=325000.00
+  ⚠️  第 2218 行结算费用错误：实际=130541.67，方式1=130000.00，方式2=146250.00
+  ⚠️  第 2219 行结算费用错误：实际=132812.45，方式1=125000.00，方式2=359375.00
+  ⚠️  第 2220 行结算费用错误：实际=155625.00，方式1=150000.00，方式2=318750.00
+  ⚠️  第 2221 行结算费用错误：实际=82500.00，方式1=75000.00，方式2=300000.00
+  ⚠️  第 2222 行结算费用错误：实际=260000.00，方式1=240000.00，方式2=600000.00
+  ⚠️  第 2223 行结算费用错误：实际=65875.01，方式1=85000.00，方式2=106250.00
+  ⚠️  第 2224 行结算费用错误：实际=63541.80，方式1=125000.00，方式2=156250.00
+  ⚠️  第 2225 行结算费用错误：实际=80708.29，方式1=130000.00，方式2=211250.00
+  ⚠️  第 2226 行结算费用错误：实际=136500.04，方式1=130000.00，方式2=325000.00
+  ⚠️  第 2227 行结算费用错误：实际=65000.00，方式1=130000.00，方式2=146250.00
+  ⚠️  第 2230 行结算费用错误：实际=75312.50，方式1=75000.00，方式2=84375.00
+  ⚠️  第 2231 行结算费用错误：实际=5937.50，方式1=5000.00，方式2=5625.00
+  ⚠️  第 2232 行结算费用错误：实际=83583.36，方式1=85000.00，方式2=85000.00
+  ⚠️  第 2233 行结算费用错误：实际=24900.00，方式1=10500.00，方式2=128625.00
+  ⚠️  第 2235 行结算费用错误：实际=55000.00，方式1=150000.00，方式2=150000.00
+  ⚠️  第 2236 行结算费用错误：实际=27500.00，方式1=75000.00，方式2=75000.00
+  ⚠️  第 2237 行结算费用错误：实际=46874.92，方式1=125000.00，方式2=156250.00
+  ⚠️  第 2242 行结算费用错误：实际=63020.93，方式1=125000.00，方式2=156250.00
+  ⚠️  第 2243 行结算费用错误：实际=2375.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2244 行结算费用错误：实际=46874.92，方式1=125000.00，方式2=156250.00
+  ⚠️  第 2245 行结算费用错误：实际=55000.00，方式1=150000.00，方式2=150000.00
+  ⚠️  第 2246 行结算费用错误：实际=27500.00，方式1=75000.00，方式2=75000.00
+  ⚠️  第 2247 行结算费用错误：实际=80000.00，方式1=240000.00，方式2=240000.00
+  ⚠️  第 2249 行结算费用错误：实际=9500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2250 行结算费用错误：实际=84375.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2251 行结算费用错误：实际=27900.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2257 行结算费用错误：实际=19500.00，方式1=13000.00，方式2=13000.00
+  ⚠️  第 2259 行结算费用错误：实际=6365.98，方式1=5866.00，方式2=4032.88
+  ⚠️  第 2265 行结算费用错误：实际=134020.62，方式1=130000.00，方式2=130000.00
+  ⚠️  第 2266 行结算费用错误：实际=68040.50，方式1=68041.27，方式2=6185.57
+  ⚠️  第 2269 行结算费用错误：实际=149440.00，方式1=130000.00，方式2=715000.00
+  ⚠️  第 2270 行结算费用错误：实际=3000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2271 行结算费用错误：实际=128000.00，方式1=240000.00，方式2=240000.00
+  ⚠️  第 2272 行结算费用错误：实际=248000.00，方式1=240000.00，方式2=480000.00
+  ⚠️  第 2273 行结算费用错误：实际=248000.00，方式1=240000.00，方式2=480000.00
+  ⚠️  第 2274 行结算费用错误：实际=134333.28，方式1=130000.00，方式2=260000.00
+  ⚠️  第 2275 行结算费用错误：实际=134333.28，方式1=130000.00，方式2=260000.00
+  ⚠️  第 2276 行结算费用错误：实际=134333.28，方式1=130000.00，方式2=260000.00
+  ⚠️  第 2277 行结算费用错误：实际=293000.00，方式1=240000.00，方式2=1830000.00
+  ⚠️  第 2278 行结算费用错误：实际=279000.00，方式1=240000.00，方式2=1410000.00
+  ⚠️  第 2279 行结算费用错误：实际=156541.59，方式1=170000.00，方式2=1126250.00
+  ⚠️  第 2280 行结算费用错误：实际=163582.92，方式1=130000.00，方式2=1137500.00
+  ⚠️  第 2281 行结算费用错误：实际=42791.54，方式1=130000.00，方式2=373750.00
+  ⚠️  第 2282 行结算费用错误：实际=302000.00，方式1=240000.00，方式2=2100000.00
+  ⚠️  第 2283 行结算费用错误：实际=302000.00，方式1=240000.00，方式2=2100000.00
+  ⚠️  第 2284 行结算费用错误：实际=163582.92，方式1=130000.00，方式2=1137500.00
+  ⚠️  第 2285 行结算费用错误：实际=163582.92，方式1=130000.00，方式2=1137500.00
+  ⚠️  第 2286 行结算费用错误：实际=62187.50，方式1=85000.00，方式2=499375.00
+  ⚠️  第 2287 行结算费用错误：实际=140291.75，方式1=112658.00，方式2=31955.88
+  ⚠️  第 2288 行结算费用错误：实际=194329.97，方式1=134020.62，方式2=1340206.20
+  ⚠️  第 2289 行结算费用错误：实际=166180.00，方式1=130000.00，方式2=1218750.00
+  ⚠️  第 2290 行结算费用错误：实际=9000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2291 行结算费用错误：实际=218000.00，方式1=180000.00，方式2=202500.00
+  ⚠️  第 2292 行结算费用错误：实际=117300.09，方式1=110000.00，方式2=948750.00
+  ⚠️  第 2293 行结算费用错误：实际=161860.00，方式1=130000.00，方式2=1088750.00
+  ⚠️  第 2294 行结算费用错误：实际=2000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2295 行结算费用错误：实际=91658.00，方式1=88000.00，方式2=638000.00
+  ⚠️  第 2296 行结算费用错误：实际=295000.00，方式1=240000.00，方式2=1890000.00
+  ⚠️  第 2297 行结算费用错误：实际=292000.00，方式1=240000.00，方式2=1800000.00
+  ⚠️  第 2298 行结算费用错误：实际=161416.28，方式1=130000.00，方式2=1072500.00
+  ⚠️  第 2299 行结算费用错误：实际=158166.32，方式1=130000.00，方式2=975000.00
+  ⚠️  第 2300 行结算费用错误：实际=301000.00，方式1=240000.00，方式2=2070000.00
+  ⚠️  第 2301 行结算费用错误：实际=311000.00，方式1=240000.00，方式2=2370000.00
+  ⚠️  第 2302 行结算费用错误：实际=92187.50，方式1=75000.00，方式2=590625.00
+  ⚠️  第 2303 行结算费用错误：实际=158166.32，方式1=130000.00，方式2=975000.00
+  ⚠️  第 2304 行结算费用错误：实际=96250.00，方式1=75000.00，方式2=712500.00
+  ⚠️  第 2305 行结算费用错误：实际=207541.49，方式1=170000.00，方式2=1296250.00
+  ⚠️  第 2306 行结算费用错误：实际=147422.68，方式1=134020.62，方式2=402061.86
+  ⚠️  第 2307 行结算费用错误：实际=137506.58，方式1=130000.00，方式2=877500.00
+  ⚠️  第 2309 行结算费用错误：实际=171707.82，方式1=130000.00，方式2=1381250.00
+  ⚠️  第 2310 行结算费用错误：实际=171066.56，方式1=130000.00，方式2=1105000.00
+  ⚠️  第 2312 行结算费用错误：实际=109989.60，方式1=88000.00，方式2=748000.00
+  ⚠️  第 2313 行结算费用错误：实际=163583.54，方式1=130000.00，方式2=1137500.00
+  ⚠️  第 2314 行结算费用错误：实际=308000.00，方式1=240000.00，方式2=2280000.00
+  ⚠️  第 2315 行结算费用错误：实际=318000.00，方式1=240000.00，方式2=2580000.00
+  ⚠️  第 2316 行结算费用错误：实际=171166.16，方式1=130000.00，方式2=1365000.00
+  ⚠️  第 2317 行结算费用错误：实际=163582.92，方式1=130000.00，方式2=1137500.00
+  ⚠️  第 2318 行结算费用错误：实际=170082.84，方式1=130000.00，方式2=1332500.00
+  ⚠️  第 2319 行结算费用错误：实际=322000.00，方式1=240000.00，方式2=2700000.00
+  ⚠️  第 2320 行结算费用错误：实际=305000.00，方式1=240000.00，方式2=2190000.00
+  ⚠️  第 2321 行结算费用错误：实际=101406.25，方式1=75000.00，方式2=862500.00
+  ⚠️  第 2322 行结算费用错误：实际=163582.92，方式1=130000.00，方式2=1137500.00
+  ⚠️  第 2323 行结算费用错误：实际=101406.25，方式1=75000.00，方式2=862500.00
+  ⚠️  第 2324 行结算费用错误：实际=239416.34，方式1=170000.00，方式2=2252500.00
+  ⚠️  第 2325 行结算费用错误：实际=162500.20，方式1=130000.00，方式2=1105000.00
+  ⚠️  第 2326 行结算费用错误：实际=164020.00，方式1=130000.00，方式2=1153750.00
+  ⚠️  第 2327 行结算费用错误：实际=164560.00，方式1=130000.00，方式2=1170000.00
+  ⚠️  第 2328 行结算费用错误：实际=5000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2329 行结算费用错误：实际=93375.00，方式1=88000.00，方式2=715000.00
+  ⚠️  第 2330 行结算费用错误：实际=305000.00，方式1=240000.00，方式2=2190000.00
+  ⚠️  第 2331 行结算费用错误：实际=300000.00，方式1=240000.00，方式2=2040000.00
+  ⚠️  第 2332 行结算费用错误：实际=162499.60，方式1=130000.00，方式2=1105000.00
+  ⚠️  第 2333 行结算费用错误：实际=4000.00，方式1=8000.00，方式2=2000.00
+  ⚠️  第 2334 行结算费用错误：实际=162499.60，方式1=130000.00，方式2=1105000.00
+  ⚠️  第 2335 行结算费用错误：实际=162499.60，方式1=130000.00，方式2=1105000.00
+  ⚠️  第 2336 行结算费用错误：实际=2000.00，方式1=6000.00，方式2=3500.00
+  ⚠️  第 2337 行结算费用错误：实际=186874.30，方式1=130000.00，方式2=1836250.00
+  ⚠️  第 2338 行结算费用错误：实际=190124.26，方式1=130000.00，方式2=1933750.00
+  ⚠️  第 2339 行结算费用错误：实际=186874.30，方式1=130000.00，方式2=1836250.00
+  ⚠️  第 2340 行结算费用错误：实际=162499.60，方式1=130000.00，方式2=1105000.00
+  ⚠️  第 2341 行结算费用错误：实际=333000.00，方式1=240000.00，方式2=3030000.00
+  ⚠️  第 2342 行结算费用错误：实际=341000.00，方式1=240000.00，方式2=3270000.00
+  ⚠️  第 2343 行结算费用错误：实际=231624.71，方式1=170000.00，方式2=2018750.00
+  ⚠️  第 2344 行结算费用错误：实际=188499.28，方式1=130000.00，方式2=1885000.00
+  ⚠️  第 2345 行结算费用错误：实际=97500.00，方式1=75000.00，方式2=750000.00
+  ⚠️  第 2346 行结算费用错误：实际=102187.50，方式1=75000.00，方式2=890625.00
+  ⚠️  第 2347 行结算费用错误：实际=162499.60，方式1=130000.00，方式2=1105000.00
+  ⚠️  第 2348 行结算费用错误：实际=162500.20，方式1=130000.00，方式2=1105000.00
+  ⚠️  第 2349 行结算费用错误：实际=163480.00，方式1=130000.00，方式2=1137500.00
+  ⚠️  第 2351 行结算费用错误：实际=162400.00，方式1=130000.00，方式2=1105000.00
+  ⚠️  第 2352 行结算费用错误：实际=6000.00，方式1=12000.00，方式2=2000.00
+  ⚠️  第 2353 行结算费用错误：实际=309000.00，方式1=240000.00，方式2=2310000.00
+  ⚠️  第 2354 行结算费用错误：实际=302000.00，方式1=240000.00，方式2=2100000.00
+  ⚠️  第 2355 行结算费用错误：实际=17082.84，方式1=130000.00，方式2=1332500.00
+  ⚠️  第 2356 行结算费用错误：实际=38457.86，方式1=130000.00，方式2=1283750.00
+  ⚠️  第 2357 行结算费用错误：实际=123500.00，方式1=110000.00，方式2=728750.00
+  ⚠️  第 2358 行结算费用错误：实际=165207.90，方式1=130000.00，方式2=1186250.00
+  ⚠️  第 2359 行结算费用错误：实际=314583.54，方式1=240000.00，方式2=2100000.00
+  ⚠️  第 2360 行结算费用错误：实际=317000.00，方式1=240000.00，方式2=2550000.00
+  ⚠️  第 2361 行结算费用错误：实际=314000.00，方式1=240000.00，方式2=2460000.00
+  ⚠️  第 2362 行结算费用错误：实际=220999.76，方式1=170000.00，方式2=1700000.00
+  ⚠️  第 2363 行结算费用错误：实际=170082.84，方式1=130000.00，方式2=1283750.00
+  ⚠️  第 2364 行结算费用错误：实际=97187.50，方式1=75000.00，方式2=796875.00
+  ⚠️  第 2365 行结算费用错误：实际=99062.50，方式1=75000.00，方式2=656250.00
+  ⚠️  第 2366 行结算费用错误：实际=163582.92，方式1=130000.00，方式2=1105000.00
+  ⚠️  第 2367 行结算费用错误：实际=164666.24，方式1=130000.00，方式2=1170000.00
+  ⚠️  第 2368 行结算费用错误：实际=49833.17，方式1=130000.00，方式2=455000.00
+  ⚠️  第 2369 行结算费用错误：实际=165910.00，方式1=130000.00，方式2=1137500.00
+  ⚠️  第 2371 行结算费用错误：实际=168880.00，方式1=130000.00，方式2=1300000.00
+  ⚠️  第 2372 行结算费用错误：实际=5000.00，方式1=8000.00，方式2=1125.00
+  ⚠️  第 2373 行结算费用错误：实际=302000.00，方式1=240000.00，方式2=2100000.00
+  ⚠️  第 2374 行结算费用错误：实际=302000.00，方式1=240000.00，方式2=2100000.00
+  ⚠️  第 2375 行结算费用错误：实际=17957.78，方式1=130000.00，方式2=1478750.00
+  ⚠️  第 2376 行结算费用错误：实际=168457.86，方式1=130000.00，方式2=1283750.00
+  ⚠️  第 2377 行结算费用错误：实际=129500.00，方式1=110000.00，方式2=1003750.00
+  ⚠️  第 2378 行结算费用错误：实际=111582.96，方式1=130000.00，方式2=877500.00
+  ⚠️  第 2379 行结算费用错误：实际=163582.92，方式1=130000.00，方式2=1137500.00
+  ⚠️  第 2380 行结算费用错误：实际=314000.00，方式1=240000.00，方式2=2460000.00
+  ⚠️  第 2381 行结算费用错误：实际=224000.00，方式1=240000.00，方式2=1680000.00
+  ⚠️  第 2382 行结算费用错误：实际=225249.74，方式1=170000.00，方式2=1827500.00
+  ⚠️  第 2383 行结算费用错误：实际=171707.82，方式1=130000.00，方式2=1381250.00
+  ⚠️  第 2384 行结算费用错误：实际=100000.00，方式1=75000.00，方式2=825000.00
+  ⚠️  第 2385 行结算费用错误：实际=99062.50，方式1=75000.00，方式2=796875.00
+  ⚠️  第 2386 行结算费用错误：实际=165207.90，方式1=130000.00，方式2=1186250.00
+  ⚠️  第 2387 行结算费用错误：实际=165626.57，方式1=130000.00，方式2=1332500.00
+  ⚠️  第 2389 行结算费用错误：实际=162926.57，方式1=130000.00，方式2=1251250.00
+  ⚠️  第 2390 行结算费用错误：实际=109957.98，方式1=130000.00，方式2=828750.00
+  ⚠️  第 2391 行结算费用错误：实际=317708.55，方式1=250000.00，方式2=2281250.00
+  ⚠️  第 2392 行结算费用错误：实际=31250.01，方式1=24999.99，方式2=14583.33
+  ⚠️  第 2394 行结算费用错误：实际=137041.33，方式1=130000.00，方式2=991250.00
+  ⚠️  第 2395 行结算费用错误：实际=178207.74，方式1=130000.00，方式2=1576250.00
+  ⚠️  第 2396 行结算费用错误：实际=164125.21，方式1=130000.00，方式2=1153750.00
+  ⚠️  第 2397 行结算费用错误：实际=139583.39，方式1=250000.00，方式2=1187500.00
+  ⚠️  第 2398 行结算费用错误：实际=114833.42，方式1=110000.00，方式2=1003750.00
+  ⚠️  第 2401 行结算费用错误：实际=12854.39，方式1=7216.50，方式2=4961.34
+  ⚠️  第 2402 行结算费用错误：实际=100555.50，方式1=75000.00，方式2=834375.00
+  ⚠️  第 2403 行结算费用错误：实际=318750.22，方式1=250000.00，方式2=2312500.00
+  ⚠️  第 2404 行结算费用错误：实际=26675.31，方式1=6185.57，方式2=11597.94
+  ⚠️  第 2405 行结算费用错误：实际=26675.31，方式1=6185.57，方式2=11597.94
+  ⚠️  第 2406 行结算费用错误：实际=321000.00，方式1=240000.00，方式2=2670000.00
+  ⚠️  第 2407 行结算费用错误：实际=231624.71，方式1=170000.00，方式2=2018750.00
+  ⚠️  第 2408 行结算费用错误：实际=170082.84，方式1=130000.00，方式2=1332500.00
+  ⚠️  第 2409 行结算费用错误：实际=99062.50，方式1=75000.00，方式2=796875.00
+  ⚠️  第 2410 行结算费用错误：实际=163041.26，方式1=130000.00，方式2=1121250.00
+  ⚠️  第 2411 行结算费用错误：实际=183624.34，方式1=130000.00，方式2=1738750.00
+  ⚠️  第 2412 行结算费用错误：实际=10000.00，方式1=0.00，方式2=2250.00
+  ⚠️  第 2413 行结算费用错误：实际=166291.22，方式1=130000.00，方式2=1218750.00
+  ⚠️  第 2414 行结算费用错误：实际=81250.05，方式1=64999.95，方式2=20583.32
+  ⚠️  第 2415 行结算费用错误：实际=317000.00，方式1=240000.00，方式2=2550000.00
+  ⚠️  第 2416 行结算费用错误：实际=302000.00，方式1=240000.00，方式2=2100000.00
+  ⚠️  第 2417 行结算费用错误：实际=302000.00，方式1=240000.00，方式2=2100000.00
+  ⚠️  第 2418 行结算费用错误：实际=165207.90，方式1=13000.00，方式2=118625.00
+  ⚠️  第 2419 行结算费用错误：实际=163582.92，方式1=13000.00，方式2=113750.00
+  ⚠️  第 2420 行结算费用错误：实际=165207.90，方式1=130000.00，方式2=1186250.00
+  ⚠️  第 2421 行结算费用错误：实际=95312.50，方式1=75000.00，方式2=684375.00
+  ⚠️  第 2422 行结算费用错误：实际=298000.00，方式1=240000.00，方式2=1980000.00
+  ⚠️  第 2423 行结算费用错误：实际=211083.14，方式1=170000.00，方式2=1402500.00
+  ⚠️  第 2424 行结算费用错误：实际=93125.00，方式1=75000.00，方式2=618750.00
+  ⚠️  第 2425 行结算费用错误：实际=161416.28，方式1=130000.00，方式2=1072500.00
+  ⚠️  第 2426 行结算费用错误：实际=161416.28，方式1=130000.00，方式2=1072500.00
+  ⚠️  第 2427 行结算费用错误：实际=92144.00，方式1=85000.00，方式2=637500.00
+  ⚠️  第 2429 行结算费用错误：实际=46000.00，方式1=1380000.00，方式2=60000.00
+  ⚠️  第 2431 行结算费用错误：实际=10000.00，方式1=300000.00，方式2=60000.00
+  ⚠️  第 2432 行结算费用错误：实际=315000.00，方式1=240000.00，方式2=2490000.00
+  ⚠️  第 2433 行结算费用错误：实际=302000.00，方式1=240000.00，方式2=2100000.00
+  ⚠️  第 2434 行结算费用错误：实际=166832.88，方式1=130000.00，方式2=1235000.00
+  ⚠️  第 2435 行结算费用错误：实际=168999.52，方式1=130000.00，方式2=1300000.00
+  ⚠️  第 2436 行结算费用错误：实际=164124.58，方式1=130000.00，方式2=1153750.00
+  ⚠️  第 2437 行结算费用错误：实际=69687.50，方式1=75000.00，方式2=515625.00
+  ⚠️  第 2438 行结算费用错误：实际=204707.93，方式1=170000.00，方式2=1551250.00
+  ⚠️  第 2439 行结算费用错误：实际=89062.50，方式1=75000.00，方式2=646875.00
+  ⚠️  第 2440 行结算费用错误：实际=81249.75，方式1=130000.00，方式2=617500.00
+  ⚠️  第 2441 行结算费用错误：实际=165207.90，方式1=130000.00，方式2=1186250.00
+  ⚠️  第 2444 行结算费用错误：实际=121874.95，方式1=130000.00，方式2=276250.00
+  ⚠️  第 2445 行结算费用错误：实际=164000.00，方式1=240000.00，方式2=1320000.00
+  ⚠️  第 2446 行结算费用错误：实际=302000.00，方式1=240000.00，方式2=2100000.00
+  ⚠️  第 2447 行结算费用错误：实际=163582.92，方式1=130000.00，方式2=1137500.00
+  ⚠️  第 2448 行结算费用错误：实际=163582.92，方式1=130000.00，方式2=1137500.00
+  ⚠️  第 2449 行结算费用错误：实际=163582.92，方式1=130000.00，方式2=1137500.00
+  ⚠️  第 2450 行结算费用错误：实际=87749.72，方式1=130000.00，方式2=682500.00
+  ⚠️  第 2453 行结算费用错误：实际=36380.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2454 行结算费用错误：实际=64200.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2455 行结算费用错误：实际=37289.50，方式1=0.00，方式2=0.00
+  ⚠️  第 2456 行结算费用错误：实际=182468.00，方式1=0.00，方式2=5800.00
+  ⚠️  第 2457 行结算费用错误：实际=2912.00，方式1=0.00，方式2=2800.00
+  ⚠️  第 2458 行结算费用错误：实际=221000.00，方式1=0.00，方式2=8500.00
+  ⚠️  第 2459 行结算费用错误：实际=14560.00，方式1=0.00，方式2=1000.00
+  ⚠️  第 2460 行结算费用错误：实际=20000.00，方式1=0.00，方式2=10000.00
+  ⚠️  第 2461 行结算费用错误：实际=37000.00，方式1=0.00，方式2=18000.00
+  ⚠️  第 2468 行结算费用错误：实际=27000.00，方式1=37000.02，方式2=8479.17
+  ⚠️  第 2470 行结算费用错误：实际=179075.00，方式1=174000.00，方式2=58000.00
+  ⚠️  第 2471 行结算费用错误：实际=30625.00，方式1=30000.00，方式2=5625.00
+  ⚠️  第 2472 行结算费用错误：实际=132675.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 2473 行结算费用错误：实际=100000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 2486 行结算费用错误：实际=202083.26，方式1=0.00，方式2=8333.33
+  ⚠️  第 2487 行结算费用错误：实际=61250.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 2490 行结算费用错误：实际=181250.00，方式1=180000.00，方式2=10000.00
+  ⚠️  第 2492 行结算费用错误：实际=182500.00，方式1=180000.00，方式2=5000.00
+  ⚠️  第 2493 行结算费用错误：实际=84300.00，方式1=81600.00，方式2=4800.00
+  ⚠️  第 2494 行结算费用错误：实际=63750.00，方式1=60000.00，方式2=13750.00
+  ⚠️  第 2496 行结算费用错误：实际=57050.00，方式1=140000.00，方式2=2292500.00
+  ⚠️  第 2497 行结算费用错误：实际=177450.00，方式1=140000.00，方式2=2012500.00
+  ⚠️  第 2498 行结算费用错误：实际=181300.00，方式1=140000.00，方式2=2205000.00
+  ⚠️  第 2499 行结算费用错误：实际=76125.00，方式1=69600.00，方式2=12325.00
+  ⚠️  第 2500 行结算费用错误：实际=1258.00，方式1=40000.00，方式2=6250.00
+  ⚠️  第 2501 行结算费用错误：实际=53437.50，方式1=52500.00，方式2=8437.50
+  ⚠️  第 2502 行结算费用错误：实际=149275.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2503 行结算费用错误：实际=23925.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2504 行结算费用错误：实际=143325.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2507 行结算费用错误：实际=136300.00，方式1=63800.00，方式2=13050.00
+  ⚠️  第 2512 行结算费用错误：实际=158437.50，方式1=150000.00，方式2=15937.50
+  ⚠️  第 2516 行结算费用错误：实际=24375.00，方式1=22500.00，方式2=9375.00
+  ⚠️  第 2527 行结算费用错误：实际=157325.00，方式1=150800.00，方式2=12325.00
+  ⚠️  第 2533 行结算费用错误：实际=23200.00，方式1=0.00，方式2=5800.00
+  ⚠️  第 2534 行结算费用错误：实际=12000.00，方式1=0.00，方式2=3000.00
+  ⚠️  第 2535 行结算费用错误：实际=13500.00，方式1=0.00，方式2=9000.00
+  ⚠️  第 2536 行结算费用错误：实际=158333.27，方式1=0.00，方式2=8333.33
+  ⚠️  第 2538 行结算费用错误：实际=136250.00，方式1=135000.00，方式2=5000.00
+  ⚠️  第 2540 行结算费用错误：实际=58275.00，方式1=56700.00，方式2=6300.00
+  ⚠️  第 2543 行结算费用错误：实际=260500.00，方式1=242500.00，方式2=16250.00
+  ⚠️  第 2545 行结算费用错误：实际=86633.39，方式1=80666.74，方式2=11687.51
+  ⚠️  第 2546 行结算费用错误：实际=150499.94，方式1=140000.00，方式2=455000.00
+  ⚠️  第 2547 行结算费用错误：实际=197333.28，方式1=0.00，方式2=185000.00
+  ⚠️  第 2548 行结算费用错误：实际=88523.68，方式1=0.00，方式2=8331.33
+  ⚠️  第 2549 行结算费用错误：实际=53635.86，方式1=0.00，方式2=8331.33
+  ⚠️  第 2550 行结算费用错误：实际=51000.00，方式1=0.00，方式2=4800.00
+  ⚠️  第 2551 行结算费用错误：实际=144625.00，方式1=135000.00，方式2=135000.00
+  ⚠️  第 2552 行结算费用错误：实际=15000.00，方式1=11000.00，方式2=11000.00
+  ⚠️  第 2553 行结算费用错误：实际=751041.67，方式1=250000.00，方式2=250000.00
+  ⚠️  第 2554 行结算费用错误：实际=210875.00，方式1=210000.00，方式2=210000.00
+  ⚠️  第 2555 行结算费用错误：实际=42000.00，方式1=8000.00，方式2=8500.00
+  ⚠️  第 2556 行结算费用错误：实际=125000.00，方式1=0.00，方式2=5000.00
+  ⚠️  第 2557 行结算费用错误：实际=2400.00，方式1=0.00，方式2=1200.00
+  ⚠️  第 2558 行结算费用错误：实际=114687.49，方式1=114000.00，方式2=110000.00
+  ⚠️  第 2559 行结算费用错误：实际=255208.35，方式1=250000.00，方式2=406250.00
+  ⚠️  第 2560 行结算费用错误：实际=210875.00，方式1=210000.00，方式2=341250.00
+  ⚠️  第 2562 行结算费用错误：实际=140937.05，方式1=110000.00，方式2=728750.00
+  ⚠️  第 2563 行结算费用错误：实际=178300.00，方式1=175000.00，方式2=25625.00
+  ⚠️  第 2566 行结算费用错误：实际=35061.99，方式1=0.00，方式2=0.00
+  ⚠️  第 2567 行结算费用错误：实际=402000.00，方式1=341000.00，方式2=43125.00
+  ⚠️  第 2568 行结算费用错误：实际=91350.00，方式1=89900.00，方式2=7250.00
+  ⚠️  第 2588 行结算费用错误：实际=158205.65，方式1=150000.00，方式2=468750.00
+  ⚠️  第 2590 行结算费用错误：实际=247500.00，方式1=232500.00，方式2=22500.00
+  ⚠️  第 2605 行结算费用错误：实际=178350.00，方式1=174000.00，方式2=10150.00
+  ⚠️  第 2607 行结算费用错误：实际=23750.00，方式1=20000.00，方式2=8750.00
+  ⚠️  第 2608 行结算费用错误：实际=122812.50，方式1=112500.00，方式2=17812.50
+  ⚠️  第 2639 行结算费用错误：实际=3000.00，方式1=6000.00，方式2=4500.00
+  ⚠️  第 2675 行结算费用错误：实际=268749.99，方式1=241666.67，方式2=35416.67
+  ⚠️  第 2676 行结算费用错误：实际=238700.00，方式1=207200.00，方式2=38500.00
+  ⚠️  第 2677 行结算费用错误：实际=213500.00，方式1=203000.00，方式2=17500.00
+  ⚠️  第 2678 行结算费用错误：实际=169375.00，方式1=150000.00，方式2=24375.00
+  ⚠️  第 2679 行结算费用错误：实际=165300.00，方式1=150800.00，方式2=20300.00
+  ⚠️  第 2680 行结算费用错误：实际=167500.00，方式1=150000.00，方式2=22500.00
+  ⚠️  第 2681 行结算费用错误：实际=163750.00，方式1=150000.00，方式2=18750.00
+  ⚠️  第 2682 行结算费用错误：实际=30000.00，方式1=25000.00，方式2=10000.00
+  ⚠️  第 2683 行结算费用错误：实际=11250.00，方式1=10000.00，方式2=6250.00
+  ⚠️  第 2684 行结算费用错误：实际=160625.00，方式1=145000.00，方式2=20625.00
+  ⚠️  第 2685 行结算费用错误：实际=26250.00，方式1=25000.00，方式2=6250.00
+  ⚠️  第 2686 行结算费用错误：实际=51875.00，方式1=45000.00，方式2=11875.00
+  ⚠️  第 2687 行结算费用错误：实际=10625.00，方式1=10000.00，方式2=5625.00
+  ⚠️  第 2690 行结算费用错误：实际=7000.00，方式1=14000.00，方式2=14000.00
+  ⚠️  第 2743 行结算费用错误：实际=4500.00，方式1=9000.00，方式2=9000.00
+  ⚠️  第 2762 行结算费用错误：实际=5000.00，方式1=10000.00，方式2=10000.00
+  ⚠️  第 2797 行结算费用错误：实际=216875.00，方式1=36875.00，方式2=65000.00
+  ⚠️  第 2799 行结算费用错误：实际=40687.50，方式1=5687.50，方式2=9375.00
+  ⚠️  第 2801 行结算费用错误：实际=232500.00，方式1=457500.00，方式2=240000.00
+  ⚠️  第 2802 行结算费用错误：实际=10000.00，方式1=20000.00，方式2=15000.00
+  ⚠️  第 2820 行结算费用错误：实际=88125.00，方式1=88152.00，方式2=7500.00
+  ⚠️  第 2822 行结算费用错误：实际=139666.60，方式1=136666.59，方式2=8999.99
+  ⚠️  第 2823 行结算费用错误：实际=134999.92，方式1=133999.92，方式2=7000.00
+  ⚠️  第 2824 行结算费用错误：实际=29000.00，方式1=29000.10，方式2=966.67
+  ⚠️  第 2826 行结算费用错误：实际=29000.00，方式1=29000.10，方式2=966.67
+  ⚠️  第 2831 行结算费用错误：实际=28000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2833 行结算费用错误：实际=7000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2835 行结算费用错误：实际=24500.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2837 行结算费用错误：实际=100000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2838 行结算费用错误：实际=160000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2839 行结算费用错误：实际=133333.33，方式1=0.00，方式2=0.00
+  ⚠️  第 2840 行结算费用错误：实际=100000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2841 行结算费用错误：实际=167666.66，方式1=7666.66，方式2=0.00
+  ⚠️  第 2842 行结算费用错误：实际=160000.00，方式1=0.00，方式2=0.00
+  ⚠️  第 2843 行结算费用错误：实际=117333.33，方式1=0.00，方式2=0.00
+  ⚠️  第 2872 行结算费用错误：实际=18440.00，方式1=0.00，方式2=0.00
+发现 1490 行结算费用计算错误，将用浅绿色标注
+
+3. 验证本次费用合计...
+  ⚠️  第 2 行本次费用合计错误：实际=0.00，应为=320.00，差异=320.00
+  ⚠️  第 68 行本次费用合计错误：实际=1500.00，应为=1560.00，差异=60.00
+  ⚠️  第 69 行本次费用合计错误：实际=3000.00，应为=3120.00，差异=120.00
+  ⚠️  第 70 行本次费用合计错误：实际=102000.00，应为=106080.00，差异=4080.00
+  ⚠️  第 71 行本次费用合计错误：实际=12000.00，应为=12480.00，差异=480.00
+  ⚠️  第 72 行本次费用合计错误：实际=26000.00，应为=27040.00，差异=1040.00
+  ⚠️  第 73 行本次费用合计错误：实际=283817.50，应为=295170.20，差异=11352.70
+  ⚠️  第 75 行本次费用合计错误：实际=26000.00，应为=27040.00，差异=1040.00
+  ⚠️  第 76 行本次费用合计错误：实际=8000.00，应为=8320.00，差异=320.00
+  ⚠️  第 77 行本次费用合计错误：实际=13000.00，应为=13520.00，差异=520.00
+  ⚠️  第 78 行本次费用合计错误：实际=3000.00，应为=3120.00，差异=120.00
+  ⚠️  第 107 行本次费用合计错误：实际=322337.00，应为=335230.48，差异=12893.48
+  ⚠️  第 108 行本次费用合计错误：实际=299999.63，应为=311999.62，差异=11999.99
+  ⚠️  第 109 行本次费用合计错误：实际=292708.01，应为=304416.33，差异=11708.32
+  ⚠️  第 131 行本次费用合计错误：实际=291666.20，应为=303332.85，差异=11666.65
+  ⚠️  第 172 行本次费用合计错误：实际=282291.26，应为=293582.91，差异=11291.65
+  ⚠️  第 173 行本次费用合计错误：实际=162166.54，应为=168653.20，差异=6486.66
+  ⚠️  第 174 行本次费用合计错误：实际=22000.00，应为=22880.00，差异=880.00
+  ⚠️  第 175 行本次费用合计错误：实际=4000.00，应为=4160.00，差异=160.00
+  ⚠️  第 176 行本次费用合计错误：实际=2000.00，应为=2080.00，差异=80.00
+  ⚠️  第 177 行本次费用合计错误：实际=2000.00，应为=2080.00，差异=80.00
+  ⚠️  第 178 行本次费用合计错误：实际=13000.00，应为=13520.00，差异=520.00
+  ⚠️  第 179 行本次费用合计错误：实际=13000.00，应为=13520.00，差异=520.00
+  ⚠️  第 244 行本次费用合计错误：实际=4000.00，应为=8320.00，差异=4320.00
+  ⚠️  第 245 行本次费用合计错误：实际=13000.00，应为=27040.00，差异=14040.00
+  ⚠️  第 246 行本次费用合计错误：实际=4000.00，应为=8320.00，差异=4320.00
+  ⚠️  第 986 行本次费用合计错误：实际=4000.00，应为=4160.00，差异=160.00
+  ⚠️  第 987 行本次费用合计错误：实际=5000.00，应为=5200.00，差异=200.00
+  ⚠️  第 988 行本次费用合计错误：实际=8000.00，应为=8320.00，差异=320.00
+  ⚠️  第 989 行本次费用合计错误：实际=4000.00，应为=4160.00，差异=160.00
+  ⚠️  第 1019 行本次费用合计错误：实际=9282.02，应为=104832.06，差异=95550.04
+  ⚠️  第 1020 行本次费用合计错误：实际=9282.02，应为=169988.00，差异=160705.98
+  ⚠️  第 1021 行本次费用合计错误：实际=9282.02，应为=190372.00，差异=181089.98
+  ⚠️  第 1083 行本次费用合计错误：实际=243749.69，应为=253499.68，差异=9749.99
+  ⚠️  第 1084 行本次费用合计错误：实际=4166.64，应为=4333.31，差异=166.67
+  ⚠️  第 1087 行本次费用合计错误：实际=118228.96，应为=122958.12，差异=4729.16
+  ⚠️  第 1354 行本次费用合计错误：实际=90937.50，应为=0.00，差异=90937.50
+  ⚠️  第 1355 行本次费用合计错误：实际=9300.00，应为=0.00，差异=9300.00
+  ⚠️  第 1356 行本次费用合计错误：实际=72375.00，应为=0.00，差异=72375.00
+  ⚠️  第 1357 行本次费用合计错误：实际=164062.50，应为=0.00，差异=164062.50
+  ⚠️  第 1358 行本次费用合计错误：实际=263000.00，应为=0.00，差异=263000.00
+  ⚠️  第 1359 行本次费用合计错误：实际=21250.00，应为=0.00，差异=21250.00
+  ⚠️  第 1360 行本次费用合计错误：实际=133000.00，应为=0.00，差异=133000.00
+  ⚠️  第 1361 行本次费用合计错误：实际=121750.00，应为=0.00，差异=121750.00
+  ⚠️  第 1362 行本次费用合计错误：实际=188750.00，应为=196300.00，差异=7550.00
+  ⚠️  第 1363 行本次费用合计错误：实际=79500.00，应为=82680.00，差异=3180.00
+  ⚠️  第 1364 行本次费用合计错误：实际=137000.00，应为=142480.00，差异=5480.00
+  ⚠️  第 1365 行本次费用合计错误：实际=32250.00，应为=33540.00，差异=1290.00
+  ⚠️  第 1366 行本次费用合计错误：实际=38625.00，应为=40170.00，差异=1545.00
+  ⚠️  第 1367 行本次费用合计错误：实际=3600.00，应为=3744.00，差异=144.00
+  ⚠️  第 1368 行本次费用合计错误：实际=63500.00，应为=66040.00，差异=2540.00
+  ⚠️  第 1369 行本次费用合计错误：实际=82187.50，应为=85475.00，差异=3287.50
+  ⚠️  第 1474 行本次费用合计错误：实际=90000.00，应为=93600.00，差异=3600.00
+  ⚠️  第 1478 行本次费用合计错误：实际=19747.50，应为=19500.00，差异=247.50
+  ⚠️  第 1629 行本次费用合计错误：实际=70500.00，应为=72930.00，差异=2430.00
+  ⚠️  第 1720 行本次费用合计错误：实际=106750.00，应为=111020.00，差异=4270.00
+  ⚠️  第 1721 行本次费用合计错误：实际=151875.00，应为=157950.00，差异=6075.00
+  ⚠️  第 1722 行本次费用合计错误：实际=160000.00，应为=166400.00，差异=6400.00
+  ⚠️  第 1723 行本次费用合计错误：实际=138125.00，应为=143650.00，差异=5525.00
+  ⚠️  第 1724 行本次费用合计错误：实际=149375.00，应为=155350.00，差异=5975.00
+  ⚠️  第 1725 行本次费用合计错误：实际=53125.00，应为=55250.00，差异=2125.00
+  ⚠️  第 1726 行本次费用合计错误：实际=49687.50，应为=51675.00，差异=1987.50
+  ⚠️  第 1727 行本次费用合计错误：实际=88600.00，应为=92144.00，差异=3544.00
+  ⚠️  第 1728 行本次费用合计错误：实际=89800.00，应为=93392.00，差异=3592.00
+  ⚠️  第 1729 行本次费用合计错误：实际=102708.17，应为=106816.50，差异=4108.33
+  ⚠️  第 1730 行本次费用合计错误：实际=123541.47，应为=128483.13，差异=4941.66
+  ⚠️  第 1731 行本次费用合计错误：实际=127708.13，应为=132816.45，差异=5108.33
+  ⚠️  第 1732 行本次费用合计错误：实际=127708.13，应为=132816.45，差异=5108.33
+  ⚠️  第 1733 行本次费用合计错误：实际=98541.51，应为=102483.17，差异=3941.66
+  ⚠️  第 1734 行本次费用合计错误：实际=54166.58，应为=56333.24，差异=2166.66
+  ⚠️  第 1735 行本次费用合计错误：实际=126666.46，应为=131733.12，差异=5066.66
+  ⚠️  第 1736 行本次费用合计错误：实际=127708.13，应为=132816.45，差异=5108.33
+  ⚠️  第 1737 行本次费用合计错误：实际=98541.51，应为=102483.17，差异=3941.66
+  ⚠️  第 1738 行本次费用合计错误：实际=116499.81，应为=121159.81，差异=4659.99
+  ⚠️  第 1739 行本次费用合计错误：实际=95833.18，应为=99666.51，差异=3833.33
+  ⚠️  第 1740 行本次费用合计错误：实际=123541.47，应为=128483.13，差异=4941.66
+  ⚠️  第 1741 行本次费用合计错误：实际=116666.48，应为=121333.14，差异=4666.66
+  ⚠️  第 1742 行本次费用合计错误：实际=99999.84，应为=103999.83，差异=3999.99
+  ⚠️  第 1743 行本次费用合计错误：实际=125624.80，应为=130649.79，差异=5024.99
+  ⚠️  第 1744 行本次费用合计错误：实际=127708.13，应为=132816.45，差异=5108.33
+  ⚠️  第 1745 行本次费用合计错误：实际=29166.62，应为=30333.28，差异=1166.66
+  ⚠️  第 1746 行本次费用合计错误：实际=265833.50，应为=276466.84，差异=10633.34
+  ⚠️  第 1747 行本次费用合计错误：实际=171000.00，应为=177840.00，差异=6840.00
+  ⚠️  第 1748 行本次费用合计错误：实际=7500.00，应为=7800.00，差异=300.00
+  ⚠️  第 1749 行本次费用合计错误：实际=95166.51，应为=98973.18，差异=3806.66
+  ⚠️  第 1750 行本次费用合计错误：实际=194500.00，应为=202280.00，差异=7780.00
+  ⚠️  第 1751 行本次费用合计错误：实际=285500.00，应为=296920.00，差异=11420.00
+  ⚠️  第 1752 行本次费用合计错误：实际=270599.91，应为=281423.91，差异=10824.00
+  ⚠️  第 1753 行本次费用合计错误：实际=172000.00，应为=178880.00，差异=6880.00
+  ⚠️  第 1754 行本次费用合计错误：实际=135500.00，应为=140920.00，差异=5420.00
+  ⚠️  第 1755 行本次费用合计错误：实际=292666.57，应为=304373.23，差异=11706.66
+  ⚠️  第 1756 行本次费用合计错误：实际=315999.90，应为=328639.90，差异=12640.00
+  ⚠️  第 1757 行本次费用合计错误：实际=196000.00，应为=203840.00，差异=7840.00
+  ⚠️  第 1758 行本次费用合计错误：实际=283333.37，应为=294666.70，差异=11333.33
+  ⚠️  第 1759 行本次费用合计错误：实际=278645.84，应为=289791.67，差异=11145.83
+  ⚠️  第 1760 行本次费用合计错误：实际=223500.00，应为=232440.00，差异=8940.00
+  ⚠️  第 1761 行本次费用合计错误：实际=261250.00，应为=271700.00，差异=10450.00
+  ⚠️  第 1762 行本次费用合计错误：实际=301041.83，应为=313083.50，差异=12041.67
+  ⚠️  第 1763 行本次费用合计错误：实际=8000.00，应为=8320.00，差异=320.00
+  ⚠️  第 1764 行本次费用合计错误：实际=295266.57，应为=307077.23，差异=11810.66
+  ⚠️  第 1765 行本次费用合计错误：实际=280500.00，应为=291720.00，差异=11220.00
+  ⚠️  第 1766 行本次费用合计错误：实际=261933.23，应为=272410.56，差异=10477.33
+  ⚠️  第 1767 行本次费用合计错误：实际=309375.12，应为=321750.12，差异=12375.00
+  ⚠️  第 1768 行本次费用合计错误：实际=147500.00，应为=153400.00，差异=5900.00
+  ⚠️  第 1769 行本次费用合计错误：实际=146500.00，应为=152360.00，差异=5860.00
+  ⚠️  第 1770 行本次费用合计错误：实际=122000.00，应为=126880.00，差异=4880.00
+  ⚠️  第 1771 行本次费用合计错误：实际=31500.00，应为=32760.00，差异=1260.00
+  ⚠️  第 1772 行本次费用合计错误：实际=41750.00，应为=43420.00，差异=1670.00
+  ⚠️  第 1773 行本次费用合计错误：实际=113750.00，应为=118300.00，差异=4550.00
+  ⚠️  第 1774 行本次费用合计错误：实际=147187.50，应为=153075.00，差异=5887.50
+  ⚠️  第 1775 行本次费用合计错误：实际=65749.81，应为=68379.80，差异=2629.99
+  ⚠️  第 1776 行本次费用合计错误：实际=125000.00，应为=130000.00，差异=5000.00
+  ⚠️  第 2453 行本次费用合计错误：实际=36380.00，应为=37835.20，差异=1455.20
+  ⚠️  第 2454 行本次费用合计错误：实际=64200.00，应为=66768.00，差异=2568.00
+  ⚠️  第 2455 行本次费用合计错误：实际=37289.50，应为=38781.08，差异=1491.58
+发现 115 行本次费用合计计算错误，将用粉红色标注
+
+⚠️  共发现 1822 处计算错误
+
+============================================================
+汇总完成！文件已保存为：
+  /Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_sum/2026年03月租赁机具台账_汇总.xlsx
+============================================================
+共处理 26 个 sheet
+成功汇总 26 个 sheet，共 2871 行数据
+
+处理报告：
+  ✅ 超颖: 成功 - 52 行 - 2,084,789.29 泰铢
+  ✅ 双塔: 成功 - 397 行 - 23,663,935.61 泰铢
+  ✅ 伊顿: 成功 - 608 行 - 32,178,549.18 泰铢
+  ✅ 糖厂: 成功 - 151 行 - 7,601,417.16 泰铢
+  ✅ 万源通: 成功 - 17 行 - 430,040.00 泰铢
+  ✅ 裕洲: 成功 - 67 行 - 4,041,228.72 泰铢
+  ✅ 昂纳: 成功 - 8 行 - 369,807.13 泰铢
+  ✅ 迈思科锐: 成功 - 71 行 - 5,492,388.16 泰铢
+  ✅ 联合橱柜: 成功 - 101 行 - 12,310,317.27 泰铢
+  ✅ 阳光物流: 成功 - 2 行 - 138,672.00 泰铢
+  ✅ 北新建材: 成功 - 109 行 - 9,292,188.11 泰铢
+  ✅ TOMAX+BK、沃森一期: 成功 - 47 行 - 2,361,553.70 泰铢
+  ✅ 欣旺达: 成功 - 569 行 - 53,293,393.33 泰铢
+  ✅ 胜图-沃森: 成功 - 52 行 - 3,823,238.13 泰铢
+  ✅ 伊莱特、沃森: 成功 - 200 行 - 30,813,299.50 泰铢
+  ✅ 振威特: 成功 - 33 行 - 2,485,504.70 泰铢
+  ✅ 正鑫源: 成功 - 47 行 - 3,266,344.91 泰铢
+  ✅ 搅拌站: 成功 - 14 行 - 1,726,391.26 泰铢
+  ✅ 新通联: 成功 - 62 行 - 6,475,531.38 泰铢
+  ✅ 荣泰: 成功 - 161 行 - 14,216,085.93 泰铢
+  ✅ 伟隆: 成功 - 16 行 - 1,072,759.99 泰铢
+  ✅ 信昌: 成功 - 36 行 - 2,566,467.80 泰铢
+  ✅ 永强: 成功 - 9 行 - 498,784.38 泰铢
+  ✅ 腾洋: 成功 - 13 行 - 1,048,666.66 泰铢
+  ✅ 樱花: 成功 - 2 行 - 120,445.00 泰铢
+  ✅ 合盈: 成功 - 27 行 - 797,747.60 泰铢
+
+  💰 总计: 222,169,546.90 泰铢
+
+已生成4个工作表：
+  1. '项目汇总机具费' - 项目汇总机具使用费
+  2. '项目月度金额增量' - 项目每月机具费用金额汇总
+  3. '处理报告' - 各项目处理情况统计 (包含错误率、差异金额)
+  4. '汇总' - 所有数据汇总 (共 2871 行)
+
+============================================================
+数据分析：
+============================================================
+
+🔧 按机具种类统计（Top 10）：
+  1. 挖机: 68,399,106.06 泰铢 (400 次)
+  2. 拉土车: 38,597,947.40 泰铢 (690 次)
+  3. 挖掘机: 12,449,502.21 泰铢 (71 次)
+  4. 随车吊: 11,407,387.63 泰铢 (132 次)
+  5. 塔吊: 9,290,112.63 泰铢 (65 次)
+  6. 压路机: 7,789,371.00 泰铢 (87 次)
+  7. 翻斗车: 7,564,851.14 泰铢 (68 次)
+  8. 泵车: 6,321,797.66 泰铢 (330 次)
+  9. 汽车吊: 5,265,369.90 泰铢 (60 次)
+  10. 自卸吊: 5,186,402.68 泰铢 (42 次)
+
+📊 按项目统计：
+  欣旺达项目: 53,293,393.33 泰铢 (27 种机具)
+  泰华电子项目: 32,178,549.18 泰铢 (57 种机具)
+  伊莱特项目: 30,813,299.50 泰铢 (14 种机具)
+  双塔项目: 23,663,935.61 泰铢 (56 种机具)
+  荣泰项目: 14,216,085.93 泰铢 (21 种机具)
+  联合橱柜: 12,310,317.27 泰铢 (18 种机具)
+  北新建材: 9,292,188.11 泰铢 (19 种机具)
+  糖厂项目: 7,601,417.16 泰铢 (29 种机具)
+  新通联项目: 6,475,531.38 泰铢 (13 种机具)
+  沃森项目: 6,184,791.83 泰铢 (29 种机具)
+  迈思科锐项目: 5,492,388.16 泰铢 (12 种机具)
+  裕州项目: 4,041,228.72 泰铢 (23 种机具)
+  正鑫源项目: 3,266,344.91 泰铢 (15 种机具)
+  信昌项目: 2,566,467.80 泰铢 (12 种机具)
+  振威特（土建+装修）: 2,485,504.70 泰铢 (10 种机具)
+  超颖项目: 2,084,789.29 泰铢 (15 种机具)
+  搅拌站: 1,726,391.26 泰铢 (8 种机具)
+  伟隆项目: 1,072,759.99 泰铢 (8 种机具)
+  腾洋项目: 1,048,666.66 泰铢 (5 种机具)
+  合盈项目: 797,747.60 泰铢 (7 种机具)
+  永强车业项目: 498,784.38 泰铢 (2 种机具)
+  万源通项目: 430,040.00 泰铢 (5 种机具)
+  昂纳科技: 369,807.13 泰铢 (5 种机具)
+  阳光城项目: 138,672.00 泰铢 (1 种机具)
+  樱花三期: 120,445.00 泰铢 (2 种机具)
+
+============================================================

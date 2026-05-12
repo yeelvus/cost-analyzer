@@ -25,10 +25,10 @@ from pathlib import Path
 import pandas as pd
 
 DEFAULT_SOURCE_SCRIPT = Path(
-    "/Users/wyattsun/Desktop/code/6_预算部分代码/广联达预算人材机文件统计.py"
+    "/Users/wyattsun/Desktop/code/3_预算部分代码/广联达预算人材机文件统计.py"
 )
 DEFAULT_OUTPUT_DIR = Path(
-    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/3_预算部分/5.1_主材汇总（广联达软件导出）/2_数据汇总分析"
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/3_预算部分/2_人材机_std"
 )
 SUMMARY_PREFIX = "【总汇总】所有标段_"
 SUMMARY_SHEET = "总汇总"
@@ -398,83 +398,63 @@ def build_html(payload):
 
     .overview-shell {
       padding: 18px 24px 24px;
-      overflow: auto;
+      overflow: visible;
     }
 
-    .overview-table {
-      min-width: 1460px;
-      border-radius: 24px;
-      overflow: hidden;
+    .project-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 12px;
+    }
+
+    .project-item {
+      border-radius: var(--radius-lg);
       border: 1px solid #dce8f2;
-      background: rgba(255,255,255,0.78);
+      background: rgba(255, 255, 255, 0.84);
+      box-shadow: 0 10px 24px rgba(23, 50, 74, 0.08);
+      overflow: hidden;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
     }
 
-    table {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
+    .project-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 28px rgba(23, 50, 74, 0.12);
     }
 
-    thead th {
-      position: sticky;
-      top: 0;
-      z-index: 3;
-      background: rgba(247, 252, 255, 0.98);
-      color: var(--ink);
-      border-bottom: 1px solid #d9e6f0;
-      padding: 14px 12px;
-      font-size: 13px;
-      text-align: center;
-      white-space: nowrap;
-    }
-
-    thead tr:first-child th {
-      background: linear-gradient(180deg, rgba(232,245,248,0.98), rgba(246,251,255,0.98));
-      font-size: 12px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #0f5d63;
-    }
-
-    thead th.project-col,
-    tbody td.project-col {
-      position: sticky;
-      left: 0;
-      z-index: 4;
-      min-width: 250px;
-      text-align: left;
-      background: rgba(252, 254, 255, 0.98);
-      box-shadow: 8px 0 18px rgba(203, 220, 233, 0.24);
-    }
-
-    tbody td {
-      padding: 12px;
-      border-bottom: 1px solid #e4eef6;
-      background: rgba(255,255,255,0.74);
-    }
-
-    tbody tr:hover td {
-      background: rgba(246, 252, 255, 0.98);
-    }
-
-    tbody tr.active td {
-      background: rgba(238, 255, 250, 0.98);
-    }
-
-    tbody tr.active td.project-col {
-      background: rgba(230, 255, 248, 0.98);
+    .project-item.active {
+      border-color: #7dd3c7;
+      box-shadow: 0 14px 30px rgba(15, 139, 141, 0.2);
     }
 
     .project-button {
       appearance: none;
       border: 0;
       background: transparent;
-      padding: 0;
+      padding: 14px;
       margin: 0;
       cursor: pointer;
       text-align: left;
       width: 100%;
       color: inherit;
+    }
+
+    .project-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .project-total {
+      background: #ebfbf6;
+      border: 1px solid #c5eee2;
+      color: #0f766e;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
     }
 
     .project-name {
@@ -490,17 +470,38 @@ def build_html(payload):
       flex-wrap: wrap;
       font-size: 12px;
       color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .metric-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: 96px minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .bar-cell {
       position: relative;
       min-width: 110px;
-      height: 44px;
+      height: 32px;
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      padding: 0 12px;
-      border-radius: 14px;
+      padding: 0 10px;
+      border-radius: 10px;
       background: #f6fbff;
       overflow: hidden;
       border: 1px solid #e6eff7;
@@ -511,7 +512,7 @@ def build_html(payload):
       left: 0;
       top: 0;
       bottom: 0;
-      border-radius: 14px;
+      border-radius: 10px;
       opacity: 0.96;
     }
 
@@ -531,7 +532,7 @@ def build_html(payload):
       position: relative;
       z-index: 1;
       font-variant-numeric: tabular-nums;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
       color: #0f2b42;
     }
@@ -874,8 +875,8 @@ def build_html(payload):
         justify-content: flex-start;
       }
 
-      .overview-table {
-        min-width: 1320px;
+      .project-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -904,8 +905,8 @@ def build_html(payload):
       <div class="section-head">
         <div>
           <div class="section-kicker">1. 全项目看板</div>
-          <h2>项目总览数据条（万元）</h2>
-          <p>纵向列出所有项目，横向固定展示汇总金额和五类金额（单位：万元）。点击项目名称后跳转到下方详情。</p>
+          <h2>项目总览卡片（万元）</h2>
+          <p>每个项目一张卡片，展示汇总金额与五类金额数据条（单位：万元）。点击卡片后跳转到下方详情。</p>
         </div>
       </div>
       <div class="overview-shell">
@@ -1059,58 +1060,49 @@ def build_html(payload):
     }
 
     function renderOverviewTable() {
-      const rowsHtml = projects.map((project, index) => {
-        const cells = overviewCols.map((column) => {
+      const cardsHtml = projects.map((project, index) => {
+        const bars = overviewCols.map((column) => {
           const value = num(project.metrics[column]);
           const width = barWidth(value, columnMax[column]);
           const tone = columnTone(column);
           return `
-            <td>
+            <div class="metric-row">
+              <span class="metric-label">${esc(column)}</span>
               <div class="bar-cell tone-${tone}">
                 <span class="bar-fill" style="width:${width}%"></span>
                 <span class="bar-value">${esc(fmtWan(value))}</span>
               </div>
-            </td>
+            </div>
           `;
         }).join('');
 
         const sequence = project['序号'] ? `序号 ${esc(project['序号'])}` : '未标序号';
         const currency = project['币种'] || '未标币种';
+        const totalValue = num(project.metrics[totalCol]);
 
         return `
-          <tr class="${index === selectedProjectIndex ? 'active' : ''}">
-            <td class="project-col">
-              <button class="project-button" type="button" data-project-index="${index}">
+          <article class="project-item ${index === selectedProjectIndex ? 'active' : ''}">
+            <button class="project-button" type="button" data-project-index="${index}">
+              <div class="project-head">
                 <div class="project-name">${esc(projectDisplayName(project))}</div>
-                <div class="project-meta">
-                  <span>${sequence}</span>
-                  <span>${esc(currency)}</span>
-                </div>
-              </button>
-            </td>
-            ${cells}
-          </tr>
+                <span class="project-total">${esc(fmtWan(totalValue))}</span>
+              </div>
+              <div class="project-meta">
+                <span>${sequence}</span>
+                <span>${esc(currency)}</span>
+              </div>
+              <div class="metric-list">
+                ${bars}
+              </div>
+            </button>
+          </article>
         `;
       }).join('');
 
-      const headerCells = overviewCols.map((column) => `<th>${esc(column)}</th>`).join('');
-
       document.getElementById('overviewTable').innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th class="project-col" rowspan="2">项目名称</th>
-              <th colspan="1">汇总金额（万）</th>
-              <th colspan="${detailCols.length}">五类金额（万）</th>
-            </tr>
-            <tr>
-              ${headerCells}
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
+        <div class="project-grid">
+          ${cardsHtml}
+        </div>
       `;
     }
 

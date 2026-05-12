@@ -1470,6 +1470,35 @@ def main(excel_path_override=None):
                     continue
         
         return ""
+
+    def extract_daily_rent(remark):
+        """从备注中提取日租金额（单位：泰铢）"""
+        if not remark or str(remark).strip() == "" or str(remark) == "nan":
+            return ""
+
+        remark_str = str(remark)
+
+        patterns = [
+            r'日租[\s]*([\d,.]+)[\s]*/[\s]*天',
+            r'日租[\s]*([\d,.]+)[\s]*/[\s]*日',
+            r'每天[\s]*([\d,.]+)[\s]*泰铢',
+            r'每天[\s]*([\d,.]+)',
+            r'日租[\s]*/[\s]*([\d,.]+)',
+            r'日租[\s]*([\d,.]+)(?![\d/天日小时])',
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, remark_str, re.IGNORECASE)
+            if match:
+                amount_str = match.group(1).replace(',', '')
+                try:
+                    amount = float(amount_str)
+                    if 100 <= amount <= 1000000:
+                        return amount
+                except ValueError:
+                    continue
+
+        return ""
     
     def extract_overtime_rate(remark):
         """从备注中提取加班费单价（单位：泰铢/小时）"""
@@ -1508,12 +1537,15 @@ def main(excel_path_override=None):
         return ""
     
     summary_df["月租金额_泰铢"] = summary_df["备注"].apply(extract_monthly_rent)
+    summary_df["日租金额_泰铢"] = summary_df["备注"].apply(extract_daily_rent)
     summary_df["备注加班费单价"] = summary_df["备注"].apply(extract_overtime_rate)
     
     # 统计提取成功率
     monthly_rent_count = (summary_df["月租金额_泰铢"] != "").sum()
+    daily_rent_count = (summary_df["日租金额_泰铢"] != "").sum()
     overtime_rate_count = (summary_df["备注加班费单价"] != "").sum()
     print(f"  ✅ 已从备注中提取月租金额：{monthly_rent_count}/{len(summary_df)} 行")
+    print(f"  ✅ 已从备注中提取日租金额：{daily_rent_count}/{len(summary_df)} 行")
     print(f"  ✅ 已从备注中提取加班费单价：{overtime_rate_count}/{len(summary_df)} 行")
     
     # 4. 生成年月列：根据使用日期智能推断
@@ -1599,11 +1631,11 @@ def main(excel_path_override=None):
     
     # 调整列顺序（基础字段统一为：sheet名称、项目编码、项目名称）
     col_order = [
-        "sheet名称", "项目编码", "项目名称", "开始月份", "区域", "标准机具种类", "标准型号规格",
-        "序号", "机具种类", "型号规格", "台班费_泰铢", "本次结算台班",
+        "sheet名称", "项目编码", "项目名称", "标准机具种类", "标准型号规格",
+        "序号", "台班费_泰铢", "本次结算台班",
         "加班小时", "加班费", "进出场费运费", "移动费拆装费", "结算费用_泰铢",
         "增值税7%", "机具租赁预扣税3%", "机具租赁预扣税5%", "本次费用合计",
-        "使用日期", "年月", "出租单位", "月份", "备注", "月租金额_泰铢", "备注加班费单价"
+        "使用日期", "出租单位", "月份", "备注", "月租金额_泰铢", "日租金额_泰铢", "备注加班费单价"
     ]
     
     # 检查是否所有列都存在
@@ -1615,6 +1647,7 @@ def main(excel_path_override=None):
     # 只选择存在的列进行重新排序
     existing_cols = [col for col in col_order if col in summary_df.columns]
     summary_df = summary_df[existing_cols]
+    summary_df = summary_df.rename(columns={"标准机具种类": "机具种类", "标准型号规格": "型号规格"})
     print(f"重新排序后的列: {list(summary_df.columns)}")
 
     # 5. 计算汇总金额并验证
@@ -1667,53 +1700,12 @@ def main(excel_path_override=None):
     # 6. 生成处理报告
     report_df = pd.DataFrame(report_data)
     
-    # 7. 生成按项目的机具种类费用汇总
-    print(f"\n生成详细统计报告...")
-    
-    # 按项目和月份汇总
-    project_month_stats = summary_df.groupby(['项目名称', '项目编码', '月份']).agg({
-        '本次费用合计': lambda x: x.apply(safe_to_float).sum(),
-        '序号': 'count',
-        '标准机具种类': 'nunique'
-    }).round(2)
-    project_month_stats.columns = ['费用合计(泰铢)', '使用次数', '机具种类数']
-    project_month_stats = project_month_stats.reset_index()
-    
-    # 按区域和机具种类汇总
-    region_kind_stats = summary_df.groupby(['区域', '标准机具种类']).agg({
-        '本次费用合计': lambda x: x.apply(safe_to_float).sum(),
-        '序号': 'count'
-    }).round(2)
-    region_kind_stats.columns = ['费用合计(泰铢)', '使用次数']
-    region_kind_stats = region_kind_stats.reset_index()
-    
-    # 按出租单位汇总
-    supplier_stats = summary_df.groupby('出租单位').agg({
-        '本次费用合计': lambda x: x.apply(safe_to_float).sum(),
-        '序号': 'count',
-        '标准机具种类': 'nunique',
-        '项目名称': lambda x: ', '.join(x.unique()[:3]),  # 显示前3个项目
-        '项目编码': lambda x: ', '.join([str(c) for c in x.unique()[:3] if c])
-    }).round(2)
-    supplier_stats.columns = ['费用合计(泰铢)', '使用次数', '机具种类数', '关联项目', '项目编码']
-    supplier_stats = supplier_stats.sort_values('费用合计(泰铢)', ascending=False).reset_index()
-    
-    # 月度趋势分析
-    month_trend = summary_df.groupby('月份').agg({
-        '本次费用合计': lambda x: x.apply(safe_to_float).sum(),
-        '序号': 'count',
-        '标准机具种类': 'nunique',
-        '项目名称': 'nunique'
-    }).round(2)
-    month_trend.columns = ['费用合计(泰铢)', '使用次数', '机具种类数', '项目数']
-    month_trend = month_trend.reset_index()
-    
     # 8. 处理数值列（转换为浮点数，保留原始数值类型）
     numeric_columns = [
         "台班费_泰铢", "本次结算台班", "加班小时", "加班费",
         "进出场费运费", "移动费拆装费", "结算费用_泰铢",
         "增值税7%", "机具租赁预扣税3%", "机具租赁预扣税5%", "本次费用合计",
-        "月租金额_泰铢", "备注加班费单价"
+        "月租金额_泰铢", "日租金额_泰铢", "备注加班费单价"
     ]
     
     # 注意：年月列不进行数值转换，保持文本格式
@@ -1722,7 +1714,7 @@ def main(excel_path_override=None):
     currency_columns = [
         "台班费_泰铢", "加班费", "进出场费运费", "移动费拆装费",
         "结算费用_泰铢", "增值税7%", "机具租赁预扣税3%", "机具租赁预扣税5%",
-        "月租金额_泰铢", "备注加班费单价"
+        "月租金额_泰铢", "日租金额_泰铢", "备注加班费单价"
     ]
     
     for col in numeric_columns:
@@ -1769,7 +1761,7 @@ def main(excel_path_override=None):
     project_summary_df = summary_df.groupby(['项目编码', '项目名称']).agg({
         '本次费用合计': lambda x: x.apply(safe_to_float).sum(),
         '序号': 'count',
-        '标准机具种类': 'nunique',
+        '机具种类': 'nunique',
         '出租单位': 'nunique',
         '月份': 'nunique'
     }).round(2).reset_index()
@@ -1875,11 +1867,6 @@ def main(excel_path_override=None):
         # 写入汇总表
         summary_df.to_excel(writer, sheet_name=SUMMARY_SHEET_NAME, index=False)
         
-        # 写入统计报表
-        project_month_stats.to_excel(writer, sheet_name="项目_月份统计", index=False)
-        region_kind_stats.to_excel(writer, sheet_name="区域_机具种类统计", index=False)
-        supplier_stats.to_excel(writer, sheet_name="出租单位统计", index=False)
-        month_trend.to_excel(writer, sheet_name="月度趋势", index=False)
 
         from openpyxl.styles import Alignment, Font
 
@@ -2083,49 +2070,6 @@ def main(excel_path_override=None):
         # 添加自动筛选
         ws_report.auto_filter.ref = ws_report.dimensions
         
-        # 美化统计报表
-        stats_sheets = [
-            ("项目_月份统计", project_month_stats),
-            ("区域_机具种类统计", region_kind_stats),
-            ("出租单位统计", supplier_stats),
-            ("月度趋势", month_trend)
-        ]
-        
-        for sheet_name, stats_df in stats_sheets:
-            ws = writer.sheets[sheet_name]
-            
-            # 设置首行格式
-            ws.row_dimensions[1].height = 40
-            for cell in ws[1]:
-                cell.alignment = Alignment(wrap_text=True, vertical='center', horizontal='center')
-            
-            # 设置列宽和格式
-            for col_idx, col_name in enumerate(stats_df.columns, 1):
-                max_length = len(str(col_name))
-                for row_idx in range(2, len(stats_df) + 2):
-                    cell = ws.cell(row=row_idx, column=col_idx)
-                    cell_value = cell.value
-                    
-                    # 为费用合计列和台班费列设置货币格式
-                    if col_name in ["费用合计(泰铢)", "台班费_泰铢"]:
-                        if isinstance(cell_value, str):
-                            try:
-                                cell.value = float(cell_value.replace(',', '').strip()) if cell_value.strip() else 0.0
-                            except:
-                                cell.value = 0.0
-                        cell.number_format = '#,##0.00'
-                    
-                    if cell_value:
-                        max_length = max(max_length, len(str(cell_value)))
-                
-                adjusted_width = min(max_length + 2, 50)
-                ws.column_dimensions[get_column_letter(col_idx)].width = adjusted_width
-            
-            # 冻结首行
-            ws.freeze_panes = 'A2'
-            
-            # 添加自动筛选
-            ws.auto_filter.ref = ws.dimensions
 
     # 新文件写入成功后，删除旧汇总文件
     deleted_old_files = 0
@@ -2151,35 +2095,20 @@ def main(excel_path_override=None):
         amount_str = f"{item.get('费用合计(泰铢)', 0):,.2f}" if item["状态"] == "成功" else "0.00"
         print(f"  {status_icon} {item['sheet名称']}: {item['状态']} - {item.get('数据行数', 0)} 行 - {amount_str} 泰铢")
     print(f"\n  💰 总计: {report_total:,.2f} 泰铢")
-    print(f"\n已生成8个工作表：")
+    print(f"\n已生成4个工作表：")
     print(f"  1. '{PROJECT_SUMMARY_SHEET_NAME}' - 项目汇总机具使用费")
     print(f"  2. '{PROJECT_MONTHLY_CHANGE_SHEET_NAME}' - 项目每月机具费用金额汇总")
     print(f"  3. '处理报告' - 各项目处理情况统计 (包含错误率、差异金额)")
     print(f"  4. '{SUMMARY_SHEET_NAME}' - 所有数据汇总 (共 {len(summary_df)} 行)")
-    print(f"  5. '项目_月份统计' - 按项目和月份分组汇总")
-    print(f"  6. '区域_机具种类统计' - 按区域和机具种类分组汇总")
-    print(f"  7. '出租单位统计' - 按出租单位汇总")
-    print(f"  8. '月度趋势' - 按月份汇总趋势分析")
     
     # 9. 生成筛选分析
     print(f"\n{'='*60}")
     print(f"数据分析：")
     print(f"{'='*60}")
     
-    # 按区域统计
-    print(f"\n📍 按区域统计：")
-    region_stats = summary_df.groupby('区域').agg({
-        '本次费用合计': lambda x: x.apply(safe_to_float).sum(),
-        '序号': 'count'
-    }).round(2)
-    region_stats.columns = ['费用合计(泰铢)', '数据行数']
-    region_stats = region_stats.sort_values('费用合计(泰铢)', ascending=False)
-    for region, row in region_stats.iterrows():
-        print(f"  {region}: {row['费用合计(泰铢)']:,.2f} 泰铢 ({int(row['数据行数'])} 行)")
-    
     # 按标准机具种类统计
     print(f"\n🔧 按机具种类统计（Top 10）：")
-    kind_stats = summary_df.groupby('标准机具种类').agg({
+    kind_stats = summary_df.groupby('机具种类').agg({
         '本次费用合计': lambda x: x.apply(safe_to_float).sum(),
         '序号': 'count'
     }).round(2)
@@ -2192,7 +2121,7 @@ def main(excel_path_override=None):
     print(f"\n📊 按项目统计：")
     project_stats = summary_df.groupby('项目名称').agg({
         '本次费用合计': lambda x: x.apply(safe_to_float).sum(),
-        '标准机具种类': 'nunique'
+        '机具种类': 'nunique'
     }).round(2)
     project_stats.columns = ['费用合计(泰铢)', '机具种类数']
     project_stats = project_stats.sort_values('费用合计(泰铢)', ascending=False)
