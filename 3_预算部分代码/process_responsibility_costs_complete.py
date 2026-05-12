@@ -38,6 +38,15 @@ def parse_amount(value):
     except ValueError:
         return None
 
+def normalize_header_text(value):
+    """Normalize header text for fuzzy matching across spaces/newlines/brackets."""
+    text = normalize_text(value)
+    if not text:
+        return ""
+    text = text.replace("\n", "").replace("\r", "").replace(" ", "")
+    text = text.replace("（", "(").replace("）", ")")
+    return text.lower()
+
 RAW_INPUT_PATH = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/3.1_责任成本/1_责任成本_raw")
 TARGET_BASE_PATH = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/3.1_责任成本")
 OUTPUT_FOLDER = TARGET_BASE_PATH / "2_责任成本_std"
@@ -143,8 +152,11 @@ def read_excel_data(excel_file):
             name_col = None
             amount_col = None
             amount_cols = []
+            material_col = None
+            construction_col = None
             
             for col_idx, val in enumerate(header_row):
+                normalized_header = normalize_header_text(val)
                 if val == "序号":
                     seq_col = col_idx
                 elif val and any(kw in str(val) for kw in ["名称", "描述", "子项", "项目"]):
@@ -152,6 +164,10 @@ def read_excel_data(excel_file):
                         name_col = col_idx
                 elif val and ("合价" in str(val) or "金额" in str(val)):
                     amount_cols.append(col_idx)
+                if normalized_header and ("材料合价" in normalized_header) and ("thb" in normalized_header or "泰铢" in normalized_header):
+                    material_col = col_idx
+                if normalized_header and ("施工合价" in normalized_header) and ("thb" in normalized_header or "泰铢" in normalized_header):
+                    construction_col = col_idx
 
             if amount_cols:
                 # 多金额列时智能选择：优先 THB/泰铢、综合列，并结合有效数值行数
@@ -195,7 +211,9 @@ def read_excel_data(excel_file):
             header_info = {
                 "seq_header": header_row[seq_col],
                 "name_header": header_row[name_col],
-                "amount_header": header_row[amount_col]
+                "amount_header": header_row[amount_col],
+                "material_header": header_row[material_col] if material_col is not None else "",
+                "construction_header": header_row[construction_col] if construction_col is not None else ""
             }
             
             data_rows = []
@@ -204,6 +222,8 @@ def read_excel_data(excel_file):
                 seq = row[seq_col].value if seq_col < len(row) else None
                 name = row[name_col].value if name_col < len(row) else None
                 amount = row[amount_col].value if amount_col < len(row) else None
+                material_amount = row[material_col].value if material_col is not None and material_col < len(row) else None
+                construction_amount = row[construction_col].value if construction_col is not None and construction_col < len(row) else None
                 
                 seq_str = str(seq).strip() if seq else None
                 
@@ -221,6 +241,8 @@ def read_excel_data(excel_file):
                     "序号": seq_str,
                     "名称": name,
                     "金额": amount,
+                    "材料合价（THB）": material_amount,
+                    "施工合价（THB）": construction_amount,
                     "row_idx": row_idx
                 })
             
@@ -482,6 +504,8 @@ def write_excel_output(data_rows, project_name, output_file, project_code, heade
         ws.cell(row=row_num, column=1).value = header_info.get("seq_header", "序号")
         ws.cell(row=row_num, column=2).value = header_info.get("name_header", "名称")
         ws.cell(row=row_num, column=3).value = header_info.get("amount_header", "金额（人民币）")
+        ws.cell(row=row_num, column=4).value = "材料合价（THB）"
+        ws.cell(row=row_num, column=5).value = "施工合价（THB）"
         row_num += 1
         
         for row_data in data_rows:
@@ -494,15 +518,33 @@ def write_excel_output(data_rows, project_name, output_file, project_code, heade
                 ws.cell(row=row_num, column=3).value = amount_num
             else:
                 ws.cell(row=row_num, column=3).value = amount_raw
+
+            material_raw = row_data.get("材料合价（THB）")
+            material_num = parse_amount(material_raw)
+            if material_num is not None:
+                ws.cell(row=row_num, column=4).value = material_num
+            else:
+                ws.cell(row=row_num, column=4).value = material_raw
+
+            construction_raw = row_data.get("施工合价（THB）")
+            construction_num = parse_amount(construction_raw)
+            if construction_num is not None:
+                ws.cell(row=row_num, column=5).value = construction_num
+            else:
+                ws.cell(row=row_num, column=5).value = construction_raw
             row_num += 1
 
-        # C列金额统一设置为带千分位逗号格式
+        # 金额列统一设置为带千分位逗号格式
         for r in range(2, row_num):
             ws.cell(row=r, column=3).number_format = "#,##0.00"
+            ws.cell(row=r, column=4).number_format = "#,##0.00"
+            ws.cell(row=r, column=5).number_format = "#,##0.00"
         
         ws.column_dimensions["A"].width = 12
         ws.column_dimensions["B"].width = 30
         ws.column_dimensions["C"].width = 18
+        ws.column_dimensions["D"].width = 18
+        ws.column_dimensions["E"].width = 18
         
         wb.save(output_file)
         log_message(f"✓ 生成汇总文件: {output_file.name}")
@@ -530,6 +572,7 @@ def write_complete_report(report_data, report_file):
             "项目编码", "项目名称",
             "A类总计", "B类总计", "合计金额", "合同金额汇总", "利润额", "毛利率", "税金补差",
             "利润额（扣除税金补差）", "扣除税金补差利润率",
+            "材料合价（THB）汇总", "施工合价（THB）汇总",
             "源文件夹存在", "Excel文件数量", "主文件名", "副文件数量", "复制状态", "异常标记", "输出状态",
             "原始名称", "汇总名称"
         ]
@@ -575,7 +618,8 @@ def write_complete_report(report_data, report_file):
         percent_headers = {"毛利率", "扣除税金补差利润率"}
         money_headers = {
             "A类总计", "B类总计", "合计金额", "合同金额汇总",
-            "税金补差", "利润额", "利润额（扣除税金补差）"
+            "税金补差", "利润额", "利润额（扣除税金补差）",
+            "材料合价（THB）汇总", "施工合价（THB）汇总"
         }
         percent_cols = [header_to_col[h] for h in percent_headers if h in header_to_col]
         money_cols = [header_to_col[h] for h in money_headers if h in header_to_col]
@@ -588,7 +632,8 @@ def write_complete_report(report_data, report_file):
         # 列宽：指定关键列为 20.5，其余尽量小
         wide_headers = {
             "A类总计", "B类总计", "合计金额", "合同金额汇总", "毛利率",
-            "税金补差", "利润额", "利润额（扣除税金补差）", "扣除税金补差利润率"
+            "税金补差", "利润额", "利润额（扣除税金补差）", "扣除税金补差利润率",
+            "材料合价（THB）汇总", "施工合价（THB）汇总"
         }
         for header, col_idx in header_to_col.items():
             width = 20.5 if header in wide_headers else 12
@@ -704,6 +749,20 @@ def main():
         # 处理数据
         processed_rows, category_totals = process_and_summarize(data_rows)
         contract_amount = extract_contract_amount(data_rows)
+        material_values = [
+            parse_amount(row.get("材料合价（THB）"))
+            for row in processed_rows
+        ]
+        construction_values = [
+            parse_amount(row.get("施工合价（THB）"))
+            for row in processed_rows
+        ]
+        material_total = sum(v for v in material_values if v is not None)
+        construction_total = sum(v for v in construction_values if v is not None)
+        material_has_numeric = any(v is not None for v in material_values)
+        construction_has_numeric = any(v is not None for v in construction_values)
+        has_material_col = bool(normalize_text(header_info.get("material_header", ""))) if header_info else False
+        has_construction_col = bool(normalize_text(header_info.get("construction_header", ""))) if header_info else False
         
         summary_names = [row.get("名称", "") for row in processed_rows if row.get("名称")]
         deleted_names = [name for name in original_names if name not in summary_names]
@@ -750,6 +809,7 @@ def main():
             report_dict[project_code] = {
                 "项目编码": project_code, "项目名称": final_project_name,
                 "A类总计": "", "B类总计": "", "合计金额": "", "合同金额汇总": "",
+                    "材料合价（THB）汇总": "", "施工合价（THB）汇总": "",
                 "源文件夹存在": "是", "Excel文件数量": 1, "主文件名": excel_file.name,
                 "副文件数量": 0, "复制状态": "raw直读", "异常标记": "", "输出状态": "",
                 "原始名称": "", "汇总名称": ""
@@ -763,6 +823,8 @@ def main():
                 "B类总计": category_totals.get("B", ""),
                 "合计金额": total_amount,
                 "合同金额汇总": contract_amount if contract_amount is not None else "",
+                "材料合价（THB）汇总": material_total if (has_material_col and material_has_numeric) else "",
+                "施工合价（THB）汇总": construction_total if (has_construction_col and construction_has_numeric) else "",
                 "异常标记": anomaly_msg if is_anomaly else "正常",
                 "输出状态": output_status
             })
