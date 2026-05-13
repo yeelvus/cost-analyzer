@@ -13,7 +13,8 @@ from typing import Dict, Tuple
 CONFIG = {
     "default_contract_root": "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑",
     "contract_group_keywords": ["总包合同", "分包合同"],
-    "hidden_items": {".*", "Thumbs.db", "desktop.ini", "__MACOSX"}
+    "hidden_items": {".*", "Thumbs.db", "desktop.ini", "__MACOSX"},
+    "contract_extensions": ('.pdf', '.doc', '.docx', '.xls', '.xlsx')
 }
 
 # ==================== JSON字段顺序定义 ====================
@@ -84,6 +85,20 @@ def normalize_contract_type(folder_name: str) -> str:
     return ""
 
 
+def get_unique_path(path: str) -> str:
+    """若路径已存在，生成带序号的新路径，避免覆盖"""
+    if not os.path.exists(path):
+        return path
+
+    base, ext = os.path.splitext(path)
+    idx = 1
+    while True:
+        candidate = f"{base}_{idx}{ext}"
+        if not os.path.exists(candidate):
+            return candidate
+        idx += 1
+
+
 # ==================== JSON 更新核心 ====================
 def ensure_json_file(folder_path: str, log_file: str, contract_type: str):
     """强制更新合同信息.json，并严格控制字段顺序"""
@@ -149,13 +164,48 @@ def process_project_folder(contract_path: str, contract_type: str, log_path: str
     log_operation(log_path, f"开始处理: {contract_path}")
     stats["processed_folders"] += 1
 
+    # 先处理直接散落在项目目录中的合同文件：自动建合同文件夹并移动文件
+    for item in os.listdir(contract_path):
+        if is_hidden(item):
+            continue
+
+        item_path = os.path.join(contract_path, item)
+        if not os.path.isfile(item_path):
+            continue
+
+        if not item.lower().endswith(CONFIG["contract_extensions"]):
+            continue
+
+        contract_folder_name = os.path.splitext(item)[0].strip() or "未命名合同"
+        target_folder = os.path.join(contract_path, contract_folder_name)
+
+        if os.path.exists(target_folder) and not os.path.isdir(target_folder):
+            target_folder = get_unique_path(os.path.join(contract_path, f"{contract_folder_name}_合同"))
+
+        if not os.path.exists(target_folder):
+            os.makedirs(target_folder, exist_ok=True)
+            stats["created_folders"] += 1
+            print(f"   ├─ 新建合同文件夹: {os.path.basename(target_folder)}")
+            log_operation(log_path, f"新建合同文件夹: {target_folder}")
+
+        target_file = get_unique_path(os.path.join(target_folder, item))
+        try:
+            shutil.move(item_path, target_file)
+            stats["moved_files"] += 1
+            print(f"   ├─ 移动合同文件: {item} -> {os.path.basename(target_folder)}")
+            log_operation(log_path, f"移动文件: {item_path} -> {target_file}")
+        except Exception as e:
+            print(f"   ❌ 移动文件失败: {item}，原因: {e}")
+            log_operation(log_path, f"移动失败: {item_path}，原因: {e}")
+
+    # 再处理合同文件夹，补齐/更新JSON
     for item in os.listdir(contract_path):
         item_path = os.path.join(contract_path, item)
         if not os.path.isdir(item_path) or is_hidden(item):
             continue
 
         files = os.listdir(item_path)
-        has_contract_file = any(f.lower().endswith(('.pdf', '.doc', '.docx', '.xls', '.xlsx')) 
+        has_contract_file = any(f.lower().endswith(CONFIG["contract_extensions"]) 
                                for f in files if not is_hidden(f))
         has_json = "合同信息.json" in files
 
@@ -203,6 +253,8 @@ if __name__ == "__main__":
 
         print("\n=== 处理完成 ===")
         print(f"共处理项目文件夹: {stats['processed_folders']} 个")
+        print(f"新建合同文件夹: {stats['created_folders']} 个")
+        print(f"移动合同文件: {stats['moved_files']} 个")
 
     except Exception as e:
         print(f"程序异常: {e}")
