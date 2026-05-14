@@ -30,6 +30,8 @@ SETTLEMENT_CHECKS = [
 
 # 这些列不参与统计且不输出到Excel
 OUTPUT_EXCLUDED_COLUMNS = {
+    "对方单位公司名称",
+    "对方公司名称",
     "竣工结算资料",
     "合同结算额",
     "结算金额",
@@ -344,8 +346,7 @@ for current_root, dirs, files in os.walk(root_dir):
             "项目状态": project_status,
             "项目编码": project_code,
             "项目名称": project_name,
-            "合同子文件夹": sub,
-            "对方单位公司名称": fields.get("对方单位公司名称", ""),
+            "合同名称": os.path.basename(sub_abs_path),
             "合同编号": fields.get("合同编号", ""),
             "合同签订日期": fields.get("合同签订日期", ""),
             "币种": fields.get("币种", ""),
@@ -384,7 +385,7 @@ if unmatched_projects:
 # =========================
 # 写入 Excel + 列排序（保持原有逻辑）
 # =========================
-fixed_cols = ["项目状态", "项目编码", "项目名称", "合同子文件夹", "对方单位公司名称", "币种", "合同金额", "有PDF", "有Word", "有Excel"]
+fixed_cols = ["项目状态", "项目编码", "项目名称", "合同名称", "币种", "合同金额", "有PDF", "有Word", "有Excel"]
 settlement_cols = [check["name"] for check in SETTLEMENT_CHECKS if check["name"] not in OUTPUT_EXCLUDED_COLUMNS]
 
 default_cols_order = fixed_cols + ["汇率", "金额（万泰铢）"] + settlement_cols
@@ -429,6 +430,9 @@ with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
                 )
                 df = df.sort_values(by="_date_sort", ascending=False)
                 df = df.drop(columns=["_date_sort"])
+
+            # 额外输出一个“不分类汇总”的明细sheet（仅明细，不插入分类汇总行）
+            detail_final = df.copy()
             
             # 分类汇总逻辑（保持不变）
             grouped = []
@@ -446,8 +450,8 @@ with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
                     sum_row["项目编码"] = "" if code is None else str(code)
                 if "项目名称" in sum_row:
                     sum_row["项目名称"] = "" if name is None else str(name)
-                if "合同子文件夹" in sum_row:
-                    sum_row["合同子文件夹"] = "（分类汇总）"
+                if "合同名称" in sum_row:
+                    sum_row["合同名称"] = "（分类汇总）"
                 if "币种" in sum_row:
                     sum_row["币种"] = cur
                 if "合同签订日期" in sum_row:
@@ -486,18 +490,18 @@ with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
             
             final["汇率"] = final.apply(lambda r: _choose_rate(r.to_dict()), axis=1)
             final["金额（万泰铢）"] = ""
-            
+
+            detail_final["汇率"] = detail_final.apply(lambda r: _choose_rate(r.to_dict()), axis=1)
+            detail_final["金额（万泰铢）"] = ""
+
             final.to_excel(writer, index=False, sheet_name=kw[:31])
+            detail_sheet_name = f"{kw}_不分类汇总"[:31]
+            detail_final.to_excel(writer, index=False, sheet_name=detail_sheet_name)
 
 # =========================
 # 格式化 Excel（保持原格式化逻辑）
 # =========================
 wb = load_workbook(output_path)
-folder_paths = {}
-for kw, rows in all_data.items():
-    for rec in rows:
-        key = (kw, rec.get("项目名称", ""), rec["合同子文件夹"])
-        folder_paths[key] = rec["_folder_path"]
 
 for sheet_name in wb.sheetnames:
     ws = wb[sheet_name]
@@ -519,7 +523,7 @@ for sheet_name in wb.sheetnames:
     rate_col = col_map.get("汇率")
     money_col = col_map.get("合同金额")
     target_col = col_map.get("金额（万泰铢）")
-    subfolder_col = col_map.get("合同子文件夹")
+    subfolder_col = col_map.get("合同名称")
     proj_col = col_map.get('项目名称')
     
     for r_idx in range(2, ws.max_row + 1):
@@ -536,19 +540,30 @@ for sheet_name in wb.sheetnames:
                     start -= 1
                 ws[f"{target_col}{r_idx}"] = f"=SUM({target_col}{start}:{target_col}{r_idx-1})"
         else:
-            key = (sheet_name, proj_val, sub_val)
-            folder_path = folder_paths.get(key, "")
-            if folder_path and os.path.isdir(folder_path) and subfolder_col:
-                safe_path = folder_path.replace("\\", "/")
-                cell = ws[f"{subfolder_col}{r_idx}"]
-                cell.hyperlink = f"file:///{safe_path}"
-                cell.font = Font(color="0000FF", underline="single")
-                cell.style = "Hyperlink"
-            
             if target_col and rate_col and money_col:
                 ws[f"{target_col}{r_idx}"] = f"=({money_col}{r_idx}*{rate_col}{r_idx}/10000)"
+
+    # 为每个项目创建可折叠行分组（明细行），汇总行保持可见
+    if proj_col and subfolder_col:
+        block_start = 2
+        for r_idx in range(2, ws.max_row + 1):
+            sub_val = ws[f"{subfolder_col}{r_idx}"].value
+            if sub_val == "（分类汇总）":
+                detail_start = block_start
+                detail_end = r_idx - 1
+                if detail_end >= detail_start:
+                    ws.row_dimensions.group(detail_start, detail_end, outline_level=1, hidden=False)
+                block_start = r_idx + 1
+
+        # 显示Excel大纲分组符号，并指定汇总行在明细下方
+        ws.sheet_properties.outlinePr.summaryBelow = True
+        ws.sheet_properties.outlinePr.applyStyles = True
     
     # 格式设置
+    if money_col:
+        for cell in ws[money_col][1:]:
+            cell.number_format = '#,##0.00'
+
     if target_col:
         for cell in ws[target_col][1:]:
             cell.number_format = '#,##0.00'
