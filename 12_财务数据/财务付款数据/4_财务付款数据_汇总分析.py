@@ -14,7 +14,7 @@ from openpyxl.utils import get_column_letter
 
 # ====================== 配置区 ======================
 class Config:
-    INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_财务付款数据/B_财务付款_std"
+    INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_财务付款数据/A_财务付款_raw"
     
     # 输出路径（同时支持两个位置）
     OUTPUT_Z = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report/财务付款数据汇总.xlsx"
@@ -24,6 +24,44 @@ class Config:
     SUBJECT_WIDE_SHEET = "一级二级科目宽表"
     SUBJECT_SUMMARY_ROW = "一级科目汇总"
     PROJECT_LEVEL1_SHEET = "项目一级科目汇总"
+
+
+def iter_excel_files(input_root: Path) -> List[Path]:
+    excel_files: List[Path] = []
+    seen: set[Path] = set()
+    for pattern in ("*.xlsx", "*.xls", "*.xlsm"):
+        for path in input_root.rglob(pattern):
+            if not path.is_file() or path.name.startswith("~$"):
+                continue
+            resolved = path.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            excel_files.append(path)
+    return sorted(excel_files)
+
+
+def infer_time_tag_from_path(file_path: Path, input_root: Path) -> str:
+    candidates: List[str] = []
+
+    try:
+        rel_parts = file_path.relative_to(input_root).parts
+    except ValueError:
+        rel_parts = file_path.parts
+
+    for part in rel_parts[:-1]:
+        candidates.append(part)
+    candidates.append(file_path.stem)
+
+    for text in reversed(candidates):
+        tag = parse_folder_tag(text)
+        digits = "".join(ch for ch in safe_text(tag) if ch.isdigit())
+        if len(digits) >= 8 and digits.startswith("20"):
+            return digits[:8]
+        if len(digits) >= 6 and digits.startswith("20"):
+            return digits[:6]
+
+    return ""
 
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -286,15 +324,10 @@ def build_subject_wide_payload() -> Dict[str, object]:
         raise FileNotFoundError(f"输入目录不存在: {input_root}")
 
     rows: List[Dict[str, object]] = []
-    for folder in sorted(input_root.iterdir()):
-        if not folder.is_dir():
-            continue
-
-        print(f"\n处理科目目录: {folder.name}")
-        for file_path in folder.glob("*.xlsx"):
-            if file_path.name.startswith("~$"):
-                continue
-            rows.extend(extract_subject_rows(file_path))
+    excel_files = iter_excel_files(input_root)
+    print(f"\n检测到Excel文件数: {len(excel_files)}")
+    for file_path in excel_files:
+        rows.extend(extract_subject_rows(file_path))
 
     if not rows:
         return {
@@ -343,14 +376,9 @@ def build_project_level1_summary_dataframe() -> pd.DataFrame:
         raise FileNotFoundError(f"输入目录不存在: {input_root}")
 
     rows: List[Dict[str, object]] = []
-    for folder in sorted(input_root.iterdir()):
-        if not folder.is_dir():
-            continue
-
-        for file_path in folder.glob("*.xlsx"):
-            if file_path.name.startswith("~$"):
-                continue
-            rows.extend(extract_subject_rows(file_path))
+    excel_files = iter_excel_files(input_root)
+    for file_path in excel_files:
+        rows.extend(extract_subject_rows(file_path))
 
     if not rows:
         return pd.DataFrame(columns=["项目编码", "项目名称"])
@@ -450,19 +478,13 @@ def build_summary_dataframe() -> pd.DataFrame:
         raise FileNotFoundError(f"输入目录不存在: {input_root}")
 
     rows = []
-    for folder in sorted(input_root.iterdir()):
-        if not folder.is_dir():
-            continue
-
-        ymd = parse_folder_tag(folder.name)
-        print(f"\n处理目录: {folder.name}")
-
-        for file_path in folder.glob("*.xlsx"):
-            if file_path.name.startswith("~$"):
-                continue
-            file_rows = extract_project_monthly_rows(file_path, ymd)
-            if file_rows:
-                rows.extend(file_rows)
+    excel_files = iter_excel_files(input_root)
+    print(f"\n检测到Excel文件数: {len(excel_files)}")
+    for file_path in excel_files:
+        ymd = infer_time_tag_from_path(file_path, input_root)
+        file_rows = extract_project_monthly_rows(file_path, ymd)
+        if file_rows:
+            rows.extend(file_rows)
 
     if not rows:
         return pd.DataFrame(columns=["项目编码", "项目名称"] + Config.AMOUNT_COLUMNS)
@@ -485,28 +507,22 @@ def build_monthly_wide_dataframe() -> pd.DataFrame:
         raise FileNotFoundError(f"输入目录不存在: {input_root}")
 
     rows = []
-    for folder in sorted(input_root.iterdir()):
-        if not folder.is_dir():
-            continue
-
-        ymd = parse_folder_tag(folder.name)
-
-        for file_path in folder.glob("*.xlsx"):
-            if file_path.name.startswith("~$"):
-                continue
-            file_rows = extract_project_monthly_rows(file_path, ymd)
-            for row in file_rows:
-                month_key = ymd_to_month(safe_text(row.get("年月日")))
-                rows.append(
-                    {
-                        "项目编码": safe_text(row.get("项目编码")),
-                        "项目名称": safe_text(row.get("项目名称")),
-                        "月份": month_key,
-                        "实付金额": float(row.get("实付金额", 0) or 0),
-                        "增值税额": float(row.get("增值税额", 0) or 0),
-                        "月度金额汇总": float(row.get("实付金额", 0) or 0) + float(row.get("增值税额", 0) or 0),
-                    }
-                )
+    excel_files = iter_excel_files(input_root)
+    for file_path in excel_files:
+        ymd = infer_time_tag_from_path(file_path, input_root)
+        file_rows = extract_project_monthly_rows(file_path, ymd)
+        for row in file_rows:
+            month_key = ymd_to_month(safe_text(row.get("年月日")))
+            rows.append(
+                {
+                    "项目编码": safe_text(row.get("项目编码")),
+                    "项目名称": safe_text(row.get("项目名称")),
+                    "月份": month_key,
+                    "实付金额": float(row.get("实付金额", 0) or 0),
+                    "增值税额": float(row.get("增值税额", 0) or 0),
+                    "月度金额汇总": float(row.get("实付金额", 0) or 0) + float(row.get("增值税额", 0) or 0),
+                }
+            )
 
     if not rows:
         return pd.DataFrame(columns=["项目编码", "项目名称"])

@@ -160,6 +160,28 @@ def extract_time_tag(folder_name):
     return folder_name
 
 
+def infer_time_tag_from_path(file_path, input_root):
+    """从相对路径与文件名中推断时间标签，兼容后续按月新增文件。"""
+    try:
+        rel_path = os.path.relpath(file_path, input_root)
+    except ValueError:
+        rel_path = file_path
+
+    parts = [p for p in rel_path.replace("\\", "/").split("/") if p and p != "."]
+    name_no_ext = os.path.splitext(os.path.basename(file_path))[0]
+    candidates = parts[:-1] + [name_no_ext]
+
+    for text in reversed(candidates):
+        tag = str(extract_time_tag(text))
+        digits = "".join(ch for ch in tag if ch.isdigit())
+        if len(digits) >= 8 and digits.startswith("20"):
+            return digits[:8]
+        if len(digits) >= 6 and digits.startswith("20"):
+            return digits[:6]
+
+    return "未识别时间"
+
+
 def extract_month_tag(time_tag):
     digits = "".join(ch for ch in str(time_tag) if ch.isdigit())
     if len(digits) >= 6:
@@ -421,21 +443,27 @@ def process_single_sheet(file_path, sheet_name):
 
 
 def iter_excel_files(folder_path):
-    for name in sorted(os.listdir(folder_path)):
-        if name.startswith("~$"):
-            continue
-        ext = os.path.splitext(name)[1].lower()
-        if ext in {".xlsx", ".xls", ".xlsm"}:
-            yield os.path.join(folder_path, name)
+    seen = set()
+    for root, _, files in os.walk(folder_path):
+        for name in sorted(files):
+            if name.startswith("~$"):
+                continue
+            ext = os.path.splitext(name)[1].lower()
+            if ext not in {".xlsx", ".xls", ".xlsm"}:
+                continue
+            full_path = os.path.join(root, name)
+            norm = os.path.normpath(full_path)
+            if norm in seen:
+                continue
+            seen.add(norm)
+            yield full_path
 
 
-def process_time_folder(folder_path):
-    folder_name = os.path.basename(os.path.normpath(folder_path))
+def process_time_folder(folder_name, excel_files):
     print(f"\n{'=' * 60}")
     print(f"开始处理时间目录: {folder_name}")
 
     result_parts = []
-    excel_files = list(iter_excel_files(folder_path))
     if not excel_files:
         print("  ⚠️ 未发现Excel文件，跳过")
         return []
@@ -533,19 +561,19 @@ def main():
     if not os.path.isdir(INPUT_ROOT):
         raise FileNotFoundError(f"输入目录不存在: {INPUT_ROOT}")
 
-    time_folders = [
-        os.path.join(INPUT_ROOT, name)
-        for name in sorted(os.listdir(INPUT_ROOT))
-        if os.path.isdir(os.path.join(INPUT_ROOT, name))
-    ]
-
-    if not time_folders:
-        print("未发现时间子目录，程序结束")
+    all_excel_files = list(iter_excel_files(INPUT_ROOT))
+    if not all_excel_files:
+        print("未发现Excel文件，程序结束")
         return
 
+    grouped_files = {}
+    for file_path in all_excel_files:
+        time_tag = infer_time_tag_from_path(file_path, INPUT_ROOT)
+        grouped_files.setdefault(time_tag, []).append(file_path)
+
     outputs = []
-    for folder_path in time_folders:
-        outputs.extend(process_time_folder(folder_path))
+    for time_tag in sorted(grouped_files.keys()):
+        outputs.extend(process_time_folder(time_tag, grouped_files[time_tag]))
 
     print(f"\n{'=' * 60}")
     print("处理完成")
