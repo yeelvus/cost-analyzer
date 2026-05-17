@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore")
 # ==================== 1. 参数设置 ====================
 # 自动查找最新的汇总文件
 import glob
-EXCEL_DIR = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具使用费/B_汇总文件"
+EXCEL_DIR = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_sum"
 # 兼容多种命名：优先“已汇总”，其次普通“汇总”
 excel_files = glob.glob(os.path.join(EXCEL_DIR, "*已汇总*.xlsx"))
 if not excel_files:
@@ -32,7 +32,7 @@ if not excel_files:
 EXCEL_PATH = max(excel_files, key=os.path.getmtime)  # 获取最新文件
 print(f"使用文件: {os.path.basename(EXCEL_PATH)}")
 
-OUTPUT_DIR = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具使用费/C_机具租赁分析报告"
+OUTPUT_DIR = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/C_机具租赁分析报告"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 HTML_REPORT = os.path.join(OUTPUT_DIR, f"机具租赁费用分析报告_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html")
@@ -127,6 +127,68 @@ for std_name, possible_names in column_groups.items():
 
 if rename_dict:
     df.rename(columns=rename_dict, inplace=True)
+
+
+def _clean_text(val):
+    if pd.isna(val):
+        return ''
+    text = str(val).strip()
+    return '' if text.lower() in {'', 'nan', 'none'} else text
+
+
+def _is_valid_region(val):
+    text = _clean_text(val)
+    return text not in {'', '未知区域', '未知'}
+
+
+# 若缺少“区域”列，尝试从“处理报告”回填
+if '区域' not in df.columns:
+    print("  未找到'区域'列，尝试从'处理报告'回填...")
+    df['区域'] = '未知区域'
+    try:
+        df_report_for_region = pd.read_excel(EXCEL_PATH, sheet_name='处理报告')
+        report_cols = set(df_report_for_region.columns)
+
+        if {'区域', '项目编码'}.issubset(report_cols):
+            code_region_map = {}
+            for _, r in df_report_for_region.iterrows():
+                code = _clean_text(r.get('项目编码'))
+                region = _clean_text(r.get('区域'))
+                if code and _is_valid_region(region):
+                    code_region_map.setdefault(code, region)
+            if '项目编码' in df.columns and code_region_map:
+                df['区域'] = df['项目编码'].astype(str).str.strip().map(code_region_map).fillna(df['区域'])
+
+        if {'区域', '项目名称'}.issubset(report_cols):
+            name_region_map = {}
+            for _, r in df_report_for_region.iterrows():
+                name = _clean_text(r.get('项目名称'))
+                region = _clean_text(r.get('区域'))
+                if name and _is_valid_region(region):
+                    name_region_map.setdefault(name, region)
+            if '项目名称' in df.columns and name_region_map:
+                missing_mask = (df['区域'].astype(str).str.strip() == '') | (df['区域'] == '未知区域')
+                df.loc[missing_mask, '区域'] = (
+                    df.loc[missing_mask, '项目名称'].astype(str).str.strip().map(name_region_map).fillna('未知区域')
+                )
+
+        if {'区域', 'sheet名称'}.issubset(report_cols):
+            sheet_region_map = {}
+            for _, r in df_report_for_region.iterrows():
+                sheet_name = _clean_text(r.get('sheet名称'))
+                region = _clean_text(r.get('区域'))
+                if sheet_name and _is_valid_region(region):
+                    sheet_region_map.setdefault(sheet_name, region)
+            if 'sheet名称' in df.columns and sheet_region_map:
+                missing_mask = (df['区域'].astype(str).str.strip() == '') | (df['区域'] == '未知区域')
+                df.loc[missing_mask, '区域'] = (
+                    df.loc[missing_mask, 'sheet名称'].astype(str).str.strip().map(sheet_region_map).fillna('未知区域')
+                )
+
+        known_region_count = int((df['区域'].astype(str).str.strip() != '未知区域').sum())
+        print(f"  区域回填完成: 已识别 {known_region_count} 行，未知 {len(df) - known_region_count} 行")
+    except Exception as e:
+        print(f"  警告: 区域回填失败，将使用默认值'未知区域'。原因: {e}")
 
 # 必填列检查
 required = ['区域', '标准机具种类', '型号规格', '月份', '台班费_泰铢', '本次结算台班']
