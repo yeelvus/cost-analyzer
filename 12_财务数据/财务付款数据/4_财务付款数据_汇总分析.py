@@ -14,11 +14,12 @@ from openpyxl.utils import get_column_letter
 
 # ====================== 配置区 ======================
 class Config:
-    INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_财务付款数据/A_财务付款_raw"
+    INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_财务付款数据/B_财务付款_std"
     
     # 输出路径（同时支持两个位置）
     OUTPUT_Z = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report/财务付款数据汇总.xlsx"
     OUTPUT_ORIGINAL = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_财务付款数据/C_财务付款_sum/财务付款数据汇总.xlsx"
+    EXCLUDED_SCAN_DIRS = {"C_财务付款_sum"}
     
     AMOUNT_COLUMNS = ["应付金额", "预扣税额", "实付金额", "增值税额", "不含税额"]
     SUBJECT_WIDE_SHEET = "一级二级科目宽表"
@@ -32,6 +33,8 @@ def iter_excel_files(input_root: Path) -> List[Path]:
     for pattern in ("*.xlsx", "*.xls", "*.xlsm"):
         for path in input_root.rglob(pattern):
             if not path.is_file() or path.name.startswith("~$"):
+                continue
+            if any(part in Config.EXCLUDED_SCAN_DIRS for part in path.parts):
                 continue
             resolved = path.resolve()
             if resolved in seen:
@@ -260,6 +263,29 @@ def subject_sort_key(value: str):
     return (1, text)
 
 
+def parse_project_from_filename(file_path: Path) -> tuple[str, str]:
+    """从文件名提取项目编码与项目名称，格式示例: THCC-2023-001_华谊项目。"""
+    stem = safe_text(file_path.stem)
+    if not stem:
+        return "", ""
+
+    match = re.match(r"^([A-Za-z0-9\-]+)[_\-\s]+(.+)$", stem)
+    if not match:
+        return "", stem
+
+    code = safe_text(match.group(1))
+    name = safe_text(match.group(2))
+    return code, name
+
+
+def pick_first_valid_text(series: pd.Series) -> str:
+    values = series.dropna().astype(str).str.strip()
+    values = values[~values.str.lower().isin(["", "nan", "none"])]
+    if values.empty:
+        return ""
+    return safe_text(values.iloc[0])
+
+
 def extract_subject_rows(file_path: Path) -> List[Dict[str, object]]:
     try:
         df = pd.read_excel(file_path)
@@ -286,21 +312,13 @@ def extract_subject_rows(file_path: Path) -> List[Dict[str, object]]:
     if df.empty:
         return []
 
-    project_code = ""
-    if "项目编码" in df.columns:
-        codes = df["项目编码"].dropna().astype(str).str.strip()
-        codes = codes[~codes.str.lower().isin(["", "nan", "none"])]
-        if not codes.empty:
-            project_code = codes.iloc[0]
-
-    project_name = ""
-    if "项目名称" in df.columns:
-        names = df["项目名称"].dropna().astype(str).str.strip()
-        names = names[~names.str.lower().isin(["", "nan", "none"])]
-        if not names.empty:
-            project_name = names.iloc[0]
+    file_code, file_name = parse_project_from_filename(file_path)
+    project_code = pick_first_valid_text(df["项目编码"]) if "项目编码" in df.columns else ""
+    project_name = pick_first_valid_text(df["项目名称"]) if "项目名称" in df.columns else ""
+    if not project_code:
+        project_code = file_code
     if not project_name:
-        project_name = file_path.stem
+        project_name = file_name or file_path.stem
 
     rows: List[Dict[str, object]] = []
     for _, row in df.iterrows():
@@ -430,22 +448,14 @@ def extract_project_monthly_rows(file_path: Path, ymd: str) -> List[Dict]:
     source_ym = extract_month_from_dataframe(df, ymd)
 
     # 项目编码 & 名称
-    project_code = ""
-    if "项目编码" in df.columns:
-        codes = df["项目编码"].dropna().astype(str).str.strip()
-        codes = codes[~codes.str.lower().isin(["", "nan", "none"])]
-        if not codes.empty:
-            project_code = codes.iloc[0]
+    file_code, file_name = parse_project_from_filename(file_path)
+    project_code = pick_first_valid_text(df["项目编码"]) if "项目编码" in df.columns else ""
+    project_name = pick_first_valid_text(df["项目名称"]) if "项目名称" in df.columns else ""
 
-    project_name = ""
-    if "项目名称" in df.columns:
-        names = df["项目名称"].dropna().astype(str).str.strip()
-        names = names[~names.str.lower().isin(["", "nan", "none"])]
-        if not names.empty:
-            project_name = names.iloc[0]
-
+    if not project_code:
+        project_code = file_code
     if not project_name:
-        project_name = file_path.stem
+        project_name = file_name or file_path.stem
 
     for col in Config.AMOUNT_COLUMNS:
         if col not in df.columns:
@@ -491,14 +501,14 @@ def build_summary_dataframe() -> pd.DataFrame:
 
     df = pd.DataFrame(rows)
 
-    # 按项目聚合全部月份数据（总体汇总）
-    agg_map = {col: (col, "sum") for col in Config.AMOUNT_COLUMNS}
-    overall = df.groupby(["项目名称"], dropna=False).agg(
-        项目编码=("项目编码", lambda s: next((v for v in s if safe_text(v)), "")),
-        **agg_map,
-    ).reset_index()
+    # 按“项目编码 + 项目名称”聚合，避免同名项目错配编码
+    overall = (
+        df.groupby(["项目编码", "项目名称"], dropna=False, as_index=False)[Config.AMOUNT_COLUMNS]
+        .sum()
+        .reset_index(drop=True)
+    )
 
-    return overall[["项目编码", "项目名称"] + Config.AMOUNT_COLUMNS].reset_index(drop=True)
+    return overall[["项目编码", "项目名称"] + Config.AMOUNT_COLUMNS]
 
 
 def build_monthly_wide_dataframe() -> pd.DataFrame:
