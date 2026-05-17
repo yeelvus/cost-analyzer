@@ -25,8 +25,26 @@ SUMMARY_DIR_CANDIDATES = [
     SUMMARY_DIR,
     "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_整理标准化汇总分包签订合同文件",
 ]
-CONTRACT_BASE_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑"
+CONTRACT_BASE_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑/B_分包合同"
 AMOUNT_TOLERANCE = 10.0  # 金额容差（泰铢）
+
+
+def normalize_text(value) -> str:
+    """将值标准化为可比较文本，空值/nan/none 统一返回空字符串。"""
+    if value is None or pd.isna(value):
+        return ''
+    text = str(value).strip()
+    return '' if text.lower() in {'', 'nan', 'none'} else text
+
+
+def ensure_contract_no(project_code: str, contract_no_value, row_id: int) -> str:
+    """为空合同编号生成兜底编号，确保可创建且可追溯。"""
+    contract_no = normalize_text(contract_no_value)
+    if contract_no:
+        return contract_no
+
+    safe_project_code = re.sub(r'[^A-Za-z0-9\-]', '', normalize_text(project_code)) or 'UNKNOWN'
+    return f"AUTO-{safe_project_code}-{row_id:04d}"
 
 
 def resolve_summary_dir(candidates: List[str]) -> str:
@@ -97,33 +115,21 @@ def find_project_folder(contract_base_dir: str, project_code: str) -> Tuple[Opti
         (项目文件夹路径, 分包合同文件夹路径) 或 (None, None) 如果未找到
     """
     
-    # 搜索所有一级子文件夹（A_在建项目、AS_收尾项目等）
+    # 目录结构：B_分包合同/分类(在建/收尾/已完工)/项目编码_项目名/合同目录
+    # 因此项目目录本身就是“分包合同文件夹”
     for category_dir in os.listdir(contract_base_dir):
         category_path = os.path.join(contract_base_dir, category_dir)
-        
-        # 只处理文件夹
+
         if not os.path.isdir(category_path) or category_dir.startswith('.'):
             continue
-        
-        # 搜索该分类下包含项目编码的文件夹
+
         for item in os.listdir(category_path):
             item_path = os.path.join(category_path, item)
-            
             if not os.path.isdir(item_path):
                 continue
-            
-            # 检查文件夹名称是否包含项目编码
+
             if project_code in item:
-                # 找到项目文件夹，现在查找分包合同文件夹
-                for subitem in os.listdir(item_path):
-                    subitem_path = os.path.join(item_path, subitem)
-                    
-                    if not os.path.isdir(subitem_path):
-                        continue
-                    
-                    # 检查是否是分包合同文件夹 (F_项目编码_分包合同)
-                    if subitem.startswith('F_') and '分包合同' in subitem:
-                        return item_path, subitem_path
+                return item_path, item_path
     
     return None, None
 
@@ -264,7 +270,7 @@ def analyze_contract_completeness(excel_file: str, contract_base_dir: str) -> Di
             })
             
             # 标记所有合同为缺失
-            for _, contract_row in project_contracts.iterrows():
+            for seq, (_, contract_row) in enumerate(project_contracts.iterrows(), start=1):
                 # 跳过合同额为空或0的记录
                 contract_amount = contract_row[amount_col]
                 if pd.isna(contract_amount) or contract_amount == 0:
@@ -284,10 +290,12 @@ def analyze_contract_completeness(excel_file: str, contract_base_dir: str) -> Di
                 else:
                     company_name = str(company_name).strip()
                 
+                contract_no = ensure_contract_no(project_code, contract_row[contract_no_col], seq)
+
                 analysis_result['missing_contracts'].append({
                     'project_code': project_code,
                     'project_name': project_name,
-                    'contract_no': contract_row[contract_no_col],
+                    'contract_no': contract_no,
                     'work_scope': work_scope,
                     'amount': contract_amount,
                     'company_name': company_name,
@@ -313,8 +321,8 @@ def analyze_contract_completeness(excel_file: str, contract_base_dir: str) -> Di
             print(f"  ✗ 金额不匹配（差异: {diff:.2f} 泰铢）")
             
             # 检查缺失的合同
-            for _, contract_row in project_contracts.iterrows():
-                contract_no = str(contract_row[contract_no_col]).strip()
+            for seq, (_, contract_row) in enumerate(project_contracts.iterrows(), start=1):
+                contract_no = ensure_contract_no(project_code, contract_row[contract_no_col], seq)
                 
                 # 跳过合同额为空或0的记录
                 contract_amount = contract_row[amount_col]
@@ -501,12 +509,14 @@ def create_missing_contracts(missing_contracts: List[Dict], dry_run: bool = True
     
     for idx, contract in enumerate(missing_contracts, 1):
         try:
-            contract_no = contract['contract_no']
+            contract_no = normalize_text(contract.get('contract_no'))
             project_code = contract['project_code']
             project_name = contract['project_name']
             work_scope = contract['work_scope']
             amount = contract['amount']
             company_name = contract.get('company_name', '')
+            if not contract_no:
+                contract_no = ensure_contract_no(project_code, '', idx)
             
             print(f"\n[{idx}/{len(missing_contracts)}] {contract_no}")
             print(f"  项目: {project_name}")

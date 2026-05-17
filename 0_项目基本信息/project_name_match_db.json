@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17 11:16:44",
+  "updated_at": "2026-05-17 15:30:13",
   "projects": {
     "永强车业项目": {
       "project_code": "THCC-2025-005",
@@ -443,7 +443,8 @@
       "project_code": "THCC-2026-002",
       "target_status": "A_在建项目",
       "aliases": [
-        "东威"
+        "东威",
+        "东威项目"
       ]
     },
     "中石泰国工厂": {
