@@ -1,4 +1,4 @@
-impo.t os
+import os
 import re
 import sys
 import importlib.util
