@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-17 15:30:13",
+  "updated_at": "2026-05-27 11:41:54",
   "projects": {
     "永强车业项目": {
       "project_code": "THCC-2025-005",
@@ -516,6 +516,16 @@
       "aliases": []
     },
     "屋顶光伏": {
+      "project_code": "需手动核对",
+      "target_status": "需手动核对",
+      "aliases": []
+    },
+    "2026年4月份": {
+      "project_code": "需手动核对",
+      "target_status": "需手动核对",
+      "aliases": []
+    },
+    "泰国子公司": {
       "project_code": "需手动核对",
       "target_status": "需手动核对",
       "aliases": []

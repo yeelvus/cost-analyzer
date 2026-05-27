@@ -741,18 +741,53 @@ def get_row_yellow_signature(worksheet, row_idx: int, usage_col: int | None, mon
     return None
 
 
-def process_sheet(worksheet) -> dict[str, Any]:
+def find_usage_date_col_in_header_row(worksheet, header_row: int) -> int | None:
+    """在表头行中查找“使用日期/使用时间”列。"""
+    preferred_headers = (
+        "使用日期",
+        "使用时间",
+        "使用期间",
+        "起止时间",
+        "起止日期",
+    )
+    for col_idx in range(1, worksheet.max_column + 1):
+        text = normalize_header_text(worksheet.cell(header_row, col_idx).value)
+        if not text:
+            continue
+        if any(h in text for h in preferred_headers):
+            return col_idx
+    return None
+
+
+def process_sheet(worksheet, file_year_month: tuple[int, int] | None = None) -> dict[str, Any]:
     detection = detect_header_and_columns(worksheet)
 
+    # 输出前先裁剪：删除表头之前的所有行，仅保留表头及其后数据。
+    if detection.header_row > 1:
+        worksheet.delete_rows(1, detection.header_row - 1)
+        detection.header_row = 1
+
     if detection.month_col is None:
-        return {
-            "sheet": worksheet.title,
-            "status": "skipped",
-            "reason": "未找到月份列",
-            "header_row": detection.header_row,
-            "usage_col": detection.usage_col,
-            "month_col": None,
-        }
+        if file_year_month is None:
+            return {
+                "sheet": worksheet.title,
+                "status": "skipped",
+                "reason": "未找到月份列",
+                "header_row": detection.header_row,
+                "usage_col": detection.usage_col,
+                "month_col": None,
+            }
+
+        # 按月更新文件：若缺失月份列，则在“使用日期/使用时间”后新增“月份”列。
+        usage_date_col = find_usage_date_col_in_header_row(worksheet, detection.header_row)
+        if usage_date_col is not None:
+            insert_col = usage_date_col + 1
+            worksheet.insert_cols(insert_col)
+            detection.month_col = insert_col
+        else:
+            detection.month_col = worksheet.max_column + 1
+        worksheet.cell(detection.header_row, detection.month_col).value = "月份"
+        detection.month_source = "filename_added"
 
     row_states: list[RowState] = []
     previous_yellow_signature: str | None = None
@@ -799,7 +834,8 @@ def process_sheet(worksheet) -> dict[str, Any]:
     filled_by_yellow = 0
     filled_by_context = 0
     updated_cells = 0
-    explicit_sources = {"usage_explicit", "month_explicit", "yellow_explicit"}
+    explicit_sources = {"usage_explicit", "month_explicit", "yellow_explicit", "month_from_filename"}
+    fixed_month_mode = detection.month_source == "filename_added" and file_year_month is not None
 
     last_valid: tuple[int, int] | None = None
     active_yellow_signature: str | None = None
@@ -821,7 +857,11 @@ def process_sheet(worksheet) -> dict[str, Any]:
         candidate: tuple[int, int] | None = None
         source = ""
 
-        if row_state.usage_candidate is not None:
+        if fixed_month_mode:
+            candidate = file_year_month
+            source = "month_from_filename"
+            parsed_by_month += 1
+        elif row_state.usage_candidate is not None:
             candidate = row_state.usage_candidate
             if usage_value_has_explicit_year(row_state.usage_value):
                 source = "usage_explicit"
@@ -866,7 +906,9 @@ def process_sheet(worksheet) -> dict[str, Any]:
                 filled_by_context += 1
 
         if candidate is not None:
-            if source in explicit_sources:
+            if source == "month_from_filename":
+                row_state.final_ym = candidate
+            elif source in explicit_sources:
                 row_state.final_ym = clamp_to_current(candidate)
             else:
                 row_state.final_ym = coerce_continuous(candidate, last_valid)
@@ -940,7 +982,9 @@ def process_sheet(worksheet) -> dict[str, Any]:
         if not row_state.is_data_row:
             continue
 
-        if row_state.source in explicit_sources and row_state.final_ym is not None:
+        if row_state.source == "month_from_filename" and row_state.final_ym is not None:
+            pass
+        elif row_state.source in explicit_sources and row_state.final_ym is not None:
             row_state.final_ym = clamp_to_current(row_state.final_ym)
         else:
             row_state.final_ym = coerce_continuous(row_state.final_ym, floor)
@@ -954,6 +998,7 @@ def process_sheet(worksheet) -> dict[str, Any]:
             "usage_inferred",
             "month_explicit",
             "month_inferred",
+            "month_from_filename",
             "yellow",
             "yellow_explicit",
         }:
@@ -1002,8 +1047,11 @@ def format_column_info(column_index: int | None) -> str:
 
 def process_workbook(input_file: Path, suffix: str) -> dict[str, int | str]:
     output_file = build_output_path(input_file, suffix, DEFAULT_OUTPUT_DIR)
+    file_year_month = extract_year_month_from_name(input_file)
 
     print(f"读取文件: {input_file}")
+    if file_year_month is not None:
+        print(f"文件名月份: {format_year_month(file_year_month)}")
     workbook = load_workbook(input_file)
 
     total_parsed_rows = 0
@@ -1015,7 +1063,7 @@ def process_workbook(input_file: Path, suffix: str) -> dict[str, int | str]:
     total_unresolved_rows = 0
 
     for worksheet in workbook.worksheets:
-        result = process_sheet(worksheet)
+        result = process_sheet(worksheet, file_year_month=file_year_month)
         if result["status"] == "skipped":
             print(
                 f"工作表 {result['sheet']}: 表头行={result['header_row']}，"

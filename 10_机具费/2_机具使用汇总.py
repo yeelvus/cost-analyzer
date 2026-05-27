@@ -56,6 +56,11 @@ OUTPUT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具�
 OUTPUT_FILENAME_PREFIX = "机具费汇总"
 OUTPUT_FILE_SUFFIX = "汇总"
 
+# 运行模式：
+# - all: 将 B_机具费_std 下所有标准化文件一次性汇总为一个总台账
+# - monthly_pair: 按“上月+当月=>当月”组合汇总（历史模式）
+RUN_MODE = "all"
+
 PROJECT_MATCH_DB_PATH = os.path.join("/Users/wyattsun/Desktop/code/0_项目基本信息", 'project_name_match_db.json')
 
 # 汇总后新 sheet 的名字
@@ -108,7 +113,12 @@ def pick_latest_standardized_file(input_dir):
 
 
 def list_all_standardized_files(input_dir):
-    """列出标准化目录下全部待汇总文件（优先 *_标准化.xlsx）。"""
+    """列出标准化目录下全部待汇总文件。
+
+    规则：
+    1) *_标准化.xlsx 放前面
+    2) 其余 .xlsx 也一并纳入，避免漏掉仅放在标准化目录但文件名未带“_标准化”的月度台账
+    """
     input_path = Path(input_dir)
     if not input_path.exists():
         return []
@@ -117,14 +127,16 @@ def list_all_standardized_files(input_dir):
         p for p in input_path.glob("*_标准化.xlsx")
         if p.is_file() and not p.name.startswith("~$")
     ]
-    if preferred:
-        return sorted(preferred, key=lambda p: p.name)
 
-    fallback = [
+    all_xlsx = [
         p for p in input_path.glob("*.xlsx")
         if p.is_file() and not p.name.startswith("~$")
     ]
-    return sorted(fallback, key=lambda p: p.name)
+
+    preferred_set = {p.resolve() for p in preferred}
+    others = [p for p in all_xlsx if p.resolve() not in preferred_set]
+
+    return sorted(preferred, key=lambda p: p.name) + sorted(others, key=lambda p: p.name)
 
 
 def build_summary_output_basename(excel_path: Path) -> str:
@@ -133,6 +145,30 @@ def build_summary_output_basename(excel_path: Path) -> str:
     if stem.endswith("_标准化"):
         stem = stem[:-4]
     return stem
+
+
+MONTH_LIKE_TEXT_PATTERNS = [
+    r'^\d{1,2}$',
+    r'^\d{1,2}月$',
+    r'^\d{1,2}月份$',
+    r'^\d{4}年\d{1,2}月$',
+    r'^\d{4}年\d{1,2}月份$',
+    r'^\d{6}$',
+    r'^\d{4}-\d{1,2}$',
+    r'^\d{4}/\d{1,2}$',
+    r'^[一二三四五六七八九十]{1,2}月$',
+    r'^[一二三四五六七八九十]{1,2}月份$',
+]
+
+
+def is_month_like_text(value):
+    text = str(value).strip() if value is not None else ""
+    if not text or text == "nan":
+        return False
+    for pattern in MONTH_LIKE_TEXT_PATTERNS:
+        if re.match(pattern, text):
+            return True
+    return False
 
 def load_project_config():
     """加载项目配置文件（从合同管理系统）"""
@@ -614,6 +650,16 @@ def guess_region_from_sheet_name(sheet_name, mapping):
             return mapping[raw_project]
     return "未知区域"   # 没匹配到就给个默认值
 
+
+def guess_region_from_project_or_sheet(project_name, sheet_name, mapping):
+    """优先按项目名匹配区域，失败后回退按sheet名匹配。"""
+    project_name = str(project_name).strip() if project_name is not None else ""
+    if project_name and project_name != "nan":
+        for raw_project in sorted(mapping.keys(), key=len, reverse=True):
+            if raw_project and raw_project in project_name:
+                return mapping[raw_project]
+    return guess_region_from_sheet_name(sheet_name, mapping)
+
 def normalize_column_name(col_name):
     """标准化列名：去除空格、换行符、全角符号等"""
     if not col_name:
@@ -630,7 +676,7 @@ def normalize_column_name(col_name):
         col_name = col_name.replace(old, new)
     return col_name
 
-def find_matching_column(df_columns, target_patterns):
+def find_matching_column(df_columns, target_patterns, exact_only=False):
     """
     在DataFrame列中查找匹配目标模式的列名
     target_patterns: 列表，包含可能的列名关键词
@@ -643,10 +689,37 @@ def find_matching_column(df_columns, target_patterns):
         # 精确匹配
         if pattern_norm in normalized_cols:
             return normalized_cols[pattern_norm]
+        if exact_only:
+            continue
         # 包含匹配
         for norm_col, orig_col in normalized_cols.items():
             if pattern_norm in norm_col or norm_col in pattern_norm:
                 return orig_col
+    return None
+
+
+def find_use_project_column(df_columns):
+    """更稳健识别“使用项目”列，优先命中项目字段，排除项目说明/项目月份等干扰列。"""
+    normalized_pairs = [(normalize_column_name(col), col) for col in df_columns]
+
+    # 1) 先做精确优先
+    exact_candidates = ["使用项目", "使用项目名称", "项目名称", "项目"]
+    for pattern in exact_candidates:
+        pattern_norm = normalize_column_name(pattern)
+        for norm_col, orig_col in normalized_pairs:
+            if norm_col == pattern_norm:
+                return orig_col
+
+    # 2) 再做包含匹配，但排除明显非项目名字段
+    include_tokens = ["使用项目", "项目名称", "项目"]
+    exclude_tokens = ["月份", "说明", "备注", "编码", "状态", "经理", "区域"]
+    for norm_col, orig_col in normalized_pairs:
+        if not any(token in norm_col for token in include_tokens):
+            continue
+        if any(token in norm_col for token in exclude_tokens):
+            continue
+        return orig_col
+
     return None
 
 def find_header_row(ws):
@@ -865,11 +938,18 @@ def extract_project_info(ws):
     return project_name, start_month
 
 def main(excel_path_override=None):
-    if excel_path_override:
-        excel_path = Path(excel_path_override).expanduser().resolve()
+    if isinstance(excel_path_override, (list, tuple)) and excel_path_override:
+        excel_paths = [Path(p).expanduser().resolve() for p in excel_path_override]
+        print("批量模式-当前处理文件组:")
+        for p in excel_paths:
+            print(f"  - {p.name}")
+    elif excel_path_override:
+        excel_path = Path(str(excel_path_override)).expanduser().resolve()
+        excel_paths = [excel_path]
         print(f"批量模式-当前处理文件: {excel_path.name}")
     elif EXCEL_FILE_OVERRIDE and str(EXCEL_FILE_OVERRIDE).strip():
         excel_path = Path(EXCEL_FILE_OVERRIDE).expanduser().resolve()
+        excel_paths = [excel_path]
         print(f"使用手工指定文件: {excel_path}")
     else:
         picked = pick_latest_standardized_file(STANDARDIZED_INPUT_DIR)
@@ -877,11 +957,16 @@ def main(excel_path_override=None):
             print(f"找不到标准化文件：{STANDARDIZED_INPUT_DIR}")
             return
         excel_path = picked.resolve()
+        excel_paths = [excel_path]
         print(f"自动选择最新标准化文件: {excel_path.name}")
 
-    if not excel_path.exists():
-        print(f"找不到文件：{excel_path}")
-        return
+    for excel_path in excel_paths:
+        if not excel_path.exists():
+            print(f"找不到文件：{excel_path}")
+            return
+
+    # 汇总输出命名默认使用文件组中“最新月份文件”
+    primary_excel_path = excel_paths[-1]
 
     # 1. 加载映射表和项目配置
     project_mapping = load_project_mapping(PROJECT_MAPPING_JSON, PROJECT_MAPPING_TXT_LEGACY)          # 项目→区域
@@ -923,59 +1008,61 @@ def main(excel_path_override=None):
     sheet_match_results = {}
     unmatched_aliases = []
     alias_to_sheet_names = {}
-    # 2. 读取所有 sheet
-    wb = openpyxl.load_workbook(excel_path, data_only=True)
-    
     print("\n=== 第一遍扫描：提取项目名称与匹配 ===")
-    for sheet_name in wb.sheetnames:
-        if sheet_name == SUMMARY_SHEET_NAME:
-            continue
-        
-        ws = wb[sheet_name]
-        project_name_from_content, _ = extract_project_info(ws)
-        
-        # 如果没有从sheet内容提取到项目名，尝试从sheet名称提取
-        if not project_name_from_content:
-            project_name_from_content = extract_project_name_from_sheet(sheet_name)
-        
-        print(f"  Sheet: {sheet_name} (内容提取: '{project_name_from_content}')")
-        
-        # 使用统一matcher：先尝试Sheet名，再尝试内容提取的项目名
-        candidate_aliases = [sheet_name]
-        if project_name_from_content and project_name_from_content != sheet_name:
-            candidate_aliases.append(project_name_from_content)
+    for source_excel_path in excel_paths:
+        wb = openpyxl.load_workbook(source_excel_path, data_only=True)
+        print(f"\n文件: {source_excel_path.name}")
+        for sheet_name in wb.sheetnames:
+            if sheet_name == SUMMARY_SHEET_NAME:
+                continue
 
-        matched_project = None
-        for alias in candidate_aliases:
-            hit = match_project(str(alias).strip(), match_db)
-            if hit:
-                matched_project = {
-                    'project_code': hit.get('project_code', ''),
-                    'project_name': hit.get('project_name', ''),
-                    'status': hit.get('target_status', ''),
-                }
-                break
+            ws = wb[sheet_name]
+            sheet_key = f"{source_excel_path.name}::{sheet_name}"
+            project_name_from_content, _ = extract_project_info(ws)
 
-        if matched_project:
-            # 保存到本轮匹配结果（由共享匹配库驱动）
-            sheet_match_results[sheet_name] = {
-                'project_code': matched_project['project_code'],
-                'project_name': matched_project['project_name'],
-                'status': matched_project.get('status', '')
-            }
-            print(f"    ✓ 匹配成功: {matched_project['project_code']} - {matched_project['project_name']}")
-        else:
-            # 未匹配，收集alias用于统一matcher弹窗
+            # 如果没有从sheet内容提取到项目名，尝试从sheet名称提取
+            if not project_name_from_content:
+                project_name_from_content = extract_project_name_from_sheet(sheet_name)
+
+            print(f"  Sheet: {sheet_name} (内容提取: '{project_name_from_content}')")
+
+            # 使用统一matcher：先尝试Sheet名，再尝试内容提取的项目名
+            candidate_aliases = [sheet_name]
+            if project_name_from_content and project_name_from_content != sheet_name:
+                candidate_aliases.append(project_name_from_content)
+
+            matched_project = None
             for alias in candidate_aliases:
-                alias = str(alias).strip()
-                if not alias:
-                    continue
-                alias_to_sheet_names.setdefault(alias, set()).add(sheet_name)
-                if is_unmatched_alias(match_db, alias):
-                    continue
-                if alias not in unmatched_aliases:
-                    unmatched_aliases.append(alias)
-            print(f"    ✗ 未找到匹配")
+                hit = match_project(str(alias).strip(), match_db)
+                if hit:
+                    matched_project = {
+                        'project_code': hit.get('project_code', ''),
+                        'project_name': hit.get('project_name', ''),
+                        'status': hit.get('target_status', ''),
+                    }
+                    break
+
+            if matched_project:
+                # 保存到本轮匹配结果（由共享匹配库驱动）
+                sheet_match_results[sheet_key] = {
+                    'project_code': matched_project['project_code'],
+                    'project_name': matched_project['project_name'],
+                    'status': matched_project.get('status', '')
+                }
+                print(f"    ✓ 匹配成功: {matched_project['project_code']} - {matched_project['project_name']}")
+            else:
+                # 未匹配，收集alias用于统一matcher弹窗
+                for alias in candidate_aliases:
+                    alias = str(alias).strip()
+                    if not alias:
+                        continue
+                    alias_to_sheet_names.setdefault(alias, set()).add(sheet_key)
+                    if is_unmatched_alias(match_db, alias):
+                        continue
+                    if alias not in unmatched_aliases:
+                        unmatched_aliases.append(alias)
+                print(f"    ✗ 未找到匹配")
+        wb.close()
     
     # 如果有未匹配别名，使用统一matcher弹窗
     if unmatched_aliases:
@@ -984,345 +1071,407 @@ def main(excel_path_override=None):
         save_db(PROJECT_MATCH_DB_PATH, match_db)
 
         print("\n=== 统一匹配结果回填 ===")
-        for alias, sheet_names in alias_to_sheet_names.items():
+        for alias, sheet_keys in alias_to_sheet_names.items():
             hit = match_project(alias, match_db)
             if not hit:
                 continue
-            for sheet_name in sheet_names:
-                sheet_match_results[sheet_name] = {
+            for sheet_key in sheet_keys:
+                sheet_match_results[sheet_key] = {
                     'project_code': hit.get('project_code', ''),
                     'project_name': hit.get('project_name', ''),
                     'status': hit.get('target_status', ''),
                 }
-                print(f"  '{sheet_name}' → [{hit.get('project_code', '')}] {hit.get('project_name', '')}")
+                print(f"  '{sheet_key}' → [{hit.get('project_code', '')}] {hit.get('project_name', '')}")
 
     print(f"统一匹配结果数量：{len(sheet_match_results)}")
     
     # 重新打开工作簿开始第二遍处理
-    wb.close()
-    wb = openpyxl.load_workbook(excel_path, data_only=True)
+    for source_excel_path in excel_paths:
+        wb = openpyxl.load_workbook(source_excel_path, data_only=True)
+        print(f"\n=== 第二遍处理文件: {source_excel_path.name} ===")
+        for sheet_name in wb.sheetnames:
+            if sheet_name == SUMMARY_SHEET_NAME:
+                continue
+        
+            print(f"\n正在处理 sheet：{sheet_name}")
+            ws = wb[sheet_name]
+            sheet_key = f"{source_excel_path.name}::{sheet_name}"
+        
+            # 提取项目信息
+            project_name, start_month = extract_project_info(ws)
+            print(f"  项目名称: {project_name if project_name else '未找到'}")
+            print(f"  开始月份: {start_month if start_month else '未找到'}")
+            
+            # 查找表头行
+            header_row = find_header_row(ws)
+            if not header_row:
+                print(f"  ⚠️  未找到表头行，跳过此sheet")
+                report_data.append({
+                    "sheet名称": sheet_name,
+                    "项目名称": sheet_name,
+                    "项目编码": '',
+                    "开始月份": start_month,
+                    "状态": "失败：未找到表头",
+                    "数据行数": 0,
+                    "加班费错误行数": 0,
+                    "加班费错误率(%)": 0,
+                    "加班费差异金额(泰铢)": 0,
+                    "结算费用错误行数": 0,
+                    "结算费用错误率(%)": 0,
+                    "结算费用差异金额(泰铢)": 0,
+                    "本次费用合计错误行数": 0,
+                    "本次费用合计错误率(%)": 0,
+                    "本次费用合计差异金额(泰铢)": 0,
+                    "费用合计(泰铢)": 0
+                })
+                continue
+            
+            print(f"  表头位于第 {header_row} 行")
+            
+            # 使用pandas读取，从表头行开始
+            # 先不指定dtype让pandas读取原始数据类型，这样有助于公式计算
+            df = pd.read_excel(source_excel_path, sheet_name=sheet_name, header=header_row-1, engine='openpyxl')
+            
+            # 清理列名：去除换行符和多余空格
+            df.columns = [re.sub(r'\s+', ' ', str(c)).strip() for c in df.columns]
+            
+            # 定义标准列名及其可能的变体（用于模糊匹配）
+            column_mapping = {
+                "序号": ["序号"],
+                "使用项目": ["使用项目", "项目", "项目名称", "使用项目名称"],
+                "机具种类": ["机具种类"],
+                "型号规格": ["型号规格"],
+                "台班费_泰铢": ["台班费", "台班费泰铢", "台班费(泰铢)", "台班费 泰铢"],
+                "本次结算台班": ["本次结算台班", "结算台班", "本次结算台班（小时、天、月)", "本次结算台班(小时、天、月)", "本次结算台班 （小时、天、月)"],
+                "加班小时": ["加班", "加班(小时)", "加班（小时）", "加班 (小时)"],
+                "加班费": ["加班费", "加班费（小时）", "加班费(小时)", "加班费 （小时）", "加班费 "],
+                "进出场费运费": ["进出场费", "运费", "进出场费/运费", "运费＋拆装费", "运费+拆装费"],
+                "移动费拆装费": ["移动费", "拆装费", "移动费＋拆装费", "移动费+拆装费"],
+                "结算费用_泰铢": ["结算费用", "本次结算费用", "结算费用(泰铢)", "本次结算费用(泰铢)", "结算费用 (泰铢)", "本次结算费用 (泰铢)"],
+                "增值税7%": ["增值税", "增值税7%", "增值税7％"],
+                "机具租赁预扣税3%": ["预扣税", "机具租赁预扣税", "机具租赁预扣税3%", "机具租赁预扣税3％", "机具租赁预 扣税"],
+                "机具租赁预扣税5%": ["机具租赁预扣税5%", "机具租赁预扣税5％"],
+                "本次费用合计": ["本次费用合计", "本次费用合计（泰铢）", "本次费用合计(泰铢)", "本次费用合计 （泰铢）", "费用合计", "费用 合计"],
+                "使用日期": ["使用日期", "使用时间"],
+                "出租单位": ["出租单位"],
+                "月份": ["月份"],
+                "备注": ["备注", "项目说明"]
+            }
+            
+            # 创建新的DataFrame，使用标准列名
+            new_df = pd.DataFrame()
+            unmatched_cols = []
+
+            # “使用项目”列单独识别：优先使用项目字段，避免回退到sheet名称
+            use_project_col = find_use_project_column(df.columns)
+            if use_project_col:
+                new_df["使用项目"] = df[use_project_col]
+                print(f"    '{use_project_col}' -> '使用项目' (专项识别)")
+            else:
+                new_df["使用项目"] = ""
+                unmatched_cols.append("使用项目")
+            
+            for std_col, patterns in column_mapping.items():
+                if std_col == "使用项目":
+                    continue
+                # "使用项目"列必须走严格匹配，避免误吸到"项目月份/项目说明"等非目标列
+                exact_only = (std_col == "使用项目")
+                matched_col = find_matching_column(df.columns, patterns, exact_only=exact_only)
+                if matched_col:
+                    new_df[std_col] = df[matched_col]
+                    print(f"    '{matched_col}' -> '{std_col}'")
+                else:
+                    new_df[std_col] = ""
+                    unmatched_cols.append(std_col)
+            
+            if unmatched_cols:
+                print(f"  ⚠️  未匹配到的列: {', '.join(unmatched_cols)}")
+            
+            df = new_df
+            
+            # 重新计算费用相关列（处理公式未缓存的情况）
+            # Excel公式结构：
+            # 1. 结算费用 = 台班费 × 台班数 + 加班费 + 运费
+            # 2. 增值税7% = 结算费用 × 0.07
+            # 3. 预扣税3% = 结算费用 × 0.03
+            # 4. 本次费用合计 = 结算费用 + 增值税 - 预扣税3% - 预扣税5%
+            print(f"  正在检查并重新计算费用...")
+            
+            settlement_recalc = 0
+            vat_recalc = 0
+            tax_recalc = 0
+            fee_recalc = 0
+
+            def write_recalc_value(target_df, row_idx, col_name, numeric_value):
+                try:
+                    target_df.at[row_idx, col_name] = numeric_value
+                except Exception:
+                    target_df.at[row_idx, col_name] = str(numeric_value)
+            
+            for idx in range(len(df)):
+                # 第一步：重新计算"结算费用"
+                settlement = safe_to_float(df.iloc[idx]["结算费用_泰铢"])
+                
+                if settlement == 0:
+                    # 尝试从基础数据计算
+                    unit_price = safe_to_float(df.iloc[idx]["台班费_泰铢"])
+                    quantity = safe_to_float(df.iloc[idx]["本次结算台班"])
+                    overtime_fee = safe_to_float(df.iloc[idx]["加班费"])
+                    entry_fee = safe_to_float(df.iloc[idx]["进出场费运费"])
+                    move_fee = safe_to_float(df.iloc[idx]["移动费拆装费"])
+                    
+                    # 计算结算费用 = 台班费×台班数 + 加班费 + 各种运费
+                    calc_settlement = unit_price * quantity + overtime_fee + entry_fee + move_fee
+                    
+                    if calc_settlement != 0:
+                        settlement = calc_settlement
+                        write_recalc_value(df, idx, "结算费用_泰铢", settlement)
+                        settlement_recalc += 1
+                
+                # 第二步：重新计算"增值税7%"
+                vat = safe_to_float(df.iloc[idx]["增值税7%"])
+                if vat == 0 and settlement != 0:
+                    calc_vat = settlement * 0.07
+                    write_recalc_value(df, idx, "增值税7%", calc_vat)
+                    vat = calc_vat
+                    vat_recalc += 1
+                
+                # 第三步：重新计算"预扣税3%"
+                tax3 = safe_to_float(df.iloc[idx]["机具租赁预扣税3%"])
+                if tax3 == 0 and settlement != 0:
+                    calc_tax3 = settlement * 0.03
+                    write_recalc_value(df, idx, "机具租赁预扣税3%", calc_tax3)
+                    tax3 = calc_tax3
+                    tax_recalc += 1
+                
+                # 第四步：重新计算"本次费用合计"
+                current_fee = safe_to_float(df.iloc[idx]["本次费用合计"])
+                if current_fee == 0 and settlement != 0:
+                    tax5 = safe_to_float(df.iloc[idx]["机具租赁预扣税5%"])
+                    calculated_fee = settlement + vat - tax3 - tax5
+                    write_recalc_value(df, idx, "本次费用合计", calculated_fee)
+                    fee_recalc += 1
+            
+            if settlement_recalc > 0 or vat_recalc > 0 or tax_recalc > 0 or fee_recalc > 0:
+                print(f"  ✓ 重新计算: 结算费用{settlement_recalc}行, 增值税{vat_recalc}行, 预扣税{tax_recalc}行, 费用合计{fee_recalc}行")
+            
+            # 过滤空行：保留序号有效的行，或保留序号为空但有关键费用数据的行
+            key_cols = ["台班费_泰铢", "本次结算台班", "加班费", "结算费用_泰铢", "本次费用合计"]
+            
+            # 先保留序号有效的行
+            has_seq = df["序号"].notna() & (df["序号"].astype(str).str.strip() != "")
+            
+            # 对于序号为空的行，检查是否有关键列有非空数据
+            has_data = pd.Series(False, index=df.index)
+            for col in key_cols:
+                if col in df.columns:
+                    has_data |= (df[col].notna() & (df[col].astype(str).str.strip() != ""))
+            
+            # 保留有序号或有数据的行
+            df = df[has_seq | has_data].copy()  # 使用.copy()避免SettingWithCopyWarning
+            
+            if len(df) == 0:
+                print(f"  ⚠️  没有有效数据行")
+                report_data.append({
+                    "sheet名称": sheet_name,
+                    "项目名称": sheet_name,
+                    "项目编码": '',
+                    "开始月份": start_month,
+                    "状态": "失败：无有效数据",
+                    "数据行数": 0,
+                    "加班费错误行数": 0,
+                    "加班费错误率(%)": 0,
+                    "加班费差异金额(泰铢)": 0,
+                    "结算费用错误行数": 0,
+                    "结算费用错误率(%)": 0,
+                    "结算费用差异金额(泰铢)": 0,
+                    "本次费用合计错误行数": 0,
+                    "本次费用合计错误率(%)": 0,
+                    "本次费用合计差异金额(泰铢)": 0,
+                    "费用合计(泰铢)": 0
+                })
+                continue
+            
+            print(f"  有效数据行数: {len(df)}")
+            
+            # 从统一匹配结果获取项目编码和项目名称
+            matched_info = sheet_match_results.get(sheet_key)
+            if matched_info and isinstance(matched_info, dict):
+                default_project_code = matched_info.get('project_code', '')
+                default_project_name = matched_info.get('project_name', '')
+                project_status = matched_info.get('status', '')
+                print(f"  匹配结果(默认): [{default_project_code}] {default_project_name} ({project_status})")
+            else:
+                default_project_code = ''
+                default_project_name = ''
+                project_status = ''
+                print(f"  ⚠️  未找到匹配 (Sheet: '{sheet_name}')")
     
-    for sheet_name in wb.sheetnames:
-        if sheet_name == SUMMARY_SHEET_NAME:
-            continue
-        
-        print(f"\n正在处理 sheet：{sheet_name}")
-        ws = wb[sheet_name]
-        
-        # 提取项目信息
-        project_name, start_month = extract_project_info(ws)
-        print(f"  项目名称: {project_name if project_name else '未找到'}")
-        print(f"  开始月份: {start_month if start_month else '未找到'}")
-        
-        # 查找表头行
-        header_row = find_header_row(ws)
-        if not header_row:
-            print(f"  ⚠️  未找到表头行，跳过此sheet")
+            # 月度台账可能一个sheet含多个项目：优先按“使用项目”逐行匹配。
+            has_use_project_col = "使用项目" in df.columns
+            row_project_names = []
+            row_project_codes = []
+            use_project_values = (
+                df["使用项目"].fillna("").astype(str).str.strip().tolist()
+                if has_use_project_col else [""] * len(df)
+            )
+    
+            for raw_alias in use_project_values:
+                alias = raw_alias if raw_alias and raw_alias != "nan" else ""
+                if alias:
+                    # 对明显是月份文本的值，不作为项目名，直接回退默认项目。
+                    if is_month_like_text(alias):
+                        fallback_name = default_project_name if default_project_name else sheet_name
+                        row_project_names.append(fallback_name)
+                        row_project_codes.append(default_project_code)
+                        continue
+
+                    hit = match_project(alias, match_db)
+                    if hit:
+                        row_project_names.append(hit.get('project_name', '') or alias)
+                        row_project_codes.append(hit.get('project_code', '') or "")
+                    else:
+                        row_project_names.append(alias)
+                        row_project_codes.append("")
+                else:
+                    fallback_name = default_project_name if default_project_name else sheet_name
+                    row_project_names.append(fallback_name)
+                    row_project_codes.append(default_project_code)
+    
+            # 基础字段只保留：sheet名称 / 项目编码 / 项目名称
+            df["sheet名称"] = sheet_name
+            df["项目编码"] = row_project_codes
+            df["项目名称"] = row_project_names
+            df["开始月份"] = start_month
+    
+            # 增加区域并收集新项目（按项目名称优先识别）
+            df["区域"] = df["项目名称"].apply(
+                lambda x: guess_region_from_project_or_sheet(x, sheet_name, project_mapping)
+            )
+            unknown_projects = set(
+                df.loc[df["区域"] == "未知区域", "项目名称"].astype(str).str.strip().tolist()
+            )
+            for unknown_name in unknown_projects:
+                if unknown_name and unknown_name != "nan":
+                    new_projects.add(unknown_name)
+    
+            # 报告展示项目名：单项目直接显示，多项目给出提示。
+            unique_projects = sorted({p for p in row_project_names if p and p != "nan"})
+            report_project_name = unique_projects[0] if len(unique_projects) == 1 else f"多项目({len(unique_projects)})"
+            unique_codes = sorted({c for c in row_project_codes if c})
+            report_project_code = unique_codes[0] if len(unique_codes) == 1 else ""
+            unique_regions = sorted({r for r in df["区域"].astype(str).str.strip().tolist() if r and r != "nan"})
+            report_region = unique_regions[0] if len(unique_regions) == 1 else f"多区域({len(unique_regions)})"
+            
+            # 映射标准机具种类并收集新种类
+            def map_kind(x):
+                # 先做专项归一：拉土车/随车吊 + 车牌号 => 基础名称
+                val = normalize_special_vehicle_kind(x)
+                if val and val != "nan" and val not in kind_mapping:
+                    new_kinds.add(val)
+                return kind_mapping.get(val, val)
+            
+            df["标准机具种类"] = df["机具种类"].apply(map_kind)
+            
+            # 映射标准型号规格并收集新型号（基于标准机具种类）
+            def map_model(row):
+                std_kind = row["标准机具种类"]
+                raw_model = str(row["型号规格"]).strip()
+                
+                if not raw_model or raw_model == "nan":
+                    return raw_model
+                
+                # 使用(标准机具种类, 原始型号)作为键
+                key = (std_kind, raw_model)
+                if key in model_mapping:
+                    return model_mapping[key]
+                else:
+                    # 收集新型号（记录在哪个机具种类下）
+                    new_models.add((std_kind, raw_model))
+                    return raw_model
+            
+            df["标准型号规格"] = df.apply(map_model, axis=1)
+            
+            # 计算本sheet的费用合计
+            sheet_total = df["本次费用合计"].apply(safe_to_float).sum()
+            
+            all_data.append(df)
+            
+            # 计算各类费用
+            overtime_fee_total = df["加班费"].apply(safe_to_float).sum()
+            settlement_total = df["结算费用_泰铢"].apply(safe_to_float).sum()
+            
+            # 统计有数据的行数
+            overtime_count = (df["加班费"].apply(safe_to_float) != 0).sum()
+            settlement_count = (df["结算费用_泰铢"].apply(safe_to_float) != 0).sum()
+            total_count = (df["本次费用合计"].apply(safe_to_float) != 0).sum()
+            
+            # 统计验算错误的行数和金额差异
+            overtime_error_rows = 0
+            settlement_error_rows = 0
+            total_error_rows = 0
+            overtime_diff_sum = 0.0
+            settlement_diff_sum = 0.0
+            total_diff_sum = 0.0
+            
+            for idx in range(len(df)):
+                row = df.iloc[idx]
+                
+                # 检查加班费错误
+                is_correct, actual, calculated = validate_overtime_fee(row)
+                if not is_correct and actual != 0:
+                    overtime_error_rows += 1
+                    overtime_diff_sum += abs(actual - calculated)
+                
+                # 检查结算费用错误
+                is_correct, actual, calc1, calc2 = validate_settlement_amount(row)
+                if not is_correct and actual != 0:
+                    settlement_error_rows += 1
+                    # 选择差异较小的计算方式
+                    diff = min(abs(actual - calc1), abs(actual - calc2))
+                    settlement_diff_sum += diff
+                
+                # 检查本次费用合计错误
+                is_correct, actual, calculated = validate_total_amount(row)
+                if not is_correct:
+                    total_error_rows += 1
+                    total_diff_sum += abs(actual - calculated)
+            
+            # 计算错误率
+            data_rows = len(df)
+            overtime_error_rate = (overtime_error_rows / data_rows * 100) if data_rows > 0 else 0
+            settlement_error_rate = (settlement_error_rows / data_rows * 100) if data_rows > 0 else 0
+            total_error_rate = (total_error_rows / data_rows * 100) if data_rows > 0 else 0
+            
+            # 添加报告数据
             report_data.append({
                 "sheet名称": sheet_name,
-                "项目名称": sheet_name,
-                "项目编码": '',
+                "项目名称": report_project_name,
+                "项目编码": report_project_code,
                 "开始月份": start_month,
-                "状态": "失败：未找到表头",
-                "数据行数": 0,
-                "加班费错误行数": 0,
-                "加班费错误率(%)": 0,
-                "加班费差异金额(泰铢)": 0,
-                "结算费用错误行数": 0,
-                "结算费用错误率(%)": 0,
-                "结算费用差异金额(泰铢)": 0,
-                "本次费用合计错误行数": 0,
-                "本次费用合计错误率(%)": 0,
-                "本次费用合计差异金额(泰铢)": 0,
-                "费用合计(泰铢)": 0
+                "状态": "成功",
+                "数据行数": len(df),
+                "区域": report_region,
+                "机具种类数": df["标准机具种类"].nunique(),
+                "型号规格数": df["标准型号规格"].nunique(),
+                "加班费错误行数": overtime_error_rows,
+                "加班费错误率(%)": round(overtime_error_rate, 2),
+                "加班费差异金额(泰铢)": round(overtime_diff_sum, 2),
+                "结算费用错误行数": settlement_error_rows,
+                "结算费用错误率(%)": round(settlement_error_rate, 2),
+                "结算费用差异金额(泰铢)": round(settlement_diff_sum, 2),
+                "本次费用合计错误行数": total_error_rows,
+                "本次费用合计错误率(%)": round(total_error_rate, 2),
+                "本次费用合计差异金额(泰铢)": round(total_diff_sum, 2),
+                "加班费行数": overtime_count,
+                "加班费合计(泰铢)": round(overtime_fee_total, 2),
+                "结算费用行数": settlement_count,
+                "结算费用合计(泰铢)": round(settlement_total, 2),
+                "本次费用行数": total_count,
+                "费用合计(泰铢)": round(sheet_total, 2)
             })
-            continue
-        
-        print(f"  表头位于第 {header_row} 行")
-        
-        # 使用pandas读取，从表头行开始
-        # 先不指定dtype让pandas读取原始数据类型，这样有助于公式计算
-        df = pd.read_excel(excel_path, sheet_name=sheet_name, header=header_row-1, engine='openpyxl')
-        
-        # 清理列名：去除换行符和多余空格
-        df.columns = [re.sub(r'\s+', ' ', str(c)).strip() for c in df.columns]
-        
-        # 定义标准列名及其可能的变体（用于模糊匹配）
-        column_mapping = {
-            "序号": ["序号"],
-            "机具种类": ["机具种类"],
-            "型号规格": ["型号规格"],
-            "台班费_泰铢": ["台班费", "台班费泰铢", "台班费(泰铢)", "台班费 泰铢"],
-            "本次结算台班": ["本次结算台班", "结算台班", "本次结算台班（小时、天、月)", "本次结算台班(小时、天、月)", "本次结算台班 （小时、天、月)"],
-            "加班小时": ["加班", "加班(小时)", "加班（小时）", "加班 (小时)"],
-            "加班费": ["加班费", "加班费（小时）", "加班费(小时)", "加班费 （小时）", "加班费 "],
-            "进出场费运费": ["进出场费", "运费", "进出场费/运费", "运费＋拆装费", "运费+拆装费"],
-            "移动费拆装费": ["移动费", "拆装费", "移动费＋拆装费", "移动费+拆装费"],
-            "结算费用_泰铢": ["结算费用", "本次结算费用", "结算费用(泰铢)", "本次结算费用(泰铢)", "结算费用 (泰铢)", "本次结算费用 (泰铢)"],
-            "增值税7%": ["增值税", "增值税7%", "增值税7％"],
-            "机具租赁预扣税3%": ["预扣税", "机具租赁预扣税", "机具租赁预扣税3%", "机具租赁预扣税3％", "机具租赁预 扣税"],
-            "机具租赁预扣税5%": ["机具租赁预扣税5%", "机具租赁预扣税5％"],
-            "本次费用合计": ["本次费用合计", "本次费用合计（泰铢）", "本次费用合计(泰铢)", "本次费用合计 （泰铢）", "费用合计", "费用 合计"],
-            "使用日期": ["使用日期", "使用时间"],
-            "出租单位": ["出租单位"],
-            "月份": ["月份"],
-            "备注": ["备注", "项目说明"]
-        }
-        
-        # 创建新的DataFrame，使用标准列名
-        new_df = pd.DataFrame()
-        unmatched_cols = []
-        
-        for std_col, patterns in column_mapping.items():
-            matched_col = find_matching_column(df.columns, patterns)
-            if matched_col:
-                new_df[std_col] = df[matched_col]
-                print(f"    '{matched_col}' -> '{std_col}'")
-            else:
-                new_df[std_col] = ""
-                unmatched_cols.append(std_col)
-        
-        if unmatched_cols:
-            print(f"  ⚠️  未匹配到的列: {', '.join(unmatched_cols)}")
-        
-        df = new_df
-        
-        # 重新计算费用相关列（处理公式未缓存的情况）
-        # Excel公式结构：
-        # 1. 结算费用 = 台班费 × 台班数 + 加班费 + 运费
-        # 2. 增值税7% = 结算费用 × 0.07
-        # 3. 预扣税3% = 结算费用 × 0.03
-        # 4. 本次费用合计 = 结算费用 + 增值税 - 预扣税3% - 预扣税5%
-        print(f"  正在检查并重新计算费用...")
-        
-        settlement_recalc = 0
-        vat_recalc = 0
-        tax_recalc = 0
-        fee_recalc = 0
-        
-        for idx in range(len(df)):
-            # 第一步：重新计算"结算费用"
-            settlement = safe_to_float(df.iloc[idx]["结算费用_泰铢"])
-            
-            if settlement == 0:
-                # 尝试从基础数据计算
-                unit_price = safe_to_float(df.iloc[idx]["台班费_泰铢"])
-                quantity = safe_to_float(df.iloc[idx]["本次结算台班"])
-                overtime_fee = safe_to_float(df.iloc[idx]["加班费"])
-                entry_fee = safe_to_float(df.iloc[idx]["进出场费运费"])
-                move_fee = safe_to_float(df.iloc[idx]["移动费拆装费"])
-                
-                # 计算结算费用 = 台班费×台班数 + 加班费 + 各种运费
-                calc_settlement = unit_price * quantity + overtime_fee + entry_fee + move_fee
-                
-                if calc_settlement != 0:
-                    settlement = calc_settlement
-                    df.at[idx, "结算费用_泰铢"] = str(settlement)
-                    settlement_recalc += 1
-            
-            # 第二步：重新计算"增值税7%"
-            vat = safe_to_float(df.iloc[idx]["增值税7%"])
-            if vat == 0 and settlement != 0:
-                calc_vat = settlement * 0.07
-                df.at[idx, "增值税7%"] = str(calc_vat)
-                vat = calc_vat
-                vat_recalc += 1
-            
-            # 第三步：重新计算"预扣税3%"
-            tax3 = safe_to_float(df.iloc[idx]["机具租赁预扣税3%"])
-            if tax3 == 0 and settlement != 0:
-                calc_tax3 = settlement * 0.03
-                df.at[idx, "机具租赁预扣税3%"] = str(calc_tax3)
-                tax3 = calc_tax3
-                tax_recalc += 1
-            
-            # 第四步：重新计算"本次费用合计"
-            current_fee = safe_to_float(df.iloc[idx]["本次费用合计"])
-            if current_fee == 0 and settlement != 0:
-                tax5 = safe_to_float(df.iloc[idx]["机具租赁预扣税5%"])
-                calculated_fee = settlement + vat - tax3 - tax5
-                df.at[idx, "本次费用合计"] = str(calculated_fee)
-                fee_recalc += 1
-        
-        if settlement_recalc > 0 or vat_recalc > 0 or tax_recalc > 0 or fee_recalc > 0:
-            print(f"  ✓ 重新计算: 结算费用{settlement_recalc}行, 增值税{vat_recalc}行, 预扣税{tax_recalc}行, 费用合计{fee_recalc}行")
-        
-        # 过滤空行：保留序号有效的行，或保留序号为空但有关键费用数据的行
-        key_cols = ["台班费_泰铢", "本次结算台班", "加班费", "结算费用_泰铢", "本次费用合计"]
-        
-        # 先保留序号有效的行
-        has_seq = df["序号"].notna() & (df["序号"].astype(str).str.strip() != "")
-        
-        # 对于序号为空的行，检查是否有关键列有非空数据
-        has_data = pd.Series(False, index=df.index)
-        for col in key_cols:
-            if col in df.columns:
-                has_data |= (df[col].notna() & (df[col].astype(str).str.strip() != ""))
-        
-        # 保留有序号或有数据的行
-        df = df[has_seq | has_data].copy()  # 使用.copy()避免SettingWithCopyWarning
-        
-        if len(df) == 0:
-            print(f"  ⚠️  没有有效数据行")
-            report_data.append({
-                "sheet名称": sheet_name,
-                "项目名称": sheet_name,
-                "项目编码": '',
-                "开始月份": start_month,
-                "状态": "失败：无有效数据",
-                "数据行数": 0,
-                "加班费错误行数": 0,
-                "加班费错误率(%)": 0,
-                "加班费差异金额(泰铢)": 0,
-                "结算费用错误行数": 0,
-                "结算费用错误率(%)": 0,
-                "结算费用差异金额(泰铢)": 0,
-                "本次费用合计错误行数": 0,
-                "本次费用合计错误率(%)": 0,
-                "本次费用合计差异金额(泰铢)": 0,
-                "费用合计(泰铢)": 0
-            })
-            continue
-        
-        print(f"  有效数据行数: {len(df)}")
-        
-        # 从统一匹配结果获取项目编码和项目名称
-        matched_info = sheet_match_results.get(sheet_name)
-        if matched_info and isinstance(matched_info, dict):
-            project_code = matched_info.get('project_code', '')
-            matched_project_name = matched_info.get('project_name', '')
-            project_status = matched_info.get('status', '')
-            print(f"  匹配结果: [{project_code}] {matched_project_name} ({project_status})")
-        else:
-            project_code = ''
-            matched_project_name = ''
-            project_status = ''
-            print(f"  ⚠️  未找到匹配 (Sheet: '{sheet_name}')")
-        
-        # 汇总统一使用匹配后的项目名称；未匹配则回退到原始sheet名称
-        final_project_name = matched_project_name if matched_project_name else sheet_name
-        
-        # 基础字段只保留：sheet名称 / 项目编码 / 项目名称
-        df["sheet名称"] = sheet_name
-        df["项目编码"] = project_code
-        df["项目名称"] = final_project_name
-        df["开始月份"] = start_month
-        
-        # 增加区域并收集新项目
-        region = guess_region_from_sheet_name(sheet_name, project_mapping)
-        if region == "未知区域":
-            new_projects.add(sheet_name)
-        df["区域"] = region
-        
-        # 映射标准机具种类并收集新种类
-        def map_kind(x):
-            # 先做专项归一：拉土车/随车吊 + 车牌号 => 基础名称
-            val = normalize_special_vehicle_kind(x)
-            if val and val != "nan" and val not in kind_mapping:
-                new_kinds.add(val)
-            return kind_mapping.get(val, val)
-        
-        df["标准机具种类"] = df["机具种类"].apply(map_kind)
-        
-        # 映射标准型号规格并收集新型号（基于标准机具种类）
-        def map_model(row):
-            std_kind = row["标准机具种类"]
-            raw_model = str(row["型号规格"]).strip()
-            
-            if not raw_model or raw_model == "nan":
-                return raw_model
-            
-            # 使用(标准机具种类, 原始型号)作为键
-            key = (std_kind, raw_model)
-            if key in model_mapping:
-                return model_mapping[key]
-            else:
-                # 收集新型号（记录在哪个机具种类下）
-                new_models.add((std_kind, raw_model))
-                return raw_model
-        
-        df["标准型号规格"] = df.apply(map_model, axis=1)
-        
-        # 计算本sheet的费用合计
-        sheet_total = df["本次费用合计"].apply(safe_to_float).sum()
-        
-        all_data.append(df)
-        
-        # 计算各类费用
-        overtime_fee_total = df["加班费"].apply(safe_to_float).sum()
-        settlement_total = df["结算费用_泰铢"].apply(safe_to_float).sum()
-        
-        # 统计有数据的行数
-        overtime_count = (df["加班费"].apply(safe_to_float) != 0).sum()
-        settlement_count = (df["结算费用_泰铢"].apply(safe_to_float) != 0).sum()
-        total_count = (df["本次费用合计"].apply(safe_to_float) != 0).sum()
-        
-        # 统计验算错误的行数和金额差异
-        overtime_error_rows = 0
-        settlement_error_rows = 0
-        total_error_rows = 0
-        overtime_diff_sum = 0.0
-        settlement_diff_sum = 0.0
-        total_diff_sum = 0.0
-        
-        for idx in range(len(df)):
-            row = df.iloc[idx]
-            
-            # 检查加班费错误
-            is_correct, actual, calculated = validate_overtime_fee(row)
-            if not is_correct and actual != 0:
-                overtime_error_rows += 1
-                overtime_diff_sum += abs(actual - calculated)
-            
-            # 检查结算费用错误
-            is_correct, actual, calc1, calc2 = validate_settlement_amount(row)
-            if not is_correct and actual != 0:
-                settlement_error_rows += 1
-                # 选择差异较小的计算方式
-                diff = min(abs(actual - calc1), abs(actual - calc2))
-                settlement_diff_sum += diff
-            
-            # 检查本次费用合计错误
-            is_correct, actual, calculated = validate_total_amount(row)
-            if not is_correct:
-                total_error_rows += 1
-                total_diff_sum += abs(actual - calculated)
-        
-        # 计算错误率
-        data_rows = len(df)
-        overtime_error_rate = (overtime_error_rows / data_rows * 100) if data_rows > 0 else 0
-        settlement_error_rate = (settlement_error_rows / data_rows * 100) if data_rows > 0 else 0
-        total_error_rate = (total_error_rows / data_rows * 100) if data_rows > 0 else 0
-        
-        # 添加报告数据
-        report_data.append({
-            "sheet名称": sheet_name,
-            "项目名称": final_project_name,
-            "项目编码": project_code,
-            "开始月份": start_month,
-            "状态": "成功",
-            "数据行数": len(df),
-            "区域": region,
-            "机具种类数": df["标准机具种类"].nunique(),
-            "型号规格数": df["标准型号规格"].nunique(),
-            "加班费错误行数": overtime_error_rows,
-            "加班费错误率(%)": round(overtime_error_rate, 2),
-            "加班费差异金额(泰铢)": round(overtime_diff_sum, 2),
-            "结算费用错误行数": settlement_error_rows,
-            "结算费用错误率(%)": round(settlement_error_rate, 2),
-            "结算费用差异金额(泰铢)": round(settlement_diff_sum, 2),
-            "本次费用合计错误行数": total_error_rows,
-            "本次费用合计错误率(%)": round(total_error_rate, 2),
-            "本次费用合计差异金额(泰铢)": round(total_diff_sum, 2),
-            "加班费行数": overtime_count,
-            "加班费合计(泰铢)": round(overtime_fee_total, 2),
-            "结算费用行数": settlement_count,
-            "结算费用合计(泰铢)": round(settlement_total, 2),
-            "本次费用行数": total_count,
-            "费用合计(泰铢)": round(sheet_total, 2)
-        })
     
-    wb.close()
+        wb.close()
 
     # 3. 处理新发现的项目、机具种类、型号
     if new_projects or new_kinds or new_models:
@@ -1775,7 +1924,10 @@ def main(excel_path_override=None):
     # 确保输出文件夹存在
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     
-    output_basename = build_summary_output_basename(excel_path)
+    if len(excel_paths) > 1:
+        output_basename = f"{OUTPUT_FILENAME_PREFIX}_全量标准化"
+    else:
+        output_basename = build_summary_output_basename(primary_excel_path)
     output_filename = f"{output_basename}_{OUTPUT_FILE_SUFFIX}.xlsx"
     output_path = Path(OUTPUT_FOLDER) / output_filename
 
@@ -1783,7 +1935,7 @@ def main(excel_path_override=None):
     old_summary_files = []
     old_summary_patterns = [
         f"{output_basename}_*.xlsx",
-        f"{excel_path.stem}_已汇总*.xlsx",
+        f"{primary_excel_path.stem}_已汇总*.xlsx",
     ]
     for pattern in old_summary_patterns:
         for old_file in Path(OUTPUT_FOLDER).glob(pattern):
@@ -2139,7 +2291,51 @@ if __name__ == "__main__":
         if not all_input_files:
             print(f"找不到标准化文件：{STANDARDIZED_INPUT_DIR}")
         else:
-            print(f"自动发现标准化文件 {len(all_input_files)} 个，开始逐个汇总...")
-            for idx, input_file in enumerate(all_input_files, start=1):
-                print(f"\n[{idx}/{len(all_input_files)}] {input_file.name}")
-                main(input_file)
+            if RUN_MODE == "all":
+                print(f"自动发现标准化文件 {len(all_input_files)} 个，开始全量汇总...")
+                main(all_input_files)
+            else:
+                print(f"自动发现标准化文件 {len(all_input_files)} 个，开始按月份组合汇总...")
+
+                month_to_files = {}
+                undated_files = []
+                for input_file in all_input_files:
+                    ym = extract_year_month_from_filename(input_file)
+                    if ym is None:
+                        undated_files.append(input_file)
+                    else:
+                        month_to_files.setdefault(ym, []).append(input_file)
+
+                for ym, files in month_to_files.items():
+                    files.sort(key=lambda p: (p.stat().st_mtime, p.name))
+
+                jobs = []
+                sorted_months = sorted(month_to_files.keys())
+
+                def prev_month(ym):
+                    y, m = ym
+                    return (y - 1, 12) if m == 1 else (y, m - 1)
+
+                for idx, ym in enumerate(sorted_months):
+                    prev_ym = prev_month(ym)
+                    has_next = idx < len(sorted_months) - 1
+                    current_file = month_to_files[ym][-1]
+
+                    if prev_ym in month_to_files:
+                        prev_file = month_to_files[prev_ym][-1]
+                        jobs.append(([prev_file, current_file], f"{prev_ym[0]}-{prev_ym[1]:02d} + {ym[0]}-{ym[1]:02d} => {ym[0]}-{ym[1]:02d}"))
+                    elif not has_next:
+                        jobs.append((current_file, f"{ym[0]}-{ym[1]:02d}（单月）"))
+                    else:
+                        print(f"跳过单独输出：{current_file.name}（将并入下月汇总）")
+
+                for f in undated_files:
+                    jobs.append((f, f"未识别月份（单文件）：{f.name}"))
+
+                if not jobs:
+                    print("未构建到可执行任务，请检查文件命名中的年月格式（如 2026年4月）。")
+                else:
+                    print(f"共构建任务 {len(jobs)} 个。")
+                    for idx, (job_arg, job_desc) in enumerate(jobs, start=1):
+                        print(f"\n[{idx}/{len(jobs)}] {job_desc}")
+                        main(job_arg)
