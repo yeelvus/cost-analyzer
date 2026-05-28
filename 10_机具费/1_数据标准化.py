@@ -25,6 +25,49 @@ HEADER_SCAN_ROWS = 12
 SOFT_SCAN_ROWS = 60
 CURRENT_YEAR_MONTH = (date.today().year, date.today().month)
 RAW_FILE_MONTH_RE = re.compile(r"(20\d{2})\s*年\s*(1[0-2]|0?[1-9])\s*月")
+MONTHLY_FILE_MARKER_RE = re.compile(r"20\d{2}\s*年\s*(1[0-2]|0?[1-9])\s*月")
+
+MONTHLY_EXTRACT_OUTPUT_COLUMNS = [
+    "序号",
+    "机具种类",
+    "型号规格",
+    "台班费(泰铢)",
+    "本次结算台班（小时、天、月)",
+    "加班(小时)",
+    "加班费+超时费",
+    "进出场费/运费",
+    "移动费＋拆装费+接管费",
+    "结算费用(泰铢)",
+    "增值税7%",
+    "机具租赁预扣税3%",
+    "机具租赁预扣税5%",
+    "本次费用合计（泰铢）",
+    "使用日期",
+    "出租单位",
+    "项目名称",
+    "备注",
+]
+
+MONTHLY_EXTRACT_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
+    "序号": ("序号",),
+    "机具种类": ("机具种类",),
+    "型号规格": ("型号规格",),
+    "台班费(泰铢)": ("台班费(泰铢)", "台班费泰铢", "台班费"),
+    "本次结算台班（小时、天、月)": ("本次结算台班（小时、天、月)", "本次结算台班(小时、天、月)", "本次结算台班（小时天月)", "本次结算台班"),
+    "加班(小时)": ("加班(小时)", "加班（小时）", "加班小时", "加班"),
+    "加班费+超时费": ("加班费+超时费", "加班费＋超时费", "加班费超时费"),
+    "进出场费/运费": ("进出场费/运费", "进出场费", "运费"),
+    "移动费＋拆装费+接管费": ("移动费＋拆装费+接管费", "移动费+拆装费+接管费", "移动费拆装费接管费"),
+    "结算费用(泰铢)": ("结算费用(泰铢)", "结算费用（泰铢）", "结算费用泰铢", "结算费用"),
+    "增值税7%": ("增值税7%",),
+    "机具租赁预扣税3%": ("机具租赁预扣税3%",),
+    "机具租赁预扣税5%": ("机具租赁预扣税5%",),
+    "本次费用合计（泰铢）": ("本次费用合计（泰铢）", "本次费用合计(泰铢)", "本次费用合计泰铢", "本次费用合计"),
+    "使用日期": ("使用日期", "使用时间"),
+    "出租单位": ("出租单位",),
+    "项目名称": ("使用项目", "项目名称"),
+    "备注": ("备注",),
+}
 
 USAGE_HEADER_KEYWORDS = (
     "使用时间",
@@ -110,6 +153,7 @@ class RowState:
     month_candidate: tuple[int, int] | None
     yellow_signature: str | None
     starts_yellow_block: bool
+    row_text: str = ""
     final_ym: tuple[int, int] | None = None
     source: str = ""
 
@@ -119,6 +163,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("input_file", nargs="?", default=None, help="输入 Excel 文件路径（不传则自动选择原始数据目录中最新月份文件）")
     parser.add_argument("-i", "--input", dest="input_override", default=None, help="输入 Excel 文件路径（优先级高于自动选择）")
     parser.add_argument("--suffix", default=DEFAULT_OUTPUT_SUFFIX, help="输出文件名后缀")
+    parser.add_argument(
+        "--no-monthly-light",
+        action="store_true",
+        help="关闭按月文件轻量模式（默认开启）：按月文件将走完整月份重解析",
+    )
     return parser.parse_args()
 
 
@@ -127,37 +176,6 @@ def extract_year_month_from_name(path: Path) -> tuple[int, int] | None:
     if not match:
         return None
     return int(match.group(1)), int(match.group(2))
-
-
-def find_latest_raw_input_file(input_dir: Path) -> Path | None:
-    if not input_dir.exists():
-        return None
-
-    candidates = [
-        file_path
-        for file_path in input_dir.glob("*.xlsx")
-        if file_path.is_file() and not file_path.name.startswith("~$")
-    ]
-    if not candidates:
-        return None
-
-    dated_candidates: list[tuple[tuple[int, int], float, Path]] = []
-    undated_candidates: list[tuple[float, Path]] = []
-    for file_path in candidates:
-        parsed = extract_year_month_from_name(file_path)
-        modified_time = file_path.stat().st_mtime
-        if parsed is not None:
-            dated_candidates.append((parsed, modified_time, file_path))
-        else:
-            undated_candidates.append((modified_time, file_path))
-
-    if dated_candidates:
-        # 优先按文件名中的“年/月”选最新，月份一致时取修改时间更新者。
-        dated_candidates.sort(key=lambda item: (item[0], item[1]))
-        return dated_candidates[-1][2]
-
-    undated_candidates.sort(key=lambda item: item[0])
-    return undated_candidates[-1][1]
 
 
 def list_all_raw_input_files(input_dir: Path) -> list[Path]:
@@ -188,13 +206,6 @@ def format_year_month(year_month: tuple[int, int]) -> str:
     return f"{year_month[0]:04d}-{year_month[1]:02d}"
 
 
-def next_year_month(year_month: tuple[int, int]) -> tuple[int, int]:
-    year, month = year_month
-    if month == 12:
-        return year + 1, 1
-    return year, month + 1
-
-
 def clamp_to_current(year_month: tuple[int, int]) -> tuple[int, int]:
     if year_month > CURRENT_YEAR_MONTH:
         return CURRENT_YEAR_MONTH
@@ -221,31 +232,6 @@ def coerce_continuous(
             return candidate
         return floor
     return candidate
-
-
-def row_has_any_value(worksheet, row_idx: int) -> bool:
-    for col_idx in range(1, worksheet.max_column + 1):
-        value = worksheet.cell(row_idx, col_idx).value
-        if value is not None and normalize_text(value):
-            return True
-    return False
-
-
-def count_nonempty_cells(worksheet, row_idx: int) -> int:
-    count = 0
-    for col_idx in range(1, worksheet.max_column + 1):
-        if normalize_text(worksheet.cell(row_idx, col_idx).value):
-            count += 1
-    return count
-
-
-def collect_row_text(worksheet, row_idx: int) -> str:
-    values: list[str] = []
-    for col_idx in range(1, worksheet.max_column + 1):
-        text = normalize_text(worksheet.cell(row_idx, col_idx).value)
-        if text:
-            values.append(text)
-    return " ".join(values)
 
 
 def score_usage_header(text: str) -> int:
@@ -285,6 +271,23 @@ def score_month_header(text: str) -> int:
 def detect_header_and_columns(worksheet) -> HeaderDetection:
     best_row: tuple[int, int | None, int | None, int] | None = None
     scan_limit = min(HEADER_SCAN_ROWS, worksheet.max_row)
+    row_nonempty_counts: dict[int, int] = {}
+
+    for row_offset, row_values in enumerate(
+        worksheet.iter_rows(
+            min_row=1,
+            max_row=scan_limit,
+            min_col=1,
+            max_col=worksheet.max_column,
+            values_only=True,
+        ),
+        start=1,
+    ):
+        nonempty_count = 0
+        for value in row_values:
+            if normalize_text(value):
+                nonempty_count += 1
+        row_nonempty_counts[row_offset] = nonempty_count
 
     for row_idx in range(1, scan_limit + 1):
         usage_col = None
@@ -308,13 +311,13 @@ def detect_header_and_columns(worksheet) -> HeaderDetection:
                 month_col = col_idx
 
         if usage_score or month_score:
-            row_score = month_score * 10 + usage_score * 6 + min(count_nonempty_cells(worksheet, row_idx), 10)
+            row_score = month_score * 10 + usage_score * 6 + min(row_nonempty_counts[row_idx], 10)
             candidate = (row_idx, usage_col, month_col, row_score)
             if best_row is None or candidate[3] > best_row[3] or (candidate[3] == best_row[3] and candidate[0] < best_row[0]):
                 best_row = candidate
 
     if best_row is None:
-        header_row = max(range(1, scan_limit + 1), key=lambda idx: count_nonempty_cells(worksheet, idx), default=1)
+        header_row = max(range(1, scan_limit + 1), key=lambda idx: row_nonempty_counts[idx], default=1)
         usage_col = None
         month_col = None
         usage_source = "none"
@@ -630,17 +633,29 @@ def score_month_value(value: object) -> int:
 
 def soft_detect_usage_column(worksheet, header_row: int, exclude_col: int | None) -> int | None:
     sample_end = min(worksheet.max_row, header_row + SOFT_SCAN_ROWS)
+    if sample_end <= header_row:
+        return None
+
+    max_col = worksheet.max_column
+    col_scores = [0] * (max_col + 1)
+    for row_values in worksheet.iter_rows(
+        min_row=header_row + 1,
+        max_row=sample_end,
+        min_col=1,
+        max_col=max_col,
+        values_only=True,
+    ):
+        for col_idx, value in enumerate(row_values, start=1):
+            if exclude_col is not None and col_idx == exclude_col:
+                continue
+            col_scores[col_idx] += score_usage_value(value)
+
     best_col = None
     best_score = 0
-
-    for col_idx in range(1, worksheet.max_column + 1):
+    for col_idx in range(1, max_col + 1):
         if exclude_col is not None and col_idx == exclude_col:
             continue
-
-        total_score = 0
-        for row_idx in range(header_row + 1, sample_end + 1):
-            total_score += score_usage_value(worksheet.cell(row_idx, col_idx).value)
-
+        total_score = col_scores[col_idx]
         if total_score > best_score:
             best_col = col_idx
             best_score = total_score
@@ -652,17 +667,29 @@ def soft_detect_usage_column(worksheet, header_row: int, exclude_col: int | None
 
 def soft_detect_month_column(worksheet, header_row: int, exclude_col: int | None) -> int | None:
     sample_end = min(worksheet.max_row, header_row + SOFT_SCAN_ROWS)
+    if sample_end <= header_row:
+        return None
+
+    max_col = worksheet.max_column
+    col_scores = [0] * (max_col + 1)
+    for row_values in worksheet.iter_rows(
+        min_row=header_row + 1,
+        max_row=sample_end,
+        min_col=1,
+        max_col=max_col,
+        values_only=True,
+    ):
+        for col_idx, value in enumerate(row_values, start=1):
+            if exclude_col is not None and col_idx == exclude_col:
+                continue
+            col_scores[col_idx] += score_month_value(value)
+
     best_col = None
     best_score = 0
-
-    for col_idx in range(1, worksheet.max_column + 1):
+    for col_idx in range(1, max_col + 1):
         if exclude_col is not None and col_idx == exclude_col:
             continue
-
-        total_score = 0
-        for row_idx in range(header_row + 1, sample_end + 1):
-            total_score += score_month_value(worksheet.cell(row_idx, col_idx).value)
-
+        total_score = col_scores[col_idx]
         if total_score > best_score:
             best_col = col_idx
             best_score = total_score
@@ -722,7 +749,7 @@ def yellow_signature_of_cell(cell) -> str | None:
     return None
 
 
-def get_row_yellow_signature(worksheet, row_idx: int, usage_col: int | None, month_col: int | None) -> str | None:
+def get_row_yellow_signature_from_cells(row_cells, usage_col: int | None, month_col: int | None) -> str | None:
     focus_columns: list[int] = []
     if usage_col is not None:
         focus_columns.append(usage_col)
@@ -730,12 +757,14 @@ def get_row_yellow_signature(worksheet, row_idx: int, usage_col: int | None, mon
         focus_columns.append(month_col)
 
     for col_idx in focus_columns:
-        signature = yellow_signature_of_cell(worksheet.cell(row_idx, col_idx))
+        if not (1 <= col_idx <= len(row_cells)):
+            continue
+        signature = yellow_signature_of_cell(row_cells[col_idx - 1])
         if signature:
             return signature
 
-    for col_idx in range(1, worksheet.max_column + 1):
-        signature = yellow_signature_of_cell(worksheet.cell(row_idx, col_idx))
+    for cell in row_cells:
+        signature = yellow_signature_of_cell(cell)
         if signature:
             return signature
     return None
@@ -757,6 +786,133 @@ def find_usage_date_col_in_header_row(worksheet, header_row: int) -> int | None:
         if any(h in text for h in preferred_headers):
             return col_idx
     return None
+
+
+def canonicalize_header_text(value: object) -> str:
+    text = normalize_header_text(value)
+    if not text:
+        return ""
+    text = text.replace("（", "(").replace("）", ")")
+    text = text.replace("＋", "+")
+    return text
+
+
+def detect_monthly_extract_source_columns(worksheet, header_row: int) -> dict[str, int | None]:
+    header_map: dict[str, int] = {}
+    for col_idx in range(1, worksheet.max_column + 1):
+        key = canonicalize_header_text(worksheet.cell(header_row, col_idx).value)
+        if key and key not in header_map:
+            header_map[key] = col_idx
+
+    source_cols: dict[str, int | None] = {}
+    for output_col in MONTHLY_EXTRACT_OUTPUT_COLUMNS:
+        matched_col = None
+        for alias in MONTHLY_EXTRACT_COLUMN_ALIASES.get(output_col, (output_col,)):
+            alias_key = canonicalize_header_text(alias)
+            if alias_key in header_map:
+                matched_col = header_map[alias_key]
+                break
+        source_cols[output_col] = matched_col
+
+    return source_cols
+
+
+def count_monthly_extract_header_hits(worksheet, row_idx: int) -> int:
+    keys: set[str] = set()
+    for col_idx in range(1, worksheet.max_column + 1):
+        key = canonicalize_header_text(worksheet.cell(row_idx, col_idx).value)
+        if key:
+            keys.add(key)
+
+    hits = 0
+    for output_col in MONTHLY_EXTRACT_OUTPUT_COLUMNS:
+        aliases = MONTHLY_EXTRACT_COLUMN_ALIASES.get(output_col, (output_col,))
+        if any(canonicalize_header_text(alias) in keys for alias in aliases):
+            hits += 1
+    return hits
+
+
+def detect_monthly_extract_header_row(worksheet) -> int:
+    scan_limit = min(80, worksheet.max_row)
+    best_row = 1
+    best_hits = -1
+
+    for row_idx in range(1, scan_limit + 1):
+        hits = count_monthly_extract_header_hits(worksheet, row_idx)
+        if hits > best_hits:
+            best_hits = hits
+            best_row = row_idx
+
+    if best_hits <= 0:
+        return 1
+    return best_row
+
+
+def is_monthly_fast_path(input_file: Path, file_year_month: tuple[int, int] | None) -> bool:
+    if file_year_month is None:
+        return False
+    return MONTHLY_FILE_MARKER_RE.search(input_file.name) is not None
+
+
+def process_sheet_monthly_light(
+    worksheet,
+    file_year_month: tuple[int, int] | None,
+) -> dict[str, Any]:
+    header_row = detect_monthly_extract_header_row(worksheet)
+
+    if header_row > 1:
+        worksheet.delete_rows(1, header_row - 1)
+
+    # 轻量提取前先取消合并，避免写入首行时触发 MergedCell 只读错误。
+    merged_ranges = list(worksheet.merged_cells.ranges)
+    for merged_range in merged_ranges:
+        worksheet.unmerge_cells(str(merged_range))
+
+    source_cols = detect_monthly_extract_source_columns(worksheet, 1)
+    missing_columns = [name for name, col_idx in source_cols.items() if col_idx is None]
+    if missing_columns:
+        print(f"工作表 {worksheet.title}: 缺失字段 {', '.join(missing_columns)}，将按空值输出")
+
+    extracted_rows: list[list[Any]] = []
+    for row_values in worksheet.iter_rows(
+        min_row=2,
+        max_row=worksheet.max_row,
+        min_col=1,
+        max_col=worksheet.max_column,
+        values_only=True,
+    ):
+        if not any(normalize_text(v) for v in row_values):
+            continue
+        extracted_row: list[Any] = []
+        for output_col in MONTHLY_EXTRACT_OUTPUT_COLUMNS:
+            source_col = source_cols.get(output_col)
+            value = row_values[source_col - 1] if source_col is not None and source_col - 1 < len(row_values) else None
+            extracted_row.append(value)
+        extracted_rows.append(extracted_row)
+
+    if worksheet.max_row >= 2:
+        worksheet.delete_rows(2, worksheet.max_row - 1)
+
+    output_col_count = len(MONTHLY_EXTRACT_OUTPUT_COLUMNS)
+    for col_idx, header in enumerate(MONTHLY_EXTRACT_OUTPUT_COLUMNS, start=1):
+        worksheet.cell(1, col_idx).value = header
+
+    for row_offset, row_data in enumerate(extracted_rows, start=2):
+        for col_idx, value in enumerate(row_data, start=1):
+            worksheet.cell(row_offset, col_idx).value = value
+
+    if worksheet.max_column > output_col_count:
+        worksheet.delete_cols(output_col_count + 1, worksheet.max_column - output_col_count)
+
+    return {
+        "sheet": worksheet.title,
+        "status": "ok",
+        "mode": "monthly_light",
+        "header_row": 1,
+        "extracted_rows": len(extracted_rows),
+        "output_columns": output_col_count,
+        "missing_columns": missing_columns,
+    }
 
 
 def process_sheet(worksheet, file_year_month: tuple[int, int] | None = None) -> dict[str, Any]:
@@ -789,15 +945,28 @@ def process_sheet(worksheet, file_year_month: tuple[int, int] | None = None) -> 
         worksheet.cell(detection.header_row, detection.month_col).value = "月份"
         detection.month_source = "filename_added"
 
+    assert detection.month_col is not None
+
     row_states: list[RowState] = []
     previous_yellow_signature: str | None = None
 
-    for row_idx in range(detection.header_row + 1, worksheet.max_row + 1):
-        is_data_row = row_has_any_value(worksheet, row_idx)
-        yellow_signature = get_row_yellow_signature(worksheet, row_idx, detection.usage_col, detection.month_col)
+    for row_cells in worksheet.iter_rows(
+        min_row=detection.header_row + 1,
+        max_row=worksheet.max_row,
+        min_col=1,
+        max_col=worksheet.max_column,
+    ):
+        row_idx = row_cells[0].row
+        row_text_parts: list[str] = []
+        for cell in row_cells:
+            text = normalize_text(cell.value)
+            if text:
+                row_text_parts.append(text)
+        is_data_row = bool(row_text_parts)
+        yellow_signature = get_row_yellow_signature_from_cells(row_cells, detection.usage_col, detection.month_col)
         starts_yellow_block = bool(is_data_row and yellow_signature is not None and yellow_signature != previous_yellow_signature)
-        month_cell = worksheet.cell(row_idx, detection.month_col)
-        usage_value = worksheet.cell(row_idx, detection.usage_col).value if detection.usage_col is not None else None
+        month_cell = row_cells[detection.month_col - 1]
+        usage_value = row_cells[detection.usage_col - 1].value if detection.usage_col is not None else None
 
         _usage_candidate = parse_usage_year_month(usage_value)
         # 显式解析出的未来日期（如序列号 46357=Dec2026、"2026/12/13"）视为数据错误，
@@ -824,6 +993,7 @@ def process_sheet(worksheet, file_year_month: tuple[int, int] | None = None) -> 
                 month_candidate=_month_candidate,
                 yellow_signature=yellow_signature,
                 starts_yellow_block=starts_yellow_block,
+                row_text=" ".join(row_text_parts),
             )
         )
 
@@ -881,7 +1051,7 @@ def process_sheet(worksheet, file_year_month: tuple[int, int] | None = None) -> 
             if row_state.yellow_signature is not None:
                 if row_state.starts_yellow_block:
                     active_yellow_signature = row_state.yellow_signature
-                    row_text_candidate = parse_explicit_year_month_from_text(collect_row_text(worksheet, row_state.row_idx))
+                    row_text_candidate = parse_explicit_year_month_from_text(row_state.row_text)
                     if (row_text_candidate is not None
                             and row_text_candidate <= CURRENT_YEAR_MONTH):
                         active_yellow_month = row_text_candidate
@@ -1045,13 +1215,19 @@ def format_column_info(column_index: int | None) -> str:
     return f"{get_column_letter(column_index)}({column_index})"
 
 
-def process_workbook(input_file: Path, suffix: str) -> dict[str, int | str]:
+def process_workbook(
+    input_file: Path,
+    suffix: str,
+    enable_monthly_light: bool,
+) -> dict[str, int | str]:
     output_file = build_output_path(input_file, suffix, DEFAULT_OUTPUT_DIR)
     file_year_month = extract_year_month_from_name(input_file)
+    use_monthly_light = enable_monthly_light and is_monthly_fast_path(input_file, file_year_month)
 
     print(f"读取文件: {input_file}")
     if file_year_month is not None:
         print(f"文件名月份: {format_year_month(file_year_month)}")
+    print(f"处理模式: {'月度轻量提取+项目校验' if use_monthly_light else '完整月份标准化'}")
     workbook = load_workbook(input_file)
 
     total_parsed_rows = 0
@@ -1061,14 +1237,32 @@ def process_workbook(input_file: Path, suffix: str) -> dict[str, int | str]:
     total_filled_context = 0
     total_updated_cells = 0
     total_unresolved_rows = 0
+    total_extracted_rows = 0
 
     for worksheet in workbook.worksheets:
-        result = process_sheet(worksheet, file_year_month=file_year_month)
+        if use_monthly_light:
+            result = process_sheet_monthly_light(
+                worksheet,
+                file_year_month=file_year_month,
+            )
+        else:
+            result = process_sheet(worksheet, file_year_month=file_year_month)
+
         if result["status"] == "skipped":
             print(
                 f"工作表 {result['sheet']}: 表头行={result['header_row']}，"
                 f"使用时间列={format_column_info(result['usage_col'])}，"
                 f"月份列=未找到月份列，跳过写入"
+            )
+            continue
+
+        if result.get("mode") == "monthly_light":
+            total_extracted_rows += int(result["extracted_rows"])
+            print(
+                f"工作表 {result['sheet']}: 轻量提取，"
+                f"表头行={result['header_row']}，"
+                f"输出列数={result['output_columns']}，"
+                f"提取行数={result['extracted_rows']}"
             )
             continue
 
@@ -1104,6 +1298,8 @@ def process_workbook(input_file: Path, suffix: str) -> dict[str, int | str]:
     print(f"上下文填充合计: {total_filled_context}")
     print(f"修改单元格合计: {total_updated_cells}")
     print(f"未解析行数合计: {total_unresolved_rows}")
+    if use_monthly_light:
+        print(f"轻量模式提取行数合计: {total_extracted_rows}")
 
     return {
         "input": str(input_file),
@@ -1116,6 +1312,7 @@ def process_workbook(input_file: Path, suffix: str) -> dict[str, int | str]:
 def main() -> None:
     args = parse_args()
     provided_input = args.input_override or args.input_file
+    enable_monthly_light = not args.no_monthly_light
 
     if provided_input:
         input_file = Path(provided_input).expanduser().resolve()
@@ -1140,7 +1337,11 @@ def main() -> None:
         if len(input_files) > 1:
             print(f"\n[{idx}/{len(input_files)}] 开始处理: {input_file.name}")
 
-        result = process_workbook(input_file, args.suffix)
+        result = process_workbook(
+            input_file,
+            args.suffix,
+            enable_monthly_light=enable_monthly_light,
+        )
         batch_parsed_rows += int(result["parsed_rows"])
         batch_updated_cells += int(result["updated_cells"])
 
