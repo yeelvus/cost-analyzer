@@ -67,10 +67,12 @@ PROJECT_MATCH_DB_PATH = os.path.join("/Users/wyattsun/Desktop/code/0_项目基�
 SUMMARY_SHEET_NAME = "汇总"
 PROJECT_SUMMARY_SHEET_NAME = "项目汇总机具费"
 PROJECT_MONTHLY_CHANGE_SHEET_NAME = "项目月度金额增量"
+PROJECT_MONTHLY_WIDE_SHEET_NAME = "项目月份金额宽表"
 
 # ================================================
 
 LATEST_FILE_MONTH_RE = re.compile(r"(20\d{2})\s*年\s*(1[0-2]|0?[1-9])\s*月")
+PROJECT_SPLIT_FILE_RE = re.compile(r"^(20\d{2}(?:0[1-9]|1[0-2]))_(.+?)机具费(?:_标准化)?\.xlsx$")
 
 
 def extract_year_month_from_filename(file_path):
@@ -145,6 +147,52 @@ def build_summary_output_basename(excel_path: Path) -> str:
     if stem.endswith("_标准化"):
         stem = stem[:-4]
     return stem
+
+
+def extract_project_name_from_filename(file_path: Path) -> str | None:
+    """从按月拆分文件名中提取项目名，例如 202604_伟隆项目机具费.xlsx。"""
+    match = PROJECT_SPLIT_FILE_RE.match(file_path.name)
+    if not match:
+        return None
+    project_name = match.group(2).strip()
+    return project_name or None
+
+
+def group_files_by_project(file_paths):
+    """将标准化目录中的月度项目文件按项目名分组。"""
+    project_to_files = {}
+    unmatched_files = []
+
+    for file_path in file_paths:
+        project_name = extract_project_name_from_filename(file_path)
+        if not project_name:
+            unmatched_files.append(file_path)
+            continue
+        project_to_files.setdefault(project_name, []).append(file_path)
+
+    for project_name, grouped_files in project_to_files.items():
+        grouped_files.sort(key=lambda p: (extract_year_month_from_filename(p) or (0, 0), p.name))
+
+    return project_to_files, unmatched_files
+
+
+def build_project_output_basename(project_name, match_db):
+    """生成按项目汇总输出名：项目编码_项目名称_机具费。"""
+    project_name = str(project_name).strip()
+    if not project_name:
+        return f"需手动核对_未匹配项目_机具费"
+
+    hit = match_project(project_name, match_db)
+    if hit:
+        project_code = str(hit.get('project_code', '')).strip() or '需手动核对'
+        standard_name = str(hit.get('project_name', '')).strip() or project_name
+    else:
+        project_code = '需手动核对'
+        standard_name = project_name
+
+    safe_name = re.sub(r'[\\/:*?"<>|]', '_', standard_name)
+    safe_code = re.sub(r'[\\/:*?"<>|]', '_', project_code)
+    return f"{safe_code}_{safe_name}_机具费"
 
 
 MONTH_LIKE_TEXT_PATTERNS = [
@@ -937,7 +985,30 @@ def extract_project_info(ws):
     
     return project_name, start_month
 
-def main(excel_path_override=None):
+
+def normalize_year_month_text(value):
+    """将常见年月文本归一为 YYYY-MM。"""
+    text = str(value).strip() if value is not None else ""
+    if not text or text.lower() in {"nan", "none", "nat", "<na>"}:
+        return ""
+
+    patterns = [
+        re.compile(r"(?<!\d)(20\d{2})[-/.年]\s*(1[0-2]|0?[1-9])(?:月|月份)?"),
+        re.compile(r"(?<!\d)(20\d{2})(0[1-9]|1[0-2])(?!\d)"),
+    ]
+
+    for pattern in patterns:
+        match = pattern.search(text)
+        if not match:
+            continue
+        year = int(match.group(1))
+        month = int(match.group(2))
+        if 2020 <= year <= 2035:
+            return f"{year:04d}-{month:02d}"
+
+    return ""
+
+def main(excel_path_override=None, output_basename_override=None):
     if isinstance(excel_path_override, (list, tuple)) and excel_path_override:
         excel_paths = [Path(p).expanduser().resolve() for p in excel_path_override]
         print("批量模式-当前处理文件组:")
@@ -1003,6 +1074,14 @@ def main(excel_path_override=None):
     
     all_data = []
     report_data = []  # 用于生成报告
+
+    internal_generated_sheets = {
+        SUMMARY_SHEET_NAME,
+        PROJECT_SUMMARY_SHEET_NAME,
+        PROJECT_MONTHLY_CHANGE_SHEET_NAME,
+        PROJECT_MONTHLY_WIDE_SHEET_NAME,
+        "处理报告",
+    }
     
     # 第一遍扫描：收集所有需要匹配的项目
     sheet_match_results = {}
@@ -1011,9 +1090,10 @@ def main(excel_path_override=None):
     print("\n=== 第一遍扫描：提取项目名称与匹配 ===")
     for source_excel_path in excel_paths:
         wb = openpyxl.load_workbook(source_excel_path, data_only=True)
+        workbook_looks_generated = len(set(wb.sheetnames) & internal_generated_sheets) >= 2
         print(f"\n文件: {source_excel_path.name}")
         for sheet_name in wb.sheetnames:
-            if sheet_name == SUMMARY_SHEET_NAME:
+            if workbook_looks_generated and sheet_name in internal_generated_sheets:
                 continue
 
             ws = wb[sheet_name]
@@ -1088,9 +1168,10 @@ def main(excel_path_override=None):
     # 重新打开工作簿开始第二遍处理
     for source_excel_path in excel_paths:
         wb = openpyxl.load_workbook(source_excel_path, data_only=True)
+        workbook_looks_generated = len(set(wb.sheetnames) & internal_generated_sheets) >= 2
         print(f"\n=== 第二遍处理文件: {source_excel_path.name} ===")
         for sheet_name in wb.sheetnames:
-            if sheet_name == SUMMARY_SHEET_NAME:
+            if workbook_looks_generated and sheet_name in internal_generated_sheets:
                 continue
         
             print(f"\n正在处理 sheet：{sheet_name}")
@@ -1155,6 +1236,7 @@ def main(excel_path_override=None):
                 "使用日期": ["使用日期", "使用时间"],
                 "出租单位": ["出租单位"],
                 "月份": ["月份"],
+                "年月": ["年月", "年-月", "月度", "期间"],
                 "备注": ["备注", "项目说明"]
             }
             
@@ -1699,8 +1781,19 @@ def main(excel_path_override=None):
     
     # 4. 生成年月列：根据使用日期智能推断
     def extract_year_month(row):
+        year_month_field = str(row.get('年月', '')).strip()
         use_date = str(row.get('使用日期', '')).strip()
         month_field = str(row.get('月份', '')).strip()
+
+        # 优先使用源数据中的年月列，避免已有年月被二次解析丢失。
+        normalized_from_field = normalize_year_month_text(year_month_field)
+        if normalized_from_field:
+            return normalized_from_field
+
+        # 其次使用月份列（常见格式：2026年4月、2026-04、202604）
+        normalized_from_month = normalize_year_month_text(month_field)
+        if normalized_from_month:
+            return normalized_from_month
         
         if not use_date or use_date == 'nan' or use_date == '':
             return ""
@@ -1777,6 +1870,11 @@ def main(excel_path_override=None):
         print(f"✅ 已自动修正 {len(swapped_month_indices)} 行出租单位/月份填反的数据，将用黄色标注")
     else:
         print(f"✅ 未发现出租单位/月份填反的数据")
+
+    # 月份列可能在上一步被纠正，需重算年月，确保汇总列使用最新值
+    summary_df["年月"] = summary_df.apply(extract_year_month, axis=1)
+    refreshed_year_month_count = (summary_df["年月"] != "").sum()
+    print(f"✅ 已按最新月份信息重算年月列，成功解析 {refreshed_year_month_count}/{len(summary_df)} 行")
     
     # 调整列顺序（基础字段统一为：sheet名称、项目编码、项目名称）
     col_order = [
@@ -1784,7 +1882,7 @@ def main(excel_path_override=None):
         "序号", "台班费_泰铢", "本次结算台班",
         "加班小时", "加班费", "进出场费运费", "移动费拆装费", "结算费用_泰铢",
         "增值税7%", "机具租赁预扣税3%", "机具租赁预扣税5%", "本次费用合计",
-        "使用日期", "出租单位", "月份", "备注", "月租金额_泰铢", "日租金额_泰铢", "备注加班费单价"
+        "使用日期", "出租单位", "月份", "年月", "备注", "月租金额_泰铢", "日租金额_泰铢", "备注加班费单价"
     ]
     
     # 检查是否所有列都存在
@@ -1870,42 +1968,6 @@ def main(excel_path_override=None):
         if col in summary_df.columns:
             summary_df[col] = summary_df[col].apply(safe_to_float)
 
-    # 生成项目月度机具费汇总表：纵向项目，横向使用“月份”列
-    monthly_report_source = summary_df.copy()
-
-    monthly_report_source["月度项目编码"] = monthly_report_source["项目编码"].fillna("").astype(str).str.strip()
-    monthly_report_source["月度项目名称"] = monthly_report_source["项目名称"].fillna("未匹配项目").astype(str).str.strip()
-    monthly_report_source["月度报告月份"] = monthly_report_source["月份"].fillna("").astype(str).str.strip()
-    monthly_report_source = monthly_report_source[
-        (monthly_report_source["月度报告月份"] != "") &
-        (monthly_report_source["月度报告月份"] != "nan")
-    ].copy()
-
-    project_monthly_fee_report = monthly_report_source.pivot_table(
-        index=["月度项目编码", "月度项目名称"],
-        columns="月度报告月份",
-        values="本次费用合计",
-        aggfunc="sum",
-        fill_value=0
-    )
-
-    month_columns = list(project_monthly_fee_report.columns)
-
-    def sort_monthly_report_column(col_name):
-        col_str = str(col_name)
-        if re.match(r'^\d{4}-\d{2}$', col_str):
-            return (0, col_str)
-        return (1, col_str)
-
-    project_monthly_fee_report = project_monthly_fee_report.reindex(
-        columns=sorted(month_columns, key=sort_monthly_report_column)
-    )
-    project_monthly_fee_report = project_monthly_fee_report.reset_index().round(2)
-    project_monthly_fee_report = project_monthly_fee_report.rename(columns={
-        "月度项目编码": "项目编码",
-        "月度项目名称": "项目名称"
-    })
-
     # 生成项目汇总机具费表
     project_summary_df = summary_df.groupby(['项目编码', '项目名称']).agg({
         '本次费用合计': lambda x: x.apply(safe_to_float).sum(),
@@ -1917,15 +1979,50 @@ def main(excel_path_override=None):
     project_summary_df.columns = ['项目编码', '项目名称', '费用合计(泰铢)', '使用次数', '机具种类数', '出租单位数', '覆盖月份数']
     project_summary_df = project_summary_df.sort_values('费用合计(泰铢)', ascending=False).reset_index(drop=True)
 
-    # 生成项目月度金额增量表：按项目展示每月金额汇总
-    project_monthly_change_report = project_monthly_fee_report.copy().round(2)
+    # 新增：按“年月(YYYY-MM)”生成项目月份金额宽表
+    monthly_wide_source = summary_df.copy()
+    monthly_wide_source["月度项目编码"] = monthly_wide_source["项目编码"].fillna("").astype(str).str.strip()
+    monthly_wide_source["月度项目名称"] = monthly_wide_source["项目名称"].fillna("未匹配项目").astype(str).str.strip()
+    monthly_wide_source["月度年月"] = monthly_wide_source.apply(extract_year_month, axis=1)
+    monthly_wide_source["月度年月"] = monthly_wide_source["月度年月"].fillna("").astype(str).str.strip()
+    monthly_wide_source = monthly_wide_source[
+        monthly_wide_source["月度年月"].str.match(r"^20\d{2}-\d{2}$", na=False)
+    ].copy()
+
+    project_monthly_wide_report = monthly_wide_source.pivot_table(
+        index=["月度项目编码", "月度项目名称"],
+        columns="月度年月",
+        values="本次费用合计",
+        aggfunc="sum",
+        fill_value=0
+    )
+
+    wide_month_columns = list(project_monthly_wide_report.columns)
+    project_monthly_wide_report = project_monthly_wide_report.reindex(
+        columns=sorted(wide_month_columns)
+    )
+    project_monthly_wide_report = project_monthly_wide_report.reset_index().round(2)
+    project_monthly_wide_report = project_monthly_wide_report.rename(columns={
+        "月度项目编码": "项目编码",
+        "月度项目名称": "项目名称"
+    })
     
     # 8. 保存到新Excel（输出到汇总文件夹，带时间戳）
     # 确保输出文件夹存在
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
     
-    if len(excel_paths) > 1:
-        output_basename = f"{OUTPUT_FILENAME_PREFIX}_全量标准化"
+    if output_basename_override:
+        output_basename = output_basename_override
+    elif len(excel_paths) > 1:
+        grouped_project_names = {
+            extract_project_name_from_filename(path)
+            for path in excel_paths
+            if extract_project_name_from_filename(path)
+        }
+        if len(grouped_project_names) == 1:
+            output_basename = build_project_output_basename(grouped_project_names.pop(), match_db)
+        else:
+            output_basename = f"{OUTPUT_FILENAME_PREFIX}_全量标准化"
     else:
         output_basename = build_summary_output_basename(primary_excel_path)
     output_filename = f"{output_basename}_{OUTPUT_FILE_SUFFIX}.xlsx"
@@ -2011,7 +2108,7 @@ def main(excel_path_override=None):
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
         # 先写入重点sheet（放在最前）
         project_summary_df.to_excel(writer, sheet_name=PROJECT_SUMMARY_SHEET_NAME, index=False)
-        project_monthly_change_report.to_excel(writer, sheet_name=PROJECT_MONTHLY_CHANGE_SHEET_NAME, index=False)
+        project_monthly_wide_report.to_excel(writer, sheet_name=PROJECT_MONTHLY_WIDE_SHEET_NAME, index=False)
 
         # 写入报告表
         report_df.to_excel(writer, sheet_name="处理报告", index=False)
@@ -2182,9 +2279,9 @@ def main(excel_path_override=None):
         ws_project_summary.freeze_panes = 'A2'
         ws_project_summary.auto_filter.ref = ws_project_summary.dimensions
 
-        # 美化项目月度金额增量表
-        ws_project_monthly_change = writer.sheets[PROJECT_MONTHLY_CHANGE_SHEET_NAME]
-        format_monthly_report_sheet(ws_project_monthly_change, project_monthly_change_report)
+        # 美化项目月份金额宽表
+        ws_project_monthly_wide = writer.sheets[PROJECT_MONTHLY_WIDE_SHEET_NAME]
+        format_monthly_report_sheet(ws_project_monthly_wide, project_monthly_wide_report)
         
         # 美化报告表
         ws_report = writer.sheets["处理报告"]
@@ -2249,7 +2346,7 @@ def main(excel_path_override=None):
     print(f"\n  💰 总计: {report_total:,.2f} 泰铢")
     print(f"\n已生成4个工作表：")
     print(f"  1. '{PROJECT_SUMMARY_SHEET_NAME}' - 项目汇总机具使用费")
-    print(f"  2. '{PROJECT_MONTHLY_CHANGE_SHEET_NAME}' - 项目每月机具费用金额汇总")
+    print(f"  2. '{PROJECT_MONTHLY_WIDE_SHEET_NAME}' - 各项目按年月横向金额宽表")
     print(f"  3. '处理报告' - 各项目处理情况统计 (包含错误率、差异金额)")
     print(f"  4. '{SUMMARY_SHEET_NAME}' - 所有数据汇总 (共 {len(summary_df)} 行)")
     
@@ -2292,8 +2389,24 @@ if __name__ == "__main__":
             print(f"找不到标准化文件：{STANDARDIZED_INPUT_DIR}")
         else:
             if RUN_MODE == "all":
-                print(f"自动发现标准化文件 {len(all_input_files)} 个，开始全量汇总...")
-                main(all_input_files)
+                project_to_files, unmatched_files = group_files_by_project(all_input_files)
+                if unmatched_files:
+                    print(f"以下 {len(unmatched_files)} 个文件未识别到项目名，已跳过按项目汇总：")
+                    for skipped_file in unmatched_files:
+                        print(f"  - {skipped_file.name}")
+
+                if not project_to_files:
+                    print("未找到可按项目分组的标准化文件，请检查文件命名格式（如 202604_伟隆项目机具费.xlsx）。")
+                else:
+                    print(f"自动发现标准化文件 {len(all_input_files)} 个，按项目构建汇总任务 {len(project_to_files)} 个...")
+                    sorted_jobs = sorted(project_to_files.items(), key=lambda item: item[0])
+                    for idx, (project_name, project_files) in enumerate(sorted_jobs, start=1):
+                        print(f"\n[{idx}/{len(sorted_jobs)}] 项目汇总：{project_name}（{len(project_files)} 个文件）")
+                        project_output_basename = build_project_output_basename(project_name, load_or_init_db(PROJECT_MATCH_DB_PATH, []))
+                        main(project_files, output_basename_override=project_output_basename)
+
+                    print(f"\n[总汇总] 基于全部标准化文件生成总汇总...")
+                    main(all_input_files, output_basename_override=f"{OUTPUT_FILENAME_PREFIX}_全量标准化")
             else:
                 print(f"自动发现标准化文件 {len(all_input_files)} 个，开始按月份组合汇总...")
 

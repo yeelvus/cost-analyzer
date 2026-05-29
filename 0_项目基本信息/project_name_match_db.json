@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-29 16:23:09",
+  "updated_at": "2026-05-29 16:57:39",
   "projects": {
     "永强车业项目": {
       "project_code": "THCC-2025-005",
@@ -112,7 +112,8 @@
         "泰华项目",
         "依顿",
         "泰华伊顿",
-        "泰华"
+        "泰华",
+        "泰华电子"
       ]
     },
     "正大服务区项目": {
@@ -165,7 +166,8 @@
       "target_status": "需手动核对",
       "aliases": [
         "伊莱特",
-        "伊莱特、沃森"
+        "伊莱特、沃森",
+        "伊莱特-沃森"
       ]
     },
     "沃森项目": {
@@ -357,7 +359,8 @@
       "aliases": [
         "泰国TOMAX项目（土建+安装）",
         "TOMAX",
-        "TOMAX项目"
+        "TOMAX项目",
+        "TONAX及BK、沃森一期"
       ]
     },
     "海螺型材": {
@@ -530,6 +533,21 @@
       "project_code": "需手动核对",
       "target_status": "需手动核对",
       "aliases": []
+    },
+    "搅拌站": {
+      "project_code": "需手动核对",
+      "target_status": "需手动核对",
+      "aliases": []
+    },
+    "Sheet1": {
+      "project_code": "需手动核对",
+      "target_status": "需手动核对",
+      "aliases": []
+    },
+    "项目编码": {
+      "project_code": "需手动核对",
+      "target_status": "需手动核对",
+      "aliases": []
     }
   },
   "unmatched_aliases": [
@@ -544,7 +562,6 @@
     "开拓者车业",
     "手动放料",
     "损耗",
-    "搅拌站",
     "旺盛项目",
     "森特建筑",
     "海信",
