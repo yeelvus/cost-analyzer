@@ -20,6 +20,9 @@ DEFAULT_OUTPUT_DIR = Path(
     "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_std"
 )
 DEFAULT_OUTPUT_SUFFIX = "_标准化"
+TARGET_SUMMARY_FILE = Path(
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/A_机具费_raw/2026年03月前租赁机具汇总台账-20260425（王队）.xlsx"
+)
 DEFAULT_YEAR_WITHOUT_EXPLICIT = 2025
 HEADER_SCAN_ROWS = 12
 SOFT_SCAN_ROWS = 60
@@ -160,8 +163,8 @@ class RowState:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="按使用时间优先规则标准化机具台账中的月份列")
-    parser.add_argument("input_file", nargs="?", default=None, help="输入 Excel 文件路径（不传则自动选择原始数据目录中最新月份文件）")
-    parser.add_argument("-i", "--input", dest="input_override", default=None, help="输入 Excel 文件路径（优先级高于自动选择）")
+    parser.add_argument("input_file", nargs="?", default=None, help="输入 Excel 文件路径（当前脚本仅允许指定汇总台账文件）")
+    parser.add_argument("-i", "--input", dest="input_override", default=None, help="输入 Excel 文件路径（当前脚本仅允许指定汇总台账文件）")
     parser.add_argument("--suffix", default=DEFAULT_OUTPUT_SUFFIX, help="输出文件名后缀")
     parser.add_argument(
         "--no-monthly-light",
@@ -849,9 +852,8 @@ def detect_monthly_extract_header_row(worksheet) -> int:
 
 
 def is_monthly_fast_path(input_file: Path, file_year_month: tuple[int, int] | None) -> bool:
-    if file_year_month is None:
-        return False
-    return MONTHLY_FILE_MARKER_RE.search(input_file.name) is not None
+    # 汇总台账仅做“月份列”标准化，不再走轻量提取（轻量提取会重排列结构）。
+    return False
 
 
 def process_sheet_monthly_light(
@@ -917,11 +919,6 @@ def process_sheet_monthly_light(
 
 def process_sheet(worksheet, file_year_month: tuple[int, int] | None = None) -> dict[str, Any]:
     detection = detect_header_and_columns(worksheet)
-
-    # 输出前先裁剪：删除表头之前的所有行，仅保留表头及其后数据。
-    if detection.header_row > 1:
-        worksheet.delete_rows(1, detection.header_row - 1)
-        detection.header_row = 1
 
     if detection.month_col is None:
         if file_year_month is None:
@@ -1312,18 +1309,20 @@ def process_workbook(
 def main() -> None:
     args = parse_args()
     provided_input = args.input_override or args.input_file
-    enable_monthly_light = not args.no_monthly_light
+    # 固定按完整模式处理，避免轻量提取改动非月份列。
+    enable_monthly_light = False
 
+    target_file = TARGET_SUMMARY_FILE.resolve()
     if provided_input:
         input_file = Path(provided_input).expanduser().resolve()
-        input_files = [input_file]
-    else:
-        input_files = [p.resolve() for p in list_all_raw_input_files(DEFAULT_INPUT_DIR)]
-        if not input_files:
-            raise FileNotFoundError(
-                f"未在原始数据目录找到可用 .xlsx 文件: {DEFAULT_INPUT_DIR}"
+        if input_file != target_file:
+            raise ValueError(
+                "当前脚本仅允许处理指定汇总台账文件: "
+                f"{target_file}"
             )
-        print(f"自动发现原始文件 {len(input_files)} 个，开始批量标准化...")
+
+    input_files = [target_file]
+    print(f"固定处理目标文件: {target_file}")
 
     batch_parsed_rows = 0
     batch_updated_cells = 0
