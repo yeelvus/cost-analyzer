@@ -1420,8 +1420,7 @@ def main(excel_path_override=None, output_basename_override=None):
                     row_project_names.append(fallback_name)
                     row_project_codes.append(default_project_code)
     
-            # 基础字段只保留：sheet名称 / 项目编码 / 项目名称
-            df["sheet名称"] = sheet_name
+            # 基础字段只保留：项目编码 / 项目名称
             df["项目编码"] = row_project_codes
             df["项目名称"] = row_project_names
             df["开始月份"] = start_month
@@ -1876,9 +1875,9 @@ def main(excel_path_override=None, output_basename_override=None):
     refreshed_year_month_count = (summary_df["年月"] != "").sum()
     print(f"✅ 已按最新月份信息重算年月列，成功解析 {refreshed_year_month_count}/{len(summary_df)} 行")
     
-    # 调整列顺序（基础字段统一为：sheet名称、项目编码、项目名称）
+    # 调整列顺序（基础字段统一为：项目编码、项目名称）
     col_order = [
-        "sheet名称", "项目编码", "项目名称", "标准机具种类", "标准型号规格",
+        "项目编码", "项目名称", "标准机具种类", "标准型号规格",
         "序号", "台班费_泰铢", "本次结算台班",
         "加班小时", "加班费", "进出场费运费", "移动费拆装费", "结算费用_泰铢",
         "增值税7%", "机具租赁预扣税3%", "机具租赁预扣税5%", "本次费用合计",
@@ -1944,8 +1943,8 @@ def main(excel_path_override=None, output_basename_override=None):
         "费用合计(泰铢)": round(report_total, 2)
     })
     
-    # 6. 生成处理报告
-    report_df = pd.DataFrame(report_data)
+    # 6. 生成处理报告（导出时不保留sheet名称列）
+    report_df = pd.DataFrame(report_data).drop(columns=["sheet名称"], errors="ignore")
     
     # 8. 处理数值列（转换为浮点数，保留原始数值类型）
     numeric_columns = [
