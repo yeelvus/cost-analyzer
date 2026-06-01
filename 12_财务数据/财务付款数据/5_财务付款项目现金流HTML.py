@@ -111,14 +111,17 @@ def build_project_payload(cashflow_df: pd.DataFrame) -> Dict[str, Dict]:
         ].copy().sort_values("日期")
 
         project_df["累计实际现金流"] = project_df["实际现金流"].cumsum()
+        project_df["累计实际现金流_万"] = (project_df["累计实际现金流"] / 10000.0).round(0)
 
         total = float(project_df["实际现金流"].sum())
+        total_wan = round(total / 10000.0)
         payload[key] = {
             "projectCode": project_code,
             "projectName": project_name,
             "dates": project_df["日期"].tolist(),
-            "values": [round(float(v), 2) for v in project_df["累计实际现金流"].tolist()],
-            "total": round(total, 2),
+          "values": [int(v) for v in project_df["累计实际现金流_万"].tolist()],
+          "total": round(total, 2),
+          "totalWan": int(total_wan),
         }
 
     return payload
@@ -142,7 +145,7 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
             f"""
             <section class=\"project-row\" id=\"section-{key}\">
               <h2>{section_title}</h2>
-              <p class=\"meta\">累计实际现金流（实付金额 + 增值税额）：{item['total']:,.2f}</p>
+              <p class=\"meta\">累计实际现金流（实付金额 + 增值税额）：{item['totalWan']:,} 万</p>
               <div class=\"chart\" id=\"chart-{key}\"></div>
             </section>
             """.strip()
@@ -251,7 +254,7 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
 <body>
   <div class=\"wrap\">
     <h1>财务付款项目实际现金流量分析</h1>
-    <p class=\"sub\">项目数：{total_projects}。口径：先按日期汇总（实付金额 + 增值税额），再按日期累计形成现金流曲线。</p>
+    <p class=\"sub\">项目数：{total_projects}。口径：先按日期汇总（实付金额 + 增值税额），再按日期累计形成现金流曲线；展示单位为万（无小数）。</p>
 
     <div class=\"page-layout\">
       <div class=\"main-list\">
@@ -268,8 +271,20 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
   <script>
     const projectData = {payload_json};
 
+    function monthStart(dateStr) {{
+      const d = new Date(`${{dateStr}}T00:00:00`);
+      return new Date(d.getFullYear(), d.getMonth(), 1);
+    }}
+
+    function monthEnd(dateStr) {{
+      const d = new Date(`${{dateStr}}T00:00:00`);
+      return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    }}
+
     function renderChart(key) {{
       const item = projectData[key];
+      const xMin = monthStart(item.dates[0]);
+      const xMax = monthEnd(item.dates[item.dates.length - 1]);
       const trace = {{
         x: item.dates,
         y: item.values,
@@ -277,14 +292,30 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
         type: 'scatter',
         line: {{ color: '#bc4f2f', width: 2 }},
         marker: {{ size: 5, color: '#7f2910' }},
-        hovertemplate: '日期: %{{x}}<br>实际现金流: %{{y:,.2f}}<extra></extra>'
+        hovertemplate: '日期: %{{x|%Y年%-m月%-d日}}<br>累计实际现金流: %{{y:,.0f}} 万<extra></extra>'
       }};
       const layout = {{
         margin: {{ l: 52, r: 16, t: 10, b: 40 }},
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: '#fffdf8',
-        xaxis: {{ title: '日期', tickangle: -25, gridcolor: '#efe5d5' }},
-        yaxis: {{ title: '累计实际现金流', separatethousands: true, gridcolor: '#efe5d5' }},
+        xaxis: {{
+          title: '日期（年月）',
+          type: 'date',
+          tickmode: 'linear',
+          tick0: xMin,
+          dtick: 'M1',
+          tickformat: '%Y年%-m月',
+          tickangle: -25,
+          showgrid: true,
+          gridcolor: '#efe5d5',
+          range: [xMin, xMax]
+        }},
+        yaxis: {{
+          title: '累计实际现金流（万）',
+          tickformat: ',.0f',
+          separatethousands: true,
+          gridcolor: '#efe5d5'
+        }},
       }};
       const config = {{ displaylogo: false, responsive: true }};
       Plotly.newPlot(`chart-${{key}}`, [trace], layout, config);
