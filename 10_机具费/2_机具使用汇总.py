@@ -9,11 +9,29 @@ import os
 import sys
 from datetime import datetime
 import json
+import unicodedata
 
 BASE_CODE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_DIR = Path(__file__).resolve().parent
+CODE_ROOT_DIR = SCRIPT_DIR.parent
+
+
+def resolve_existing_path(*candidates):
+    """按候选顺序返回第一个存在的路径，否则返回最后一个候选。"""
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+    return candidates[-1] if candidates else ""
+
+
+def resolve_code_path(*parts):
+    """解析到当前代码仓库根目录下的路径。"""
+    return str(CODE_ROOT_DIR.joinpath(*parts))
+
+
 MATCHER_DIR_CANDIDATES = [
-    os.path.join(BASE_CODE_DIR, '0_项目基本信息'),
-    os.path.join(BASE_CODE_DIR, '0_项目基本信息情况'),
+    resolve_code_path('0_项目基本信息'),
+    resolve_code_path('0_项目基本信息情况'),
 ]
 
 for matcher_dir in MATCHER_DIR_CANDIDATES:
@@ -39,18 +57,40 @@ STANDARDIZED_INPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10
 EXCEL_FILE_OVERRIDE = ""
 
 # 映射表文件名（JSON）
-PROJECT_MAPPING_JSON = "/Users/wyattsun/Desktop/code/10_机具费汇总代码/区域映射表.json"      # ←←← 项目区域映射文件(JSON)
-MACHINE_MAPPING_JSON = "/Users/wyattsun/Desktop/code/10_机具费汇总代码/机具映射表.json"      # ←←← 机具种类和型号映射文件(JSON)
+PROJECT_MAPPING_JSON = resolve_existing_path(
+    resolve_code_path('10_机具费', '区域映射表.json'),
+    resolve_code_path('10_机具费汇总代码', '区域映射表.json'),
+)      # ←←← 项目区域映射文件(JSON)
+MACHINE_MAPPING_JSON = resolve_existing_path(
+    resolve_code_path('10_机具费', '机具映射表.json'),
+    resolve_code_path('10_机具费汇总代码', '机具映射表.json'),
+)      # ←←← 机具种类和型号映射文件(JSON)
 
 # 兼容旧版TXT映射表（仅用于首次自动迁移）
-PROJECT_MAPPING_TXT_LEGACY = "/Users/wyattsun/Desktop/code/10_机具费汇总代码/区域映射表.txt"
-MACHINE_MAPPING_TXT_LEGACY = "/Users/wyattsun/Desktop/code/10_机具费汇总代码/机具映射表.txt"
+PROJECT_MAPPING_TXT_LEGACY = resolve_existing_path(
+    resolve_code_path('10_机具费', '区域映射表.txt'),
+    resolve_code_path('10_机具费汇总代码', '区域映射表.txt'),
+)
+MACHINE_MAPPING_TXT_LEGACY = resolve_existing_path(
+    resolve_code_path('10_机具费', '机具映射表.txt'),
+    resolve_code_path('10_机具费汇总代码', '机具映射表.txt'),
+)
 
 # 项目编码名称汇总文件（统一标准项目映射）
-PROJECT_CODE_NAME_MAPPING_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"  # ←←← 统一的项目编码映射表
+PROJECT_CODE_NAME_MAPPING_FILE = resolve_existing_path(
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx",
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息/项目基本信息表.xlsx",
+    resolve_code_path('0_项目基本信息情况', '项目基本信息表.xlsx'),
+    resolve_code_path('0_项目基本信息', '项目基本信息表.xlsx'),
+)  # ←←← 统一的项目编码映射表
 
 # 汇总文件输出文件夹路径
-OUTPUT_FOLDER = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_sum"                  # ←←← 汇总文件保存位置
+OUTPUT_FOLDER = resolve_existing_path(
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_sum",
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费/B_机具费_sum",
+    resolve_code_path('10_机具费🚜', 'B_机具费_sum'),
+    resolve_code_path('10_机具费', 'B_机具费_sum'),
+)                  # ←←← 汇总文件保存位置
 
 # 汇总输出文件名前缀（精简）
 OUTPUT_FILENAME_PREFIX = "机具费汇总"
@@ -61,7 +101,12 @@ OUTPUT_FILE_SUFFIX = "汇总"
 # - monthly_pair: 按“上月+当月=>当月”组合汇总（历史模式）
 RUN_MODE = "all"
 
-PROJECT_MATCH_DB_PATH = os.path.join("/Users/wyattsun/Desktop/code/0_项目基本信息", 'project_name_match_db.json')
+PROJECT_MATCH_DB_PATH = resolve_existing_path(
+    "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json",
+    "/Users/wyattsun/Desktop/code/0_项目基本信息情况/project_name_match_db.json",
+    resolve_code_path('0_项目基本信息', 'project_name_match_db.json'),
+    resolve_code_path('0_项目基本信息情况', 'project_name_match_db.json'),
+)
 
 # 汇总后新 sheet 的名字
 SUMMARY_SHEET_NAME = "汇总"
@@ -217,6 +262,18 @@ def is_month_like_text(value):
         if re.match(pattern, text):
             return True
     return False
+
+
+def normalize_lookup_text(value):
+    """将机具种类/型号等映射键归一化，减少空格、全半角和大小写差异。"""
+    if value is None:
+        return ""
+    text = unicodedata.normalize("NFKC", str(value)).strip()
+    if not text or text.lower() in {"nan", "none", "nat", "<na>"}:
+        return ""
+    text = re.sub(r"\s+", "", text)
+    text = text.replace("—", "-").replace("–", "-").replace("－", "-")
+    return text.lower()
 
 def load_project_config():
     """加载项目配置文件（从合同管理系统）"""
@@ -548,19 +605,19 @@ def load_machine_mapping(json_path, legacy_txt_path=None):
                         continue
                     if isinstance(aliases, list):
                         for alias in aliases:
-                            alias = str(alias).strip()
+                            alias = normalize_lookup_text(alias)
                             if alias:
                                 machine_kind_map[alias] = std_kind
                     elif isinstance(aliases, str):
                         for alias in re.split(r'[，,]', aliases):
-                            alias = alias.strip()
+                            alias = normalize_lookup_text(alias)
                             if alias:
                                 machine_kind_map[alias] = std_kind
             elif isinstance(legacy_kind_map, dict):
                 machine_kind_map = {
-                    str(raw).strip(): str(std).strip()
+                    normalize_lookup_text(raw): str(std).strip()
                     for raw, std in legacy_kind_map.items()
-                    if str(raw).strip()
+                    if normalize_lookup_text(raw)
                 }
 
             # 型号映射：优先读取推荐分组结构
@@ -569,7 +626,7 @@ def load_machine_mapping(json_path, legacy_txt_path=None):
 
             if isinstance(grouped_model_map, dict) and grouped_model_map:
                 for kind, std_model_dict in grouped_model_map.items():
-                    kind = str(kind).strip()
+                    kind = normalize_lookup_text(kind)
                     if not kind or not isinstance(std_model_dict, dict):
                         continue
                     for std_model, aliases in std_model_dict.items():
@@ -578,21 +635,21 @@ def load_machine_mapping(json_path, legacy_txt_path=None):
                             continue
                         if isinstance(aliases, list):
                             for alias in aliases:
-                                alias = str(alias).strip()
+                                alias = normalize_lookup_text(alias)
                                 if alias:
                                     model_map[(kind, alias)] = std_model
                         elif isinstance(aliases, str):
                             for alias in re.split(r'[，,]', aliases):
-                                alias = alias.strip()
+                                alias = normalize_lookup_text(alias)
                                 if alias:
                                     model_map[(kind, alias)] = std_model
             elif isinstance(legacy_model_map, dict):
                 for kind, model_dict in legacy_model_map.items():
-                    kind = str(kind).strip()
+                    kind = normalize_lookup_text(kind)
                     if not kind or not isinstance(model_dict, dict):
                         continue
                     for raw_model, std_model in model_dict.items():
-                        raw_model = str(raw_model).strip()
+                        raw_model = normalize_lookup_text(raw_model)
                         std_model = str(std_model).strip()
                         if raw_model:
                             model_map[(kind, raw_model)] = std_model
@@ -645,9 +702,9 @@ def save_machine_mapping(json_path, kind_mapping, model_mapping):
     """保存机具种类和型号规格映射JSON（按标准项分组）。"""
     try:
         normalized_kind_map = {
-            str(raw).strip(): str(std).strip()
+            normalize_lookup_text(raw): str(std).strip()
             for raw, std in kind_mapping.items()
-            if str(raw).strip()
+            if normalize_lookup_text(raw)
         }
 
         kind_to_aliases = {}
@@ -663,8 +720,8 @@ def save_machine_mapping(json_path, kind_mapping, model_mapping):
 
         model_to_aliases = {}
         for (kind, raw_model), std_model in model_mapping.items():
-            kind = str(kind).strip()
-            raw_model = str(raw_model).strip()
+            kind = normalize_lookup_text(kind)
+            raw_model = normalize_lookup_text(raw_model)
             std_model = str(std_model).strip()
             if not kind or not raw_model:
                 continue
@@ -1042,6 +1099,16 @@ def main(excel_path_override=None, output_basename_override=None):
     # 1. 加载映射表和项目配置
     project_mapping = load_project_mapping(PROJECT_MAPPING_JSON, PROJECT_MAPPING_TXT_LEGACY)          # 项目→区域
     kind_mapping, model_mapping = load_machine_mapping(MACHINE_MAPPING_JSON, MACHINE_MAPPING_TXT_LEGACY)  # 机具种类、型号
+    kind_mapping = {
+        normalize_lookup_text(raw): str(std).strip()
+        for raw, std in kind_mapping.items()
+        if normalize_lookup_text(raw)
+    }
+    model_mapping = {
+        (normalize_lookup_text(kind), normalize_lookup_text(raw_model)): str(std_model).strip()
+        for (kind, raw_model), std_model in model_mapping.items()
+        if normalize_lookup_text(kind) and normalize_lookup_text(raw_model)
+    }
     
     # 加载项目配置：优先使用统一的项目编码映射表
     project_config = load_unified_project_mapping()
@@ -1447,7 +1514,7 @@ def main(excel_path_override=None, output_basename_override=None):
             # 映射标准机具种类并收集新种类
             def map_kind(x):
                 # 先做专项归一：拉土车/随车吊 + 车牌号 => 基础名称
-                val = normalize_special_vehicle_kind(x)
+                val = normalize_lookup_text(normalize_special_vehicle_kind(x))
                 if val and val != "nan" and val not in kind_mapping:
                     new_kinds.add(val)
                 return kind_mapping.get(val, val)
@@ -1456,8 +1523,8 @@ def main(excel_path_override=None, output_basename_override=None):
             
             # 映射标准型号规格并收集新型号（基于标准机具种类）
             def map_model(row):
-                std_kind = row["标准机具种类"]
-                raw_model = str(row["型号规格"]).strip()
+                std_kind = normalize_lookup_text(row["标准机具种类"])
+                raw_model = normalize_lookup_text(row["型号规格"])
                 
                 if not raw_model or raw_model == "nan":
                     return raw_model
@@ -1469,7 +1536,7 @@ def main(excel_path_override=None, output_basename_override=None):
                 else:
                     # 收集新型号（记录在哪个机具种类下）
                     new_models.add((std_kind, raw_model))
-                    return raw_model
+                    return str(row["型号规格"]).strip()
             
             df["标准型号规格"] = df.apply(map_model, axis=1)
             
