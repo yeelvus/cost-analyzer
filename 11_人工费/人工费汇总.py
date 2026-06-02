@@ -12,6 +12,20 @@ import pandas as pd
 from openpyxl import load_workbook
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+_CODE_ROOT = SCRIPT_DIR.parent
+
+if str(_CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_CODE_ROOT))
+
+from common.project import (
+    build_standard_projects_from_dataframe,
+    is_unmatched_alias,
+    load_or_init_db,
+    match_project,
+    save_db,
+)
+from common.excel import apply_common_excel_layout
+from settings import MATCH_DB_PATH as _SETTINGS_MATCH_DB_PATH
 
 # ====================== 配置区 ======================
 class Config:
@@ -21,7 +35,7 @@ class Config:
     
     # 项目匹配
     MAPPING_EXCEL_PATH = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
-    MATCH_DB_PATH = r"/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
+    MATCH_DB_PATH = str(_SETTINGS_MATCH_DB_PATH)
     
     # 输出
     OUTPUT_STD = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std"
@@ -29,43 +43,6 @@ class Config:
     
     MONEY_COLUMNS = ['中方正式工铢', '中方劳务工铢', '子公司属地工铢', '劳务公司铢', '签证费']
 
-
-# ====================== 路径与模块初始化 ======================
-MATCHER_DIR = SCRIPT_DIR.parent / "0_项目基本信息"
-LEGACY_MATCHER_DIR = SCRIPT_DIR.parent / "19_代码"
-
-for p in [MATCHER_DIR, LEGACY_MATCHER_DIR]:
-    if p.exists() and str(p) not in sys.path:
-        sys.path.insert(0, str(p))
-
-from project_name_matcher import (
-    build_standard_projects_from_dataframe,
-    is_unmatched_alias,
-    load_or_init_db,
-    match_project,
-    save_db,
-)
-
-
-def load_apply_common_excel_layout():
-    """优先从项目固定路径加载格式工具，避免同名模块被环境路径覆盖。"""
-    util_path = MATCHER_DIR / "excel_formatting_utils.py"
-    if util_path.exists():
-        spec = importlib.util.spec_from_file_location("excel_formatting_utils_local", str(util_path))
-        if spec and spec.loader:
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            func = getattr(module, "apply_common_excel_layout", None)
-            if callable(func):
-                print(f"ℹ️ Excel样式工具来源：{util_path}")
-                return func
-    from excel_formatting_utils import apply_common_excel_layout as fallback_func
-
-    print(f"⚠️ Excel样式工具使用sys.path导入：{fallback_func.__module__}")
-    return fallback_func
-
-
-apply_common_excel_layout = load_apply_common_excel_layout()
 
 
 # ====================== 辅助函数 ======================

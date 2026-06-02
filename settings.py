@@ -24,3 +24,6 @@ def report_path(*parts: str) -> Path:
 
 def code_path(*parts: str) -> Path:
     return CODE_ROOT.joinpath(*parts)
+
+
+MATCH_DB_PATH = CODE_ROOT / "0_项目基本信息" / "project_name_match_db.json"

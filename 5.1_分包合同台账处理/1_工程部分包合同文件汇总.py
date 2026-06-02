@@ -7,45 +7,20 @@ from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
-DATA_ROOT = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计')
-CODE_ROOT = Path('/Users/wyattsun/Desktop/code')
-MODULE_DIRS = [
-    DATA_ROOT / '0_项目基本信息情况',
-    CODE_ROOT,
-    CODE_ROOT / '0_项目基本信息',
-]
-for module_dir in MODULE_DIRS:
-    if module_dir.exists() and str(module_dir) not in sys.path:
-        sys.path.insert(0, str(module_dir))
+_CODE_ROOT = Path(__file__).resolve().parents[1]
+if str(_CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_CODE_ROOT))
 
-def _load_module_from_path(module_name: str, file_path: Path):
-    if not file_path.exists():
-        raise FileNotFoundError(f"未找到模块文件: {file_path}")
-    spec = importlib.util.spec_from_file_location(module_name, str(file_path))
-    if spec is None or spec.loader is None:
-        raise ImportError(f"无法加载模块: {file_path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-MODULE_BASE = Path('/Users/wyattsun/Desktop/code/0_项目基本信息')
-project_name_matcher = _load_module_from_path(
-    'project_name_matcher',
-    MODULE_BASE / 'project_name_matcher.py'
+from common.project import (
+    build_standard_projects_from_dataframe,
+    load_or_init_db,
+    save_db,
+    get_project_lookup,
+    add_mapping,
+    match_project,
 )
-excel_formatting_utils = _load_module_from_path(
-    'excel_formatting_utils',
-    MODULE_BASE / 'excel_formatting_utils.py'
-)
-
-build_standard_projects_from_dataframe = project_name_matcher.build_standard_projects_from_dataframe
-load_or_init_db = project_name_matcher.load_or_init_db
-save_db = project_name_matcher.save_db
-get_project_lookup = project_name_matcher.get_project_lookup
-add_mapping = project_name_matcher.add_mapping
-match_project = project_name_matcher.match_project
-apply_common_excel_layout = excel_formatting_utils.apply_common_excel_layout
+from common.excel import apply_common_excel_layout
+from settings import MATCH_DB_PATH
 
 # ================= 配置区域 =================
 EXCEL_INFO_PATH = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx')
@@ -58,7 +33,6 @@ NEW_OUTPUT_DIR = NEW_SUBPACKAGE_ROOT / '2_分包合同台账_std'
 INPUT_DIR = NEW_INPUT_DIR
 OUTPUT_DIR = NEW_OUTPUT_DIR
 
-MATCH_DB_PATH = Path('/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json')
 # ===========================================
 
 def smart_process_and_match():

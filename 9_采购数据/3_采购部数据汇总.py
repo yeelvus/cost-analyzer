@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 import pandas as pd
 from collections import defaultdict
@@ -8,27 +9,23 @@ from openpyxl.styles import Alignment
 import re
 import importlib.util
 
-PROJECT_MATCHER_MODULE_PATH = '/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_matcher.py'
+# ── common 模块加载（单例，避免孤立实例）──────────────────────────────────
+_CODE_ROOT = Path(__file__).resolve().parents[1]
+if str(_CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_CODE_ROOT))
 
-
-def _load_module_from_path(module_name, file_path):
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"无法加载模块: {file_path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-_project_name_matcher = _load_module_from_path('project_name_matcher', PROJECT_MATCHER_MODULE_PATH)
-add_mapping = _project_name_matcher.add_mapping
-get_project_lookup = _project_name_matcher.get_project_lookup
-is_unmatched_alias = _project_name_matcher.is_unmatched_alias
-load_or_init_db = _project_name_matcher.load_or_init_db
-mark_unmatched = _project_name_matcher.mark_unmatched
-match_project = _project_name_matcher.match_project
-prompt_unmatched_project_mappings = _project_name_matcher.prompt_unmatched_project_mappings
-save_db = _project_name_matcher.save_db
+from common.project import (
+    add_mapping,
+    get_project_lookup,
+    is_unmatched_alias,
+    load_or_init_db,
+    mark_unmatched,
+    match_project,
+    prompt_unmatched_project_mappings,
+    save_db,
+)
+from common.excel import apply_common_excel_layout
+from settings import MATCH_DB_PATH
 
 # ============= 配置区域 =============
 # 文件夹按关键词动态查找，忽略 A_ / B_ / C_ / D_ 等前缀字母
@@ -51,8 +48,7 @@ else:
     PROCUREMENT_STD_MODULE_PATH = str(_路径_mod.find_script("采购部单文件标准化输出"))
 
 PROJECT_INFO_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
-PROJECT_MATCH_DB_FILE = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
-EXCEL_FORMATTING_UTILS_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/excel_formatting_utils.py"
+PROJECT_MATCH_DB_FILE = str(MATCH_DB_PATH)
 STD_MERGED_SUFFIX = 'std_merged.xlsx'
 SIMPLIFY_OUTPUT_FILENAME = "采购台账_simplify_std_merged.xlsx"
 # ===================================
@@ -65,9 +61,6 @@ FINAL_OUTPUT_COLUMNS = [
     '单价', '不含税金额', '7%增值税', '含税金额', '货币种类', '汇率', '年月',
     '标准日期', '供货商名称', '备注', '签订日期'
 ]
-
-_excel_formatting_utils = _load_module_from_path('excel_formatting_utils', EXCEL_FORMATTING_UTILS_PATH)
-apply_common_excel_layout = _excel_formatting_utils.apply_common_excel_layout
 
 
 def apply_unified_workbook_format(output_wb):

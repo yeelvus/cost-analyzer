@@ -11,9 +11,20 @@ from datetime import datetime
 import json
 import unicodedata
 
-BASE_CODE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT_DIR = Path(__file__).resolve().parent
 CODE_ROOT_DIR = SCRIPT_DIR.parent
+
+if str(CODE_ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(CODE_ROOT_DIR))
+
+from common.project import (
+    build_standard_projects_from_dataframe,
+    is_unmatched_alias,
+    load_or_init_db,
+    match_project,
+    prompt_unmatched_project_mappings,
+    save_db,
+)
 
 
 def resolve_existing_path(*candidates):
@@ -27,27 +38,6 @@ def resolve_existing_path(*candidates):
 def resolve_code_path(*parts):
     """解析到当前代码仓库根目录下的路径。"""
     return str(CODE_ROOT_DIR.joinpath(*parts))
-
-
-MATCHER_DIR_CANDIDATES = [
-    resolve_code_path('0_项目基本信息'),
-    resolve_code_path('0_项目基本信息情况'),
-]
-
-for matcher_dir in MATCHER_DIR_CANDIDATES:
-    if os.path.exists(os.path.join(matcher_dir, 'project_name_matcher.py')):
-        if matcher_dir not in sys.path:
-            sys.path.insert(0, matcher_dir)
-        break
-
-from project_name_matcher import (
-    build_standard_projects_from_dataframe,
-    is_unmatched_alias,
-    load_or_init_db,
-    match_project,
-    prompt_unmatched_project_mappings,
-    save_db,
-)
 
 # ==================== 配置区 ====================
 # 标准化文件目录（自动选择最新文件）

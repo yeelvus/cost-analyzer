@@ -1,4 +1,5 @@
 import os
+import sys
 import re
 import importlib.util
 from datetime import datetime, date as date_type
@@ -20,9 +21,23 @@ _路径_spec.loader.exec_module(_路径_mod)
 RAW_DATA_ROOT = str(_路径_mod.RAW_DIR)
 OUTPUT_ROOT = str(_路径_mod.STD_DIR)
 PROJECT_INFO_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
-PROJECT_MATCH_DB_FILE = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
-PROJECT_MATCHER_MODULE_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_matcher.py"
 UNIT_MAP_UTILS_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/unit_map_utils.py"
+
+# ── common 模块加载（单例，避免孤立实例）──────────────────────────────────
+_CODE_ROOT = Path(__file__).resolve().parents[1]
+if str(_CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_CODE_ROOT))
+
+from common.project import (
+    load_or_init_db,
+    save_db,
+    match_project,
+    mark_unmatched,
+    add_mapping,
+)
+from settings import MATCH_DB_PATH
+
+PROJECT_MATCH_DB_FILE = str(MATCH_DB_PATH)
 
 
 # ============= 标准化流水线配置 =============
@@ -83,13 +98,12 @@ standardize_unit = _unit_map_utils.standardize_unit
 
 
 def load_project_matcher_funcs():
-    matcher = _load_module_from_path("project_name_matcher", PROJECT_MATCHER_MODULE_PATH)
     return {
-        "load_or_init_db": matcher.load_or_init_db,
-        "save_db": matcher.save_db,
-        "match_project": matcher.match_project,
-        "mark_unmatched": matcher.mark_unmatched,
-        "add_mapping": matcher.add_mapping,
+        "load_or_init_db": load_or_init_db,
+        "save_db": save_db,
+        "match_project": match_project,
+        "mark_unmatched": mark_unmatched,
+        "add_mapping": add_mapping,
     }
 
 
