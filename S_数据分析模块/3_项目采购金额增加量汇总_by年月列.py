@@ -28,7 +28,38 @@ import pandas as pd
 # ============= 路径配置 =============
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-INPUT_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_sum")
+PURCHASE_PATH_MODULE = Path("/Users/wyattsun/Desktop/code/9_采购数据/_采购路径.py")
+
+
+def resolve_input_root() -> Path:
+    """优先走共享路径模块，失败时使用候选目录兜底。"""
+    if PURCHASE_PATH_MODULE.is_file():
+        try:
+            spec = importlib.util.spec_from_file_location("_采购路径", str(PURCHASE_PATH_MODULE))
+            if spec is not None and spec.loader is not None:
+                _path_mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(_path_mod)
+            else:
+                _path_mod = None
+            if _path_mod is None:
+                raise ImportError(f"无法加载模块: {PURCHASE_PATH_MODULE}")
+            sum_dir = Path(_path_mod.SUM_DIR)
+            if sum_dir.is_dir():
+                return sum_dir
+        except Exception:
+            pass
+
+    candidates = [
+        Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/D_采购部采购台账_sum"),
+        Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_sum"),
+    ]
+    for p in candidates:
+        if p.is_dir():
+            return p
+    return candidates[0]
+
+
+INPUT_ROOT = resolve_input_root()
 DEFAULT_OUTPUT_PATH = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report/项目采购金额增加量汇总_by年月.xlsx")
 
 EXCEL_FORMATTING_UTILS_PATH = Path("/Users/wyattsun/Desktop/code/0_项目基本信息/excel_formatting_utils.py")
