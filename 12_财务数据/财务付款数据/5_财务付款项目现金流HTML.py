@@ -15,6 +15,9 @@ class Config:
     OUTPUT_HTML = Path(
         "/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰/A_财务付款数据/C_财务付款_sum/财务付款项目现金流量分析.html"
     )
+    PROJECT_INFO = Path(
+        "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
+    )
     SHEET_CANDIDATES = ["明细数据", "明细数据_万泰铢"]
 
 
@@ -91,13 +94,24 @@ def build_cashflow_df(input_root: Path) -> pd.DataFrame:
     return grouped
 
 
-def build_project_payload(cashflow_df: pd.DataFrame) -> Dict[str, Dict]:
+def load_project_status(project_info: Path) -> Dict[str, str]:
+    """读取项目基本信息表，返回 {项目编码: 项目状态} 映射。"""
+    if not project_info.exists():
+        print(f"警告：项目基本信息表不存在，将跳过状态加载: {project_info}")
+        return {}
+    df = pd.read_excel(project_info, dtype={"项目编码": str})
+    df["项目编码"] = df["项目编码"].astype(str).str.strip()
+    df["项目状态"] = df["项目状态"].astype(str).str.strip().fillna("未知")
+    return dict(zip(df["项目编码"], df["项目状态"]))
+
+
+def build_project_payload(cashflow_df: pd.DataFrame, status_map: Dict[str, str]) -> Dict[str, Dict]:
     payload: Dict[str, Dict] = {}
 
     projects = (
         cashflow_df[["项目编码", "项目名称"]]
         .drop_duplicates()
-        .sort_values(["项目编码", "项目名称"])
+        .sort_values(["项目编码", "项目名称"], ascending=False)
     )
 
     for idx, row in projects.reset_index(drop=True).iterrows():
@@ -115,13 +129,15 @@ def build_project_payload(cashflow_df: pd.DataFrame) -> Dict[str, Dict]:
 
         total = float(project_df["实际现金流"].sum())
         total_wan = round(total / 10000.0)
+        status = status_map.get(project_code, "未知")
         payload[key] = {
             "projectCode": project_code,
             "projectName": project_name,
+            "projectStatus": status,
             "dates": project_df["日期"].tolist(),
-          "values": [int(v) for v in project_df["累计实际现金流_万"].tolist()],
-          "total": round(total, 2),
-          "totalWan": int(total_wan),
+            "values": [int(v) for v in project_df["累计实际现金流_万"].tolist()],
+            "total": round(total, 2),
+            "totalWan": int(total_wan),
         }
 
     return payload
@@ -133,8 +149,10 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
 
     for key, item in payload.items():
         label = f"{item['projectCode']} | {item['projectName']}"
+        status_escaped = escape(item['projectStatus'])
         nav_links_html.append(
-            f"<a class=\"nav-link\" href=\"#section-{key}\">{escape(label)}</a>"
+            f"<a class=\"nav-link\" href=\"#section-{key}\" "
+            f"data-status=\"{status_escaped}\">{escape(label)}</a>"
         )
 
         section_title = (
@@ -143,9 +161,9 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
         )
         sections_html.append(
             f"""
-            <section class=\"project-row\" id=\"section-{key}\">
+            <section class=\"project-row\" id=\"section-{key}\" data-status=\"{status_escaped}\">
               <h2>{section_title}</h2>
-              <p class=\"meta\">累计实际现金流（实付金额 + 增值税额）：{item['totalWan']:,} 万</p>
+              <p class=\"meta\">项目状态：{status_escaped} &nbsp;｜&nbsp; 累计实际现金流（实付金额 + 增值税额）：{item['totalWan']:,} 万</p>
               <div class=\"chart\" id=\"chart-{key}\"></div>
             </section>
             """.strip()
@@ -153,6 +171,16 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
 
     payload_json = json.dumps(payload, ensure_ascii=False)
     total_projects = len(payload)
+
+    # 收集所有状态（保持顺序）
+    seen_statuses: list[str] = []
+    for item in payload.values():
+        s = item['projectStatus']
+        if s not in seen_statuses:
+            seen_statuses.append(s)
+    status_buttons_html = '<button class="status-btn active" data-filter="__all__">全部</button>'
+    for s in seen_statuses:
+        status_buttons_html += f'<button class="status-btn" data-filter="{escape(s)}">{escape(s)}</button>'
 
     html = f"""
 <!doctype html>
@@ -194,7 +222,30 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
       letter-spacing: 0.3px;
       font-size: clamp(24px, 2.8vw, 36px);
     }}
-    .sub {{ margin: 0 0 16px; color: var(--muted); }}
+    .sub {{ margin: 0 0 10px; color: var(--muted); }}
+    .status-bar {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 16px;
+    }}
+    .status-btn {{
+      padding: 6px 14px;
+      border: 1px solid #d4bfa0;
+      border-radius: 20px;
+      background: #fff9ef;
+      color: #4f3e2e;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+    }}
+    .status-btn:hover {{ background: #f4e3c8; border-color: #c09060; }}
+    .status-btn.active {{
+      background: #bc4f2f;
+      border-color: #bc4f2f;
+      color: #fff;
+    }}
     .sidebar {{
       position: sticky;
       top: 12px;
@@ -241,13 +292,13 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
     .project-row h2 {{ margin: 0 0 4px; font-size: 18px; }}
     .code {{ color: var(--muted); font-size: 14px; font-weight: normal; }}
     .meta {{ margin: 0 0 10px; color: #5e4631; font-size: 13px; }}
-    .chart {{ width: 100%; height: 300px; }}
+    .chart {{ width: 100%; height: 340px; }}
     @media (max-width: 980px) {{
       .page-layout {{ grid-template-columns: 1fr; }}
       .sidebar {{ position: static; max-height: none; }}
     }}
     @media (max-width: 600px) {{
-      .chart {{ height: 260px; }}
+      .chart {{ height: 300px; }}
     }}
   </style>
 </head>
@@ -255,15 +306,16 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
   <div class=\"wrap\">
     <h1>财务付款项目实际现金流量分析</h1>
     <p class=\"sub\">项目数：{total_projects}。口径：先按日期汇总（实付金额 + 增值税额），再按日期累计形成现金流曲线；展示单位为万（无小数）。</p>
+    <div class="status-bar">{status_buttons_html}</div>
 
-    <div class=\"page-layout\">
-      <div class=\"main-list\">
+    <div class="page-layout">
+      <div class="main-list" id="main-list">
         {''.join(sections_html)}
       </div>
 
-      <aside class=\"sidebar\">
+      <aside class="sidebar">
         <h3>项目选择（右侧固定）</h3>
-        <div class=\"nav-list\">{''.join(nav_links_html)}</div>
+        <div class="nav-list" id="nav-list">{''.join(nav_links_html)}</div>
       </aside>
     </div>
   </div>
@@ -295,7 +347,7 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
         hovertemplate: '日期: %{{x|%Y年%-m月%-d日}}<br>累计实际现金流: %{{y:,.0f}} 万<extra></extra>'
       }};
       const layout = {{
-        margin: {{ l: 52, r: 16, t: 10, b: 40 }},
+        margin: {{ l: 72, r: 16, t: 12, b: 72 }},
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: '#fffdf8',
         xaxis: {{
@@ -305,7 +357,11 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
           tick0: xMin,
           dtick: 'M1',
           tickformat: '%Y年%-m月',
-          tickangle: -25,
+          tickangle: -35,
+          tickfont: {{ size: 9 }},
+          automargin: true,
+          titlefont: {{ size: 12 }},
+          title_standoff: 14,
           showgrid: true,
           gridcolor: '#efe5d5',
           range: [xMin, xMax]
@@ -314,6 +370,10 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
           title: '累计实际现金流（万）',
           tickformat: ',.0f',
           separatethousands: true,
+          tickfont: {{ size: 10 }},
+          automargin: true,
+          titlefont: {{ size: 12 }},
+          title_standoff: 14,
           gridcolor: '#efe5d5'
         }},
       }};
@@ -322,6 +382,28 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
     }}
 
     Object.keys(projectData).forEach(renderChart);
+
+    // ── 状态过滤 ──
+    let currentFilter = '__all__';
+
+    function applyFilter(filter) {{
+      currentFilter = filter;
+      document.querySelectorAll('.status-btn').forEach(btn => {{
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+      }});
+      document.querySelectorAll('#main-list .project-row').forEach(sec => {{
+        const show = filter === '__all__' || sec.dataset.status === filter;
+        sec.style.display = show ? '' : 'none';
+      }});
+      document.querySelectorAll('#nav-list .nav-link').forEach(a => {{
+        const show = filter === '__all__' || a.dataset.status === filter;
+        a.style.display = show ? '' : 'none';
+      }});
+    }}
+
+    document.querySelectorAll('.status-btn').forEach(btn => {{
+      btn.addEventListener('click', () => applyFilter(btn.dataset.filter));
+    }});
   </script>
 </body>
 </html>
@@ -333,7 +415,8 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
 
 def main() -> None:
     cashflow_df = build_cashflow_df(Config.INPUT_ROOT)
-    payload = build_project_payload(cashflow_df)
+    status_map = load_project_status(Config.PROJECT_INFO)
+    payload = build_project_payload(cashflow_df, status_map)
     render_html(payload, Config.OUTPUT_HTML)
 
     print(f"完成: {Config.OUTPUT_HTML}")
