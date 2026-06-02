@@ -48,6 +48,7 @@ class Config:
         "年-月",
         "去程机票日期",
         "回程机票日期",
+        "出发地-到达地",
         "本次机票航班号",
         "舱位",
         "本次机票价格（泰铢）",
@@ -103,6 +104,18 @@ def _parse_year_month(series: pd.Series) -> pd.Series:
     return converted.dt.strftime("%Y-%m").where(converted.notna(), other="")
 
 
+def _format_date_only(series: pd.Series) -> pd.Series:
+    """将日期序列统一为 YYYY/M/D，去掉时分秒。"""
+    converted = pd.to_datetime(series, errors="coerce", dayfirst=False)
+
+    def _to_ymd(v):
+        if pd.isna(v):
+            return ""
+        return f"{v.year}/{v.month}/{v.day}"
+
+    return converted.apply(_to_ymd)
+
+
 def _pick_col(columns, candidates: List[str]) -> Optional[str]:
     """返回第一个在 columns 中能模糊匹配到的候选列名。"""
     for cand in candidates:
@@ -150,6 +163,8 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
         "订票时间":       ["订票时间", "订票日期", "购票时间", "购票日期"],
         "去程机票日期":   ["去程机票日期", "去程日期", "出发日期"],
         "回程机票日期":   ["回程机票日期", "回程日期", "返回日期"],
+        "出发地":         ["出发地", "起飞地", "始发地", "出发城市"],
+        "到达地":         ["到达地", "目的地", "抵达地", "到达城市"],
         "本次机票航班号": ["本次机票航班号", "航班号", "航班"],
         "舱位":           ["舱位", "座位等级"],
         "本次机票价格（泰铢）": ["本次机票价格", "机票价格", "票价", "金额"],
@@ -177,6 +192,13 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     for col in list(col_map.keys()):
         if col not in df.columns:
             df[col] = ""
+
+    dep = df["出发地"].fillna("").astype(str).str.strip()
+    arr = df["到达地"].fillna("").astype(str).str.strip()
+    df["出发地-到达地"] = dep.where(dep != "", "") + "-" + arr.where(arr != "", "")
+    df.loc[(dep == "") & (arr != ""), "出发地-到达地"] = arr[arr != ""]
+    df.loc[(dep != "") & (arr == ""), "出发地-到达地"] = dep[dep != ""]
+    df.loc[(dep == "") & (arr == ""), "出发地-到达地"] = ""
 
     return df
 
@@ -265,7 +287,7 @@ def export_per_project_excel(df: pd.DataFrame, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     non_numeric = {"所属单位", "姓名", "订票时间", "年-月", "去程机票日期", "回程机票日期",
-                   "本次机票航班号", "舱位", "机票类型", "票代", "护照", "项目编码", "项目名称",
+                   "出发地-到达地", "本次机票航班号", "舱位", "机票类型", "票代", "护照", "项目编码", "项目名称",
                    "原始项目名称", "_来源文件"}
 
     projects = df[["项目编码", "项目名称"]].drop_duplicates()
@@ -651,6 +673,11 @@ def main():
     df["人次"] = _parse_person_count(df["姓名"])
     df["人均机票价格（泰铢）"] = (df[Config.MONEY_COL] / df["人次"]).round(2)
 
+    # 3.2 日期列去掉时分秒，仅保留 YYYY/M/D
+    for date_col in ["订票时间", "去程机票日期", "回程机票日期"]:
+        if date_col in df.columns:
+            df[date_col] = _format_date_only(df[date_col])
+
     # 4. 年-月列
     df["年-月"] = _parse_year_month(df["订票时间"])
 
@@ -692,7 +719,7 @@ def main():
     display_cols = [c for c in Config.TARGET_COLUMNS if c in df.columns]
 
     non_numeric_headers = {"所属单位", "姓名", "订票时间", "年-月", "去程机票日期", "回程机票日期",
-                           "本次机票航班号", "舱位", "机票类型", "票代", "护照", "项目编码", "项目名称",
+                           "出发地-到达地", "本次机票航班号", "舱位", "机票类型", "票代", "护照", "项目编码", "项目名称",
                            "原始项目名称", "_来源文件"}
 
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
