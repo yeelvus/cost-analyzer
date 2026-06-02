@@ -74,7 +74,7 @@ def apply_unified_workbook_format(output_wb):
     """统一使用excel_formatting_utils模块格式化输出工作簿。"""
     amount_keywords = ('金额', '单价', '税')
 
-    for sheet_name in ['合并数据', '项目汇总']:
+    for sheet_name in ['合并数据', '项目汇总', '采购总金额']:
         if sheet_name not in output_wb.sheetnames:
             continue
 
@@ -85,14 +85,74 @@ def apply_unified_workbook_format(output_wb):
             if isinstance(h, str) and any(k in h for k in amount_keywords)
         ]
 
-        apply_common_excel_layout(
-            ws,
-            numeric_start_col=ws.max_column + 1,
-            amount_headers=amount_headers,
-            header_row=1,
-            header_height=40,
-            freeze_panes='A2',
-        )
+        if sheet_name == '采购总金额':
+            apply_common_excel_layout(
+                ws,
+                numeric_start_col=3,
+                amount_headers=[h for h in headers[2:] if isinstance(h, str)],
+                header_row=1,
+                header_height=40,
+                freeze_panes='A2',
+            )
+        else:
+            apply_common_excel_layout(
+                ws,
+                numeric_start_col=ws.max_column + 1,
+                amount_headers=amount_headers,
+                header_row=1,
+                header_height=40,
+                freeze_panes='A2',
+            )
+
+
+def _period_key(period_text):
+    y, m = str(period_text).split('-')
+    return int(y), int(m)
+
+
+def build_procurement_total_sheet(merged_df):
+    """由合并数据构建'采购总金额'宽表（项目 × 年月）。"""
+    required = {'项目编码', '项目名称', '年月', '含税金额'}
+    if not required.issubset(set(merged_df.columns)):
+        return pd.DataFrame(columns=['项目编码', '项目名称'])
+
+    work = merged_df[['项目编码', '项目名称', '年月', '含税金额']].copy()
+    work['项目编码'] = work['项目编码'].fillna('').astype(str).str.strip()
+    work['项目名称'] = work['项目名称'].fillna('').astype(str).str.strip()
+    work['年月'] = work['年月'].fillna('').astype(str).str.strip()
+    work['含税金额'] = pd.to_numeric(work['含税金额'], errors='coerce')
+
+    work = work[(work['项目编码'] != '') | (work['项目名称'] != '')]
+    work = work[work['年月'].str.fullmatch(r'(?:19|20)\d{2}-(?:0[1-9]|1[0-2])', na=False)]
+    work = work[work['含税金额'].notna()]
+    if work.empty:
+        return pd.DataFrame(columns=['项目编码', '项目名称'])
+
+    grouped = (
+        work.groupby(['项目编码', '项目名称', '年月'], as_index=False)
+        .agg(含税金额=('含税金额', 'sum'))
+    )
+
+    periods = sorted(grouped['年月'].unique().tolist(), key=_period_key)
+    label_map = {p: f"{int(p.split('-')[0])}年{int(p.split('-')[1])}月" for p in periods}
+
+    pivot = grouped.pivot_table(
+        index=['项目编码', '项目名称'],
+        columns='年月',
+        values='含税金额',
+        aggfunc='sum',
+        fill_value=0.0,
+    ).reindex(columns=periods, fill_value=0.0)
+
+    amount_wide = pivot.rename(columns=label_map).reset_index()
+    sort_cols = [label_map[p] for p in reversed(periods)]
+    amount_wide['__编码为空'] = amount_wide['项目编码'].astype(str).str.strip().eq('')
+    amount_wide = amount_wide.sort_values(
+        ['__编码为空', *sort_cols],
+        ascending=[True] + [False] * len(sort_cols),
+    )
+    amount_wide = amount_wide.drop(columns=['__编码为空']).reset_index(drop=True)
+    return amount_wide
 
 def load_project_config():
     """从 Excel 文件加载项目配置数据"""
@@ -482,6 +542,12 @@ def process_simplify_folder(project_config):
     summary_ws.append(["项目编码", "项目名称", "总采购金额"])
     for (code, name), total in sorted(project_totals.items()):
         summary_ws.append([code, name, total])
+
+    procurement_total_df = build_procurement_total_sheet(merged_df)
+    total_ws = output_wb.create_sheet("采购总金额")
+    total_ws.append(procurement_total_df.columns.tolist())
+    for row in procurement_total_df.itertuples(index=False, name=None):
+        total_ws.append(list(row))
 
     apply_unified_workbook_format(output_wb)
 
