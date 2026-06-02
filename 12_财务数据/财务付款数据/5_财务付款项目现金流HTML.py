@@ -38,7 +38,7 @@ def choose_sheet_name(excel_file: Path) -> str | None:
     for sheet_name in xls.sheet_names:
         preview = pd.read_excel(excel_file, sheet_name=sheet_name, nrows=1)
         if all(col in preview.columns for col in REQUIRED_COLUMNS):
-            return sheet_name
+            return str(sheet_name)
 
     return None
 
@@ -82,9 +82,9 @@ def build_cashflow_df(input_root: Path) -> pd.DataFrame:
     merged["实际现金流"] = merged["实付金额"] + merged["增值税额"]
 
     grouped = (
-        merged.groupby(["项目编码", "项目名称", "日期"], as_index=False)["实际现金流"]
-        .sum()
-        .sort_values(["项目编码", "项目名称", "日期"])
+        merged.groupby(["项目编码", "项目名称", "日期"], as_index=False)
+        .agg(实际现金流=("实际现金流", "sum"))
+        .sort_values(by=["项目编码", "项目名称", "日期"])
     )
 
     grouped["日期"] = grouped["日期"].dt.strftime("%Y-%m-%d")
