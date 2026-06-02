@@ -33,19 +33,28 @@ save_db = _project_name_matcher.save_db
 # ============= 配置区域 =============
 # 文件夹按关键词动态查找，忽略 A_ / B_ / C_ / D_ 等前缀字母
 _路径_spec = importlib.util.spec_from_file_location("_采购路径", str(Path(__file__).parent / "_采购路径.py"))
-_路径_mod = importlib.util.module_from_spec(_路径_spec)
-_路径_spec.loader.exec_module(_路径_mod)
-RAW_DATA_ROOT = str(_路径_mod.RAW_DIR)
-STANDARDIZED_DATA_ROOT = str(_路径_mod.STD_DIR)
-SUMMARY_OUTPUT_ROOT = str(_路径_mod.SUM_DIR)
+if _路径_spec is None or _路径_spec.loader is None:
+    # 动态加载失败时回退到脚本目录，避免脚本直接崩溃
+    _fallback_root = Path(__file__).parent
+    RAW_DATA_ROOT = str(_fallback_root)
+    STANDARDIZED_DATA_ROOT = str(_fallback_root)
+    SUMMARY_OUTPUT_ROOT = str(_fallback_root)
+    SIMPLIFY_DATA_ROOT = str(_fallback_root)
+    PROCUREMENT_STD_MODULE_PATH = ""
+else:
+    _路径_mod = importlib.util.module_from_spec(_路径_spec)
+    _路径_spec.loader.exec_module(_路径_mod)
+    RAW_DATA_ROOT = str(_路径_mod.RAW_DIR)
+    STANDARDIZED_DATA_ROOT = str(_路径_mod.STD_DIR)
+    SUMMARY_OUTPUT_ROOT = str(_路径_mod.SUM_DIR)
+    SIMPLIFY_DATA_ROOT = str(_路径_mod.SIMPLIFY_DIR)
+    PROCUREMENT_STD_MODULE_PATH = str(_路径_mod.find_script("采购部单文件标准化输出"))
 
 PROJECT_INFO_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
 PROJECT_MATCH_DB_FILE = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
 EXCEL_FORMATTING_UTILS_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/excel_formatting_utils.py"
 STD_MERGED_SUFFIX = 'std_merged.xlsx'
-SIMPLIFY_DATA_ROOT = str(_路径_mod.SIMPLIFY_DIR)
 SIMPLIFY_OUTPUT_FILENAME = "采购台账_simplify_std_merged.xlsx"
-PROCUREMENT_STD_MODULE_PATH = str(_路径_mod.find_script("采购部单文件标准化输出"))
 # ===================================
 
 # 全局匹配库（来自 0_项目基本信息/project_name_matcher.py）
@@ -262,6 +271,8 @@ def merge_standardized_excels(folder_path):
 
     output_wb = openpyxl.Workbook()
     merged_ws = output_wb.active
+    if merged_ws is None:
+        raise RuntimeError('无法创建工作表: 合并数据')
     merged_ws.title = '合并数据'
     merged_ws.append(FINAL_OUTPUT_COLUMNS)
 
@@ -453,6 +464,8 @@ def process_simplify_folder(project_config):
     # 构建工作簿
     output_wb = openpyxl.Workbook()
     merged_ws = output_wb.active
+    if merged_ws is None:
+        raise RuntimeError('无法创建工作表: 合并数据')
     merged_ws.title = "合并数据"
     merged_ws.append(FINAL_OUTPUT_COLUMNS)
 

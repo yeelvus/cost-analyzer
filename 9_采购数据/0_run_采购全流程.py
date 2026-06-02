@@ -16,6 +16,8 @@ CURRENT_DIR = Path(__file__).parent
 
 # 动态加载 _采购路径 模块以使用 find_script
 _路径_spec = importlib.util.spec_from_file_location("_采购路径", str(CURRENT_DIR / "_采购路径.py"))
+if _路径_spec is None or _路径_spec.loader is None:
+    raise ImportError(f"无法加载路径配置模块: {CURRENT_DIR / '_采购路径.py'}")
 _路径_mod = importlib.util.module_from_spec(_路径_spec)
 _路径_spec.loader.exec_module(_路径_mod)
 find_script = _路径_mod.find_script
@@ -26,6 +28,8 @@ def load_main(keyword: str):
     if not script_path.exists():
         raise FileNotFoundError(f"未找到含关键词 '{keyword}' 的脚本: {CURRENT_DIR}")
     spec = importlib.util.spec_from_file_location(script_path.name, str(script_path))
+    if spec is None or spec.loader is None:
+        raise ImportError(f"无法加载脚本模块: {script_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.main
