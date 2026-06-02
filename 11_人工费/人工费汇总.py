@@ -111,6 +111,11 @@ def parse_money(series: pd.Series) -> pd.Series:
     return cleaned.apply(to_num)
 
 
+def _sanitize_filename(name: str) -> str:
+    """移除文件名中的非法字符。"""
+    return re.sub(r'[\\/*?:"<>|\r\n\t]', '_', str(name)).strip()
+
+
 @dataclass
 class LaborMonthlyRecord:
         month: str
@@ -628,6 +633,86 @@ def make_labor_html(project_data: Dict[str, List[LaborMonthlyRecord]], months: L
 """
 
 
+# ====================== 按项目拆分导出 ======================
+def export_per_project_excel(
+    grouped: pd.DataFrame,
+    df_raw: pd.DataFrame,
+    money_columns: list,
+    output_dir: Path,
+) -> None:
+    """将人工费数据按项目拆分，每个项目输出一个独立 Excel 文件。"""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    metrics = money_columns + ['总人工费']
+    non_numeric_headers = {'项目名称', '地区', '年', '月', '年-月', '项目编码', '项目状态', '原始项目名称'}
+
+    projects = grouped[['项目编码', '项目名称']].drop_duplicates()
+    print(f"\n📂 开始按项目拆分输出（共 {len(projects)} 个项目）...")
+
+    for _, proj_row in projects.iterrows():
+        code = str(proj_row['项目编码']).strip()
+        name = str(proj_row['项目名称']).strip()
+
+        prefix = f"{code}_{name}" if code and code != 'nan' else name
+        filename = _sanitize_filename(prefix) + "_人工费.xlsx"
+        out_path = output_dir / filename
+
+        mask_grouped = (grouped['项目名称'] == proj_row['项目名称']) & (grouped['项目编码'] == proj_row['项目编码'])
+        mask_raw = (df_raw['项目名称'] == proj_row['项目名称']) & (df_raw['项目编码'] == proj_row['项目编码'])
+        proj_grouped = grouped[mask_grouped].copy()
+        proj_raw = df_raw[mask_raw].copy()
+
+        if proj_grouped.empty:
+            continue
+
+        with pd.ExcelWriter(out_path, engine='openpyxl') as writer:
+            # Sheet1: 月度汇总
+            monthly_cols = ['年-月'] + money_columns + ['总人工费']
+            available = [c for c in monthly_cols if c in proj_grouped.columns]
+            monthly_df = proj_grouped[available].sort_values('年-月').reset_index(drop=True)
+            monthly_df.to_excel(writer, sheet_name='月度汇总', index=False)
+
+            # Sheet2: 原始数据
+            drop_cols = [c for c in ['项目状态', '原始项目名称'] if c in proj_raw.columns]
+            proj_raw.drop(columns=drop_cols).to_excel(writer, sheet_name='原始数据', index=False)
+
+            # Sheet3+: 各金额指标按月透视
+            for metric in metrics:
+                if metric not in proj_grouped.columns:
+                    continue
+                pivot = proj_grouped.pivot_table(
+                    index=['项目编码', '项目名称'],
+                    columns='年-月',
+                    values=metric,
+                    aggfunc='sum',
+                    fill_value=0,
+                )
+                cols_sorted = sorted(
+                    pivot.columns,
+                    key=lambda s: (int(str(s).split('-')[0]), int(str(s).split('-')[1])),
+                )
+                pivot = pivot.reindex(columns=cols_sorted)
+                sheet_name = metric[:31]
+                pivot.to_excel(writer, sheet_name=sheet_name)
+
+        wb = load_workbook(out_path)
+        for ws in wb.worksheets:
+            headers = [cell.value for cell in ws[1]]
+            numeric_start = next(
+                (i + 1 for i, h in enumerate(headers) if h and str(h) not in non_numeric_headers),
+                3,
+            )
+            apply_common_excel_layout(
+                ws,
+                numeric_start_col=numeric_start,
+                freeze_panes='B2',
+                thousand_number_format='#,##0.00',
+            )
+        wb.save(out_path)
+        print(f"  ✅ {filename}")
+
+    print(f"✅ 按项目拆分 Excel 已输出至：{output_dir}")
+
+
 # ====================== 主程序 ======================
 def main():
     print("🚀 开始处理人工费台账...")
@@ -806,6 +891,14 @@ def main():
             )
         wb.save(out_path)
         print(f"✅ 已输出：{out_path}")
+
+    # 按项目拆分导出
+    export_per_project_excel(
+        grouped=grouped,
+        df_raw=df,
+        money_columns=money_columns,
+        output_dir=Path(Config.OUTPUT_STD) / "按项目拆分",
+    )
 
     # ====================== HTML 报告 ======================
     print("\n📊 生成人工费项目月度 HTML 报告...")
