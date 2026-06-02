@@ -1,6 +1,9 @@
+import html
+import json
 import os
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -316,6 +319,315 @@ def export_per_project_excel(df: pd.DataFrame, output_dir: Path) -> None:
     print(f"✅ 按项目拆分输出完成：{output_dir}")
 
 
+# ====================== HTML 报告生成 ======================
+def build_html_report(df: pd.DataFrame, out_path: Path) -> None:
+    """生成机票费用分析 HTML 报告（Chart.js 风格，对齐人工费汇总样式）。"""
+    MONEY = Config.MONEY_COL
+    AVG_COL = "人均机票价格（泰铢）"
+
+    months_all = sorted(
+        [m for m in df["年-月"].dropna().unique() if "-" in str(m)],
+        key=lambda s: (int(s.split("-")[0]), int(s.split("-")[1])),
+    )
+    ticket_types = sorted(t for t in df["机票类型"].dropna().astype(str).unique() if t and t != "nan")
+
+    def _month_series(sub: pd.DataFrame, col: str, agg: str) -> list:
+        s = sub.groupby("年-月")[col].mean() if agg == "mean" else sub.groupby("年-月")[col].sum()
+        return [round(float(s[m]), 2) if m in s.index else None for m in months_all]
+
+    type_chart_data: dict = {}
+    for t in ticket_types:
+        sub = df[df["机票类型"].astype(str) == t]
+        type_chart_data[t] = {
+            "avg_price": _month_series(sub, AVG_COL, "mean"),
+            "total":     _month_series(sub, MONEY, "sum"),
+            "trips":     _month_series(sub, "人次", "sum"),
+        }
+    overview = {t: type_chart_data[t]["avg_price"] for t in ticket_types}
+
+    # KPIs
+    total_cost      = df[MONEY].sum()
+    total_trips     = int(df["人次"].sum()) if "人次" in df.columns else len(df)
+    avg_price_all   = df[AVG_COL].mean() if AVG_COL in df.columns and len(df) > 0 else 0
+    project_count   = df["项目名称"].nunique() if "项目名称" in df.columns else 0
+    date_range      = f"{months_all[0]} 至 {months_all[-1]}" if months_all else "-"
+
+    COLORS = ["#2c7fb8", "#3fae72", "#d08b2f", "#8f5ccf", "#245f4b", "#e05c5c", "#e8a838", "#3ea3a3", "#c46a2f"]
+
+    toc_items: list = ["<a class='toc-link' href='#card_overview'>📊 总览对比</a>"]
+    sections:  list = []
+
+    # ── 总览卡片 ──────────────────────────────────────────────
+    overview_card = (
+        "<section class='project-card' id='card_overview'>"
+        "<div class='card-header'><h2>各机票类型人均价格对比</h2>"
+        "<span class='status-tag'>全类型汇总</span></div>"
+        "<div class='chart-wrap' style='height:360px'>"
+        "<h3>各类型每月人均价格趋势（泰铢）</h3>"
+        "<canvas id='chart_overview'></canvas></div>"
+        "</section>"
+    )
+    sections.append(overview_card)
+
+    # ── 各类型卡片 ────────────────────────────────────────────
+    for idx, t in enumerate(ticket_types):
+        card_id       = f"card_{idx}"
+        chart_avg_id  = f"chart_avg_{idx}"
+        chart_tot_id  = f"chart_tot_{idx}"
+        sub           = df[df["机票类型"].astype(str) == t]
+        type_total    = sub[MONEY].sum()
+        type_trips    = int(sub["人次"].sum()) if "人次" in sub.columns else len(sub)
+        type_avg      = sub[AVG_COL].mean() if AVG_COL in sub.columns and len(sub) > 0 else 0
+
+        toc_items.append(f"<a class='toc-link' href='#{card_id}'>{html.escape(t)}</a>")
+
+        rows = []
+        for m in months_all:
+            msub = sub[sub["年-月"] == m]
+            if msub.empty:
+                continue
+            m_trips = int(msub["人次"].sum()) if "人次" in msub.columns else len(msub)
+            m_avg   = msub[AVG_COL].mean() if AVG_COL in msub.columns else 0
+            m_total = msub[MONEY].sum()
+            rows.append(
+                f"<tr>"
+                f"<td class='metric-cell'>{m}</td>"
+                f"<td class='num metric-cell'>{m_trips}</td>"
+                f"<td class='num metric-cell'>{m_avg:,.2f}</td>"
+                f"<td class='num metric-cell strong-cell'>{m_total:,.2f}</td>"
+                f"</tr>"
+            )
+
+        sections.append(
+            f"<section class='project-card' id='{card_id}'>"
+            f"<div class='card-header'><h2>{html.escape(t)}</h2>"
+            f"<span class='status-tag'>累计 {type_total:,.0f} 铢 · {type_trips} 人次 · 均价 {type_avg:,.0f}</span></div>"
+            "<div class='chart-grid'>"
+            f"<div class='chart-wrap'><h3>每月人均价格趋势（泰铢）</h3><canvas id='{chart_avg_id}'></canvas></div>"
+            f"<div class='chart-wrap'><h3>每月总费用趋势（泰铢）</h3><canvas id='{chart_tot_id}'></canvas></div>"
+            "</div>"
+            "<table>"
+            "<thead><tr><th>月份</th><th>人次</th><th>人均价格（泰铢）</th><th>总费用（泰铢）</th></tr></thead>"
+            "<tbody>" + "".join(rows) + "</tbody></table>"
+            "</section>"
+        )
+
+    toc_html    = "".join(toc_items)
+    all_sections = "".join(sections)
+
+    months_json    = json.dumps(months_all,    ensure_ascii=False)
+    type_data_json = json.dumps(type_chart_data, ensure_ascii=False)
+    overview_json  = json.dumps(overview,      ensure_ascii=False)
+    colors_json    = json.dumps(COLORS)
+
+    html_content = f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>机票费用分析报告</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+        :root {{
+            --bg1: #f3f7f2;
+            --bg2: #f9efe4;
+            --card: rgba(255,255,255,0.9);
+            --line: #dde6dc;
+            --txt: #21322a;
+            --muted: #5e7167;
+            --accent: #2f7d61;
+            --accent2: #c46a2f;
+        }}
+        * {{ box-sizing: border-box; }}
+        body {{
+            margin: 0;
+            color: var(--txt);
+            font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+            background:
+                radial-gradient(circle at 20% 0%, #e8f2e3 0%, transparent 40%),
+                radial-gradient(circle at 80% 0%, #f8e6d6 0%, transparent 35%),
+                linear-gradient(160deg, var(--bg1), var(--bg2));
+            min-height: 100vh;
+            scroll-behavior: smooth;
+        }}
+        .container {{ width: min(1400px, 97vw); margin: 28px auto 48px; }}
+        .layout {{ display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; align-items: start; }}
+        .toc {{
+            position: sticky; top: 14px;
+            max-height: calc(100vh - 28px); overflow: auto;
+            background: var(--card); border: 1px solid var(--line);
+            border-radius: 14px; box-shadow: 0 10px 20px rgba(36,48,41,.06); padding: 12px;
+        }}
+        .toc-title {{ margin: 0 0 8px; font-size: 14px; color: #2f4338; font-weight: 700; }}
+        .toc-links {{ display: grid; gap: 6px; }}
+        .toc-link {{
+            display: block; padding: 6px 8px; border-radius: 8px;
+            color: #2a473c; text-decoration: none; font-size: 12px; line-height: 1.35;
+            background: rgba(227,237,230,0.4);
+        }}
+        .toc-link:hover {{ background: rgba(196,106,47,0.18); }}
+        .hero {{
+            background: var(--card); border: 1px solid var(--line);
+            border-radius: 18px; padding: 18px 22px;
+            box-shadow: 0 12px 24px rgba(36,48,41,.08); margin-bottom: 16px;
+        }}
+        h1 {{ margin: 4px 0 8px; font-size: clamp(22px, 3vw, 32px); }}
+        .hint {{ color: var(--muted); margin: 0; }}
+        .kpi-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 14px; }}
+        .kpi {{ background: rgba(227,237,230,0.5); border-radius: 10px; padding: 12px 14px; text-align: center; }}
+        .kpi-val {{ font-size: 22px; font-weight: 700; color: var(--accent); }}
+        .kpi-lbl {{ font-size: 11px; color: var(--muted); margin-top: 3px; }}
+        .project-card {{
+            background: var(--card); border: 1px solid var(--line);
+            border-radius: 16px; padding: 18px; margin: 14px 0;
+            box-shadow: 0 10px 20px rgba(36,48,41,.06);
+        }}
+        .card-header {{ display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }}
+        .card-header h2 {{ margin: 4px 0; flex: 1; font-size: clamp(18px, 2.2vw, 24px); }}
+        .status-tag {{
+            padding: 4px 10px; font-size: 12px; border-radius: 999px;
+            background: rgba(47,125,97,0.12); color: #285846; white-space: nowrap;
+        }}
+        h3 {{ margin: 0 0 8px; font-size: 14px; color: #2f4338; }}
+        .chart-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px; }}
+        .chart-wrap {{ width: 100%; height: 320px; margin-bottom: 0; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }}
+        th, td {{ border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: center; vertical-align: middle; }}
+        th {{ color: #31453a; background: rgba(227,237,230,0.55); }}
+        td.num {{ text-align: center; font-variant-numeric: tabular-nums; }}
+        td.metric-cell {{ font-size: 12px; }}
+        td.strong-cell {{ font-weight: 700; color: #244d3e; }}
+        @media (max-width: 768px) {{
+            .layout {{ grid-template-columns: 1fr; }}
+            .toc {{ position: static; max-height: none; }}
+            .chart-grid {{ grid-template-columns: 1fr; margin-bottom: 20px; }}
+            .chart-wrap {{ height: 260px; }}
+            table {{ min-width: 480px; }}
+        }}
+        @media print {{
+            body {{ background: white; }}
+            .hero, .project-card {{ box-shadow: none; border: 1px solid #ccc; }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="layout">
+            <aside class="toc">
+                <h3 class="toc-title">机票类型目录</h3>
+                <div class="toc-links">{toc_html}</div>
+            </aside>
+            <main>
+                <section class="hero">
+                    <h1>✈️ 机票费用分析报告</h1>
+                    <p class="hint">数据区间：{date_range}（单位：泰铢）</p>
+                    <div class="kpi-grid">
+                        <div class="kpi"><div class="kpi-val">{total_cost:,.0f}</div><div class="kpi-lbl">总机票费用（泰铢）</div></div>
+                        <div class="kpi"><div class="kpi-val">{total_trips:,}</div><div class="kpi-lbl">总人次</div></div>
+                        <div class="kpi"><div class="kpi-val">{avg_price_all:,.0f}</div><div class="kpi-lbl">平均人均票价（铢）</div></div>
+                        <div class="kpi"><div class="kpi-val">{len(ticket_types)}</div><div class="kpi-lbl">机票类型数</div></div>
+                        <div class="kpi"><div class="kpi-val">{project_count}</div><div class="kpi-lbl">涉及项目数</div></div>
+                        <div class="kpi"><div class="kpi-val">{len(months_all)}</div><div class="kpi-lbl">统计月份数</div></div>
+                    </div>
+                </section>
+                {all_sections}
+            </main>
+        </div>
+    </div>
+
+    <script>
+        const months        = {months_json};
+        const allTypeData   = {type_data_json};
+        const overviewData  = {overview_json};
+        const COLORS        = {colors_json};
+
+        const amtFmt = (v) => v == null ? '-' : Number(v).toLocaleString('zh-CN', {{maximumFractionDigits: 0}});
+        const lblFmt = (v) => v == null ? '' : Number(v).toLocaleString('zh-CN', {{maximumFractionDigits: 0}});
+
+        const inlineLabelPlugin = {{
+            id: 'inlineLabelPlugin',
+            afterDatasetsDraw(chart) {{
+                const ctx = chart.ctx;
+                chart.data.datasets.forEach((ds, di) => {{
+                    const meta = chart.getDatasetMeta(di);
+                    if (meta.hidden) return;
+                    meta.data.forEach((el, i) => {{
+                        const raw = ds.data[i];
+                        if (raw == null) return;
+                        const txt = lblFmt(raw);
+                        if (!txt) return;
+                        const pos = el.tooltipPosition();
+                        ctx.save();
+                        ctx.fillStyle = '#24352d';
+                        ctx.font = '600 10px "PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(txt, pos.x, pos.y - 6);
+                        ctx.restore();
+                    }});
+                }});
+            }}
+        }};
+        Chart.register(inlineLabelPlugin);
+
+        const bounds = (...lists) => {{
+            const vals = lists.flat().filter(v => v != null && !isNaN(v));
+            if (!vals.length) return {{ min: 0, max: 1 }};
+            const lo = Math.min(...vals), hi = Math.max(...vals);
+            return lo >= 0 ? {{ min: 0, max: hi * 1.2 + 1 }} : {{ min: lo - (hi-lo)*0.12 - 1, max: hi + (hi-lo)*0.12 + 1 }};
+        }};
+
+        const mkLine = (id, datasets, b) => {{
+            const el = document.getElementById(id);
+            if (!el) return;
+            new Chart(el, {{
+                type: 'line',
+                data: {{ labels: months, datasets }},
+                options: {{
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: {{ mode: 'index', intersect: false }},
+                    plugins: {{
+                        legend: {{ position: 'top' }},
+                        inlineLabelPlugin: {{}},
+                        tooltip: {{ callbacks: {{ label: (c) => `${{c.dataset.label}}: ${{amtFmt(c.raw)}} 铢` }} }}
+                    }},
+                    scales: {{ y: {{ min: b.min, max: b.max, ticks: {{ callback: amtFmt }} }} }}
+                }}
+            }});
+        }};
+
+        // 总览：各类型人均价格对比（多线）
+        (() => {{
+            const types = Object.keys(overviewData);
+            const datasets = types.map((t, i) => ({{
+                label: t,
+                data: overviewData[t],
+                borderColor: COLORS[i % COLORS.length],
+                backgroundColor: COLORS[i % COLORS.length] + '28',
+                pointRadius: 4, borderWidth: 2, tension: 0.25, spanGaps: true,
+            }}));
+            mkLine('chart_overview', datasets, bounds(...types.map(t => overviewData[t])));
+        }})();
+
+        // 各类型单独卡片
+        Object.entries(allTypeData).forEach(([t, s], idx) => {{
+            const c = COLORS[idx % COLORS.length];
+            const ds = (label, data) => ({{
+                label, data,
+                borderColor: c, backgroundColor: c + '28',
+                pointRadius: 4, borderWidth: 2, tension: 0.25, spanGaps: true,
+            }});
+            mkLine(`chart_avg_${{idx}}`, [ds('人均价格（铢）', s.avg_price)], bounds(s.avg_price));
+            mkLine(`chart_tot_${{idx}}`, [ds('总费用（铢）',   s.total)],     bounds(s.total));
+        }});
+    </script>
+</body>
+</html>"""
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(html_content, encoding="utf-8")
+
+
 # ====================== 主程序 ======================
 def main():
     print("🚀 开始处理机票台账...")
@@ -381,7 +693,7 @@ def main():
 
     non_numeric_headers = {"所属单位", "姓名", "订票时间", "年-月", "去程机票日期", "回程机票日期",
                            "本次机票航班号", "舱位", "机票类型", "票代", "护照", "项目编码", "项目名称",
-                           "原始项目名称", "_来源文件"}}
+                           "原始项目名称", "_来源文件"}
 
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         # Sheet1: 基础汇总（所有行）
@@ -416,6 +728,12 @@ def main():
 
     print("\n🎉 机票台账处理完成！")
 
+    # ========== 输出 HTML 分析报告 ==========
+    html_path = out_dir / "机票分析报告.html"
+    build_html_report(df, out_path=html_path)
+    print(f"✅ HTML 报告已输出：{html_path}")
+
 
 if __name__ == "__main__":
     main()
+
