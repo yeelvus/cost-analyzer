@@ -66,6 +66,15 @@ FINAL_OUTPUT_COLUMNS = [
 ]
 
 
+def _load_module_from_path(module_name: str, file_path: str):
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"无法加载模块: {file_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def apply_unified_workbook_format(output_wb):
     """统一使用excel_formatting_utils模块格式化输出工作簿。"""
     amount_keywords = ('金额', '单价', '税')
