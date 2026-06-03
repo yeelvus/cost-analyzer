@@ -51,6 +51,9 @@ PROJECT_INFO_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项�
 PROJECT_MATCH_DB_FILE = str(MATCH_DB_PATH)
 STD_MERGED_SUFFIX = 'std_merged.xlsx'
 SIMPLIFY_OUTPUT_FILENAME = "采购台账_simplify_std_merged.xlsx"
+DIRECT_STD_INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/C_采购部采购台账_simplify"
+DIRECT_OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/D_采购部采购台账_sum"
+DIRECT_OUTPUT_FILENAME = "采购部采购台账_std_merged.xlsx"
 # ===================================
 
 # 全局匹配库（来自 0_项目基本信息/project_name_matcher.py）
@@ -555,6 +558,28 @@ def main():
     global PROJECT_MATCH_DB
 
     raw_root = RAW_DATA_ROOT
+    standardized_root = DIRECT_STD_INPUT_ROOT
+    out_root = DIRECT_OUTPUT_ROOT
+
+    # 直连模式：直接汇总指定标准化目录，并输出到指定简化目录
+    if os.path.isdir(standardized_root):
+        os.makedirs(out_root, exist_ok=True)
+        print("\n直连模式：")
+        print(f"- 输入目录: {standardized_root}")
+        print(f"- 输出目录: {out_root}")
+
+        output_wb_std, _ = merge_standardized_excels(standardized_root)
+        if output_wb_std is None:
+            print("直连模式未产生有效汇总数据")
+            return
+
+        std_output_path = os.path.join(out_root, DIRECT_OUTPUT_FILENAME)
+        apply_unified_workbook_format(output_wb_std)
+        output_wb_std.save(std_output_path)
+        print(f"已输出（直连汇总）: {std_output_path}")
+        return
+
+    # 兜底：若直连目录不存在，回退原有按月份目录处理模式
     standardized_root = STANDARDIZED_DATA_ROOT
     out_root = SUMMARY_OUTPUT_ROOT
 

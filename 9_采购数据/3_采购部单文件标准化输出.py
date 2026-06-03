@@ -18,8 +18,8 @@ if _路径_spec is None or _路径_spec.loader is None:
     raise ImportError("无法加载路径模块: _采购路径.py")
 _路径_mod = importlib.util.module_from_spec(_路径_spec)
 _路径_spec.loader.exec_module(_路径_mod)
-RAW_DATA_ROOT = str(_路径_mod.RAW_DIR)
-OUTPUT_ROOT = str(_路径_mod.STD_DIR)
+RAW_DATA_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_std/采购部采购台账"
+OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/C_采购部采购台账_simplify"
 PROJECT_INFO_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
 UNIT_MAP_UTILS_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/unit_map_utils.py"
 
@@ -28,16 +28,30 @@ _CODE_ROOT = Path(__file__).resolve().parents[1]
 if str(_CODE_ROOT) not in sys.path:
     sys.path.insert(0, str(_CODE_ROOT))
 
-from common.project import (
-    load_or_init_db,
-    save_db,
-    match_project,
-    mark_unmatched,
-    add_mapping,
-)
 from settings import MATCH_DB_PATH
 
 PROJECT_MATCH_DB_FILE = str(MATCH_DB_PATH)
+PROJECT_MATCHER_PATH = str(_CODE_ROOT / "0_项目基本信息" / "project_name_matcher.py")
+
+
+def _load_project_matcher_module(file_path: str):
+    spec = importlib.util.spec_from_file_location("_project_name_matcher_runtime", file_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"无法加载项目匹配模块: {file_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_project_matcher = _load_project_matcher_module(PROJECT_MATCHER_PATH)
+load_or_init_db = _project_matcher.load_or_init_db
+save_db = _project_matcher.save_db
+match_project = _project_matcher.match_project
+mark_unmatched = _project_matcher.mark_unmatched
+add_mapping = _project_matcher.add_mapping
+get_project_lookup = _project_matcher.get_project_lookup
+is_unmatched_alias = _project_matcher.is_unmatched_alias
+prompt_unmatched_project_mappings = _project_matcher.prompt_unmatched_project_mappings
 
 
 # ============= 标准化流水线配置 =============
@@ -104,6 +118,9 @@ def load_project_matcher_funcs():
         "match_project": match_project,
         "mark_unmatched": mark_unmatched,
         "add_mapping": add_mapping,
+        "get_project_lookup": get_project_lookup,
+        "is_unmatched_alias": is_unmatched_alias,
+        "prompt_unmatched_project_mappings": prompt_unmatched_project_mappings,
     }
 
 
@@ -167,6 +184,37 @@ def list_excel_files(root_dir):
             if ext in {".xlsx", ".xls", ".xlsm"}:
                 excel_paths.append(os.path.join(root, name))
     return sorted(excel_paths)
+
+
+def preload_project_matches_for_files(excel_files, project_config, matcher_funcs, match_db):
+    """批量收集未识别项目名并一次性调用匹配模块，减少逐文件弹窗。"""
+    unmatched_projects = []
+    for file_path in excel_files:
+        extracted_name = extract_project_name(os.path.basename(file_path))
+        matched = find_matching_project(extracted_name, project_config, matcher_funcs["match_project"], match_db)
+        if matched:
+            continue
+        if extracted_name not in unmatched_projects:
+            unmatched_projects.append(extracted_name)
+
+    if not unmatched_projects:
+        return
+
+    print(f"\n发现 {len(unmatched_projects)} 个未识别项目，打开批量匹配窗口...")
+    batch_results = matcher_funcs["prompt_unmatched_project_mappings"](
+        unmatched_projects,
+        match_db,
+        window_title="采购-批量项目匹配",
+    )
+    project_lookup = matcher_funcs["get_project_lookup"](match_db)
+    for raw_name, std_name in batch_results.items():
+        if std_name:
+            matcher_funcs["add_mapping"](match_db, raw_name, std_name)
+            code, _ = project_lookup.get(std_name, ("", ""))
+            print(f"  ✓ 匹配: '{raw_name}' -> [{code}] {std_name}")
+        else:
+            matcher_funcs["mark_unmatched"](match_db, raw_name)
+            print(f"  - 留空: '{raw_name}'")
 
 
 def normalize_headers(headers):
@@ -773,6 +821,8 @@ def main():
     if not os.path.isdir(RAW_DATA_ROOT):
         raise FileNotFoundError(f"输入目录不存在: {RAW_DATA_ROOT}")
 
+    print(f"项目匹配模块: {PROJECT_MATCHER_PATH}")
+
     os.makedirs(OUTPUT_ROOT, exist_ok=True)
 
     project_config = load_project_config()
@@ -787,6 +837,8 @@ def main():
     if not excel_files:
         print("未发现Excel文件，程序结束")
         return
+
+    preload_project_matches_for_files(excel_files, project_config, matcher_funcs, match_db)
 
     success_count = 0
     skip_count = 0
