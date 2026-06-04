@@ -1,5 +1,7 @@
 import os
+import shutil
 import sys
+import tempfile
 from collections import defaultdict
 from pathlib import Path
 
@@ -17,9 +19,10 @@ from common.excel import apply_common_excel_layout
 
 # 仅保留当前在用的直连汇总能力：
 # 输入目录（递归汇总全部 Excel）-> 输出目录（单个汇总文件）
-DIRECT_STD_INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/C_采购部采购台账_simplify"
+DIRECT_STD_INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_std/材料采购台账_标准"
 DIRECT_OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/D_采购部采购台账_sum"
-DIRECT_OUTPUT_FILENAME = "采购部采购台账_std_merged.xlsx"
+DIRECT_OUTPUT_FILENAME_WITH_STD = "采购部采购台账_std_merged.xlsx"
+DIRECT_OUTPUT_FILENAME_WITHOUT_STD = "采购部采购台账_merged.xlsx"
 
 FINAL_OUTPUT_COLUMNS = [
     "项目编码",
@@ -41,6 +44,22 @@ FINAL_OUTPUT_COLUMNS = [
     "备注",
     "签订日期",
 ]
+
+
+def _load_procurement_standardization_utils():
+    """动态加载采购内容标准化工具。"""
+    utils_path = Path(__file__).resolve().parent / "采购内容标准化_utils.py"
+    if not utils_path.exists():
+        raise FileNotFoundError(f"未找到标准化工具: {utils_path}")
+
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("procurement_content_std_utils", str(utils_path))
+    if spec is None or spec.loader is None:
+        raise ImportError(f"无法加载标准化工具: {utils_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def apply_unified_workbook_format(output_wb):
@@ -143,13 +162,17 @@ def list_source_excel_files_recursive(folder_path):
     return sorted(excel_files)
 
 
-def merge_standardized_excels(folder_path):
+def merge_standardized_excels(folder_path, use_content_standardization=False):
     """汇总目录下全部 Excel，输出工作簿对象。"""
     excel_paths = list_source_excel_files_recursive(folder_path)
+    std_utils = None
+    if use_content_standardization:
+        std_utils = _load_procurement_standardization_utils()
 
     print("\n" + "=" * 80)
-    print(f"【纯汇总模式】开始处理文件夹: {folder_path}")
-    print(f"【纯汇总模式】发现 {len(excel_paths)} 个Excel文件")
+    mode_name = "启用采购内容标准化" if use_content_standardization else "不启用采购内容标准化"
+    print(f"【纯汇总模式 - {mode_name}】开始处理文件夹: {folder_path}")
+    print(f"【纯汇总模式 - {mode_name}】发现 {len(excel_paths)} 个Excel文件")
     print("=" * 80 + "\n")
 
     if not excel_paths:
@@ -170,11 +193,29 @@ def merge_standardized_excels(folder_path):
         file_name = os.path.basename(file_path)
         print(f"[{idx}/{len(excel_paths)}] 汇总文件: {file_name}")
 
+        read_path = file_path
+        temp_dir = None
+        if use_content_standardization and std_utils is not None:
+            try:
+                temp_dir = tempfile.mkdtemp(prefix="procurement_std_")
+                temp_file = os.path.join(temp_dir, file_name)
+                shutil.copy2(file_path, temp_file)
+                std_utils.apply_standardization_pipeline(temp_file)
+                read_path = temp_file
+            except Exception as exc:
+                print(f"  ⚠️ 标准化失败，回退原文件: {exc}")
+                read_path = file_path
+
         try:
-            df = pd.read_excel(file_path)
+            df = pd.read_excel(read_path)
         except Exception as e:
             print(f"  ✗ 读取失败: {e}")
+            if temp_dir and os.path.isdir(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
             continue
+        finally:
+            if temp_dir and os.path.isdir(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
 
         if df.empty:
             print("  ⚠️ 空文件，跳过")
@@ -242,15 +283,24 @@ def main():
     print(f"- 输入目录: {standardized_root}")
     print(f"- 输出目录: {out_root}")
 
-    output_wb = merge_standardized_excels(standardized_root)
-    if output_wb is None:
-        print("未产生有效汇总数据")
-        return
+    version_configs = [
+        (False, DIRECT_OUTPUT_FILENAME_WITHOUT_STD),
+        (True, DIRECT_OUTPUT_FILENAME_WITH_STD),
+    ]
 
-    output_path = os.path.join(out_root, DIRECT_OUTPUT_FILENAME)
-    apply_unified_workbook_format(output_wb)
-    output_wb.save(output_path)
-    print(f"已输出（直连汇总）: {output_path}")
+    for use_std, output_filename in version_configs:
+        output_wb = merge_standardized_excels(
+            standardized_root,
+            use_content_standardization=use_std,
+        )
+        if output_wb is None:
+            print(f"未产生有效汇总数据: {output_filename}")
+            continue
+
+        output_path = os.path.join(out_root, output_filename)
+        apply_unified_workbook_format(output_wb)
+        output_wb.save(output_path)
+        print(f"已输出（直连汇总）: {output_path}")
 
 
 if __name__ == "__main__":

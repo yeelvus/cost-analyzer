@@ -19,9 +19,9 @@ if _路径_spec is None or _路径_spec.loader is None:
 _路径_mod = importlib.util.module_from_spec(_路径_spec)
 _路径_spec.loader.exec_module(_路径_mod)
 RAW_DATA_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_std/采购部采购台账"
-OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/C_采购部采购台账_simplify"
+OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_std/材料采购台账_标准"
 PROJECT_INFO_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
-UNIT_MAP_UTILS_PATH = "/Users/wyattsun/Desktop/code/0_项目基本信息/unit_map_utils.py"
+OUTPUT_FILENAME_SUFFIX = "_processed"
 
 # ── common 模块加载（单例，避免孤立实例）──────────────────────────────────
 _CODE_ROOT = Path(__file__).resolve().parents[1]
@@ -52,12 +52,6 @@ add_mapping = _project_matcher.add_mapping
 get_project_lookup = _project_matcher.get_project_lookup
 is_unmatched_alias = _project_matcher.is_unmatched_alias
 prompt_unmatched_project_mappings = _project_matcher.prompt_unmatched_project_mappings
-
-
-# ============= 标准化流水线配置 =============
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-STANDARDIZATION_PIPELINE_DIR = os.path.join(CURRENT_DIR, "物品名称规格标准化")
-PIPELINE_CONTEXT = None
 
 
 # ============= 列配置 =============
@@ -105,11 +99,6 @@ def _load_module_from_path(module_name, file_path):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
-# 加载单位标准化模块（含 Tkinter 交互对话框与 unit_map.json 读写）
-_unit_map_utils = _load_module_from_path("unit_map_utils", UNIT_MAP_UTILS_PATH)
-standardize_unit = _unit_map_utils.standardize_unit
-
 
 def load_project_matcher_funcs():
     return {
@@ -306,6 +295,32 @@ def parse_date(date_str):
             return (y, m, d)
 
     return (None, None, None)
+
+
+def extract_year_month_from_filename(file_name: str) -> str:
+    """从文件名中提取年月，统一返回 YYYY-MM，失败返回空字符串。"""
+    stem = os.path.splitext(os.path.basename(file_name))[0]
+
+    patterns = [
+        r"((?:19|20)\d{2})年\s*(0?[1-9]|1[0-2])月",
+        r"((?:19|20)\d{2})[-_/\.](0?[1-9]|1[0-2])",
+        r"((?:19|20)\d{2})(0[1-9]|1[0-2])",
+    ]
+    for p in patterns:
+        m = re.search(p, stem)
+        if not m:
+            continue
+        y, mm = int(m.group(1)), int(m.group(2))
+        return f"{y:04d}-{mm:02d}"
+
+    # 兜底识别：形如 25年3月
+    m2 = re.search(r"(\d{2})年\s*(0?[1-9]|1[0-2])月", stem)
+    if m2:
+        y2, mm2 = int(m2.group(1)), int(m2.group(2))
+        y2 += 2000 if y2 < 70 else 1900
+        return f"{y2:04d}-{mm2:02d}"
+
+    return ""
 
 
 def is_numeric_value(value):
@@ -507,71 +522,6 @@ def format_date_str(year, month, day):
     return f"{year}-{month:02d}-{day:02d}"
 
 
-def get_pipeline_context():
-    """缓存流水线模块与规则模块，避免每个文件重复import。"""
-    global PIPELINE_CONTEXT
-    if PIPELINE_CONTEXT is not None:
-        return PIPELINE_CONTEXT
-
-    pipeline_dir = Path(STANDARDIZATION_PIPELINE_DIR)
-    pipeline_script = pipeline_dir / "0_统一标准化流水线.py"
-    if not pipeline_script.exists():
-        PIPELINE_CONTEXT = {"ok": False, "reason": f"未找到标准化流水线脚本: {pipeline_script}"}
-        return PIPELINE_CONTEXT
-
-    spec = importlib.util.spec_from_file_location("_standardization_pipeline", str(pipeline_script))
-    if spec is None or spec.loader is None:
-        PIPELINE_CONTEXT = {"ok": False, "reason": f"无法加载标准化流水线: {pipeline_script}"}
-        return PIPELINE_CONTEXT
-
-    pipeline_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(pipeline_module)
-
-    rule_names = getattr(pipeline_module, "DEFAULT_RULES", [])
-    if not rule_names:
-        PIPELINE_CONTEXT = {"ok": False, "reason": "标准化流水线 DEFAULT_RULES 为空"}
-        return PIPELINE_CONTEXT
-
-    rule_modules = []
-    for rule_name in rule_names:
-        rule_file = pipeline_dir / rule_name
-        if not rule_file.exists():
-            continue
-        try:
-            rule_module = pipeline_module.load_module_from_file(rule_file)
-            rule_modules.append((rule_file.name, rule_module))
-        except Exception:
-            continue
-
-    PIPELINE_CONTEXT = {
-        "ok": True,
-        "pipeline_module": pipeline_module,
-        "rule_modules": rule_modules,
-    }
-    return PIPELINE_CONTEXT
-
-
-def apply_standardization_pipeline(excel_path):
-    context = get_pipeline_context()
-    if not context.get("ok"):
-        print(f"  ⚠️ {context.get('reason', '标准化流水线不可用，已跳过')}")
-        return
-
-    workbook = openpyxl.load_workbook(excel_path)
-    pipeline_module = context["pipeline_module"]
-    for rule_name, rule_module in context["rule_modules"]:
-        try:
-            stats = pipeline_module.run_rule_on_workbook(rule_module, workbook, rule_name)
-            print(
-                f"  ✓ {rule_name}: "
-                f"命中 {stats['matched']} 行, 更新 {stats['updated']} 行, 未识别 {stats['unresolved']} 行"
-            )
-        except Exception as exc:
-            print(f"  ✗ 规则执行失败 {rule_name}: {exc}")
-
-    workbook.save(excel_path)
-
-
 def extract_rows_from_single_excel(file_path, project_code, project_name):
     formula_wb = openpyxl.load_workbook(file_path, data_only=False)
     formula_sheet = formula_wb.active
@@ -664,7 +614,7 @@ def extract_rows_from_single_excel(file_path, project_code, project_name):
                 unit_idx = header_idx_map.get("单位")
                 if unit_idx is not None and unit_idx < len(row_vals):
                     unit_val = row_vals[unit_idx]
-                    row_obj[col_name] = standardize_unit(unit_val)
+                    row_obj[col_name] = "" if unit_val is None else str(unit_val).strip()
                 else:
                     row_obj[col_name] = ""
             elif col_name in header_idx_map:
@@ -752,7 +702,7 @@ def build_output_path(input_path):
     rel_path = os.path.relpath(input_path, RAW_DATA_ROOT)
     rel_dir = os.path.dirname(rel_path)
     base_name, _ = os.path.splitext(os.path.basename(rel_path))
-    output_name = f"{base_name}.xlsx"
+    output_name = f"{base_name}{OUTPUT_FILENAME_SUFFIX}.xlsx"
     return os.path.join(OUTPUT_ROOT, rel_dir, output_name)
 
 
@@ -786,11 +736,6 @@ def process_single_file(file_path, project_config, matcher_funcs, match_db):
 
     df = pd.DataFrame(rows)
 
-    # 统一处理本文件扫描到的未知单位（一次弹窗批量选择），并回填标准单位列。
-    resolved_count = _unit_map_utils.resolve_pending_unit_mappings()
-    if resolved_count and "单位" in df.columns:
-        df["单位"] = df["单位"].apply(lambda v: standardize_unit(v, auto_prompt=False))
-
     # 仅保留金额合计不为0的行。
     amount_df = df[[c for c in ["单价", "不含税金额", "7%增值税", "含税金额"] if c in df.columns]].apply(
         pd.to_numeric, errors="coerce"
@@ -803,6 +748,15 @@ def process_single_file(file_path, project_config, matcher_funcs, match_db):
 
     df = enrich_dates(df)
 
+    # 若日期推断后仍有空年月，则尝试用文件名中的年月兜底回填。
+    file_year_month = extract_year_month_from_filename(file_name)
+    if file_year_month and "年月" in df.columns:
+        ym_series = df["年月"].fillna("").astype(str).str.strip()
+        empty_mask = ym_series.eq("")
+        if empty_mask.any():
+            df.loc[empty_mask, "年月"] = file_year_month
+            print(f"  ✓ 年月文件名兜底: 回填 {int(empty_mask.sum())} 行 -> {file_year_month}")
+
     # 单位补全：单位为空时，按同物品名称+单价回填，优先同项目再按日期最近。
     df, filled_unit_count = fill_missing_units_by_similarity(df, global_unit_ref=_GLOBAL_UNIT_REF)
     if filled_unit_count:
@@ -810,7 +764,6 @@ def process_single_file(file_path, project_config, matcher_funcs, match_db):
 
     output_path = build_output_path(file_path)
     write_output(df, output_path)
-    apply_standardization_pipeline(output_path)
 
     print(f"  ✓ 已输出: {output_path}")
     return True, ""
