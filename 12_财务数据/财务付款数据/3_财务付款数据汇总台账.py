@@ -5,6 +5,7 @@ import importlib.util
 
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
 
@@ -517,6 +518,7 @@ def process_time_folder(folder_name, excel_files):
                 level1_col="一级科目",
                 level2_col="二级科目",
             )
+            apply_output_format(output_path)
             print(f"  ♻️ 已存在文件，仅更新科目分类列：{os.path.basename(output_path)} | 更新行数: {updated}")
             output_paths.append(output_path)
             continue
@@ -535,6 +537,44 @@ def process_time_folder(folder_name, excel_files):
 
 
 def apply_output_format(output_path):
+    def _to_float(value):
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip().replace(",", "")
+        if not text:
+            return None
+        try:
+            return float(text)
+        except Exception:
+            return None
+
+    def _highlight_mismatch_rows(ws):
+        headers = {str(cell.value).strip(): idx for idx, cell in enumerate(ws[1], start=1) if cell.value is not None}
+        payable_col = headers.get("应付金额")
+        withholding_col = headers.get("预扣税额")
+        actual_col = headers.get("实付金额")
+        if not payable_col or not withholding_col or not actual_col:
+            return
+
+        mismatch_fill = PatternFill(fill_type="solid", fgColor="FFF2CC")
+        for row_idx in range(2, ws.max_row + 1):
+            payable_raw = _to_float(ws.cell(row=row_idx, column=payable_col).value)
+            withholding_raw = _to_float(ws.cell(row=row_idx, column=withholding_col).value)
+            actual_raw = _to_float(ws.cell(row=row_idx, column=actual_col).value)
+
+            if payable_raw is None and withholding_raw is None and actual_raw is None:
+                continue
+
+            payable = 0.0 if payable_raw is None else payable_raw
+            withholding = 0.0 if withholding_raw is None else withholding_raw
+            actual = 0.0 if actual_raw is None else actual_raw
+
+            if abs(payable - (withholding + actual)) > 1e-6:
+                for col_idx in range(1, ws.max_column + 1):
+                    ws.cell(row=row_idx, column=col_idx).fill = mismatch_fill
+
     wb = load_workbook(output_path)
     if not wb.worksheets:
         wb.save(output_path)
@@ -553,6 +593,8 @@ def apply_output_format(output_path):
             )
         except Exception as exc:
             print(f"  ⚠️ 应用样式格式失败: {exc}")
+
+        _highlight_mismatch_rows(ws)
 
     wb.save(output_path)
 
