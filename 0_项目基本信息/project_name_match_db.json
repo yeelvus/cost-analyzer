@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-03 17:21:07",
+  "updated_at": "2026-06-05 13:36:29",
   "projects": {
     "永强车业项目": {
       "project_code": "THCC-2025-005",
@@ -501,7 +501,8 @@
       "project_code": "THCC-2026-005",
       "target_status": "需手动核对",
       "aliases": [
-        "晶赛"
+        "晶赛",
+        "晶赛项目"
       ]
     },
     "子公司": {
@@ -560,6 +561,26 @@
       "aliases": []
     },
     "宗通": {
+      "project_code": "需手动核对",
+      "target_status": "需手动核对",
+      "aliases": []
+    },
+    "塑恩": {
+      "project_code": "需手动核对",
+      "target_status": "需手动核对",
+      "aliases": []
+    },
+    "百明搅拌站": {
+      "project_code": "需手动核对",
+      "target_status": "需手动核对",
+      "aliases": []
+    },
+    "袁总": {
+      "project_code": "需手动核对",
+      "target_status": "需手动核对",
+      "aliases": []
+    },
+    "鸿基道安": {
       "project_code": "需手动核对",
       "target_status": "需手动核对",
       "aliases": []
