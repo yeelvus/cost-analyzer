@@ -705,72 +705,82 @@ def process_concrete_data():
                 '年月', '日期', '强度（塌落度）', '价格', '金额', '金额（万泰铢）',
             ]
             merged_df = merged_df.reindex(columns=[c for c in keep_cols if c in merged_df.columns])
+            ym_suffix = datetime.now().strftime('%Y%m')
+            if total_groups > 1:
+                output_base = f"搅拌站混凝土汇总报表_{ym_suffix}_{idx_item:02d}"
+            else:
+                output_base = f"搅拌站混凝土汇总报表_{ym_suffix}"
 
-            customer_summary = merged_df.groupby(['项目编码', '项目名称']).agg({
-                '总方量': 'sum',
-                '金额': 'sum',
-                '总车次': 'sum'
-            }).reset_index()
-            customer_summary = customer_summary.sort_values(by='项目编码', ascending=False, na_position='last')
-            customer_summary['金额（万泰铢）'] = customer_summary['金额'] / 10000
-            cs_order = ['项目编码', '项目名称', '总方量', '总车次', '金额', '金额（万泰铢）']
-            customer_summary = customer_summary.reindex(columns=[c for c in cs_order if c in customer_summary.columns])
-
-            detail_summary = merged_df.groupby(['项目编码', '项目名称', '砼强度', '塌落度']).agg({
-                '总方量': 'sum',
-                '价格': 'first',
-                '金额': 'sum',
-            }).reset_index()
-            detail_summary['金额（万泰铢）'] = detail_summary['金额'] / 10000
-            ds_order = ['项目编码', '项目名称', '砼强度', '塌落度', '总方量', '价格', '金额', '金额（万泰铢）']
-            detail_summary = detail_summary.reindex(columns=[c for c in ds_order if c in detail_summary.columns])
-
-            merged_for_month = merged_df.copy()
-            merged_for_month = merged_for_month[merged_for_month['年月'] != '']
-
-            monthly_volume_pivot = merged_for_month.pivot_table(
-                index=['项目编码', '项目名称'],
-                columns='年月',
-                values='总方量',
-                aggfunc='sum',
-                fill_value=0,
-            )
-            monthly_amount_pivot = merged_for_month.pivot_table(
-                index=['项目编码', '项目名称'],
-                columns='年月',
-                values='金额',
-                aggfunc='sum',
-                fill_value=0,
-            )
+            z_report_dir = '/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report'
+            os.makedirs(z_report_dir, exist_ok=True)
 
             def sort_month_cols(cols):
                 return sorted(cols, key=lambda s: (int(str(s).split('-')[0]), int(str(s).split('-')[1])))
 
-            if len(monthly_volume_pivot.columns) > 0:
-                monthly_volume_pivot = monthly_volume_pivot.reindex(columns=sort_month_cols(monthly_volume_pivot.columns))
-            if len(monthly_amount_pivot.columns) > 0:
-                monthly_amount_pivot = monthly_amount_pivot.reindex(columns=sort_month_cols(monthly_amount_pivot.columns))
+            def build_and_write_report(source_df, name_suffix=''):
+                customer_summary = source_df.groupby(['项目编码', '项目名称']).agg({
+                    '总方量': 'sum',
+                    '金额': 'sum',
+                    '总车次': 'sum'
+                }).reset_index()
+                customer_summary = customer_summary.sort_values(by='项目编码', ascending=False, na_position='last')
+                customer_summary['金额（万泰铢）'] = customer_summary['金额'] / 10000
+                cs_order = ['项目编码', '项目名称', '总方量', '总车次', '金额', '金额（万泰铢）']
+                customer_summary = customer_summary.reindex(columns=[c for c in cs_order if c in customer_summary.columns])
 
-            monthly_volume_pivot = monthly_volume_pivot.reset_index()
-            monthly_amount_pivot = monthly_amount_pivot.reset_index()
+                detail_summary = source_df.groupby(['项目编码', '项目名称', '砼强度', '塌落度']).agg({
+                    '总方量': 'sum',
+                    '价格': 'first',
+                    '金额': 'sum',
+                }).reset_index()
+                detail_summary['金额（万泰铢）'] = detail_summary['金额'] / 10000
+                ds_order = ['项目编码', '项目名称', '砼强度', '塌落度', '总方量', '价格', '金额', '金额（万泰铢）']
+                detail_summary = detail_summary.reindex(columns=[c for c in ds_order if c in detail_summary.columns])
 
-            monthly_volume_pivot = monthly_volume_pivot.sort_values(by='项目编码', ascending=False, na_position='last')
-            monthly_amount_pivot = monthly_amount_pivot.sort_values(by='项目编码', ascending=False, na_position='last')
+                merged_for_month = source_df[source_df['年月'] != ''].copy()
+                monthly_volume_pivot = merged_for_month.pivot_table(
+                    index=['项目编码', '项目名称'],
+                    columns='年月',
+                    values='总方量',
+                    aggfunc='sum',
+                    fill_value=0,
+                )
+                monthly_amount_pivot = merged_for_month.pivot_table(
+                    index=['项目编码', '项目名称'],
+                    columns='年月',
+                    values='金额',
+                    aggfunc='sum',
+                    fill_value=0,
+                )
 
-            ym_suffix = datetime.now().strftime('%Y%m')
-            if total_groups > 1:
-                output_name = f"搅拌站混凝土汇总报表_{ym_suffix}_{idx_item:02d}.xlsx"
-            else:
-                output_name = f"搅拌站混凝土汇总报表_{ym_suffix}.xlsx"
-            output_path = os.path.join(output_dir, output_name)
-            _write_outputs(merged_df, detail_summary, customer_summary, monthly_volume_pivot, monthly_amount_pivot, output_path)
+                if len(monthly_volume_pivot.columns) > 0:
+                    monthly_volume_pivot = monthly_volume_pivot.reindex(columns=sort_month_cols(monthly_volume_pivot.columns))
+                if len(monthly_amount_pivot.columns) > 0:
+                    monthly_amount_pivot = monthly_amount_pivot.reindex(columns=sort_month_cols(monthly_amount_pivot.columns))
 
-            z_report_dir = '/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report'
-            os.makedirs(z_report_dir, exist_ok=True)
-            z_report_path = os.path.join(z_report_dir, output_name)
-            import shutil
-            shutil.copy2(output_path, z_report_path)
-            print(f"  已同步到 Z_report: {z_report_path}")
+                monthly_volume_pivot = monthly_volume_pivot.reset_index()
+                monthly_amount_pivot = monthly_amount_pivot.reset_index()
+
+                monthly_volume_pivot = monthly_volume_pivot.sort_values(by='项目编码', ascending=False, na_position='last')
+                monthly_amount_pivot = monthly_amount_pivot.sort_values(by='项目编码', ascending=False, na_position='last')
+
+                output_name = f"{output_base}{name_suffix}.xlsx"
+                output_path = os.path.join(output_dir, output_name)
+                _write_outputs(source_df, detail_summary, customer_summary, monthly_volume_pivot, monthly_amount_pivot, output_path)
+
+                z_report_path = os.path.join(z_report_dir, output_name)
+                import shutil
+                shutil.copy2(output_path, z_report_path)
+                print(f"  已同步到 Z_report: {z_report_path}")
+
+            # 保留原始全量版本
+            build_and_write_report(merged_df, '')
+
+            # 新增仅有项目编码版本：项目编码为空/空白的行不显示且不参与汇总
+            code_series = merged_df['项目编码'].astype(str).str.strip()
+            coded_mask = merged_df['项目编码'].notna() & (code_series != '') & (code_series.str.lower() != 'nan')
+            coded_df = merged_df.loc[coded_mask].copy()
+            build_and_write_report(coded_df, '_仅有项目编码')
 
         print("数据处理成功！")
         print(f"文件保存位置: {data_dir}")
