@@ -14,6 +14,9 @@ SCRIPT_SEQUENCE = [
     BASE_DIR / "预计毛利率对比_数据统计与环比.py",
 ]
 
+# 综合分析 HTML 生成器（位于 code 根目录）
+COMPREHENSIVE_HTML_SCRIPT = BASE_DIR.parent / "build_comprehensive_cost_analysis_html.py"
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -68,6 +71,27 @@ def main() -> None:
     for script_path in SCRIPT_SEQUENCE:
         print(f"- {script_path.name}")
     print(f"{'=' * 72}")
+    print("  + 标准综合分析报告：项目成本统计综合分析报告.html （位于 Z_report）")
+
+    # ==================== 扩展：生成统一综合分析 HTML ====================
+    if COMPREHENSIVE_HTML_SCRIPT.exists():
+        print(f"\n{'=' * 72}")
+        print("[开始] 生成标准综合分析 HTML 报告（build_comprehensive_cost_analysis_html.py）")
+        print(f"{'=' * 72}")
+        try:
+            # 在 code 根目录执行（以便正确使用 settings / 相对路径）
+            subprocess.run(
+                [sys.executable, str(COMPREHENSIVE_HTML_SCRIPT)],
+                check=True,
+                cwd=COMPREHENSIVE_HTML_SCRIPT.parent,
+            )
+            print("[完成] 综合分析 HTML 报告已生成（默认输出到 Z_report/项目成本统计综合分析报告.html）")
+        except subprocess.CalledProcessError as exc:
+            print(f"[失败] 综合HTML报告生成失败，退出码: {exc.returncode}")
+            if not args.continue_on_error:
+                raise SystemExit(exc.returncode) from exc
+    else:
+        print(f"\n⚠️ 未找到综合分析HTML生成脚本: {COMPREHENSIVE_HTML_SCRIPT}")
 
 
 if __name__ == "__main__":
