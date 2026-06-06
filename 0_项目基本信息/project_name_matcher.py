@@ -1,7 +1,6 @@
 import json
 import os
 import re
-from datetime import datetime
 import pandas as pd
 
 try:
@@ -27,10 +26,6 @@ def _normalize_key(text):
     if text is None:
         return ""
     return re.sub(r"\s+", "", str(text)).strip().lower()
-
-
-def _now_text():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _iter_project_alias_pairs(db):
@@ -92,7 +87,6 @@ def build_standard_projects_from_dataframe(info_df):
 def load_or_init_db(db_path, standard_projects=None):
     db = {
         "version": 1,
-        "updated_at": _now_text(),
         "projects": {},
         "unmatched_aliases": [],
     }
@@ -104,7 +98,6 @@ def load_or_init_db(db_path, standard_projects=None):
             if isinstance(loaded, dict):
                 db.update({
                     "version": loaded.get("version", 1),
-                    "updated_at": loaded.get("updated_at", _now_text()),
                     "projects": loaded.get("projects", {}) or {},
                     "unmatched_aliases": loaded.get("unmatched_aliases", []) or [],
                 })
@@ -131,12 +124,12 @@ def load_or_init_db(db_path, standard_projects=None):
         if std_name in db["unmatched_aliases"]:
             db["unmatched_aliases"].remove(std_name)
 
-    db["updated_at"] = _now_text()
     return db
 
 
 def save_db(db_path, db):
-    db["updated_at"] = _now_text()
+    # 匹配库不再维护 updated_at，避免每次运行都触发无意义变更。
+    db.pop("updated_at", None)
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     with open(db_path, "w", encoding="utf-8") as f:
         json.dump(db, f, ensure_ascii=False, indent=2)
@@ -353,8 +346,8 @@ def prompt_unmatched_project_mappings(unmatched_names, db, window_title="手动�
     for raw_name, var in var_map.items():
         selected = var.get().strip()
         if not result["ok"] or selected == blank_option or not selected:
-            # 用户明确选择"保留原名称"：将原名映射到自身，下次运行直接命中，不再弹窗
-            add_mapping(db, raw_name, raw_name)
+            # 跳过匹配时仅标记为未匹配，不创建同名“伪项目”。
+            mark_unmatched(db, raw_name)
             selected_map[raw_name] = ""
             continue
 
