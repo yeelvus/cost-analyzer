@@ -447,7 +447,8 @@
         "洽洽项目",
         "洽洽",
         "洽洽二期",
-        "恰恰"
+        "恰恰",
+        "恰恰项目"
       ]
     },
     "东威科技": {
@@ -504,86 +505,6 @@
         "晶赛",
         "晶赛项目"
       ]
-    },
-    "子公司": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "巴真搅拌站": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "百年陶瓷": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "预制厂": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "INSEE项目": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "屋顶光伏": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "2026年4月份": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "泰国子公司": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "搅拌站": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "Sheet1": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "项目编码": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "宗通": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "塑恩": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "百明搅拌站": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "袁总": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
-    },
-    "鸿基道安": {
-      "project_code": "需手动核对",
-      "target_status": "需手动核对",
-      "aliases": []
     }
   },
   "unmatched_aliases": [
@@ -622,7 +543,6 @@
     "零星销售",
     "预制场",
     "飞剑",
-    "飞剑项目",
-    "恰恰项目"
-  ]
+    "飞剑项目"
+    ]
 }
