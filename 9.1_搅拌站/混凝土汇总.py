@@ -162,17 +162,52 @@ def _normalize_detail_df(detail_df):
         return next((c for c in candidates if c in detail_df.columns), None)
 
     # 适配日期列（后期数据）或年/月（前期数据）
+    year_col = pick_col(["年", "年份"])
+    month_col = pick_col(["月", "月份"])
     date_col = pick_col(["日期", "生产日期", "开盘日期"])
     if date_col:
-        detail_df["日期"] = pd.to_datetime(detail_df[date_col], errors="coerce")
+        raw_date = detail_df[date_col]
+        parsed_date = pd.to_datetime(raw_date, errors="coerce")
+
+        # 兜底识别如“4月1日”这类日期文本（优先结合年份列）
+        md = raw_date.astype(str).str.extract(r"(?P<m>\d{1,2})\D+(?P<d>\d{1,2})")
+        m = pd.to_numeric(md["m"], errors="coerce")
+        d = pd.to_numeric(md["d"], errors="coerce")
+        if year_col:
+            y = pd.to_numeric(detail_df[year_col], errors="coerce")
+        else:
+            y = pd.Series([np.nan] * len(detail_df), index=detail_df.index)
+        md_parsed = pd.to_datetime(
+            pd.DataFrame({"year": y, "month": m, "day": d}),
+            errors="coerce",
+        )
+
+        missing_date = parsed_date.isna()
+        if missing_date.any():
+            parsed_date = parsed_date.where(~missing_date, md_parsed)
+
+        detail_df["日期"] = parsed_date
+        detail_df["_日期粒度"] = np.where(detail_df["日期"].notna(), "day", "month")
+
+        # 当日期列无法解析时，回退到年/月
+        if year_col and month_col:
+            y2 = pd.to_numeric(detail_df[year_col], errors="coerce")
+            m2 = pd.to_numeric(detail_df[month_col], errors="coerce")
+            ym_fallback = pd.to_datetime(
+                pd.DataFrame({"year": y2, "month": m2, "day": 1}),
+                errors="coerce",
+            )
+            need_fallback = detail_df["日期"].isna()
+            if need_fallback.any():
+                detail_df.loc[need_fallback, "日期"] = ym_fallback[need_fallback]
+                detail_df.loc[need_fallback, "_日期粒度"] = "month"
     else:
-        year_col = pick_col(["年", "年份"])
-        month_col = pick_col(["月", "月份"])
         if year_col and month_col:
             years = detail_df[year_col].astype(str).str.replace(r"\D+", "", regex=True)
             months = detail_df[month_col].astype(str).str.replace(r"\D+", "", regex=True)
             ym = years.str.zfill(4) + "-" + months.str.zfill(2) + "-01"
             detail_df["日期"] = pd.to_datetime(ym, format="%Y-%m-%d", errors="coerce")
+            detail_df["_日期粒度"] = "month"
 
     # 适配“客户名”列名变更
     customer_candidates = [
@@ -626,16 +661,48 @@ def process_concrete_data():
             # 年/月转为整数显示
             merged_df['年'] = merged_df['年'].astype('Int64')
             merged_df['月'] = merged_df['月'].astype('Int64')
-            # 日期列去掉时间部分
+
+            # 汇总输出日期列：有具体日输出 YYYY-MM-DD，无具体日输出 YYYY-MM
             if '日期' in merged_df.columns:
-                merged_df['日期'] = merged_df['日期'].dt.date
+                merged_df['日期'] = pd.to_datetime(merged_df['日期'], errors='coerce')
+            else:
+                merged_df['日期'] = pd.NaT
+            if '_日期粒度' not in merged_df.columns:
+                merged_df['_日期粒度'] = np.where(merged_df['日期'].notna(), 'day', 'month')
+
+            month_fallback = pd.to_datetime(
+                pd.DataFrame({
+                    'year': pd.to_numeric(merged_df['年'], errors='coerce'),
+                    'month': pd.to_numeric(merged_df['月'], errors='coerce'),
+                    'day': 1,
+                }),
+                errors='coerce',
+            )
+            need_month_fill = merged_df['日期'].isna() & merged_df['年'].notna() & merged_df['月'].notna()
+            if need_month_fill.any():
+                merged_df.loc[need_month_fill, '日期'] = month_fallback[need_month_fill]
+                merged_df.loc[need_month_fill, '_日期粒度'] = 'month'
+
+            date_str = merged_df['日期'].dt.strftime('%Y-%m-%d')
+            month_only_mask = (merged_df['_日期粒度'].astype(str) == 'month') & merged_df['年'].notna() & merged_df['月'].notna()
+            if month_only_mask.any():
+                date_str.loc[month_only_mask] = merged_df.loc[month_only_mask].apply(
+                    lambda r: f"{int(r['年'])}-{int(r['月']):02d}",
+                    axis=1,
+                )
+            merged_df['日期'] = date_str.fillna('')
+            merged_df['年月'] = merged_df.apply(
+                lambda r: f"{int(r['年'])}-{int(r['月']):02d}" if pd.notna(r['年']) and pd.notna(r['月']) else '',
+                axis=1,
+            )
+
             merged_df['强度（塌落度）'] = merged_df['_s_key'].astype(str) + '(' + merged_df['_t_key'].astype(str) + ')'
             merged_df['金额（万泰铢）'] = merged_df['金额'] / 10000
 
             # 只保留指定列
             keep_cols = [
                 '项目编码', '项目名称', '砼强度', '建筑部位', '总方量', '总车次', '塌落度', '抗渗',
-                '年', '月', '强度（塌落度）', '价格', '金额', '金额（万泰铢）',
+                '年月', '日期', '强度（塌落度）', '价格', '金额', '金额（万泰铢）',
             ]
             merged_df = merged_df.reindex(columns=[c for c in keep_cols if c in merged_df.columns])
 
@@ -659,10 +726,6 @@ def process_concrete_data():
             detail_summary = detail_summary.reindex(columns=[c for c in ds_order if c in detail_summary.columns])
 
             merged_for_month = merged_df.copy()
-            merged_for_month['年月'] = merged_for_month.apply(
-                lambda r: f"{int(r['年'])}-{int(r['月']):02d}" if pd.notna(r['年']) and pd.notna(r['月']) else '',
-                axis=1
-            )
             merged_for_month = merged_for_month[merged_for_month['年月'] != '']
 
             monthly_volume_pivot = merged_for_month.pivot_table(
