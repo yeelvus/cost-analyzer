@@ -201,6 +201,17 @@ def safe_filename(name):
     return text[:80]
 
 
+def format_last_payment_date(df):
+    if df is None or df.empty or "日期" not in df.columns:
+        return "未识别日期"
+
+    parsed_date = pd.to_datetime(df["日期"], errors="coerce")
+    if parsed_date.notna().any():
+        return parsed_date.max().strftime("%Y-%m-%d")
+
+    return "未识别日期"
+
+
 def normalize_group_key(key):
     if isinstance(key, tuple):
         if len(key) == 0:
@@ -493,7 +504,7 @@ def process_time_folder(folder_name, excel_files):
     final_df = enrich_project_fields(final_df, load_project_matcher_context())
     final_df = append_subject_levels(final_df)
 
-    output_dir = os.path.join(OUTPUT_ROOT, folder_name)
+    output_dir = OUTPUT_ROOT
     os.makedirs(output_dir, exist_ok=True)
 
     output_paths = []
@@ -502,7 +513,14 @@ def process_time_folder(folder_name, excel_files):
     for project_name_key, project_df in grouped:
         project_name = normalize_group_key(project_name_key)
         project_part = safe_filename(project_name)
-        output_name = f"{project_part}_{folder_name}.xlsx"
+        project_code = ""
+        if "项目编码" in project_df.columns:
+            project_code_values = project_df["项目编码"].dropna().astype(str).str.strip()
+            if not project_code_values.empty:
+                project_code = project_code_values.iloc[0]
+        project_code_part = safe_filename(project_code) if project_code else "未识别编码"
+        last_payment_date = format_last_payment_date(project_df)
+        output_name = f"{project_code_part}_{project_part}_({last_payment_date}).xlsx"
         output_path = os.path.join(output_dir, output_name)
 
         detail_sheet_name = "明细数据"
