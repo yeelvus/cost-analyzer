@@ -18,8 +18,8 @@ if _路径_spec is None or _路径_spec.loader is None:
     raise ImportError("无法加载路径模块: _采购路径.py")
 _路径_mod = importlib.util.module_from_spec(_路径_spec)
 _路径_spec.loader.exec_module(_路径_mod)
-RAW_DATA_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_std/采购部采购台账"
-OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_std/材料采购台账_标准"
+RAW_DATA_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/A_采购台账提取"
+OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_std"
 PROJECT_INFO_FILE = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
 OUTPUT_FILENAME_SUFFIX = "_processed"
 
@@ -337,6 +337,26 @@ def is_numeric_value(value):
     return re.fullmatch(r"[+-]?\d+(?:\.\d+)?", s) is not None
 
 
+def _normalize_unit_quantity(unit_val, qty_val):
+    """纠正单位/数量填反或错位。
+    规则：
+    1) 单位为空且数量是非数值文本 -> 挪到单位列。
+    2) 单位是数值、数量是非数值文本 -> 交换两列。
+    """
+    unit_text = "" if unit_val is None else str(unit_val).strip()
+    qty_text = "" if qty_val is None else str(qty_val).strip()
+
+    # 情况1：单位为空，数量里是单位文本。
+    if unit_text == "" and qty_text and not is_numeric_value(qty_val):
+        return qty_text, ""
+
+    # 情况2：单位与数量明显填反（单位是数字，数量是单位文本）。
+    if unit_text and qty_text and is_numeric_value(unit_val) and not is_numeric_value(qty_val):
+        return qty_text, unit_val
+
+    return unit_val, qty_val
+
+
 def _to_price_key(value):
     """将单价标准化为可比较的浮点键，无法转换返回 None。"""
     num = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
@@ -623,14 +643,12 @@ def extract_rows_from_single_excel(file_path, project_code, project_name):
             else:
                 row_obj[col_name] = ""
 
-        # 纠错：若数量为非数字且单位为空，将数量内容挪到单位列。
+        # 纠错：统一处理单位/数量错位。
         qty_val = row_obj.get("数量", "")
         unit_val = row_obj.get("单位", "")
-        if str(unit_val).strip() == "":
-            qty_text = str(qty_val).strip()
-            if qty_text and not is_numeric_value(qty_val):
-                row_obj["单位"] = qty_text
-                row_obj["数量"] = ""
+        new_unit, new_qty = _normalize_unit_quantity(unit_val, qty_val)
+        row_obj["单位"] = new_unit
+        row_obj["数量"] = new_qty
 
         rows.append(row_obj)
 

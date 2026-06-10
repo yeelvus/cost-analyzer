@@ -19,7 +19,7 @@ from common.excel import apply_common_excel_layout
 
 # 仅保留当前在用的直连汇总能力：
 # 输入目录（递归汇总全部 Excel）-> 输出目录（单个汇总文件）
-DIRECT_STD_INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_std/材料采购台账_标准"
+DIRECT_STD_INPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_std"
 DIRECT_OUTPUT_ROOT = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/D_采购部采购台账_sum"
 DIRECT_OUTPUT_FILENAME_WITH_STD = "采购部采购台账_std_merged.xlsx"
 DIRECT_OUTPUT_FILENAME_WITHOUT_STD = "采购部采购台账_merged.xlsx"
