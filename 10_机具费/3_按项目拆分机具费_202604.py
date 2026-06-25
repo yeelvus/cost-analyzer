@@ -8,7 +8,7 @@ import pandas as pd
 
 
 INPUT_FILE = Path(
-    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/A_机具费_raw/2026年04月机具租赁台账-20260527.xlsx"
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/A_机具费_raw/2026年05月机具租赁台账-20260625.xlsx"
 )
 OUTPUT_DIR = Path(
     "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_std"
