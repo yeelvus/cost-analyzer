@@ -669,6 +669,15 @@ def export_per_project_excel(
             monthly_cols = ['年-月'] + money_columns + ['总人工费']
             available = [c for c in monthly_cols if c in proj_grouped.columns]
             monthly_df = proj_grouped[available].sort_values('年-月').reset_index(drop=True)
+            
+            # 添加汇总行
+            summary_row = pd.DataFrame([{col: None for col in monthly_df.columns}])
+            summary_row['年-月'] = '合计'
+            for col in money_columns + ['总人工费']:
+                if col in monthly_df.columns:
+                    summary_row[col] = monthly_df[col].sum()
+            monthly_df = pd.concat([monthly_df, summary_row], ignore_index=True)
+            
             monthly_df.to_excel(writer, sheet_name='月度汇总', index=False)
 
             # Sheet2: 原始数据
