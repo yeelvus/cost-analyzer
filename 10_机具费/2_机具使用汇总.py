@@ -185,12 +185,20 @@ def build_summary_output_basename(excel_path: Path) -> str:
 
 
 def extract_project_name_from_filename(file_path: Path) -> str | None:
-    """从按月拆分文件名中提取项目名，例如 202604_伟隆项目机具费.xlsx。"""
+    """从按月拆分文件名中提取项目名。
+
+    示例：202604_伟隆项目机具费.xlsx -> 伟隆项目
+    如果文件名不符合年月命名规范，则回退为文件名（不含扩展名）。
+    """
     match = PROJECT_SPLIT_FILE_RE.match(file_path.name)
-    if not match:
-        return None
-    project_name = match.group(2).strip()
-    return project_name or None
+    if match:
+        project_name = match.group(2).strip()
+        if project_name:
+            return project_name
+
+    # 回退到文件名 stem，确保不因命名格式不同而跳过文件
+    fallback_name = file_path.stem.strip()
+    return fallback_name if fallback_name else None
 
 
 def group_files_by_project(file_paths):

@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import re
 import sys
 from pathlib import Path
@@ -7,18 +6,15 @@ from pathlib import Path
 import pandas as pd
 
 
-INPUT_FILE = Path(
-    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_std/2026年03月前租赁机具汇总台账_标准化.xlsx"
-)
-OUTPUT_DIR = Path(
+INPUT_FILE_NAME = "clean_机具费_raw合并.xlsx"
+DEFAULT_INPUT_DIR = Path(
     "/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_std"
 )
-MATCHER_DIR = Path("/Users/wyattsun/Desktop/code/0_项目基本信息")
-PROJECT_INFO_FILE = Path(
-    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
-)
-PROJECT_MATCH_DB = MATCHER_DIR / "project_name_match_db.json"
-
+FALLBACK_INPUT_DIRS = [
+    Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/A_机具费_raw"),
+    Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_sum"),
+]
+OUTPUT_DIR = DEFAULT_INPUT_DIR
 DEFAULT_YEAR = "2025"
 
 OUTPUT_COLUMNS = [
@@ -62,6 +58,8 @@ SOURCE_COLUMNS = [
     "使用日期",
     "出租单位",
     "月份",
+    "项目名称",
+    "项目编码",
     "备注",
 ]
 
@@ -114,6 +112,8 @@ COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "出租单位": ("出租单位",),
     "月份": ("月份",),
     "备注": ("备注",),
+    "项目名称": ("项目名称",),
+    "项目编码": ("项目编码",),
 }
 
 HEADER_TOKENS = ("序号", "机具种类", "型号规格")
@@ -209,48 +209,20 @@ def format_month_label(month_key: object) -> str:
     return f"{DEFAULT_YEAR}-01"
 
 
-def load_matcher():
-    if str(MATCHER_DIR) not in sys.path:
-        sys.path.insert(0, str(MATCHER_DIR))
+def resolve_input_file() -> Path:
+    candidate = DEFAULT_INPUT_DIR / INPUT_FILE_NAME
+    if candidate.exists():
+        return candidate
 
-    from project_name_matcher import (  # pylint: disable=import-outside-toplevel
-        build_standard_projects_from_dataframe,
-        load_or_init_db,
-        match_project,
-        prompt_unmatched_project_mappings,
-        save_db,
-    )
+    for fallback_dir in FALLBACK_INPUT_DIRS:
+        fallback = fallback_dir / INPUT_FILE_NAME
+        if fallback.exists():
+            print(f"警告: 在默认输入目录未找到文件，改用备选路径: {fallback}")
+            return fallback
 
-    return (
-        build_standard_projects_from_dataframe,
-        load_or_init_db,
-        match_project,
-        prompt_unmatched_project_mappings,
-        save_db,
-    )
-
-
-def load_project_info_df(project_info_file: Path) -> pd.DataFrame:
-    excel_file = pd.ExcelFile(project_info_file)
-    preferred_sheets = ["汇总", "在建项目"]
-
-    for sheet_name in preferred_sheets:
-        if sheet_name not in excel_file.sheet_names:
-            continue
-        df = pd.read_excel(project_info_file, sheet_name=sheet_name)
-        if "项目名称" in df.columns:
-            print(f"项目基础信息来源sheet: {sheet_name}")
-            return df
-
-    for sheet_name in excel_file.sheet_names:
-        df = pd.read_excel(project_info_file, sheet_name=sheet_name)
-        if "项目名称" in df.columns:
-            print(f"项目基础信息来源sheet: {sheet_name}")
-            return df
-
-    raise ValueError(
-        "项目基础信息表中未找到包含“项目名称”列的工作表，"
-        f"可用sheet: {excel_file.sheet_names}"
+    raise FileNotFoundError(
+        f"输入文件不存在: {INPUT_FILE_NAME}\n"
+        f"已检查路径: {DEFAULT_INPUT_DIR} 和 {', '.join(str(p) for p in FALLBACK_INPUT_DIRS)}"
     )
 
 
@@ -297,66 +269,31 @@ def load_sheet_data(input_file: Path, sheet_name: str) -> tuple[pd.DataFrame, st
 
 
 def main() -> None:
-    if not INPUT_FILE.exists():
-        raise FileNotFoundError(f"输入文件不存在: {INPUT_FILE}")
-
+    input_file = resolve_input_file()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    (
-        build_standard_projects_from_dataframe,
-        load_or_init_db,
-        match_project,
-        prompt_unmatched_project_mappings,
-        save_db,
-    ) = load_matcher()
-
-    info_df = load_project_info_df(PROJECT_INFO_FILE)
-    standard_projects = build_standard_projects_from_dataframe(info_df)
-    db = load_or_init_db(str(PROJECT_MATCH_DB), standard_projects=standard_projects)
-
-    excel_file = pd.ExcelFile(INPUT_FILE)
+    excel_file = pd.ExcelFile(input_file)
     all_rows: list[pd.DataFrame] = []
-    unmatched_names: list[str] = []
 
     for sheet_name in excel_file.sheet_names:
-        selected, project_raw_name = load_sheet_data(INPUT_FILE, sheet_name)
+        selected, project_raw_name = load_sheet_data(input_file, sheet_name)
         if selected.empty:
             continue
         all_rows.append(selected)
-        if has_project_value(project_raw_name) and match_project(project_raw_name, db) is None:
-            unmatched_names.append(project_raw_name)
 
     if not all_rows:
         raise ValueError("未读取到可拆分的数据行")
 
     merged_df = pd.concat(all_rows, ignore_index=True)
 
-    unmatched_names = sorted(set(unmatched_names))
-    if unmatched_names:
-        print(f"发现未匹配项目 {len(unmatched_names)} 个，准备弹窗手动匹配...")
-        prompt_unmatched_project_mappings(
-            unmatched_names,
-            db,
-            window_title="汇总台账机具费项目名称匹配",
-            db_path=str(PROJECT_MATCH_DB),
-        )
-        save_db(str(PROJECT_MATCH_DB), db)
+    if "项目名称" not in merged_df.columns:
+        merged_df["项目名称"] = ""
+    if "项目编码" not in merged_df.columns:
+        merged_df["项目编码"] = "需手动核对"
 
-    def to_standard_project(raw_name: object) -> tuple[str, str]:
-        result = match_project(raw_name, db)
-        if result and result.get("project_name"):
-            return str(result["project_name"]), str(result.get("project_code", "需手动核对"))
-        raw_text = "" if pd.isna(raw_name) else str(raw_name).strip()
-        return (raw_text if raw_text else "未匹配项目", "需手动核对")
-
-    merged_df[["项目名称", "项目编码"]] = merged_df["原始项目名称"].apply(
-        lambda x: pd.Series(to_standard_project(x), index=["项目名称", "项目编码"])
-    )
     merged_df["月份键"] = merged_df["月份"].apply(parse_month_key)
     merged_df = merged_df[merged_df["月份键"].apply(has_project_value)].copy()
     merged_df["年月"] = merged_df["月份键"].apply(format_month_label)
-
-    save_db(str(PROJECT_MATCH_DB), db)
 
     output_count = 0
     for (month_key, project_name, project_code), group_df in merged_df.groupby(
