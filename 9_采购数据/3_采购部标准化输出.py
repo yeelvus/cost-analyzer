@@ -165,13 +165,18 @@ def find_matching_project(extracted_name, project_config, match_project, match_d
 
 def list_excel_files(root_dir):
     excel_paths = []
-    for root, _, files in os.walk(root_dir):
-        for name in sorted(files):
-            if name.startswith("~$"):
-                continue
-            ext = os.path.splitext(name)[1].lower()
-            if ext in {".xlsx", ".xls", ".xlsm"}:
-                excel_paths.append(os.path.join(root, name))
+    if not os.path.isdir(root_dir):
+        return excel_paths
+
+    for name in sorted(os.listdir(root_dir)):
+        path = os.path.join(root_dir, name)
+        if not os.path.isfile(path):
+            continue
+        if name.startswith("~$"):
+            continue
+        ext = os.path.splitext(name)[1].lower()
+        if ext in {".xlsx", ".xls", ".xlsm"}:
+            excel_paths.append(path)
     return sorted(excel_paths)
 
 

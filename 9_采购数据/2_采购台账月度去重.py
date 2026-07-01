@@ -14,16 +14,13 @@ import pandas as pd
 from openpyxl.utils import get_column_letter
 
 
-# 文件夹按关键词动态查找，忽略 A_ / B_ / C_ 等前缀字母
-_路径_spec = importlib.util.spec_from_file_location("_采购路径", str(Path(__file__).parent / "_采购路径.py"))
-if _路径_spec is None or _路径_spec.loader is None:
-    RAW_ROOT = Path(__file__).parent
-    STD_ROOT = Path(__file__).parent
-else:
-    _路径_mod = importlib.util.module_from_spec(_路径_spec)
-    _路径_spec.loader.exec_module(_路径_mod)
-    RAW_ROOT = Path(_路径_mod.RAW_DIR)
-    STD_ROOT = Path(_路径_mod.STD_DIR)
+# 输入：仍然扫描源目录下所有子文件夹中的 Excel 文件
+_DEFAULT_INPUT_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/A_采购部采购台账_raw")
+_OUTPUT_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/A_采购台账提取")
+_OUTPUT_SUBDIR_NAME = "去重分析输出"
+
+RAW_ROOT = _DEFAULT_INPUT_ROOT
+STD_ROOT = _OUTPUT_ROOT
 
 
 AMOUNT_COL_CANDIDATES = ["含税金额", "总金额", "价税合计", "含税总金额"]
@@ -46,8 +43,8 @@ def extract_project_name(file_name: str) -> str:
     return stem
 
 
-def extract_month_label(folder_name: str) -> str | None:
-    m = MONTH_PATTERN.search(folder_name)
+def extract_month_label(text: str) -> str | None:
+    m = MONTH_PATTERN.search(text)
     if not m:
         return None
     y, mm = int(m.group(1)), int(m.group(2))
@@ -227,34 +224,47 @@ class FileRecord:
     内容哈希: str
 
 
+def iter_monthly_excel_files(raw_root: Path) -> list[tuple[Path, str]]:
+    candidates: list[tuple[Path, str]] = []
+    seen: set[Path] = set()
+
+    for path in sorted(raw_root.rglob("*")):
+        if not path.is_file():
+            continue
+        if path.name.startswith("~$"):
+            continue
+        if path.suffix.lower() not in {".xlsx", ".xls", ".xlsm"}:
+            continue
+
+        month_label = extract_month_label(str(path))
+        if not month_label or path in seen:
+            continue
+
+        seen.add(path)
+        candidates.append((path, month_label))
+
+    return sorted(candidates, key=lambda item: month_key(item[1]))
+
+
 def scan_raw_files(raw_root: Path) -> list[FileRecord]:
     records: list[FileRecord] = []
 
-    month_dirs = [p for p in raw_root.iterdir() if p.is_dir()]
-    month_dirs = [p for p in month_dirs if extract_month_label(p.name)]
-    month_dirs.sort(key=lambda p: month_key(extract_month_label(p.name) or "1900-01"))
-
-    for month_dir in month_dirs:
-        month_label = extract_month_label(month_dir.name)
-        if not month_label:
-            continue
-
-        for excel_path in list_excel_files(month_dir):
-            project_name = extract_project_name(excel_path.name)
-            file_hash = sha256_file(excel_path)
-            amount_sum, row_count, value_hash = get_excel_metrics(excel_path)
-            records.append(
-                FileRecord(
-                    月份=month_label,
-                    项目名称=project_name,
-                    文件名=excel_path.name,
-                    文件路径=str(excel_path),
-                    含税金额合计=amount_sum,
-                    行数=row_count,
-                    文件哈希=file_hash,
-                    内容哈希=value_hash,
-                )
+    for excel_path, month_label in iter_monthly_excel_files(raw_root):
+        project_name = extract_project_name(excel_path.name)
+        file_hash = sha256_file(excel_path)
+        amount_sum, row_count, value_hash = get_excel_metrics(excel_path)
+        records.append(
+            FileRecord(
+                月份=month_label,
+                项目名称=project_name,
+                文件名=excel_path.name,
+                文件路径=str(excel_path),
+                含税金额合计=amount_sum,
+                行数=row_count,
+                文件哈希=file_hash,
+                内容哈希=value_hash,
             )
+        )
 
     return records
 
@@ -328,10 +338,16 @@ def clear_directory(dir_path: Path) -> None:
 
 
 def export_one_file_per_project(decision_df: pd.DataFrame, std_root: Path) -> tuple[Path, int, int]:
-    """每个项目仅保留1个文件（最新非明确重复），并保持原文件名复制到STD目录。"""
-    out_dir = std_root / "采购部采购台账"
+    """每个项目仅保留1个文件（最新非明确重复），并保持原文件名复制到输出根目录。"""
+    out_dir = std_root
     out_dir.mkdir(parents=True, exist_ok=True)
-    clear_directory(out_dir)
+    for item in out_dir.iterdir():
+        if item.name == "去重分析输出" and item.is_dir():
+            continue
+        if item.is_dir():
+            shutil.rmtree(item)
+        else:
+            item.unlink()
 
     required_cols = {"月份", "项目名称", "文件路径", "处理建议"}
     if not required_cols.issubset(set(decision_df.columns)):
@@ -392,25 +408,32 @@ def export_one_file_per_project(decision_df: pd.DataFrame, std_root: Path) -> tu
             }
         )
 
+    analysis_dir = std_root / "去重分析输出"
+    analysis_dir.mkdir(parents=True, exist_ok=True)
     copied_df = pd.DataFrame(copied).sort_values(["项目名称"]).reset_index(drop=True)
-    copied_df.to_excel(std_root / "A_拷贝清单.xlsx", index=False)
+    copied_df.to_excel(analysis_dir / "A_拷贝清单.xlsx", index=False)
 
     if conflicts:
-        pd.DataFrame(conflicts).to_excel(out_dir / "每项目仅1个_同名冲突清单.xlsx", index=False)
+        pd.DataFrame(conflicts).to_excel(analysis_dir / "每项目仅1个_同名冲突清单.xlsx", index=False)
 
     return out_dir, int(len(copied)), int(len(conflicts))
 
 
 def run(raw_root: Path, output_file: Path) -> None:
     records = scan_raw_files(raw_root)
+
     if not records:
-        raise RuntimeError(f"未扫描到Excel文件: {raw_root}")
+        decision_df = pd.DataFrame(
+            columns=["月份", "项目名称", "文件名", "文件路径", "含税金额合计", "行数", "文件哈希", "内容哈希", "对比结论", "处理建议", "是否在最新口径体现"]
+        )
+        summary_df = pd.DataFrame(columns=["月份", "处理建议", "文件数", "项目数"])
+        print(f"未扫描到 {raw_root} 下的 Excel 文件，已生成空分析结果")
+    else:
+        df = pd.DataFrame([r.__dict__ for r in records])
+        df = df.sort_values(["项目名称", "月份"]).reset_index(drop=True)
 
-    df = pd.DataFrame([r.__dict__ for r in records])
-    df = df.sort_values(["项目名称", "月份"]).reset_index(drop=True)
-
-    decision_df = compare_with_previous(df)
-    summary_df = build_month_summary(decision_df)
+        decision_df = compare_with_previous(df)
+        summary_df = build_month_summary(decision_df)
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
@@ -426,15 +449,17 @@ def run(raw_root: Path, output_file: Path) -> None:
     print(f"每项目1个文件拷贝成功: {copied_count}")
     print(f"每项目1个文件同名冲突: {conflict_count}")
     print("说明:")
-    print("1) A_采购部采购台账_raw 为源数据，先按项目逐月比较，优先使用文件哈希/内容哈希判断是否完全一致")
-    print("2) 再用 含税金额合计 + 行数 作为疑似未更新判据")
+    print("1) 只读取目标目录下的顶层 Excel 文件，不再依赖子文件夹")
+    print("2) 分析结果和拷贝清单输出到目标目录下的子文件夹：去重分析输出")
     print("3) 处理建议为 复用上月，当前月不体现 的记录，可在最新月份报表中直接剔除")
-    print("4) 已按每项目仅1个文件导出到 B_采购部采购台账_std，且保留原文件名")
+    print("4) 目标目录根下将只保留去重后的 Excel 文件，分析文件在子文件夹中")
 
 
 def main() -> None:
     raw_root = RAW_ROOT
-    output_file = raw_root.parent / "C_采购部台账去重分析" / "采购台账_月度去重分析.xlsx"
+    output_dir = STD_ROOT
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / "去重分析输出" / "采购台账_月度去重分析.xlsx"
     run(raw_root=raw_root, output_file=output_file)
 
 
