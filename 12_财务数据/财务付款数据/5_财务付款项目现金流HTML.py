@@ -1,4 +1,4 @@
-from __future__ import annotations
+fr/m __future__ import annotations
 
 import json
 from html import escape
