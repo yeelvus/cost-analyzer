@@ -29,7 +29,11 @@ apply_common_excel_layout = _excel_formatting_utils.apply_common_excel_layout
 
 _PROJECT_ROOT = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计')
 _DATA_ROOT = _PROJECT_ROOT / "9_采购台账📦"
-SUMMARY_INPUT_ROOT = _DATA_ROOT / "B_采购部采购台账_sum"
+DEFAULT_SUMMARY_FILE = _DATA_ROOT / "D_采购部采购台账_sum" / "采购部采购台账_std_merged.xlsx"
+SUMMARY_INPUT_ROOTS = [
+    _DATA_ROOT / "D_采购部采购台账_sum",
+    _DATA_ROOT / "B_采购部采购台账_sum",
+]
 ANALYSIS_OUTPUT_ROOT = _PROJECT_ROOT / "Z_report" / "C_采购数据分析"
 INPUT_GLOB = "*_采购台账_std_merged.xlsx"
 DEFAULT_SHEET_NAME = "合并数据"
@@ -95,19 +99,25 @@ def extract_year_month_from_name(path: Path) -> tuple[int, int] | None:
 
 
 def find_latest_summary_file() -> Path | None:
-    if not SUMMARY_INPUT_ROOT.is_dir():
-        return None
-    candidates = [p for p in SUMMARY_INPUT_ROOT.glob(INPUT_GLOB) if p.is_file()]
-    if not candidates:
-        return None
+    if DEFAULT_SUMMARY_FILE.is_file():
+        return DEFAULT_SUMMARY_FILE
 
-    def sort_key(p: Path):
-        ym = extract_year_month_from_name(p)
-        if ym is not None:
-            return (1, ym[0], ym[1], p.stat().st_mtime)
-        return (0, 0, 0, p.stat().st_mtime)
+    for summary_root in SUMMARY_INPUT_ROOTS:
+        if not summary_root.is_dir():
+            continue
+        candidates = [p for p in summary_root.glob(INPUT_GLOB) if p.is_file()]
+        if not candidates:
+            continue
 
-    return max(candidates, key=sort_key)
+        def sort_key(p: Path):
+            ym = extract_year_month_from_name(p)
+            if ym is not None:
+                return (1, ym[0], ym[1], p.stat().st_mtime)
+            return (0, 0, 0, p.stat().st_mtime)
+
+        return max(candidates, key=sort_key)
+
+    return None
 
 
 def safe_float(value) -> float | None:
@@ -200,9 +210,11 @@ def weighted_average(frame: pd.DataFrame, value_col: str, weight_col: str) -> fl
 def load_source_data(input_file: Path, sheet_name: str) -> pd.DataFrame:
     df = pd.read_excel(input_file, sheet_name=sheet_name)
 
-    # 兼容新版汇总字段：项目名称 -> 标准项目名称
+    # 兼容不同版本采购台账字段名
     if "标准项目名称" not in df.columns and "项目名称" in df.columns:
         df["标准项目名称"] = df["项目名称"]
+    if "标准单位" not in df.columns and "单位" in df.columns:
+        df["标准单位"] = df["单位"]
 
     required_columns = ["标准项目名称", "物品名称", "规格", "标准单位", "数量", "单价", "不含税金额", "供货商名称"]
     missing_columns = [column for column in required_columns if column not in df.columns]
@@ -984,7 +996,7 @@ def main():
     else:
         latest = find_latest_summary_file()
         if latest is None:
-            raise FileNotFoundError(f"未在 {SUMMARY_INPUT_ROOT} 找到 {INPUT_GLOB}")
+            raise FileNotFoundError(f"未在 {SUMMARY_INPUT_ROOTS} 找到 {INPUT_GLOB}")
         input_file = latest.resolve()
 
     output_file, excel_out = build_output_path(input_file, args.output_file)
