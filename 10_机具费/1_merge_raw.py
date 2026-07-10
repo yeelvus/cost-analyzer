@@ -272,7 +272,7 @@ if '月份' in merged.columns:
     print(f"  已按月份排序")
 
 # ========== 输出到 B_机具费_sum ==========
-out_path = os.path.join(OUT_DIR, "clean_机具费_raw合并.xlsx")
+out_path = os.path.join(OUT_DIR, "机具费_raw合并.xlsx")
 with pd.ExcelWriter(out_path, engine='openpyxl') as writer:
     merged.to_excel(writer, sheet_name='机具费合并', index=False)
     ws = writer.sheets['机具费合并']
