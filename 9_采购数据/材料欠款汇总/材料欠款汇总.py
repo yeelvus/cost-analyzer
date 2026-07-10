@@ -23,7 +23,7 @@ from project_name_matcher import (
 from excel_formatting_utils import apply_common_excel_layout
 
 # ====================== 配置区 ======================
-excel_path = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_材料欠款/A_材料欠款_raw/泰国子公司各项目采购欠款汇总4.13.xlsx"
+excel_path = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_材料欠款/A_材料欠款_raw/泰国子公司各项目采购欠款汇总7.9.xlsx"
 db_path = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
 
 # 输出目录
