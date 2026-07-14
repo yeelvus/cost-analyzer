@@ -68,23 +68,57 @@ def _build_alias_map(db):
     return alias_map
 
 
+def _pick_status_column(columns) -> str | None:
+    """项目信息表状态列优先顺序：项目状态 > 备注 > 状态 > target_status。"""
+    cols = [str(c).strip() for c in columns]
+    for name in ("项目状态", "备注", "状态", "target_status"):
+        if name in cols:
+            return name
+    return None
+
+
+def _clean_field(value, default: str = "") -> str:
+    if value is None:
+        return default
+    s = str(value).strip()
+    if not s or s.lower() in {"nan", "none", "nat"}:
+        return default
+    return s
+
+
 def build_standard_projects_from_dataframe(info_df):
+    """
+    从项目基本信息表构建标准项目列表。
+    状态字段读取「项目状态」（兼容旧表「备注」），不再误用空备注覆盖为「需手动核对」。
+    """
+    status_col = _pick_status_column(info_df.columns)
     rows = []
     for _, row in info_df.iterrows():
-        name = str(row.get("项目名称", "")).strip()
-        if not name or name.lower() == "nan":
+        name = _clean_field(row.get("项目名称", ""))
+        if not name:
             continue
-        code = str(row.get("项目编码", "需手动核对")).strip()
-        status = str(row.get("备注", "需手动核对")).strip()
+        code = _clean_field(row.get("项目编码", ""), default="需手动核对")
+        if status_col:
+            status = _clean_field(row.get(status_col, ""), default="需手动核对")
+        else:
+            status = "需手动核对"
         rows.append({
             "project_name": name,
-            "project_code": code if code and code.lower() != "nan" else "需手动核对",
-            "target_status": status if status and status.lower() != "nan" else "需手动核对",
+            "project_code": code,
+            "target_status": status,
         })
     return rows
 
 
 def load_or_init_db(db_path, standard_projects=None):
+    """
+    加载匹配库，并可选合并标准项目列表。
+
+    合并规则（避免每次运行把状态刷成「需手动核对」）：
+    - 新项目：写入编码/状态（缺省才用「需手动核对」）
+    - 已有项目：仅当本次传入了「有意义」的编码/状态时才覆盖
+      （调用方若只传 project_name+project_code、不传 target_status，则保留库内原状态）
+    """
     db = {
         "version": 1,
         "projects": {},
@@ -109,18 +143,39 @@ def load_or_init_db(db_path, standard_projects=None):
         if str(name).strip()
     ]
 
-    # Merge standard projects into DB as base data.
     for item in (standard_projects or []):
-        std_name = item["project_name"]
-        db["projects"].setdefault(std_name, {
-            "project_code": item.get("project_code", "需手动核对"),
-            "target_status": item.get("target_status", "需手动核对"),
-            "aliases": [],
-        })
+        std_name = _clean_field(item.get("project_name", ""))
+        if not std_name:
+            continue
 
-        # Keep latest standard code/status from source table.
-        db["projects"][std_name]["project_code"] = item.get("project_code", "需手动核对")
-        db["projects"][std_name]["target_status"] = item.get("target_status", "需手动核对")
+        # 调用方是否显式提供了字段（用于区分「未传」与「传了空」）
+        has_code_key = "project_code" in item
+        has_status_key = "target_status" in item
+        code = _clean_field(item.get("project_code", "")) if has_code_key else ""
+        status = _clean_field(item.get("target_status", "")) if has_status_key else ""
+
+        if std_name not in db["projects"]:
+            db["projects"][std_name] = {
+                "project_code": code or "需手动核对",
+                "target_status": status or "需手动核对",
+                "aliases": [],
+            }
+        else:
+            meta = db["projects"][std_name]
+            # 有明确编码且不是占位时才覆盖
+            if has_code_key and code and code != "需手动核对":
+                meta["project_code"] = code
+            elif not _clean_field(meta.get("project_code", "")):
+                meta["project_code"] = code or "需手动核对"
+
+            # 有明确状态时才覆盖；未传 target_status 则保留原值
+            if has_status_key and status:
+                meta["target_status"] = status
+            elif not _clean_field(meta.get("target_status", "")):
+                meta["target_status"] = "需手动核对"
+
+            meta.setdefault("aliases", [])
+
         if std_name in db["unmatched_aliases"]:
             db["unmatched_aliases"].remove(std_name)
 

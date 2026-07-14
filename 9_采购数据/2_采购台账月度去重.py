@@ -1,466 +1,290 @@
+#!/usr/bin/env python3
+"""
+步骤2：扫描 raw 各月台账，按项目对比上月，剔除未更新文件；
+每个项目只保留 1 份最新有效文件 → EXTRACT_DIR。
+
+判定优先级：
+  文件哈希相同 / 内容哈希相同 → 复用上月（不体现）
+  金额+行数一致 → 建议复核后复用
+  仅金额一致 → 建议人工复核
+  金额变化 → 保留
+"""
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import re
 import shutil
-from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
-from typing import Iterable
 
 import openpyxl
 import pandas as pd
 from openpyxl.utils import get_column_letter
 
+from _采购路径 import (
+    EXTRACT_DIR,
+    RAW_DIR,
+    extract_month_iso,
+    extract_project_name,
+    is_excel,
+    month_sort_key,
+)
 
-# 输入：仍然扫描源目录下所有子文件夹中的 Excel 文件
-_DEFAULT_INPUT_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/A_采购部采购台账_raw")
-_OUTPUT_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/A_采购台账提取")
-_OUTPUT_SUBDIR_NAME = "去重分析输出"
-
-RAW_ROOT = _DEFAULT_INPUT_ROOT
-STD_ROOT = _OUTPUT_ROOT
+AMOUNT_CANDIDATES = ("含税金额", "总金额", "价税合计", "含税总金额", "金额")
+SKIP_DECISION = "复用上月，当前月不体现"
+ANALYSIS_DIR_NAME = "去重分析输出"
 
 
-AMOUNT_COL_CANDIDATES = ["含税金额", "总金额", "价税合计", "含税总金额"]
-MONTH_PATTERN = re.compile(r"((?:19|20)\d{2})年(0?[1-9]|1[0-2])月")
-
-
-def normalize_text(value: object) -> str:
-    if value is None:
+def _norm(v: object) -> str:
+    if v is None:
         return ""
-    return str(value).replace("\n", " ").replace("\r", " ").strip()
+    return str(v).replace("\n", " ").replace("\r", " ").strip()
 
 
-def extract_project_name(file_name: str) -> str:
-    stem = Path(file_name).stem.strip()
-    if "_" in stem:
-        return stem.split("_", 1)[0].strip()
-    m = re.match(r"^(.+?项目)", stem)
-    if m:
-        return m.group(1).strip()
-    return stem
-
-
-def extract_month_label(text: str) -> str | None:
-    m = MONTH_PATTERN.search(text)
-    if not m:
-        return None
-    y, mm = int(m.group(1)), int(m.group(2))
-    return f"{y:04d}-{mm:02d}"
-
-
-def month_key(month_label: str) -> tuple[int, int]:
-    y, m = month_label.split("-")
-    return int(y), int(m)
-
-
-def list_excel_files(folder: Path) -> list[Path]:
-    out: list[Path] = []
-    for p in folder.iterdir():
-        if not p.is_file():
-            continue
-        if p.name.startswith("~$"):
-            continue
-        if p.suffix.lower() not in {".xlsx", ".xls", ".xlsm"}:
-            continue
-        out.append(p)
-    return sorted(out)
-
-
-def sha256_file(path: Path) -> str:
+def _sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
-        while True:
-            chunk = f.read(1024 * 1024)
-            if not chunk:
-                break
+        for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
 
 
-def _normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    df2 = df.copy()
-    df2.columns = [normalize_text(c) for c in df2.columns]
-    for col in df2.columns:
-        if pd.api.types.is_numeric_dtype(df2[col]):
-            df2[col] = pd.to_numeric(df2[col], errors="coerce").round(6)
-        else:
-            df2[col] = df2[col].map(normalize_text)
-    return df2
-
-
-def _best_amount_column(columns: Iterable[str]) -> str | None:
-    cols = [normalize_text(c) for c in columns]
-    for std in AMOUNT_COL_CANDIDATES:
-        if std in cols:
-            return std
-    fuzzy: list[str] = []
+def _best_amount_col(columns: list[str]) -> str | None:
+    cols = [_norm(c) for c in columns]
+    for name in AMOUNT_CANDIDATES:
+        if name in cols:
+            return name
     for c in cols:
-        if ("含税" in c and "金额" in c) or c in {"金额", "总金额"}:
-            fuzzy.append(c)
-    return fuzzy[0] if fuzzy else None
+        if "金额" in c:
+            return c
+    return None
 
 
-def _is_sum_formula_for_amount_column(formula_text: object, amount_col_index: int) -> bool:
-    if not isinstance(formula_text, str):
-        return False
-
-    f = formula_text.upper().replace(" ", "")
-    if "SUM(" not in f:
-        return False
-
-    col_letter = get_column_letter(amount_col_index)
-    if f"{col_letter}:{col_letter}" in f:
-        return True
-
-    range_pattern = rf"\$?{col_letter}\$?\d+:\$?{col_letter}\$?\d+"
-    return re.search(range_pattern, f) is not None
-
-
-def _detect_summary_row_indexes(
-    formula_ws: openpyxl.worksheet.worksheet.Worksheet | None,
-    normalized_columns: Iterable[str],
-    amount_col: str | None,
-) -> set[int]:
-    if formula_ws is None or not amount_col:
+def _summary_row_indexes(ws, columns: list[str], amount_col: str | None) -> set[int]:
+    """识别金额列上的 SUM 汇总行（DataFrame 0-based 索引）。"""
+    if ws is None or not amount_col:
+        return set()
+    try:
+        col_idx = [_norm(c) for c in columns].index(amount_col) + 1
+    except ValueError:
         return set()
 
-    cols = [normalize_text(c) for c in normalized_columns]
-    amount_col_index = None
-    for idx, col_name in enumerate(cols, start=1):
-        if col_name == amount_col:
-            amount_col_index = idx
-            break
-
-    if amount_col_index is None:
-        return set()
-
-    summary_indexes: set[int] = set()
-    for row_idx in range(2, formula_ws.max_row + 1):
-        cell = formula_ws.cell(row_idx, amount_col_index)
+    letter = get_column_letter(col_idx)
+    found: set[int] = set()
+    for r in range(2, ws.max_row + 1):
+        cell = ws.cell(r, col_idx)
         if cell.data_type != "f":
             continue
-        if _is_sum_formula_for_amount_column(cell.value, amount_col_index):
-            # DataFrame 默认首行表头，Excel 第2行对应 DataFrame 第0行
-            summary_indexes.add(row_idx - 2)
-
-    return summary_indexes
-
-
-def _sheet_metrics(
-    df: pd.DataFrame,
-    formula_ws: openpyxl.worksheet.worksheet.Worksheet | None = None,
-) -> tuple[float, int, str]:
-    if df.empty:
-        return 0.0, 0, ""
-
-    ndf = _normalize_dataframe(df)
-    amount_col = _best_amount_column(ndf.columns)
-
-    summary_row_indexes = _detect_summary_row_indexes(formula_ws, ndf.columns, amount_col)
-    if summary_row_indexes:
-        valid_indexes = [idx for idx in summary_row_indexes if 0 <= idx < len(ndf)]
-        if valid_indexes:
-            ndf = ndf.drop(index=valid_indexes).reset_index(drop=True)
-
-    if ndf.empty:
-        return 0.0, 0, ""
-
-    amount_sum = 0.0
-    row_count = int(len(ndf))
-    if amount_col:
-        amount_series = pd.to_numeric(ndf[amount_col], errors="coerce")
-        amount_sum = float(amount_series.fillna(0).sum())
-
-    # 用值级别签名辅助识别“内容一致但文件元数据不同”的情况
-    sig_df = ndf.copy()
-    if amount_col and amount_col in sig_df.columns:
-        sig_df[amount_col] = pd.to_numeric(sig_df[amount_col], errors="coerce").round(2)
-    sig_df = sig_df.fillna("")
-
-    payload = "|".join(sig_df.columns) + "\n"
-    for row in sig_df.itertuples(index=False, name=None):
-        payload += "\t".join(normalize_text(v) for v in row) + "\n"
-
-    value_hash = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return amount_sum, row_count, value_hash
+        f = str(cell.value).upper().replace(" ", "")
+        if "SUM(" not in f:
+            continue
+        if f"{letter}:{letter}" in f or re.search(
+            rf"\$?{letter}\$?\d+:\$?{letter}\$?\d+", f
+        ):
+            found.add(r - 2)
+    return found
 
 
-def get_excel_metrics(path: Path) -> tuple[float, int, str]:
-    xls = pd.ExcelFile(path)
+def excel_metrics(path: Path) -> tuple[float, int, str]:
+    """返回 (含税金额合计, 数据行数, 内容哈希)。"""
     formula_wb = openpyxl.load_workbook(path, data_only=False)
     total_sum = 0.0
     total_rows = 0
     hash_acc = hashlib.sha256()
 
     try:
+        xls = pd.ExcelFile(path)
         for sheet in xls.sheet_names:
             try:
                 df = pd.read_excel(path, sheet_name=sheet)
             except Exception:
                 continue
-            formula_ws = formula_wb[sheet] if sheet in formula_wb.sheetnames else None
-            s_sum, s_rows, s_hash = _sheet_metrics(df, formula_ws=formula_ws)
-            total_sum += s_sum
-            total_rows += s_rows
-            hash_acc.update(f"{sheet}:{s_hash}".encode("utf-8"))
+            if df.empty:
+                continue
+
+            df.columns = [_norm(c) for c in df.columns]
+            amount_col = _best_amount_col(list(df.columns))
+            fws = formula_wb[sheet] if sheet in formula_wb.sheetnames else None
+            drop_idx = _summary_row_indexes(fws, list(df.columns), amount_col)
+            if drop_idx:
+                df = df.drop(index=[i for i in drop_idx if 0 <= i < len(df)]).reset_index(drop=True)
+
+            for col in df.columns:
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    df[col] = pd.to_numeric(df[col], errors="coerce").round(6)
+                else:
+                    df[col] = df[col].map(_norm)
+
+            if amount_col and amount_col in df.columns:
+                total_sum += float(pd.to_numeric(df[amount_col], errors="coerce").fillna(0).sum())
+            total_rows += len(df)
+
+            sig = df.copy()
+            if amount_col and amount_col in sig.columns:
+                sig[amount_col] = pd.to_numeric(sig[amount_col], errors="coerce").round(2)
+            sig = sig.fillna("")
+            payload = "|".join(sig.columns) + "\n"
+            for row in sig.itertuples(index=False, name=None):
+                payload += "\t".join(_norm(v) for v in row) + "\n"
+            hash_acc.update(f"{sheet}:{hashlib.sha256(payload.encode()).hexdigest()}".encode())
     finally:
         formula_wb.close()
 
     return round(total_sum, 2), total_rows, hash_acc.hexdigest()
 
 
-@dataclass
-class FileRecord:
-    月份: str
-    项目名称: str
-    文件名: str
-    文件路径: str
-    含税金额合计: float
-    行数: int
-    文件哈希: str
-    内容哈希: str
-
-
-def iter_monthly_excel_files(raw_root: Path) -> list[tuple[Path, str]]:
-    candidates: list[tuple[Path, str]] = []
-    seen: set[Path] = set()
-
+def scan_raw(raw_root: Path) -> pd.DataFrame:
+    rows = []
     for path in sorted(raw_root.rglob("*")):
-        if not path.is_file():
+        if not is_excel(path):
             continue
-        if path.name.startswith("~$"):
+        month = extract_month_iso(str(path))
+        if not month:
             continue
-        if path.suffix.lower() not in {".xlsx", ".xls", ".xlsm"}:
-            continue
+        amount, n_rows, content_hash = excel_metrics(path)
+        rows.append(
+            {
+                "月份": month,
+                "项目名称": extract_project_name(path.name),
+                "文件名": path.name,
+                "文件路径": str(path),
+                "含税金额合计": amount,
+                "行数": n_rows,
+                "文件哈希": _sha256_file(path),
+                "内容哈希": content_hash,
+            }
+        )
+    return pd.DataFrame(rows)
 
-        month_label = extract_month_label(str(path))
-        if not month_label or path in seen:
-            continue
 
-        seen.add(path)
-        candidates.append((path, month_label))
-
-    return sorted(candidates, key=lambda item: month_key(item[1]))
-
-
-def scan_raw_files(raw_root: Path) -> list[FileRecord]:
-    records: list[FileRecord] = []
-
-    for excel_path, month_label in iter_monthly_excel_files(raw_root):
-        project_name = extract_project_name(excel_path.name)
-        file_hash = sha256_file(excel_path)
-        amount_sum, row_count, value_hash = get_excel_metrics(excel_path)
-        records.append(
-            FileRecord(
-                月份=month_label,
-                项目名称=project_name,
-                文件名=excel_path.name,
-                文件路径=str(excel_path),
-                含税金额合计=amount_sum,
-                行数=row_count,
-                文件哈希=file_hash,
-                内容哈希=value_hash,
-            )
+def decide(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame(
+            columns=list(df.columns) + ["对比结论", "处理建议", "是否在最新口径体现"]
         )
 
-    return records
-
-
-def compare_with_previous(df: pd.DataFrame) -> pd.DataFrame:
-    out_rows: list[dict] = []
-
-    for project_name, g in df.groupby("项目名称", sort=False):
-        g2 = g.sort_values("月份", key=lambda s: s.map(month_key)).reset_index(drop=True)
-        prev_row = None
-        for _, row in g2.iterrows():
-            reason = "首月保留"
-            decision = "保留"
-
-            if prev_row is not None:
-                amount_diff = abs(float(row["含税金额合计"]) - float(prev_row["含税金额合计"]))
-                row_diff = int(row["行数"]) - int(prev_row["行数"])
-
-                if row["文件哈希"] == prev_row["文件哈希"]:
-                    reason = "与上月文件字节完全一致"
-                    decision = "复用上月，当前月不体现"
-                elif row["内容哈希"] == prev_row["内容哈希"]:
-                    reason = "与上月内容值一致（忽略文件元数据）"
-                    decision = "复用上月，当前月不体现"
-                elif amount_diff <= 0.01 and row_diff == 0:
-                    reason = "含税金额合计一致且行数一致（疑似未更新）"
-                    decision = "建议复核后复用上月"
-                elif amount_diff <= 0.01:
-                    reason = "含税金额合计一致但行数变化"
-                    decision = "建议人工复核"
+    out = []
+    for _, g in df.groupby("项目名称", sort=False):
+        g = g.sort_values("月份", key=lambda s: s.map(month_sort_key))
+        prev = None
+        for _, row in g.iterrows():
+            reason, decision = "首月保留", "保留"
+            if prev is not None:
+                amt_diff = abs(float(row["含税金额合计"]) - float(prev["含税金额合计"]))
+                row_diff = int(row["行数"]) - int(prev["行数"])
+                if row["文件哈希"] == prev["文件哈希"]:
+                    reason, decision = "与上月文件字节完全一致", SKIP_DECISION
+                elif row["内容哈希"] == prev["内容哈希"]:
+                    reason, decision = "与上月内容值一致（忽略文件元数据）", SKIP_DECISION
+                elif amt_diff <= 0.01 and row_diff == 0:
+                    reason, decision = "含税金额合计一致且行数一致（疑似未更新）", "建议复核后复用上月"
+                elif amt_diff <= 0.01:
+                    reason, decision = "含税金额合计一致但行数变化", "建议人工复核"
                 else:
-                    reason = f"金额变化 {amount_diff:,.2f}"
-                    decision = "保留"
-
-            out_rows.append(
+                    reason, decision = f"金额变化 {amt_diff:,.2f}", "保留"
+            out.append(
                 {
                     **row.to_dict(),
                     "对比结论": reason,
                     "处理建议": decision,
-                    "是否在最新口径体现": "是" if decision == "保留" else "否",
+                    "是否在最新口径体现": "否" if decision == SKIP_DECISION else "是",
                 }
             )
-            prev_row = row
-
-    return pd.DataFrame(out_rows)
-
-
-def build_month_summary(decision_df: pd.DataFrame) -> pd.DataFrame:
-    grp = (
-        decision_df.groupby(["月份", "处理建议"], as_index=False)
-        .agg(文件数=("文件名", "count"), 项目数=("项目名称", "nunique"))
-        .sort_values(["月份", "处理建议"])
-    )
-    return grp
+            prev = row
+    return pd.DataFrame(out)
 
 
-def _month_key(month_text: str) -> tuple[int, int]:
-    y, m = str(month_text).split("-")
-    return int(y), int(m)
-
-
-def clear_directory(dir_path: Path) -> None:
-    """清空目录下所有内容（保留目录本身）。"""
-    if not dir_path.exists():
-        return
-    for item in dir_path.iterdir():
-        if item.is_dir():
-            shutil.rmtree(item)
-        else:
-            item.unlink()
-
-
-def export_one_file_per_project(decision_df: pd.DataFrame, std_root: Path) -> tuple[Path, int, int]:
-    """每个项目仅保留1个文件（最新非明确重复），并保持原文件名复制到输出根目录。"""
-    out_dir = std_root
+def export_latest_per_project(decision_df: pd.DataFrame, out_dir: Path) -> tuple[int, int]:
+    """每项目保留最新非明确重复文件；分析文件放 去重分析输出/。"""
     out_dir.mkdir(parents=True, exist_ok=True)
+    analysis = out_dir / ANALYSIS_DIR_NAME
+    analysis.mkdir(exist_ok=True)
+
+    # 清空输出根目录（保留分析子目录）
     for item in out_dir.iterdir():
-        if item.name == "去重分析输出" and item.is_dir():
+        if item.name == ANALYSIS_DIR_NAME:
             continue
         if item.is_dir():
             shutil.rmtree(item)
         else:
             item.unlink()
 
-    required_cols = {"月份", "项目名称", "文件路径", "处理建议"}
-    if not required_cols.issubset(set(decision_df.columns)):
-        raise RuntimeError("判定结果缺少必要列，无法导出每项目单文件")
+    if decision_df.empty:
+        return 0, 0
 
-    candidate = decision_df[decision_df["处理建议"] != "复用上月，当前月不体现"].copy()
-    if candidate.empty:
-        return out_dir, 0, 0
+    cand = decision_df[decision_df["处理建议"] != SKIP_DECISION].copy()
+    if cand.empty:
+        return 0, 0
 
-    priority = {
-        "保留": 3,
-        "建议复核后复用上月": 2,
-        "建议人工复核": 1,
-    }
-    candidate["_month_key"] = candidate["月份"].map(_month_key)
-    candidate["_priority"] = candidate["处理建议"].map(priority).fillna(0)
+    priority = {"保留": 3, "建议复核后复用上月": 2, "建议人工复核": 1}
+    cand["_mk"] = cand["月份"].map(month_sort_key)
+    cand["_pri"] = cand["处理建议"].map(priority).fillna(0)
+    selected = (
+        cand.sort_values(["_mk", "_pri"], ascending=[False, False])
+        .groupby("项目名称", sort=False, as_index=False)
+        .first()
+    )
 
-    selected_rows = []
-    for _, g in candidate.groupby("项目名称", sort=False):
-        g2 = g.sort_values(["_month_key", "_priority"], ascending=[False, False]).reset_index(drop=True)
-        selected_rows.append(g2.iloc[0])
-    selected = pd.DataFrame(selected_rows).reset_index(drop=True)
-
-    copied = []
-    conflicts = []
-    used_names: set[str] = set()
-
+    copied, conflicts = [], []
+    used: set[str] = set()
     for _, row in selected.iterrows():
         src = Path(str(row["文件路径"]))
         if not src.is_file():
             continue
-
-        # 保持原文件名不变
         dst = out_dir / src.name
-        if src.name in used_names or dst.exists():
-            conflicts.append(
-                {
-                    "项目名称": str(row.get("项目名称", "")),
-                    "选中月份": str(row.get("月份", "")),
-                    "冲突文件名": src.name,
-                    "原文件路径": str(src),
-                }
-            )
+        if src.name in used or dst.exists():
+            conflicts.append({"项目名称": row["项目名称"], "文件名": src.name, "路径": str(src)})
             continue
-
         shutil.copy2(src, dst)
-        used_names.add(src.name)
+        used.add(src.name)
         copied.append(
             {
-                "项目名称": str(row.get("项目名称", "")),
-                "选中月份": str(row.get("月份", "")),
-                "处理建议": str(row.get("处理建议", "")),
-                "对比结论": str(row.get("对比结论", "")),
-                "原文件名": src.name,
-                "拷贝后文件名": dst.name,
-                "原文件路径": str(src),
-                "拷贝后路径": str(dst),
+                "项目名称": row["项目名称"],
+                "选中月份": row["月份"],
+                "处理建议": row["处理建议"],
+                "对比结论": row["对比结论"],
+                "文件名": src.name,
             }
         )
 
-    analysis_dir = std_root / "去重分析输出"
-    analysis_dir.mkdir(parents=True, exist_ok=True)
-    copied_df = pd.DataFrame(copied).sort_values(["项目名称"]).reset_index(drop=True)
-    copied_df.to_excel(analysis_dir / "A_拷贝清单.xlsx", index=False)
-
+    pd.DataFrame(copied).to_excel(analysis / "A_拷贝清单.xlsx", index=False)
     if conflicts:
-        pd.DataFrame(conflicts).to_excel(analysis_dir / "每项目仅1个_同名冲突清单.xlsx", index=False)
+        pd.DataFrame(conflicts).to_excel(analysis / "同名冲突清单.xlsx", index=False)
+    return len(copied), len(conflicts)
 
-    return out_dir, int(len(copied)), int(len(conflicts))
 
+def run(raw_root: Path = RAW_DIR, extract_dir: Path = EXTRACT_DIR) -> None:
+    print(f"源目录: {raw_root}")
+    print(f"输出目录: {extract_dir}")
 
-def run(raw_root: Path, output_file: Path) -> None:
-    records = scan_raw_files(raw_root)
-
-    if not records:
-        decision_df = pd.DataFrame(
-            columns=["月份", "项目名称", "文件名", "文件路径", "含税金额合计", "行数", "文件哈希", "内容哈希", "对比结论", "处理建议", "是否在最新口径体现"]
-        )
-        summary_df = pd.DataFrame(columns=["月份", "处理建议", "文件数", "项目数"])
-        print(f"未扫描到 {raw_root} 下的 Excel 文件，已生成空分析结果")
+    df = scan_raw(raw_root)
+    if df.empty:
+        print("未扫描到 Excel，结束")
+        decision = pd.DataFrame()
+        summary = pd.DataFrame()
     else:
-        df = pd.DataFrame([r.__dict__ for r in records])
         df = df.sort_values(["项目名称", "月份"]).reset_index(drop=True)
+        decision = decide(df)
+        summary = (
+            decision.groupby(["月份", "处理建议"], as_index=False)
+            .agg(文件数=("文件名", "count"), 项目数=("项目名称", "nunique"))
+            .sort_values(["月份", "处理建议"])
+        )
 
-        decision_df = compare_with_previous(df)
-        summary_df = build_month_summary(decision_df)
+    analysis = extract_dir / ANALYSIS_DIR_NAME
+    analysis.mkdir(parents=True, exist_ok=True)
+    report = analysis / "采购台账_月度去重分析.xlsx"
+    with pd.ExcelWriter(report, engine="openpyxl") as w:
+        decision.to_excel(w, index=False, sheet_name="逐文件判定")
+        summary.to_excel(w, index=False, sheet_name="月份汇总")
 
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
-        decision_df.to_excel(writer, index=False, sheet_name="逐文件判定")
-        summary_df.to_excel(writer, index=False, sheet_name="月份汇总")
-
-    export_dir, copied_count, conflict_count = export_one_file_per_project(decision_df, STD_ROOT)
-
-    print(f"分析完成: {output_file}")
-    print(f"逐文件判定行数: {len(decision_df)}")
-    print(f"月份汇总行数: {len(summary_df)}")
-    print(f"每项目1个文件输出目录: {export_dir}")
-    print(f"每项目1个文件拷贝成功: {copied_count}")
-    print(f"每项目1个文件同名冲突: {conflict_count}")
-    print("说明:")
-    print("1) 只读取目标目录下的顶层 Excel 文件，不再依赖子文件夹")
-    print("2) 分析结果和拷贝清单输出到目标目录下的子文件夹：去重分析输出")
-    print("3) 处理建议为 复用上月，当前月不体现 的记录，可在最新月份报表中直接剔除")
-    print("4) 目标目录根下将只保留去重后的 Excel 文件，分析文件在子文件夹中")
+    n_copy, n_conflict = export_latest_per_project(decision, extract_dir)
+    print(f"分析报告: {report}")
+    print(f"判定行数: {len(decision)} | 拷贝: {n_copy} | 冲突: {n_conflict}")
+    print(f"提取目录: {extract_dir}")
 
 
 def main() -> None:
-    raw_root = RAW_ROOT
-    output_dir = STD_ROOT
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / "去重分析输出" / "采购台账_月度去重分析.xlsx"
-    run(raw_root=raw_root, output_file=output_file)
+    run()
 
 
 if __name__ == "__main__":
