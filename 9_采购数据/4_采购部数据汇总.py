@@ -6,7 +6,8 @@
   1) 采购部采购台账_merged.xlsx              — 纯合并（不改内容）
   2) 采购部采购台账_std_merged.xlsx          — 内容标准化后合并
   3) 采购部采购台账_std_merged_对比.xlsx    — 标准化对比版
-     （材料归类前增加：原始物品名称、原始规格、原始单位）
+     原始物品名称/规格/单位 | 转换单位/计算数量 | 标准化后列
+     转换规则见 单位数量转换/（网片 m2→kg、砖块→m3）
 
 不改动 STD 目录下的单项目 *_processed.xlsx。
 可用 --plain-only / --std-only / --no-compare 控制输出。
@@ -41,10 +42,11 @@ FINAL_OUTPUT_COLUMNS = [
     "标准日期", "供货商名称", "备注", "年月", "签订日期",
 ]
 
-# 对比版：在「材料归类」前插入原始三列
+# 对比版：原始列 + 转换列 + 标准化后列
 COMPARE_OUTPUT_COLUMNS = [
     "项目编码", "项目名称",
     "原始物品名称", "原始规格", "原始单位",
+    "转换单位", "计算数量",
     "材料归类", "物品名称", "规格", "单位", "数量",
     "单价", "不含税金额", "7%增值税", "含税金额", "货币种类", "汇率",
     "标准日期", "供货商名称", "备注", "年月", "签订日期",
@@ -54,8 +56,57 @@ OUTPUT_PLAIN = "采购部采购台账_merged.xlsx"
 OUTPUT_WITH_STD = "采购部采购台账_std_merged.xlsx"
 OUTPUT_COMPARE = "采购部采购台账_std_merged_对比.xlsx"
 CONTENT_STD_UTILS = Path(__file__).resolve().parent / "采购内容标准化_utils.py"
+UNIT_CONV_PIPELINE = Path(__file__).resolve().parent / "单位数量转换" / "0_统一转换流水线.py"
+
+AMOUNT_FIELD_NAMES = {"单价", "不含税金额", "7%增值税", "含税金额", "数量", "计算数量", "汇率"}
+# Excel 错误字面量 / 非数值，写入或汇总时当作空
+_EXCEL_ERROR_TOKENS = {
+    "#VALUE!", "#REF!", "#DIV/0!", "#N/A", "#NAME?", "#NULL!", "#NUM!",
+    "#GETTING_DATA", "#SPILL!", "#CALC!", "#ERROR!",
+}
 
 _STD_UTILS = None
+_UNIT_CONV = None
+
+
+def _is_excel_error_token(value: object) -> bool:
+    if value is None:
+        return False
+    s = str(value).strip().upper()
+    if not s:
+        return False
+    if s in {t.upper() for t in _EXCEL_ERROR_TOKENS}:
+        return True
+    return s.startswith("#") and s.endswith("!")
+
+
+def coerce_amount(value: object) -> float | None:
+    """将金额/数量安全转为 float；#VALUE!/空/无法解析 → None。"""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        if pd.isna(value):
+            return None
+        return float(value)
+    if isinstance(value, str):
+        s = value.strip().replace(",", "").replace("，", "")
+        if not s or _is_excel_error_token(s):
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            return None
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _load_procurement_standardization_utils():
@@ -85,6 +136,34 @@ def _load_procurement_standardization_utils():
         return None
 
     _STD_UTILS = mod
+    return mod
+
+
+def _load_unit_conversion_pipeline():
+    """加载单位数量转换流水线（钢筋网片 m2→kg、砖块→m3 等）。"""
+    global _UNIT_CONV
+    if _UNIT_CONV is not None:
+        return _UNIT_CONV if _UNIT_CONV is not False else None
+
+    if not UNIT_CONV_PIPELINE.exists():
+        print(f"⚠️ 未找到单位转换流水线: {UNIT_CONV_PIPELINE}")
+        _UNIT_CONV = False
+        return None
+
+    spec = importlib.util.spec_from_file_location(
+        "unit_qty_conversion_pipeline", str(UNIT_CONV_PIPELINE)
+    )
+    if spec is None or spec.loader is None:
+        _UNIT_CONV = False
+        return None
+    mod = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(mod)
+    except Exception as exc:
+        print(f"⚠️ 单位转换流水线加载失败: {exc}")
+        _UNIT_CONV = False
+        return None
+    _UNIT_CONV = mod
     return mod
 
 
@@ -132,7 +211,7 @@ def build_procurement_total_sheet(merged_df: pd.DataFrame) -> pd.DataFrame:
     work["项目编码"] = work["项目编码"].fillna("").astype(str).str.strip()
     work["项目名称"] = work["项目名称"].fillna("").astype(str).str.strip()
     work["年月"] = work["年月"].fillna("").astype(str).str.strip()
-    work["含税金额"] = pd.to_numeric(work["含税金额"], errors="coerce")
+    work["含税金额"] = work["含税金额"].map(coerce_amount)
     work = work[(work["项目编码"] != "") | (work["项目名称"] != "")]
     work = work[work["年月"].str.fullmatch(r"(?:19|20)\d{2}-(?:0[1-9]|1[0-2])", na=False)]
     work = work[work["含税金额"].notna()]
@@ -191,13 +270,25 @@ def _new_merge_workbook(columns: list[str]) -> tuple[openpyxl.Workbook, openpyxl
 def _append_data_row(ws, row_idx: int, columns: list[str], row_data: dict) -> None:
     for col_idx, col_name in enumerate(columns, start=1):
         value = row_data.get(col_name, "")
-        if pd.isna(value):
+        try:
+            if pd.isna(value):
+                value = ""
+        except Exception:
+            pass
+
+        # 金额/数量列：清洗 #VALUE! 等，只写真正的数字或空
+        if col_name in AMOUNT_FIELD_NAMES or col_name.endswith("金额"):
+            num = coerce_amount(value)
+            cell = ws.cell(row_idx, col_idx, num if num is not None else None)
+            if num is not None and col_name in {
+                "单价", "不含税金额", "7%增值税", "含税金额", "计算数量",
+            }:
+                cell.number_format = "#,##0.00"
+            continue
+
+        if _is_excel_error_token(value):
             value = ""
         cell = ws.cell(row_idx, col_idx, value)
-        if col_name in {"单价", "不含税金额", "7%增值税", "含税金额"} and isinstance(
-            value, (int, float)
-        ):
-            cell.number_format = "0.00"
 
 
 def _finalize_workbook(
@@ -219,19 +310,43 @@ def _finalize_workbook(
 
     summary_ws = output_wb.create_sheet("项目汇总")
     summary_ws.append(["项目编码", "项目名称", "总采购金额"])
+    grand_total = 0.0
     for row_idx, ((code, name), total) in enumerate(sorted(project_totals.items()), start=2):
-        summary_ws.append([code, name, total])
-        summary_ws.cell(row_idx, 3).number_format = "0.00"
+        amt = float(total) if total is not None else 0.0
+        summary_ws.append([code, name, amt])
+        summary_ws.cell(row_idx, 3).number_format = "#,##0.00"
+        grand_total += amt
+    # 合计行（数值，不用公式，避免 #VALUE!）
+    last = summary_ws.max_row + 1
+    summary_ws.cell(last, 1, "")
+    summary_ws.cell(last, 2, "【合计】")
+    summary_ws.cell(last, 3, round(grand_total, 2)).number_format = "#,##0.00"
 
     merged_df = pd.DataFrame(merged_ws.values)
     merged_df.columns = merged_df.iloc[0]
     merged_df = merged_df.iloc[1:].reset_index(drop=True)
+    # 金额列再清洗一遍，供宽表聚合
+    if "含税金额" in merged_df.columns:
+        merged_df["含税金额"] = merged_df["含税金额"].map(coerce_amount)
 
     total_df = build_procurement_total_sheet(merged_df)
     total_ws = output_wb.create_sheet("采购总金额")
     total_ws.append(total_df.columns.tolist())
     for row in total_df.itertuples(index=False, name=None):
-        total_ws.append(list(row))
+        cleaned = []
+        for v in row:
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                cleaned.append(float(v))
+            else:
+                # 非金额文本列（项目编码/名称）原样
+                cleaned.append("" if _is_excel_error_token(v) else v)
+        total_ws.append(cleaned)
+
+    # 只保留业务 sheet，去掉 openpyxl/Excel 可能残留的空 Sheet
+    keep = {"合并数据", "项目汇总", "采购总金额"}
+    for sn in list(output_wb.sheetnames):
+        if sn not in keep:
+            del output_wb[sn]
 
     return output_wb
 
@@ -278,8 +393,12 @@ def merge_standardized_excels(
 
     formal_wb, formal_ws = _new_merge_workbook(FINAL_OUTPUT_COLUMNS)
     compare_wb = compare_ws = None
+    unit_conv = None
     if build_compare:
         compare_wb, compare_ws = _new_merge_workbook(COMPARE_OUTPUT_COLUMNS)
+        unit_conv = _load_unit_conversion_pipeline()
+        if unit_conv is None:
+            print("⚠️ 单位转换不可用：对比版「转换单位/计算数量」将为空")
 
     formal_row = 2
     compare_row = 2
@@ -336,10 +455,14 @@ def merge_standardized_excels(
             if col not in df.columns:
                 df[col] = ""
 
+        # 清洗源文件里残留的 #VALUE! 等错误字面量
+        for col in list(df.columns):
+            if col in AMOUNT_FIELD_NAMES or str(col).endswith("金额"):
+                df[col] = df[col].map(coerce_amount)
+
         # 对齐原始快照行数
         if build_compare:
             if orig_snapshot is None or len(orig_snapshot) != len(df):
-                # 行数不一致时，用当前值兜底为「原始」（至少不崩）
                 orig_snapshot = pd.DataFrame(
                     {
                         "原始物品名称": df["物品名称"].values,
@@ -352,21 +475,40 @@ def merge_standardized_excels(
             df = df.reset_index(drop=True)
             df = pd.concat([orig_snapshot, df], axis=1)
 
+            # 单位数量转换：用标准化后的 名称/规格/单位/数量 计算
+            conv_units: list = []
+            conv_qtys: list = []
+            for _, r in df.iterrows():
+                if unit_conv is not None and hasattr(unit_conv, "convert_row"):
+                    cr = unit_conv.convert_row(
+                        item_name=r.get("物品名称", ""),
+                        spec=r.get("规格", ""),
+                        unit=r.get("单位", ""),
+                        qty=r.get("数量", ""),
+                    )
+                    conv_units.append(cr.get("转换单位", ""))
+                    conv_qtys.append(cr.get("计算数量", ""))
+                else:
+                    conv_units.append("")
+                    conv_qtys.append("")
+            df["转换单位"] = conv_units
+            df["计算数量"] = conv_qtys
+
         for i, row in df.iterrows():
             formal_data = {c: row[c] for c in FINAL_OUTPUT_COLUMNS}
             _append_data_row(formal_ws, formal_row, FINAL_OUTPUT_COLUMNS, formal_data)
 
             code = "" if pd.isna(row["项目编码"]) else str(row["项目编码"]).strip()
             name = "" if pd.isna(row["项目名称"]) else str(row["项目名称"]).strip()
-            amt = pd.to_numeric(pd.Series([row["含税金额"]]), errors="coerce").iloc[0]
-            if pd.notna(amt):
+            amt = coerce_amount(row["含税金额"])
+            if amt is not None:
                 project_totals[(code, name)] += float(amt)
             formal_row += 1
 
             if build_compare and compare_ws is not None:
                 compare_data = {c: row[c] if c in row.index else "" for c in COMPARE_OUTPUT_COLUMNS}
                 _append_data_row(compare_ws, compare_row, COMPARE_OUTPUT_COLUMNS, compare_data)
-                if pd.notna(amt):
+                if amt is not None:
                     compare_totals[(code, name)] += float(amt)
                 compare_row += 1
 
