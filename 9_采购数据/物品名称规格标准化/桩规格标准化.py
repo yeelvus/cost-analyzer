@@ -14,6 +14,7 @@ ANALYSIS_OUTPUT_ROOT = SCRIPT_DIR / "C_数据分析"
 INPUT_GLOB = "*_材料采购_merged.xlsx"
 OUTPUT_SUFFIX = "_桩规格标准化"
 TARGET_KEYWORD = "桩"
+TARGET_CATEGORY = "桩"  # 命中桩类行 → 材料归类填「桩」
 PILE_COST_PREFIX = "（打桩费）"
 PILE_COST_KEYWORDS = ("打桩", "施工")
 
@@ -202,10 +203,12 @@ def process_worksheet(worksheet):
 
     item_col = header_map["物品名称"]
     spec_col = header_map["规格"]
+    category_col = header_map.get("材料归类")
 
     matched_rows = 0
     updated_rows = 0
     prefixed_rows = 0
+    category_updated = 0
     unresolved_rows = []
 
     for row_idx in range(2, worksheet.max_row + 1):
@@ -215,6 +218,14 @@ def process_worksheet(worksheet):
             continue
 
         matched_rows += 1
+
+        # 材料归类 → 桩（空/其他/错填均覆盖）
+        if category_col is not None:
+            cat_cell = worksheet.cell(row_idx, category_col)
+            old_cat = "" if cat_cell.value is None else str(cat_cell.value).strip()
+            if old_cat != TARGET_CATEGORY:
+                cat_cell.value = TARGET_CATEGORY
+                category_updated += 1
 
         if should_prefix_pile_cost(item_name):
             item_cell.value = f"{PILE_COST_PREFIX}{str(item_name).strip()}"
@@ -230,14 +241,15 @@ def process_worksheet(worksheet):
             )
             continue
 
-        if str(spec_cell.value).strip() != standardized:
+        old_spec = "" if spec_cell.value is None else str(spec_cell.value).strip()
+        if old_spec != standardized:
             spec_cell.value = standardized
             updated_rows += 1
 
     return {
         "sheet_name": worksheet.title,
         "matched_rows": matched_rows,
-        "updated_rows": updated_rows,
+        "updated_rows": updated_rows + category_updated,
         "prefixed_rows": prefixed_rows,
         "unresolved_rows": unresolved_rows,
         "skipped": False,

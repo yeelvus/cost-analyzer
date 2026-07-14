@@ -17,16 +17,40 @@ OUTPUT_SUFFIX = "_钢筋规格标准化"
 TARGET_KEYWORDS = ("钢筋网片", "螺纹钢", "钢筋")
 MESH_KEYWORDS = ("钢筋网片", "网片")
 REBAR_KEYWORDS = ("螺纹钢",)
+# 名称含「钢筋」但不是棒材本身的物品，跳过规格标准化
+SKIP_NAME_KEYWORDS = (
+    "套筒", "弯曲机", "切断机", "调直", "加工棚", "工棚",
+    "检查井", "方桩", "管桩", "扎钩", "网片",
+)
 
-PHI_PATTERN = re.compile(r"[φΦØøDd]\s*(\d+(?:\.\d+)?)")
-HRB_DIA_PATTERN = re.compile(r"(hrb|hpb|rrb)\s*[- ]?\s*(\d{3,4})([a-zA-Z]*)\s*[- ]?\s*(\d{1,2}(?:\.\d+)?)", re.IGNORECASE)
+PHI_PATTERN = re.compile(r"[φΦØø]\s*(\d+(?:\.\d+)?)")
+# D16 / d16 直径写法（避免把 SD40 里的 D 误吃掉，要求 D 前非字母数字或在边界）
+D_DIA_PATTERN = re.compile(r"(?<![A-Za-z0-9])[Dd]\s*(\d{1,2}(?:\.\d+)?)(?!\d)")
+HRB_DIA_PATTERN = re.compile(
+    r"(hrb|hpb|rrb)\s*[- ]?\s*(\d{3,4})([a-zA-Z]*)\s*[- ]?\s*(\d{1,2}(?:\.\d+)?)",
+    re.IGNORECASE,
+)
 GRADE_PATTERN = re.compile(r"(hrb|hpb|rrb)\s*[- ]?\s*(\d{3,4})([a-zA-Z]*)", re.IGNORECASE)
+# 泰国螺纹钢牌号 SD40 / SD40T / SD50
+SD_GRADE_PATTERN = re.compile(r"(SD\s*\d{2,3}\s*T?)", re.IGNORECASE)
 MM_DIA_PATTERN = re.compile(r"(?<!\d)(\d{1,2}(?:\.\d+)?)\s*(?:mm|毫米)\b", re.IGNORECASE)
 RAW_DIA_PATTERN = re.compile(r"(?<!\d)(\d{1,2}(?:\.\d+)?)(?!\d)")
-LENGTH_PATTERN = re.compile(r"(?<!\d)(\d+(?:\.\d+)?)\s*(?:m|米)\b", re.IGNORECASE)
+# 显式带 m/米 的长度
+LENGTH_M_PATTERN = re.compile(r"(?<!\d)(\d+(?:\.\d+)?)\s*m\b", re.IGNORECASE)
+# Φ12x12 / φ16*12 / 16x12 （第二段为定尺长度，可无单位）
+PHI_LEN_PATTERN = re.compile(
+    r"[φΦØø]\s*(\d+(?:\.\d+)?)\s*[xX*]\s*(\d+(?:\.\d+)?)(?!\d)",
+    re.IGNORECASE,
+)
+DIA_LEN_PATTERN = re.compile(
+    r"(?<![φΦØøA-Za-z])(\d{1,2}(?:\.\d+)?)\s*(?:mm)?\s*[xX*]\s*(\d+(?:\.\d+)?)(?!\d)",
+    re.IGNORECASE,
+)
 SPACING_PATTERN = re.compile(r"(?<!\d)(\d{2,3})\s*[xX×*＊/]\s*(\d{2,3})(?!\d)")
 SHEET_SIZE_PATTERN = re.compile(r"(?<!\d)(\d+(?:\.\d+)?)\s*[xX×*＊]\s*(\d+(?:\.\d+)?)\s*(?:m|米)", re.IGNORECASE)
 
+# 常见定尺（米）；也允许 6~18 的整数米
+COMMON_REBAR_LENGTHS_M = {6, 8, 9, 10, 11, 12, 15}
 
 def format_number(value: float) -> str:
     rounded = round(value)
@@ -53,6 +77,16 @@ def normalize_text(value: object) -> str:
     return text
 
 
+def _is_rebar_length_m(val: float) -> bool:
+    """判断是否像钢筋定尺长度（米）。"""
+    if val in COMMON_REBAR_LENGTHS_M:
+        return True
+    # 允许 6~18 的整数米（如 7m、14m 偶发）
+    if 6 <= val <= 18 and math.isclose(val, round(val), abs_tol=1e-9):
+        return True
+    return False
+
+
 def find_diameter(text: str, *, prefer_mesh: bool = False) -> float | None:
     if not text:
         return None
@@ -60,6 +94,13 @@ def find_diameter(text: str, *, prefer_mesh: bool = False) -> float | None:
     match = PHI_PATTERN.search(text)
     if match:
         return float(match.group(1))
+
+    match = D_DIA_PATTERN.search(text)
+    if match:
+        val = float(match.group(1))
+        low, high = (2, 20) if prefer_mesh else (4, 50)
+        if low <= val <= high:
+            return val
 
     match = HRB_DIA_PATTERN.search(text)
     if match:
@@ -69,9 +110,13 @@ def find_diameter(text: str, *, prefer_mesh: bool = False) -> float | None:
     if match:
         return float(match.group(1))
 
-    # 钢筋直径通常在 4~50mm，网片钢丝常见 3~12mm；此处按关键字场景约束范围
+    # 去掉牌号数字后再扫裸数字，避免 SD40T16x12 把 40 当成直径
+    stripped = SD_GRADE_PATTERN.sub(" ", text)
+    stripped = GRADE_PATTERN.sub(" ", stripped)
+
+    # 钢筋直径通常在 4~50mm，网片钢丝常见 3~12mm
     low, high = (2, 20) if prefer_mesh else (4, 50)
-    for m in RAW_DIA_PATTERN.finditer(text):
+    for m in RAW_DIA_PATTERN.finditer(stripped):
         val = float(m.group(1))
         if low <= val <= high:
             return val
@@ -80,20 +125,57 @@ def find_diameter(text: str, *, prefer_mesh: bool = False) -> float | None:
 
 def find_grade(text: str) -> str | None:
     match = GRADE_PATTERN.search(text)
-    if not match:
+    if match:
+        prefix = match.group(1).upper()
+        level = match.group(2)
+        suffix = match.group(3).upper() if match.group(3) else ""
+        return f"{prefix}{level}{suffix}"
+
+    match = SD_GRADE_PATTERN.search(text)
+    if match:
+        # 统一 SD40T / SD40 t → SD40T
+        g = re.sub(r"\s+", "", match.group(1).upper())
+        if not g.endswith("T") and re.fullmatch(r"SD\d{2,3}", g):
+            return g
+        return g
+    return None
+
+
+def find_length_m(text: str, diameter: float | None = None) -> float | None:
+    """
+    解析钢筋长度（米）。
+
+    支持：
+      - 显式单位：φ12x12m、12米、12m
+      - 台账常见无单位写法：φ12*12、φ16x12、16*12（第二段为定尺米数）
+    """
+    if not text:
         return None
-    prefix = match.group(1).upper()
-    level = match.group(2)
-    suffix = match.group(3).upper() if match.group(3) else ""
-    return f"{prefix}{level}{suffix}"
 
-
-def find_length_m(text: str) -> float | None:
-    # 钢筋常见长度 6m/9m/12m，避免把网片间距误识别成长度
-    for m in LENGTH_PATTERN.finditer(text):
+    # 1) 显式 m（normalize 后 米→m）
+    for m in LENGTH_M_PATTERN.finditer(text):
         val = float(m.group(1))
         if 1 <= val <= 18:
             return val
+
+    # 2) Φd x L（无单位）：φ12x12 → 长度 12m
+    m = PHI_LEN_PATTERN.search(text)
+    if m:
+        length = float(m.group(2))
+        if _is_rebar_length_m(length):
+            return length
+
+    # 3) d x L（无 Φ，可带 mm）：16x12、16mmx12
+    m = DIA_LEN_PATTERN.search(text)
+    if m:
+        dia = float(m.group(1))
+        length = float(m.group(2))
+        if diameter is not None and not math.isclose(dia, diameter, abs_tol=1e-6):
+            # 与已识别直径不一致时仍可接受常见定尺
+            pass
+        if 4 <= dia <= 50 and _is_rebar_length_m(length):
+            return length
+
     return None
 
 
@@ -107,7 +189,7 @@ def standardize_rebar_or_steel(spec_value: object) -> str | None:
         return None
 
     grade = find_grade(text)
-    length = find_length_m(text)
+    length = find_length_m(text, diameter=diameter)
 
     base = f"Φ{format_number(diameter)}"
     if length is not None:
@@ -171,8 +253,14 @@ def detect_category(item_name: object) -> str | None:
     if not item_text:
         return None
 
+    # 网片单独处理
     if any(keyword in item_text for keyword in MESH_KEYWORDS):
         return "mesh"
+
+    # 排除套筒/设备/桩等，避免误改规格
+    if any(k in item_text for k in SKIP_NAME_KEYWORDS):
+        return None
+
     if any(keyword in item_text for keyword in REBAR_KEYWORDS):
         return "rebar"
     if "钢筋" in item_text:

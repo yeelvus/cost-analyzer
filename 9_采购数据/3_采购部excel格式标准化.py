@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-步骤3：读取 EXTRACT_DIR 去重后的台账 → 列映射/项目匹配/日期/单位补全
+步骤3：读取 EXTRACT_DIR 去重后的台账 → 列映射/项目匹配/日期
 → 写出 STD_DIR/*_processed.xlsx。
 
-不做物品规格等内容规则标准化（桩/钢筋/网片/砂浆等由其他脚本单独处理）。
+不做：
+- 单位纠错/补全
+- 物品规格等内容规则标准化（桩/钢筋/网片/砂浆等由其他脚本处理）
 """
 from __future__ import annotations
 
 import re
 import sys
-from collections import Counter
 from datetime import date as date_type
 from datetime import datetime
 from pathlib import Path
@@ -78,8 +79,6 @@ FINAL_COLUMNS = [
 AMOUNT_COLS = {"单价", "不含税金额", "7%增值税", "含税金额"}
 CENTER_COLS = {"单位", "数量", "货币种类", "汇率"}
 OUTPUT_SUFFIX = "_processed"
-
-_GLOBAL_UNIT_REF: dict[str, str] = {}
 
 
 # ── 项目配置 / 匹配 ───────────────────────────────────────
@@ -189,25 +188,6 @@ def is_summary_row(ws, row_idx: int, amount_col: int) -> bool:
     return bool(re.search(rf"\$?{letter}\$?\d+:\$?{letter}\$?\d+", f.replace(" ", "")))
 
 
-def is_numeric(value) -> bool:
-    if value is None:
-        return False
-    if isinstance(value, (int, float)) and pd.notna(value):
-        return True
-    s = str(value).strip().replace(",", "")
-    return bool(s and re.fullmatch(r"[+-]?\d+(?:\.\d+)?", s))
-
-
-def fix_unit_qty(unit_val, qty_val):
-    unit = "" if unit_val is None else str(unit_val).strip()
-    qty = "" if qty_val is None else str(qty_val).strip()
-    if unit == "" and qty and not is_numeric(qty_val):
-        return qty, ""
-    if unit and qty and is_numeric(unit_val) and not is_numeric(qty_val):
-        return qty, unit_val
-    return unit_val, qty_val
-
-
 def extract_rows(file_path: Path, project_code: str, project_name: str):
     fwb = openpyxl.load_workbook(file_path, data_only=False)
     fws = fwb.active
@@ -263,10 +243,13 @@ def extract_rows(file_path: Path, project_code: str, project_name: str):
         for col in STANDARD_COLUMNS:
             if col in hmap and hmap[col] < len(vals):
                 v = vals[hmap[col]]
-                obj[col] = "" if v is None else (str(v).strip() if col == "单位" else v)
+                # 单位原样保留（仅 strip 字符串空白），不做纠错/补全
+                if col == "单位":
+                    obj[col] = "" if v is None else str(v).strip()
+                else:
+                    obj[col] = "" if v is None else v
             else:
                 obj[col] = ""
-        obj["单位"], obj["数量"] = fix_unit_qty(obj.get("单位", ""), obj.get("数量", ""))
         rows.append(obj)
 
     vwb.close()
@@ -334,80 +317,6 @@ def enrich_dates(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ── 单位补全 ──────────────────────────────────────────────
-def build_global_unit_ref(std_root: Path) -> dict[str, str]:
-    ref: dict[str, Counter] = {}
-    if not std_root.is_dir():
-        return {}
-    for path in list_excels(std_root, recursive=True):
-        try:
-            df = pd.read_excel(path, sheet_name=0, usecols=["物品名称", "单位"], dtype=str)
-        except Exception:
-            continue
-        df = df.dropna(subset=["物品名称"])
-        df["物品名称"] = df["物品名称"].str.strip()
-        df["单位"] = df["单位"].fillna("").str.strip()
-        for name, grp in df[df["单位"].ne("")].groupby("物品名称"):
-            ref.setdefault(str(name), Counter()).update(grp["单位"].tolist())
-    return {k: v.most_common(1)[0][0] for k, v in ref.items()}
-
-
-def fill_missing_units(df: pd.DataFrame, global_ref: dict | None = None) -> tuple[pd.DataFrame, int]:
-    if df.empty or "单位" not in df.columns:
-        return df, 0
-    need = {"物品名称", "单价", "单位", "项目名称", "标准日期"}
-    if not need.issubset(df.columns):
-        return df, 0
-
-    out = df.copy()
-    out["_name"] = out["物品名称"].astype(str).str.strip()
-    out["_unit"] = out["单位"].astype(str).str.strip()
-    out["_price"] = pd.to_numeric(out["单价"], errors="coerce")
-    out["_ts"] = pd.to_datetime(out["标准日期"], errors="coerce")
-
-    targets = out.index[out["_unit"].eq("") & out["_name"].ne("") & out["_price"].notna()]
-    if len(targets) == 0:
-        return df, 0
-
-    cands = out[out["_unit"].ne("") & out["_name"].ne("") & out["_price"].notna()]
-    filled = 0
-    for idx in targets:
-        row = out.loc[idx]
-        name = row["_name"]
-        avg = out.loc[out["_name"].eq(name) & out["_price"].notna() & out["_price"].ne(0), "_price"]
-        avg_p = float(avg.mean()) if not avg.empty else None
-
-        pool = cands[cands["_name"] == name]
-        if avg_p is not None and avg_p != 0:
-            pool = pool[pool["_price"].apply(lambda p: abs(p - avg_p) / abs(avg_p) <= 0.5 if pd.notna(p) else False)]
-        elif avg_p == 0:
-            pool = pool[pool["_price"].fillna(1).abs() < 1e-9]
-
-        if pool.empty:
-            fb = (global_ref or {}).get(str(name), "")
-            if fb:
-                out.at[idx, "单位"] = fb
-                filled += 1
-            continue
-
-        proj = str(row.get("项目名称", "")).strip()
-        ts = row["_ts"]
-        best = None
-        best_key = (2, 10**9)
-        for _, c in pool.iterrows():
-            same = 0 if str(c.get("项目名称", "")).strip() == proj else 1
-            gap = abs((c["_ts"] - ts).days) if pd.notna(ts) and pd.notna(c["_ts"]) else 10**9
-            key = (same, gap)
-            if key < best_key:
-                best_key = key
-                best = str(c["单位"]).strip()
-        if best:
-            out.at[idx, "单位"] = best
-            filled += 1
-
-    return out.drop(columns=["_name", "_unit", "_price", "_ts"], errors="ignore"), filled
-
-
 # ── 写出 ──────────────────────────────────────────────────
 def write_output(df: pd.DataFrame, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -471,10 +380,6 @@ def process_one(file_path: Path, projects: list[dict], match_db) -> tuple[bool, 
             df.loc[empty, "年月"] = file_ym
             print(f"  ✓ 年月兜底 {int(empty.sum())} 行 -> {file_ym}")
 
-    df, n_unit = fill_missing_units(df, _GLOBAL_UNIT_REF)
-    if n_unit:
-        print(f"  ✓ 单位补全 {n_unit} 行")
-
     out_path = STD_DIR / f"{file_path.stem}{OUTPUT_SUFFIX}.xlsx"
     write_output(df, out_path)
     print(f"  ✓ {out_path.name}")
@@ -482,8 +387,6 @@ def process_one(file_path: Path, projects: list[dict], match_db) -> tuple[bool, 
 
 
 def main() -> None:
-    global _GLOBAL_UNIT_REF
-
     if not EXTRACT_DIR.is_dir():
         raise FileNotFoundError(f"提取目录不存在: {EXTRACT_DIR}")
     STD_DIR.mkdir(parents=True, exist_ok=True)
@@ -494,11 +397,8 @@ def main() -> None:
 
     projects = load_project_config()
     match_db = _matcher.load_or_init_db(str(MATCH_DB_PATH), projects)
-    _GLOBAL_UNIT_REF = build_global_unit_ref(STD_DIR)
-    print(f"全局单位库: {len(_GLOBAL_UNIT_REF)} 个物品")
 
     files = list_excels(EXTRACT_DIR, recursive=False)
-    # 排除分析子目录误扫：list_excels 非递归已安全
     if not files:
         print("未发现 Excel，结束")
         return
@@ -507,7 +407,7 @@ def main() -> None:
 
     ok = skip = 0
     skipped = []
-    print(f"\n扫描到 {len(files)} 个文件，开始标准化提取…")
+    print(f"\n扫描到 {len(files)} 个文件，开始格式标准化…")
     for f in files:
         success, reason = process_one(f, projects, match_db)
         if success:
