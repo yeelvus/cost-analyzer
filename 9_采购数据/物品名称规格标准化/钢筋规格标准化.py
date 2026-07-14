@@ -138,24 +138,29 @@ def find_sheet_size(text: str) -> tuple[float, float] | None:
 
 
 def standardize_mesh(spec_value: object) -> str | None:
+    """网片规格委托给专用模块，输出「间距 型号 大小」，如 200x200 Φ8 3x6m。"""
+    try:
+        from pathlib import Path
+        import importlib.util
+
+        mesh_path = Path(__file__).resolve().parent / "钢筋网片规格标准化.py"
+        if mesh_path.exists():
+            spec = importlib.util.spec_from_file_location("_mesh_spec_std", str(mesh_path))
+            if spec is not None and spec.loader is not None:
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                return mod.standardize_mesh(spec_value)
+    except Exception:
+        pass
+
+    # 回退：旧逻辑（尽量给出直径）
     text = normalize_text(spec_value)
     if not text:
         return None
-
     diameter = find_diameter(text, prefer_mesh=True)
-    spacing = find_spacing(text)
     if diameter is None:
         return None
-
-    result = f"Φ{format_number(diameter)}"
-    if spacing is not None:
-        result = f"{result}@{spacing[0]}x{spacing[1]}"
-
-    sheet_size = find_sheet_size(text)
-    if sheet_size is not None:
-        result = f"{result}-{format_number(sheet_size[0])}x{format_number(sheet_size[1])}m"
-
-    return result
+    return f"Φ{format_number(diameter)}"
 
 
 def detect_category(item_name: object) -> str | None:

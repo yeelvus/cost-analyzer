@@ -14,7 +14,13 @@ SUMMARY_INPUT_ROOT = SCRIPT_DIR.parent.parent / "9_采购台账📦/B_采购部�
 ANALYSIS_OUTPUT_ROOT = SCRIPT_DIR.parent.parent / "C_数据分析"
 INPUT_GLOB = "*_材料采购_merged.xlsx"
 DEFAULT_OUTPUT_SUFFIX = "_标准化汇总"
-DEFAULT_RULES = ["桩规格标准化.py", "钢筋规格标准化.py", "钢筋网片归类修正.py", "砂浆规格标准化.py"]
+DEFAULT_RULES = [
+    "桩规格标准化.py",
+    "钢筋规格标准化.py",
+    "钢筋网片规格标准化.py",  # 网片：间距 型号 大小（覆盖钢筋规则中的网片部分）
+    "钢筋网片归类修正.py",
+    "砂浆规格标准化.py",
+]
 
 
 def extract_year_month_from_name(path: Path) -> tuple[int, int] | None:
