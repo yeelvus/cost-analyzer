@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>__TITLE__ · __MONTH__</title>
+<!-- Chart.js 内联：file:// 下 Edge 会拦截本地/CDN 外链脚本 -->
+<script>__CHART_JS_INLINE__</script>
+<style>
+:root {
+  --bg:#eef2f1; --card:#fff; --text:#15201c; --muted:#667872;
+  --good:#1f8a65; --warn:#c4892a; --danger:#c2473d; --muted-r:#8a9390;
+  --line:#dde5e1; --brand1:#0f3d4c; --brand2:#1a6b7a; --accent:#2b8a6e;
+}
+* {box-sizing:border-box;}
+body {margin:0;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--text);}
+.wrap {max-width:1540px;margin:0 auto;padding:16px 18px 40px;}
+.hero {
+  background:linear-gradient(125deg,var(--brand1),var(--brand2) 55%,#1f8a65);
+  color:#fff;border-radius:18px;padding:20px 24px;margin-bottom:14px;
+  box-shadow:0 10px 28px rgba(15,61,76,.2);
+}
+.hero h1 {margin:0 0 6px;font-size:22px;letter-spacing:.02em;}
+.hero p {margin:3px 0;font-size:13px;opacity:.93;}
+.chain {display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.chain span {background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:4px 11px;font-size:12px;}
+.kpis {display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:10px;margin-bottom:14px;}
+.kpi {background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 13px;}
+.kpi .l {font-size:11px;color:var(--muted);}
+.kpi .v {font-size:19px;font-weight:700;margin-top:3px;}
+.kpi .u {font-size:10px;color:var(--muted);margin-top:2px;}
+.panel {background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px;}
+.panel h2 {margin:0 0 10px;font-size:15px;}
+.charts {display:grid;grid-template-columns:1.15fr 1fr;gap:12px;}
+@media (max-width:1000px) {.charts {grid-template-columns:1fr;}}
+.chart-box {height:300px;background:#f7faf9;border:1px solid var(--line);border-radius:12px;padding:8px;}
+.filters {display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+.filters select,.filters input {border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;background:#fff;}
+.filters .hint {margin-left:auto;font-size:12px;color:var(--muted);}
+.table-scroll {max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:10px;}
+table {width:100%;border-collapse:collapse;font-size:12px;}
+th,td {padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;}
+th {position:sticky;top:0;background:#e8f0ee;z-index:1;font-weight:600;}
+.num {text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.sub {font-size:11px;color:var(--muted);margin-top:2px;}
+.row {cursor:pointer;} .row:hover {background:#f0f8f5;}
+.dot {display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;}
+.dot.good {background:var(--good);} .dot.warning {background:var(--warn);}
+.dot.danger {background:var(--danger);} .dot.muted {background:var(--muted-r);}
+.tag {display:inline-block;background:#eef2f0;border-radius:6px;padding:1px 6px;margin:1px;font-size:10.5px;}
+.tag.ok {background:#e7f6ef;color:var(--good);}
+.note {font-size:12px;color:var(--muted);line-height:1.55;}
+.legend {display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px;}
+.legend i {display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px;}
+
+/* modal */
+.mask {
+  position:fixed;inset:0;background:rgba(12,22,28,.5);display:none;z-index:100;
+  align-items:center;justify-content:center;padding:10px;backdrop-filter:blur(3px);
+}
+.mask.show {display:flex;}
+.modal {
+  width:min(1320px,98vw);max-height:min(96vh,1080px);height:min(96vh,1080px);background:#fff;border-radius:16px;
+  box-shadow:0 24px 60px rgba(0,0,0,.28);display:flex;flex-direction:column;
+  transform:translateY(10px) scale(.98);opacity:0;transition:.2s ease;
+}
+.mask.show .modal {transform:none;opacity:1;}
+.modal-hd {
+  padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:10px;
+  background:linear-gradient(180deg,#f7fbfa,#fff);
+  border-radius:16px 16px 0 0;
+}
+.modal-hd h3 {margin:0;font-size:17px;flex:1;}
+.modal-hd .close {
+  border:none;background:#e8eeeb;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;
+}
+.modal-hd .close:hover {background:#dce5e1;}
+.tabs {
+  display:flex;flex-wrap:wrap;gap:4px;padding:10px 14px 0;border-bottom:1px solid var(--line);
+  background:#fafcfb;
+}
+.tabs button {
+  border:none;background:transparent;padding:8px 12px;border-radius:8px 8px 0 0;
+  cursor:pointer;font-size:12.5px;color:var(--muted);border-bottom:2px solid transparent;
+}
+.tabs button.active {color:var(--brand2);font-weight:600;border-bottom-color:var(--brand2);background:#fff;}
+.modal-bd {padding:16px 22px 28px;overflow:auto;flex:1;min-height:0;}
+.tab-pane {display:none;}
+.tab-pane.active {display:block;}
+.lifecycle {display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:8px 0 14px;}
+.lifecycle .s {background:#f5faf8;border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;}
+.lifecycle .t {font-size:12px;color:var(--muted);}
+.lifecycle .n {font-size:17px;font-weight:700;margin-top:4px;}
+.kv {display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;}
+.kv .item {background:#f7faf9;border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+.kv .item .t {font-size:12px;color:var(--muted);}
+.kv .item .n {font-size:15px;font-weight:600;margin-top:2px;}
+.grid2 {display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media (max-width:900px) {.grid2 {grid-template-columns:1fr;}}
+.mini-chart {height:280px;background:#fafcfb;border:1px solid var(--line);border-radius:10px;padding:8px;}
+.sec {margin:14px 0 6px;font-size:13px;font-weight:600;color:#2a4038;}
+.bar-row {display:grid;grid-template-columns:70px 1fr 90px;gap:8px;align-items:center;margin:5px 0;font-size:12px;}
+.track {height:10px;background:#e6eeeb;border-radius:5px;overflow:hidden;position:relative;}
+.track i {position:absolute;left:0;top:0;height:100%;}
+.track i.b {background:rgba(26,107,122,.45);}
+.track i.p {background:rgba(31,138,101,.85);}
+table.inner {font-size:12px;}
+table.inner th {background:#f0f5f3;position:static;}
+.er-danger {color:var(--danger);font-weight:700;}
+.er-warning {color:var(--warn);font-weight:600;}
+.er-good {color:var(--good);font-weight:600;}
+.foot {font-size:11px;color:var(--muted);margin-top:16px;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>综合成本分析看板</h1>
+    <p>数据月：<b id="mMonth"></b> ｜ 生成：<span id="mGen"></span> ｜ 单位：万泰铢 ｜ 汇率 CNY→THB：<span id="mFx"></span></p>
+    <p>单入口综合看板：选择项目后可查看 预算人材机 · 采购 · 预算vs采购 · 分包/责任成本 · 财务付款 一体化分析。</p>
+    <div class="chain">
+      <span>① 预算人材机</span><span>② 责任成本</span><span>③ 过程（采购/人/机）</span>
+      <span>④ 分包执行</span><span>⑤ 财务付款</span><span>⑥ 预计毛利闭环</span>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="panel">
+    <h2>组合视图</h2>
+    <div class="charts">
+      <div class="chart-box"><canvas id="cMargin"></canvas></div>
+      <div class="chart-box"><canvas id="cStruct"></canvas></div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--good)"></i>健康</span>
+      <span><i style="background:var(--warn)"></i>需关注</span>
+      <span><i style="background:var(--danger)"></i>高风险</span>
+      <span><i style="background:var(--muted-r)"></i>数据缺口</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>项目一览（点击行打开综合分析）</h2>
+    <div class="filters">
+      <label>范围
+        <select id="fBucket">
+          <option value="在建" selected>在建</option>
+          <option value="已完工">已完工</option>
+          <option value="">全部</option>
+        </select>
+      </label>
+      <label>风险
+        <select id="fRisk">
+          <option value="">全部</option>
+          <option value="danger">高风险</option>
+          <option value="warning">需关注</option>
+          <option value="good">健康</option>
+          <option value="muted">数据缺口</option>
+        </select>
+      </label>
+      <label>经理 <select id="fPm"><option value="">全部</option></select></label>
+      <label>搜索 <input id="fSearch" placeholder="编码/名称"/></label>
+      <span class="hint">金额：万泰铢 · 执行率=过程/预算</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>编码</th><th>项目</th>
+            <th class="num">预计结算</th><th class="num">责任成本</th>
+            <th class="num">已发生</th><th class="num">预计毛利率</th>
+            <th class="num">预算人材机</th><th class="num">过程人材机</th>
+            <th class="num">执行率</th>
+            <th class="num">分包合同</th><th class="num">财务实付</th>
+            <th>预警</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="foot" id="sources"></div>
+  </div>
+</div>
+
+<div class="mask" id="mask" role="dialog" aria-modal="true">
+  <div class="modal" id="modal" onclick="event.stopPropagation()">
+    <div class="modal-hd">
+      <div style="flex:1">
+        <h3 id="dTitle">项目</h3>
+        <div class="sub" id="dSub"></div>
+      </div>
+      <button class="close" id="btnClose" type="button">关闭</button>
+    </div>
+    <div class="tabs" id="tabs">
+      <button type="button" data-tab="overview" class="active">总览</button>
+      <button type="button" data-tab="budget">预算人材机</button>
+      <button type="button" data-tab="purchase">采购材料</button>
+      <button type="button" data-tab="cmp">预算vs采购</button>
+      <button type="button" data-tab="sub">分包·责任成本</button>
+      <button type="button" data-tab="fin">财务付款</button>
+    </div>
+    <div class="modal-bd">
+      <div class="tab-pane active" id="tab-overview"></div>
+      <div class="tab-pane" id="tab-budget"></div>
+      <div class="tab-pane" id="tab-purchase"></div>
+      <div class="tab-pane" id="tab-cmp"></div>
+      <div class="tab-pane" id="tab-sub"></div>
+      <div class="tab-pane" id="tab-fin"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = __DATA_JSON__;
+const projects = DATA.projects || [];
+const meta = DATA.meta || {};
+
+document.getElementById('mMonth').textContent = meta.month || '—';
+document.getElementById('mGen').textContent = meta.generated || '—';
+document.getElementById('mFx').textContent = meta.fx_cny_to_thb || '—';
+
+function fmt(n, d=1) {
+  if (n === null || n === undefined || n === '') return '—';
+  const x = Number(n); if (Number.isNaN(x)) return '—';
+  return x.toLocaleString('zh-CN', {maximumFractionDigits:d, minimumFractionDigits:d});
+}
+function pct(n, d=1) {
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return '—';
+  return (Number(n)*100).toFixed(d) + '%';
+}
+function erClass(n) {
+  if (n === null || n === undefined) return '';
+  if (n >= 1.3) return 'er-danger';
+  if (n >= 1.15) return 'er-warning';
+  return 'er-good';
+}
+
+// KPI
+const active = projects.filter(p => p.bucket === '在建');
+const sum = (arr, k) => arr.reduce((s,p) => s + (Number(p[k])||0), 0);
+const k_settle = sum(active,'settle'), k_resp = sum(active,'resp_cost');
+const k_actual = sum(active,'actual'), k_forecast = sum(active,'forecast');
+const k_profit = sum(active,'exp_profit');
+const k_bud = sum(active,'budget_total'), k_proc = sum(active,'proc_total');
+const k_sub = sum(active,'sub_contract'), k_fin = sum(active,'fin_paid');
+const n_risk = active.filter(p => p.risk === 'danger' || p.risk === 'warning').length;
+document.getElementById('kpis').innerHTML = `
+  <div class="kpi"><div class="l">在建项目</div><div class="v">${active.length}</div><div class="u">已完工 ${meta.counts?.done||0}</div></div>
+  <div class="kpi"><div class="l">需关注</div><div class="v" style="color:var(--danger)">${n_risk}</div><div class="u">红+黄</div></div>
+  <div class="kpi"><div class="l">预计结算合计</div><div class="v">${fmt(k_settle,0)}</div><div class="u">万泰铢</div></div>
+  <div class="kpi"><div class="l">责任成本合计</div><div class="v">${fmt(k_resp,0)}</div><div class="u">已发生 ${fmt(k_actual,0)}</div></div>
+  <div class="kpi"><div class="l">组合预计毛利</div><div class="v">${fmt(k_profit,0)}</div><div class="u">${k_settle?pct(k_profit/k_settle):'—'}</div></div>
+  <div class="kpi"><div class="l">预算→过程人材机</div><div class="v">${fmt(k_bud,0)}→${fmt(k_proc,0)}</div><div class="u">执行 ${k_bud?pct(k_proc/k_bud):'—'}</div></div>
+  <div class="kpi"><div class="l">分包合同合计</div><div class="v">${fmt(k_sub,0)}</div><div class="u">万泰铢</div></div>
+  <div class="kpi"><div class="l">财务实付合计</div><div class="v">${fmt(k_fin,0)}</div><div class="u">万泰铢 · 台账口径</div></div>
+`;
+
+// filters PM
+const pms = [...new Set(projects.map(p => p.pm).filter(Boolean))].sort();
+pms.forEach(pm => {
+  const o = document.createElement('option'); o.value = pm; o.textContent = pm;
+  document.getElementById('fPm').appendChild(o);
+});
+
+// table
+function renderTable() {
+  const bucket = document.getElementById('fBucket').value;
+  const risk = document.getElementById('fRisk').value;
+  const pm = document.getElementById('fPm').value;
+  const q = document.getElementById('fSearch').value.trim().toLowerCase();
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = '';
+  projects.forEach((p, idx) => {
+    if (bucket && p.bucket !== bucket) return;
+    if (risk && p.risk !== risk) return;
+    if (pm && p.pm !== pm) return;
+    if (q && !((p.name||'')+(p.code||'')).toLowerCase().includes(q)) return;
+    const tags = (p.alerts||[]).length
+      ? p.alerts.map(a => `<span class="tag">${a}</span>`).join(' ')
+      : '<span class="tag ok">正常</span>';
+    const tr = document.createElement('tr');
+    tr.className = 'row';
+    tr.innerHTML = `
+      <td><span class="dot ${p.risk||'muted'}"></span>${p.code||'—'}</td>
+      <td><strong>${p.name||'—'}</strong><div class="sub">${p.pm||''} · ${p.status||p.bucket||''}</div></td>
+      <td class="num">${fmt(p.settle,0)}</td>
+      <td class="num">${fmt(p.resp_cost,0)}</td>
+      <td class="num">${fmt(p.actual,0)}</td>
+      <td class="num ${erClass(p.exp_margin!=null && p.exp_margin<0.05 ? 1.2 : 0)}">${pct(p.exp_margin)}</td>
+      <td class="num">${fmt(p.budget_total,0)}</td>
+      <td class="num">${fmt(p.proc_total,0)}</td>
+      <td class="num ${erClass(p.exec_total)}">${pct(p.exec_total)}</td>
+      <td class="num">${fmt(p.sub_contract,0)}</td>
+      <td class="num">${fmt(p.fin_paid,0)}</td>
+      <td>${tags}</td>`;
+    tr.addEventListener('click', () => openProject(p));
+    tb.appendChild(tr);
+  });
+}
+['fBucket','fRisk','fPm','fSearch'].forEach(id => document.getElementById(id).addEventListener('input', renderTable));
+renderTable();
+
+// charts（Chart 失败时不阻断表格）
+// 注意：不能用 const top —— 浏览器全局已有 window.top，会报 Identifier already declared
+const topProjects = active.slice().sort((a,b)=>(b.settle||0)-(a.settle||0)).slice(0,16);
+try {
+if (typeof Chart !== 'undefined') {
+new Chart(document.getElementById('cMargin'), {
+  type:'bar',
+  data:{
+    labels: topProjects.map(p=>p.name),
+    datasets:[
+      {label:'预计毛利率%', data: topProjects.map(p=>p.exp_margin!=null?+(p.exp_margin*100).toFixed(1):null), backgroundColor:'rgba(31,138,101,.75)'},
+      {label:'投标毛利率%', data: topProjects.map(p=>p.bid_margin!=null?+(p.bid_margin*100).toFixed(1):null), backgroundColor:'rgba(26,107,122,.4)'},
+    ]
+  },
+  options:{
+    responsive:true,
+    maintainAspectRatio:false,
+    plugins:{title:{display:true,text:'在建项目毛利率（预计 vs 投标）'},legend:{position:'bottom'}},
+    scales:{x:{ticks:{maxRotation:55,font:{size:10}}},y:{title:{display:true,text:'%'}}}
+  }
+});
+new Chart(document.getElementById('cStruct'), {
+  type:'bar',
+  data:{
+    labels:['人','材','机'],
+    datasets:[
+      {label:'预算', data:[sum(active,'budget_labor'),sum(active,'budget_mat'),sum(active,'budget_mach')], backgroundColor:'rgba(26,107,122,.55)'},
+      {label:'过程', data:[sum(active,'proc_labor'),sum(active,'proc_mat'),sum(active,'proc_mach')], backgroundColor:'rgba(31,138,101,.7)'},
+    ]
+  },
+  options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'在建组合 · 预算 vs 过程人材机'},legend:{position:'bottom'}}}
+});
+}
+} catch (err) {
+  console.warn('组合图表初始化失败', err);
+}
+
+// sources
+const src = meta.sources || {};
+document.getElementById('sources').innerHTML = '<b>数据源</b><br/>' + Object.entries(src).map(([k,v])=>`· ${k}：${v}`).join('<br/>');
+
+// modal
+const mask = document.getElementById('mask');
+let charts = [];
+function destroyCharts() { charts.forEach(c => c.destroy()); charts = []; }
+function closeModal() {
+  mask.classList.remove('show');
+  document.body.style.overflow = '';
+  destroyCharts();
+}
+function openModal() {
+  mask.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+document.getElementById('btnClose').onclick = (e) => { e.stopPropagation(); closeModal(); };
+mask.onclick = closeModal;
+document.addEventListener('keydown', e => { if (e.key==='Escape') closeModal(); });
+
+document.getElementById('tabs').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-tab]');
+  if (!btn) return;
+  const tab = btn.dataset.tab;
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b===btn));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-'+tab));
+});
+
+function barPair(label, b, p, maxv) {
+  const bw = maxv ? (b/maxv*100) : 0, pw = maxv ? (p/maxv*100) : 0;
+  return `<div class="bar-row"><span>${label}</span><div class="track"><i class="b" style="width:${bw}%"></i><i class="p" style="width:${pw}%"></i></div><span>${fmt(b)} / ${fmt(p)}</span></div>`;
+}
+
+function openProject(p) {
+  destroyCharts();
+  document.getElementById('dTitle').textContent = (p.code ? p.code + ' · ' : '') + (p.name || '');
+  document.getElementById('dSub').textContent = [p.pm, p.status||p.bucket, p.full_name].filter(Boolean).join(' ｜ ');
+  document.querySelectorAll('.tabs button').forEach((b,i) => b.classList.toggle('active', i===0));
+  document.querySelectorAll('.tab-pane').forEach((el,i) => el.classList.toggle('active', i===0));
+
+  // 1 总览
+  document.getElementById('tab-overview').innerHTML = `
+    <div class="lifecycle">
+      <div class="s"><div class="t">预算人材机</div><div class="n">${fmt(p.budget_total)}</div></div>
+      <div class="s"><div class="t">责任成本</div><div class="n">${fmt(p.resp_cost)}</div></div>
+      <div class="s"><div class="t">已发生</div><div class="n">${fmt(p.actual)}</div><div class="t">消耗 ${pct(p.consume)}</div></div>
+      <div class="s"><div class="t">预估剩余</div><div class="n">${fmt(p.forecast)}</div></div>
+      <div class="s"><div class="t">预计总成本</div><div class="n">${fmt(p.est_cost)}</div></div>
+      <div class="s"><div class="t">预计毛利 / 率</div><div class="n">${fmt(p.exp_profit)}</div><div class="t">${pct(p.exp_margin)}</div></div>
+    </div>
+    <div class="kv">
+      <div class="item"><div class="t">业主合同 / 预计结算</div><div class="n">${fmt(p.contract)} / ${fmt(p.settle)}</div></div>
+      <div class="item"><div class="t">投标毛利 / 率</div><div class="n">${fmt(p.bid_profit)} / ${pct(p.bid_margin)}</div></div>
+      <div class="item"><div class="t">形象进度</div><div class="n">${pct(p.progress)}</div></div>
+      <div class="item"><div class="t">成本-进度差</div><div class="n">${p.cost_progress_gap==null?'—':(p.cost_progress_gap*100).toFixed(1)+' pct'}</div></div>
+      <div class="item"><div class="t">人材机执行率</div><div class="n ${erClass(p.exec_total)}">${pct(p.exec_total)}</div></div>
+      <div class="item"><div class="t">分包合同 / 财务实付</div><div class="n">${fmt(p.sub_contract)} / ${fmt(p.fin_paid)}</div></div>
+    </div>
+    <div class="sec">综合判断</div>
+    <div>${(p.alerts&&p.alerts.length)?p.alerts.map(a=>`<span class="tag">${a}</span>`).join(' '):'<span class="tag ok">未触发预警规则</span>'}</div>
+    <div class="note" style="margin-top:8px">${p.note||''} ${p.progress_note||''}</div>
+  `;
+
+  // 2 预算
+  const bl=p.budget_labor||0, bm=p.budget_mat||0, bh=p.budget_mach||0;
+  document.getElementById('tab-budget').innerHTML = `
+    <div class="kv">
+      <div class="item"><div class="t">预算币种</div><div class="n">${p.budget_currency||'—'}</div></div>
+      <div class="item"><div class="t">人材机合计</div><div class="n">${fmt(p.budget_total)} 万泰铢</div></div>
+      <div class="item"><div class="t">人 / 材 / 机</div><div class="n">${fmt(bl)} / ${fmt(bm)} / ${fmt(bh)}</div></div>
+      <div class="item"><div class="t">管 + 其他</div><div class="n">${fmt(p.budget_mgmt)} / ${fmt(p.budget_other)}</div></div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="mini-chart"><canvas id="pieBud"></canvas></div>
+      <div>
+        <div class="sec">主材预算金额（万泰铢）</div>
+        <table class="inner" width="100%"><thead><tr><th>品类</th><th class="num">数量</th><th class="num">金额</th></tr></thead>
+        <tbody>
+          <tr><td>钢筋</td><td class="num">${fmt(p.bud_rebar_qty_kg,0)} kg</td><td class="num">${fmt(p.bud_rebar_amt)}</td></tr>
+          <tr><td>混凝土</td><td class="num">${fmt(p.bud_conc_qty_m3,0)} m³</td><td class="num">${fmt(p.bud_conc_amt)}</td></tr>
+          <tr><td>砂浆</td><td class="num">${fmt(p.bud_mortar_qty,0)}</td><td class="num">${fmt(p.bud_mortar_amt)}</td></tr>
+          <tr><td>碎石</td><td class="num">${fmt(p.bud_gravel_qty,0)}</td><td class="num">${fmt(p.bud_gravel_amt)}</td></tr>
+          <tr><td>砖</td><td class="num">${fmt(p.bud_brick_qty,0)}</td><td class="num">${fmt(p.bud_brick_amt)}</td></tr>
+          <tr><td>其他材料</td><td class="num">—</td><td class="num">${fmt(p.bud_other_mat_amt)}</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  `;
+  try { if (typeof Chart !== 'undefined') charts.push(new Chart(document.getElementById('pieBud'), {
+    type:'doughnut',
+    data:{labels:['人','材','机'],datasets:[{data:[bl,bm,bh],backgroundColor:['#3a7bd5','#1f8a65','#c4892a']}]},
+    options:{plugins:{title:{display:true,text:'预算结构'},legend:{position:'bottom'}}}
+  })); } catch(e) { console.warn(e); }
+
+  // 3 采购
+  document.getElementById('tab-purchase').innerHTML = `
+    <div class="kv">
+      <div class="item"><div class="t">采购台账合计</div><div class="n">${fmt(p.proc_purchase)}</div></div>
+      <div class="item"><div class="t">商混金额 / 方量</div><div class="n">${fmt(p.proc_ready_mix)} / ${fmt(p.ready_mix_m3,0)} m³</div></div>
+      <div class="item"><div class="t">材料过程合计</div><div class="n">${fmt(p.proc_mat)}</div></div>
+      <div class="item"><div class="t">人工 / 机具过程</div><div class="n">${fmt(p.proc_labor)} / ${fmt(p.proc_mach)}</div></div>
+    </div>
+    <div class="sec">采购分类（台账）</div>
+    <div class="grid2">
+      <div class="mini-chart"><canvas id="pieBuy"></canvas></div>
+      <table class="inner" width="100%"><thead><tr><th>分类</th><th class="num">数量</th><th class="num">金额万泰铢</th></tr></thead>
+      <tbody>
+        <tr><td>钢筋</td><td class="num">${fmt(p.buy_rebar_kg,0)} kg</td><td class="num">${fmt(p.buy_rebar_amt)}</td></tr>
+        <tr><td>砂浆水泥</td><td class="num">${fmt(p.buy_cement_kg,0)} kg</td><td class="num">${fmt(p.buy_cement_amt)}</td></tr>
+        <tr><td>砖</td><td class="num">${fmt(p.buy_brick_m3,1)} m³</td><td class="num">${fmt(p.buy_brick_amt)}</td></tr>
+        <tr><td>模板</td><td class="num">${fmt(p.buy_formwork_m2,0)} m²</td><td class="num">${fmt(p.buy_formwork_amt)}</td></tr>
+        <tr><td>碎石</td><td class="num">${fmt(p.buy_gravel_t,1)} t</td><td class="num">${fmt(p.buy_gravel_amt)}</td></tr>
+        <tr><td>其他</td><td class="num">—</td><td class="num">${fmt(p.buy_other_amt)}</td></tr>
+      </tbody></table>
+    </div>
+    <div class="note" style="margin-top:8px">过程「材」= 采购 + 商混。分类金额来自项目采购分类汇总。</div>
+  `;
+  try { if (typeof Chart !== 'undefined') charts.push(new Chart(document.getElementById('pieBuy'), {
+    type:'doughnut',
+    data:{labels:['钢筋','砂浆水泥','砖','模板','碎石','其他'],
+      datasets:[{data:[p.buy_rebar_amt||0,p.buy_cement_amt||0,p.buy_brick_amt||0,p.buy_formwork_amt||0,p.buy_gravel_amt||0,p.buy_other_amt||0],
+        backgroundColor:['#3a7bd5','#1f8a65','#c4892a','#8e6bb8','#5b8fa8','#9aa5a0']}]},
+    options:{plugins:{title:{display:true,text:'采购分类结构'},legend:{position:'bottom'}}}
+  })); } catch(e) { console.warn(e); }
+
+  // 4 预算 vs 采购
+  const maxLmh = Math.max(bl,bm,bh,p.proc_labor||0,p.proc_mat||0,p.proc_mach||0,1);
+  const rb = p.cmp_rebar_qty || {}, ra = p.cmp_rebar_amt || {}, cc = p.cmp_concrete || {};
+  document.getElementById('tab-cmp').innerHTML = `
+    <div class="sec">人材机：预算 vs 过程（条形同尺度）</div>
+    ${barPair('人', bl, p.proc_labor||0, maxLmh)}
+    ${barPair('材', bm, p.proc_mat||0, maxLmh)}
+    ${barPair('机', bh, p.proc_mach||0, maxLmh)}
+    <div class="kv" style="margin-top:10px">
+      <div class="item"><div class="t">人执行率</div><div class="n ${erClass(p.exec_labor)}">${pct(p.exec_labor)}</div></div>
+      <div class="item"><div class="t">材执行率</div><div class="n ${erClass(p.exec_mat)}">${pct(p.exec_mat)}</div></div>
+      <div class="item"><div class="t">机执行率</div><div class="n ${erClass(p.exec_mach)}">${pct(p.exec_mach)}</div></div>
+      <div class="item"><div class="t">合计执行率</div><div class="n ${erClass(p.exec_total)}">${pct(p.exec_total)}</div></div>
+    </div>
+    <div class="sec">主材量价对比</div>
+    <table class="inner" width="100%">
+      <thead><tr><th>项目</th><th class="num">预算</th><th class="num">过程</th><th class="num">执行率</th></tr></thead>
+      <tbody>
+        <tr><td>钢筋数量 (kg)</td><td class="num">${fmt(rb.budget,0)}</td><td class="num">${fmt(rb.process,0)}</td><td class="num ${erClass(rb.ratio)}">${pct(rb.ratio)}</td></tr>
+        <tr><td>钢筋金额 (万泰铢)</td><td class="num">${fmt(ra.budget)}</td><td class="num">${fmt(ra.process)}</td><td class="num ${erClass(ra.ratio)}">${pct(ra.ratio)}</td></tr>
+        <tr><td>混凝土数量 (m³)</td><td class="num">${fmt(cc.budget_qty,0)}</td><td class="num">${fmt(cc.process_qty,0)} <span class="sub">商混</span></td><td class="num ${erClass(cc.qty_ratio)}">${pct(cc.qty_ratio)}</td></tr>
+        <tr><td>混凝土金额 (万泰铢)</td><td class="num">${fmt(cc.budget_amt)}</td><td class="num">${fmt(cc.process_amt)}</td><td class="num">—</td></tr>
+      </tbody>
+    </table>
+    <div class="mini-chart" style="margin-top:12px"><canvas id="cmpBar"></canvas></div>
+    <div class="note">过程为累计台账，在建项目执行率&gt;100%可能正常（进度已过半且预算含未完）；需结合形象进度解读。</div>
+  `;
+  try { if (typeof Chart !== 'undefined') charts.push(new Chart(document.getElementById('cmpBar'), {
+    type:'bar',
+    data:{
+      labels:['人','材','机'],
+      datasets:[
+        {label:'预算', data:[bl,bm,bh], backgroundColor:'rgba(26,107,122,.55)'},
+        {label:'过程', data:[p.proc_labor||0,p.proc_mat||0,p.proc_mach||0], backgroundColor:'rgba(31,138,101,.75)'},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'预算 vs 过程（万泰铢）'},legend:{position:'bottom'}}}
+  })); } catch(e) { console.warn(e); }
+
+  // 5 分包 · 责任成本
+  const items = (p.resp_items||[]).slice(0,15);
+  const rows = items.map(it => `<tr><td>${it.is_subcontract?'📦 ':''}${it.name}</td><td class="num">${fmt(it.amount_wan)}</td></tr>`).join('')
+    || '<tr><td colspan="2" class="note">暂无责任成本明细文件</td></tr>';
+  document.getElementById('tab-sub').innerHTML = `
+    <div class="kv">
+      <div class="item"><div class="t">责任成本（报公司）</div><div class="n">${fmt(p.resp_cost)}</div></div>
+      <div class="item"><div class="t">责任成本·分包类合计</div><div class="n">${fmt(p.resp_subcontract_budget)}</div><div class="t">明细汇总</div></div>
+      <div class="item"><div class="t">分包签订合同额</div><div class="n">${fmt(p.sub_contract)}</div></div>
+      <div class="item"><div class="t">分包已付款</div><div class="n">${fmt(p.sub_paid)}</div><div class="t">比例 ${pct(p.sub_pay_ratio)}</div></div>
+      <div class="item"><div class="t">分包未付款</div><div class="n">${fmt(p.sub_unpaid)}</div></div>
+      <div class="item"><div class="t">合同/责任(分包口径)</div><div class="n ${erClass(p.sub_vs_resp)}">${pct(p.sub_vs_resp)}</div></div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="mini-chart"><canvas id="subBar"></canvas></div>
+      <div>
+        <div class="sec">责任成本明细（节选）</div>
+        <div style="max-height:220px;overflow:auto">
+          <table class="inner" width="100%"><thead><tr><th>分项</th><th class="num">金额万泰铢</th></tr></thead>
+          <tbody>${rows}</tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="note">综合：分包合同宜对照责任成本中分包口径；付款进度对照合同额与形象进度。若合同/责任显著&gt;100%，需核对接量签证或责任成本漏项。</div>
+  `;
+  try { if (typeof Chart !== 'undefined') charts.push(new Chart(document.getElementById('subBar'), {
+    type:'bar',
+    data:{
+      labels:['责任成本','责任·分包口径','分包合同','分包已付'],
+      datasets:[{label:'万泰铢', data:[p.resp_cost||0,p.resp_subcontract_budget||0,p.sub_contract||0,p.sub_paid||0],
+        backgroundColor:['#1a6b7a','#3a7bd5','#c4892a','#1f8a65']}]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{display:false},title:{display:true,text:'责任成本 vs 分包执行'}},
+      scales:{x:{ticks:{font:{size:10}}}}
+    }
+  })); } catch(e) { console.warn(e); }
+
+  // 6 财务
+  const subjects = p.fin_subjects || {};
+  const subjLabels = Object.keys(subjects);
+  const subjData = subjLabels.map(k => subjects[k]||0);
+  const months = p.fin_monthly || [];
+  const recent = months.slice(-12);
+  document.getElementById('tab-fin').innerHTML = `
+    <div class="kv">
+      <div class="item"><div class="t">应付金额</div><div class="n">${fmt(p.fin_payable)}</div></div>
+      <div class="item"><div class="t">实付金额</div><div class="n">${fmt(p.fin_paid)}</div></div>
+      <div class="item"><div class="t">付款比例</div><div class="n">${pct(p.fin_pay_ratio)}</div></div>
+      <div class="item"><div class="t">增值税 / 预扣税</div><div class="n">${fmt(p.fin_vat)} / ${fmt(p.fin_withhold)}</div></div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="mini-chart"><canvas id="finSubj"></canvas></div>
+      <div class="mini-chart"><canvas id="finMonth"></canvas></div>
+    </div>
+    <div class="sec">与成本模块对照</div>
+    <div class="kv">
+      <div class="item"><div class="t">财务实付 vs 已发生成本</div><div class="n">${fmt(p.fin_paid)} / ${fmt(p.actual)}</div></div>
+      <div class="item"><div class="t">财务实付 vs 分包已付</div><div class="n">${fmt(p.fin_paid)} / ${fmt(p.sub_paid)}</div></div>
+      <div class="item"><div class="t">实付 / 责任成本</div><div class="n">${p.resp_cost?pct((p.fin_paid||0)/p.resp_cost):'—'}</div></div>
+      <div class="item"><div class="t">实付 / 预计结算</div><div class="n">${p.settle?pct((p.fin_paid||0)/p.settle):'—'}</div></div>
+    </div>
+    <div class="note">财务科目为一级汇总（分包/人工/材料/机具等）。与工程「已发生」口径可能存在时间差与归集差，差异大时需对账。</div>
+  `;
+  try {
+  if (typeof Chart !== 'undefined' && subjLabels.length) {
+    charts.push(new Chart(document.getElementById('finSubj'), {
+      type:'doughnut',
+      data:{labels:subjLabels, datasets:[{data:subjData, backgroundColor:['#c4892a','#3a7bd5','#1f8a65','#8e6bb8','#5b8fa8','#d9847a','#9aa5a0']}]},
+      options:{plugins:{title:{display:true,text:'付款一级科目'},legend:{position:'bottom'}}}
+    }));
+  }
+  if (typeof Chart !== 'undefined' && recent.length) {
+    charts.push(new Chart(document.getElementById('finMonth'), {
+      type:'line',
+      data:{
+        labels: recent.map(x=>x.month),
+        datasets:[{label:'月付款', data:recent.map(x=>x.amount), borderColor:'#1a6b7a', backgroundColor:'rgba(26,107,122,.15)', fill:true, tension:.25}]
+      },
+      options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'近12个月付款'},legend:{display:false}}}
+    }));
+  }
+  } catch(e) { console.warn(e); }
+
+  openModal();
+}
+</script>
+</body>
+</html>
