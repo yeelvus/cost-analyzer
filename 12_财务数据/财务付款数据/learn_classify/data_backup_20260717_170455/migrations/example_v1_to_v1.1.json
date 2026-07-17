@@ -1,0 +1,24 @@
+{
+  "from_version": "1.0.0",
+  "to_version": "1.1.0",
+  "description": "示例：将「其他」中的检测类转移到检验试验（演示 id_map；实际按需改）",
+  "id_map": {},
+  "rename": {
+    "L2_mgmt_other": "其他(待拆分)"
+  },
+  "add_level2": [
+    {
+      "id": "L2_waste",
+      "name": "危废清运",
+      "parent": "L1_mgmt",
+      "order": 45,
+      "aliases": [
+        "危废处理",
+        "保温棉危废"
+      ]
+    }
+  ],
+  "reparent": {},
+  "deactivate": [],
+  "pending_l2_id": "L2_pending"
+}

@@ -1,0 +1,684 @@
+{
+  "version": "1.0.0",
+  "description": "财务付款分析分类树；用稳定 ID，显示名可改；迁移用 id_map",
+  "default_l2_id": "L2_pending",
+  "pending_l2_id": "L2_pending",
+  "level1": [
+    {
+      "id": "L1_sub",
+      "name": "0_分包",
+      "order": 0,
+      "active": true,
+      "notes": ""
+    },
+    {
+      "id": "L1_labor",
+      "name": "1_人工费",
+      "order": 1,
+      "active": true,
+      "notes": ""
+    },
+    {
+      "id": "L1_mat",
+      "name": "2_材料采购",
+      "order": 2,
+      "active": true,
+      "notes": ""
+    },
+    {
+      "id": "L1_equip",
+      "name": "3_机具费",
+      "order": 3,
+      "active": true,
+      "notes": ""
+    },
+    {
+      "id": "L1_lease",
+      "name": "4_材料租赁",
+      "order": 4,
+      "active": true,
+      "notes": ""
+    },
+    {
+      "id": "L1_logistics",
+      "name": "5_关税物流",
+      "order": 5,
+      "active": true,
+      "notes": ""
+    },
+    {
+      "id": "L1_mgmt",
+      "name": "6_管理费",
+      "order": 6,
+      "active": true,
+      "notes": ""
+    },
+    {
+      "id": "L1_exclude",
+      "name": "不计入成本",
+      "order": 7,
+      "active": true,
+      "notes": ""
+    }
+  ],
+  "level2": [
+    {
+      "id": "L2_sub_pay",
+      "name": "分包款",
+      "parent": "L1_sub",
+      "order": 0,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_sub_loan",
+      "name": "分包借款",
+      "parent": "L1_sub",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_labor_security",
+      "name": "保安工资",
+      "parent": "L1_labor",
+      "order": 0,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_labor_salary",
+      "name": "工资薪金",
+      "parent": "L1_labor",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_labor_mm",
+      "name": "缅工",
+      "parent": "L1_labor",
+      "order": 2,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_labor_local",
+      "name": "属地员工",
+      "parent": "L1_labor",
+      "order": 3,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_labor_site",
+      "name": "工程劳工",
+      "parent": "L1_labor",
+      "order": 4,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_劳务费",
+      "name": "劳务费",
+      "parent": "L1_labor",
+      "order": 5,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mat_concrete",
+      "name": "混凝土",
+      "parent": "L1_mat",
+      "order": 0,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mat_steel",
+      "name": "钢筋",
+      "parent": "L1_mat",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mat_pile",
+      "name": "桩",
+      "parent": "L1_mat",
+      "order": 2,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mat_gravel",
+      "name": "碎石",
+      "parent": "L1_mat",
+      "order": 3,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mat_generic",
+      "name": "材料采购",
+      "parent": "L1_mat",
+      "order": 4,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_物资采购",
+      "name": "物资采购",
+      "parent": "L1_mat",
+      "order": 5,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_eq_pump",
+      "name": "泵车租赁",
+      "parent": "L1_equip",
+      "order": 0,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_eq_tower",
+      "name": "塔吊租赁",
+      "parent": "L1_equip",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_eq_excavator",
+      "name": "挖机租赁",
+      "parent": "L1_equip",
+      "order": 2,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_eq_crane",
+      "name": "吊车租赁",
+      "parent": "L1_equip",
+      "order": 3,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_eq_truckcrane",
+      "name": "随车吊租赁",
+      "parent": "L1_equip",
+      "order": 4,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_eq_generator",
+      "name": "发电机租赁",
+      "parent": "L1_equip",
+      "order": 5,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_eq_loader",
+      "name": "铲车租赁",
+      "parent": "L1_equip",
+      "order": 6,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_eq_boom",
+      "name": "曲臂车租赁",
+      "parent": "L1_equip",
+      "order": 7,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_eq_flatbed",
+      "name": "平板车租赁",
+      "parent": "L1_equip",
+      "order": 8,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_eq_general",
+      "name": "机具使用费",
+      "parent": "L1_equip",
+      "order": 9,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_lease_scaffold",
+      "name": "脚手架租赁",
+      "parent": "L1_lease",
+      "order": 0,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_lease_plate",
+      "name": "钢板租赁",
+      "parent": "L1_lease",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_lease_pipe",
+      "name": "钢管租赁",
+      "parent": "L1_lease",
+      "order": 2,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_lease_container",
+      "name": "集装箱租赁",
+      "parent": "L1_lease",
+      "order": 3,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_lease_form",
+      "name": "钢膜租赁",
+      "parent": "L1_lease",
+      "order": 4,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_lease_general",
+      "name": "租赁费",
+      "parent": "L1_lease",
+      "order": 5,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_log_transport",
+      "name": "运输费",
+      "parent": "L1_logistics",
+      "order": 0,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_log_customs",
+      "name": "关税物流费",
+      "parent": "L1_logistics",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_entertain",
+      "name": "招待费",
+      "parent": "L1_mgmt",
+      "order": 0,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_safety",
+      "name": "安全费用",
+      "parent": "L1_mgmt",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_office",
+      "name": "办公费",
+      "parent": "L1_mgmt",
+      "order": 2,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_petty",
+      "name": "备用金",
+      "parent": "L1_mgmt",
+      "order": 3,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_clean",
+      "name": "场地清理费",
+      "parent": "L1_mgmt",
+      "order": 4,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_vehicle",
+      "name": "车辆使用费",
+      "parent": "L1_mgmt",
+      "order": 5,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_food",
+      "name": "伙食费",
+      "parent": "L1_mgmt",
+      "order": 6,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_other",
+      "name": "其他",
+      "parent": "L1_mgmt",
+      "order": 7,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_fuel",
+      "name": "燃料及动力",
+      "parent": "L1_mgmt",
+      "order": 8,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_util",
+      "name": "水电费",
+      "parent": "L1_mgmt",
+      "order": 9,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_deposit",
+      "name": "押金",
+      "parent": "L1_mgmt",
+      "order": 10,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_park",
+      "name": "园区管理费",
+      "parent": "L1_mgmt",
+      "order": 11,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_permit",
+      "name": "证件许可",
+      "parent": "L1_mgmt",
+      "order": 12,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_rent",
+      "name": "房租物业费",
+      "parent": "L1_mgmt",
+      "order": 13,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_flyvisa",
+      "name": "飞签",
+      "parent": "L1_mgmt",
+      "order": 14,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_water",
+      "name": "饮用水付款",
+      "parent": "L1_mgmt",
+      "order": 15,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_workvisa",
+      "name": "工作签",
+      "parent": "L1_mgmt",
+      "order": 16,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_admin",
+      "name": "行政用品",
+      "parent": "L1_mgmt",
+      "order": 17,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_ceremony",
+      "name": "开工仪式",
+      "parent": "L1_mgmt",
+      "order": 18,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_stamp",
+      "name": "印花税",
+      "parent": "L1_mgmt",
+      "order": 19,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_agency",
+      "name": "中介费",
+      "parent": "L1_mgmt",
+      "order": 20,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_cash",
+      "name": "取现",
+      "parent": "L1_mgmt",
+      "order": 21,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_fx",
+      "name": "换汇",
+      "parent": "L1_mgmt",
+      "order": 22,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_visa",
+      "name": "签证费",
+      "parent": "L1_mgmt",
+      "order": 23,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_test",
+      "name": "检验试验",
+      "parent": "L1_mgmt",
+      "order": 24,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_toll",
+      "name": "过路费",
+      "parent": "L1_mgmt",
+      "order": 25,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_perf_bond",
+      "name": "履约保证金",
+      "parent": "L1_mgmt",
+      "order": 26,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_fuel2",
+      "name": "燃料动力",
+      "parent": "L1_mgmt",
+      "order": 27,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_fuel3",
+      "name": "燃料",
+      "parent": "L1_mgmt",
+      "order": 28,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_gas",
+      "name": "加油费",
+      "parent": "L1_mgmt",
+      "order": 29,
+      "active": true,
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "id": "L2_pending",
+      "name": "待复核",
+      "parent": "L1_mgmt",
+      "order": 0,
+      "active": true,
+      "aliases": [
+        "待分类",
+        "(空白)"
+      ],
+      "notes": "seed extra"
+    },
+    {
+      "id": "L2_mgmt_travel",
+      "name": "差旅费",
+      "parent": "L1_mgmt",
+      "order": 80,
+      "active": true,
+      "aliases": [],
+      "notes": "seed extra"
+    },
+    {
+      "id": "L2_mgmt_tax",
+      "name": "税款",
+      "parent": "L1_mgmt",
+      "order": 81,
+      "active": true,
+      "aliases": [
+        "预扣税",
+        "增值税"
+      ],
+      "notes": "seed extra"
+    },
+    {
+      "id": "L2_mgmt_bid_bond",
+      "name": "投标保证金",
+      "parent": "L1_mgmt",
+      "order": 82,
+      "active": true,
+      "aliases": [],
+      "notes": "seed extra"
+    },
+    {
+      "id": "L2_exclude_transfer",
+      "name": "资金调拨",
+      "parent": "L1_exclude",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": "seed extra"
+    },
+    {
+      "id": "L2_exclude_other",
+      "name": "不计入成本",
+      "parent": "L1_exclude",
+      "order": 2,
+      "active": true,
+      "aliases": [],
+      "notes": "seed extra"
+    }
+  ]
+}

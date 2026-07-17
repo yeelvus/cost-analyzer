@@ -1,0 +1,1 @@
+{"ts": "2026-07-17T17:04:55", "subject": "其他", "summary": "带关费用测试样例XYZ", "vendor": "测试供应商A", "old_l2_id": "", "new_l2_id": "L2_mgmt_permit", "old_l1_name": "", "old_l2_name": "", "new_l1_name": "6_管理费", "new_l2_name": "证件许可", "source": "unit_test", "notes": ""}
