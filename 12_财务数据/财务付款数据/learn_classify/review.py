@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -195,6 +196,18 @@ def update_excel_classification_columns(
             if conf_idx:
                 ws.cell(row=r, column=conf_idx, value=result.confidence)
             updated += 1
+
+    # 重分类后刷新一二级下拉（与 taxonomy 同步）
+    try:
+        hub_root = Path(__file__).resolve().parent.parent
+        if str(hub_root) not in sys.path:
+            sys.path.insert(0, str(hub_root))
+        from payment_hub.category_dropdowns import apply_category_dropdowns
+
+        data_dir = Path(__file__).resolve().parent / "data"
+        apply_category_dropdowns(wb, data_dir=data_dir)
+    except Exception:
+        pass
 
     wb.save(excel_path)
     return updated

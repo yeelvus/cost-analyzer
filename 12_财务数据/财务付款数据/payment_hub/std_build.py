@@ -252,7 +252,7 @@ def format_last_payment_date(df: pd.DataFrame) -> str:
     return "未识别日期"
 
 
-def apply_output_format(output_path: Path) -> None:
+def apply_output_format(output_path: Path, classify_data: Path | None = None) -> None:
     def _to_float(value):
         if value is None:
             return None
@@ -304,6 +304,17 @@ def apply_output_format(output_path: Path) -> None:
                 if abs(payable - (withhold + actual)) > 1e-6:
                     for col_idx in range(1, ws.max_column + 1):
                         ws.cell(row=row_idx, column=col_idx).fill = mismatch_fill
+
+    # 一级/二级科目下拉（联动）
+    try:
+        from .category_dropdowns import apply_category_dropdowns
+        from .config import Paths as _Paths
+
+        data_dir = Path(classify_data) if classify_data else _Paths().classify_data
+        apply_category_dropdowns(wb, data_dir=data_dir)
+    except Exception as exc:
+        print(f"  ⚠️ 分类下拉写入失败: {exc}")
+
     wb.save(output_path)
 
 
@@ -386,7 +397,7 @@ def run_std(paths: Paths, *, cleanup_stale: bool = False) -> List[str]:
         with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
             wan_df.to_excel(writer, sheet_name="明细数据_万泰铢", index=False)
             project_df.to_excel(writer, sheet_name="明细数据", index=False)
-        apply_output_format(out_path)
+        apply_output_format(out_path, classify_data=paths.classify_data)
         outputs.append(str(out_path))
         print(f"  ✅ {out_name}  ({len(project_df)} 行)")
 

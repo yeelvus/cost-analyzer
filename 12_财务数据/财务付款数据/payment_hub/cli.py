@@ -163,6 +163,12 @@ def build_parser() -> argparse.ArgumentParser:
     c = sub.add_parser("show-paths", help="显示当前默认路径")
     _add_path_args(c)
 
+    c = sub.add_parser(
+        "dropdowns",
+        help="给 B_std 下已有 Excel 的一级/二级列批量加下拉（不重算数据）",
+    )
+    _add_path_args(c)
+
     return p
 
 
@@ -283,6 +289,15 @@ def main(argv=None) -> int:
                     indent=2,
                 )
             )
+            return 0
+
+        if args.cmd == "dropdowns":
+            from .category_dropdowns import apply_category_dropdowns_to_std_dir
+
+            stats = apply_category_dropdowns_to_std_dir(
+                paths.std_dir, data_dir=paths.classify_data
+            )
+            print(f"✅ 下拉批量完成: {stats}")
             return 0
 
         parser.error(f"未知命令: {args.cmd}")
