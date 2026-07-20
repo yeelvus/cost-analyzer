@@ -60,11 +60,14 @@
   "履约保证金": "L2_mgmt_perf_bond",
   "燃料动力": "L2_mgmt_fuel2",
   "燃料": "L2_mgmt_fuel3",
-  "加油费": "L2_mgmt_gas",
+  "加油费": "L2_mgmt_fuel",
   "待复核": "L2_pending",
   "差旅费": "L2_mgmt_travel",
   "税款": "L2_mgmt_tax",
   "投标保证金": "L2_mgmt_bid_bond",
   "资金调拨": "L2_exclude_transfer",
-  "不计入成本": "L2_exclude_other"
+  "不计入成本": "L2_exclude_other",
+  "手续费": "L2_mgmt_bank_fee",
+  "检测费": "L2_mgmt_test",
+  "试验费": "L2_mgmt_test"
 }

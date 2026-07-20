@@ -18,9 +18,13 @@ from pathlib import Path
 from .config import Paths
 from .pipeline import (
     run_pipeline,
+    step_apply_class_master,
     step_cashflow,
+    step_export_class_master,
     step_export_review,
+    step_export_taxonomy,
     step_health,
+    step_import_taxonomy,
     step_learn,
     step_reclassify,
     step_std,
@@ -44,6 +48,7 @@ def _paths_from_args(args) -> Paths:
         p.classify_data = Path(args.data_dir)
         p.review_xlsx = p.classify_data / "待复核池.xlsx"
         p.rules_suggest_xlsx = p.classify_data / "规则建议.xlsx"
+        p.class_master_xlsx = p.classify_data / "付款分类总表.xlsx"
     return p
 
 
@@ -70,8 +75,11 @@ def build_parser() -> argparse.ArgumentParser:
   python 财务付款一体化.py summary           # 仅汇总
   python 财务付款一体化.py cashflow          # 仅 HTML
   python 财务付款一体化.py review            # 导出待复核
-  python 财务付款一体化.py learn -i 待复核池.xlsx
-  python 财务付款一体化.py help-guide        # 打印使用说明
+  python 财务付款一体化.py export-class      # 导出「付款分类总表」(摘要去重)
+  python 财务付款一体化.py apply-class       # 按总表学习并重刷分类
+  python 财务付款一体化.py export-taxonomy   # 导出一级/二级科目体系 Excel
+  python 财务付款一体化.py import-taxonomy   # 导入科目体系(改下拉选项)
+  python 财务付款一体化.py help-guide
         """,
     )
     # 无子命令时默认全流程；以下为全流程可用参数（写在主 parser 上）
@@ -168,6 +176,54 @@ def build_parser() -> argparse.ArgumentParser:
         help="给 B_std 下已有 Excel 的一级/二级列批量加下拉（不重算数据）",
     )
     _add_path_args(c)
+
+    c = sub.add_parser(
+        "export-class",
+        help="导出付款分类总表（全部摘要+一级+二级，可在一个Excel里改）",
+    )
+    _add_path_args(c)
+    c.add_argument(
+        "-o",
+        "--output",
+        default=None,
+        help="输出路径（默认 learn_classify/data/付款分类总表.xlsx）",
+    )
+
+    c = sub.add_parser(
+        "apply-class",
+        help="读取分类总表中的一二级 → 学习记忆 → 重刷 B_std → 再导出总表",
+    )
+    _add_path_args(c)
+    c.add_argument(
+        "-i",
+        "--input",
+        default=None,
+        help="分类总表路径（默认自动找 data 或 C_sum 下的 付款分类总表.xlsx）",
+    )
+    c.add_argument(
+        "--no-reclassify",
+        action="store_true",
+        help="只学习，不重刷 B_std",
+    )
+    c.add_argument(
+        "--no-reexport",
+        action="store_true",
+        help="应用后不重新导出总表",
+    )
+
+    c = sub.add_parser(
+        "export-taxonomy",
+        help="导出一级/二级科目体系 Excel（编辑下拉选项）",
+    )
+    _add_path_args(c)
+    c.add_argument("-o", "--output", default=None, help="默认 data/科目体系.xlsx")
+
+    c = sub.add_parser(
+        "import-taxonomy",
+        help="从科目体系 Excel 写回 taxonomy.json",
+    )
+    _add_path_args(c)
+    c.add_argument("-i", "--input", default=None, help="默认 data/科目体系.xlsx")
 
     return p
 
@@ -298,6 +354,33 @@ def main(argv=None) -> int:
                 paths.std_dir, data_dir=paths.classify_data
             )
             print(f"✅ 下拉批量完成: {stats}")
+            return 0
+
+        if args.cmd == "export-class":
+            step_export_class_master(
+                paths, Path(args.output) if args.output else None
+            )
+            return 0
+
+        if args.cmd == "apply-class":
+            step_apply_class_master(
+                paths,
+                Path(args.input) if args.input else None,
+                reclassify=not args.no_reclassify,
+                reexport=not args.no_reexport,
+            )
+            return 0
+
+        if args.cmd == "export-taxonomy":
+            step_export_taxonomy(
+                paths, Path(args.output) if args.output else None
+            )
+            return 0
+
+        if args.cmd == "import-taxonomy":
+            step_import_taxonomy(
+                paths, Path(args.input) if args.input else None
+            )
             return 0
 
         parser.error(f"未知命令: {args.cmd}")

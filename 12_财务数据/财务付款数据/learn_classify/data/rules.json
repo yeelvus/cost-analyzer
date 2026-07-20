@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "description": "关键词规则 target=l2_id；priority 越大越优先",
+  "version": "1.1.0",
+  "description": "2026-07 数据驱动扩展",
   "rules": [
     {
       "id": "r_L2_sub_pay",
@@ -257,9 +257,9 @@
     {
       "id": "r_L2_mgmt_other",
       "l2_id": "L2_mgmt_other",
-      "priority": 40,
-      "含有": "质保保函;手续费;网络费;春节支出",
-      "不包含": "垃圾处理;场地清理;危废"
+      "priority": 25,
+      "含有": "杂费;无法归类;零星杂费",
+      "不包含": ""
     },
     {
       "id": "r_L2_mgmt_fuel",
@@ -393,6 +393,174 @@
       "priority": 80,
       "含有": "螺栓;焊条;铁丝;钉子;自钻;膨胀螺栓;切割片;五金",
       "不包含": ""
+    },
+    {
+      "id": "r_bank_fee",
+      "l2_id": "L2_mgmt_bank_fee",
+      "priority": 230,
+      "含有": "手续费;银行转账手续费;转账手续费;电汇费",
+      "不包含": "中介费;律师"
+    },
+    {
+      "id": "r_customs_agent",
+      "l2_id": "L2_log_customs_agent",
+      "priority": 220,
+      "含有": "带关费;保关费;带关;报关费;清关",
+      "不包含": ""
+    },
+    {
+      "id": "r_test_fee",
+      "l2_id": "L2_mgmt_test",
+      "priority": 210,
+      "含有": "大小应变;低应变;高应变;检测费;试验费;桩基检测;检验试验;三线检测;一线检测",
+      "不包含": "塔吊"
+    },
+    {
+      "id": "r_net",
+      "l2_id": "L2_mgmt_net",
+      "priority": 200,
+      "含有": "网费;网络费;宽带费;网络;宽带",
+      "不包含": ""
+    },
+    {
+      "id": "r_post",
+      "l2_id": "L2_mgmt_post",
+      "priority": 200,
+      "含有": "邮寄费;邮寄费用;快递费;快递",
+      "不包含": ""
+    },
+    {
+      "id": "r_ins",
+      "l2_id": "L2_mgmt_insurance",
+      "priority": 200,
+      "含有": "保险费;保费;车辆保险;工程保险",
+      "不包含": "安全带"
+    },
+    {
+      "id": "r_design",
+      "l2_id": "L2_mgmt_design",
+      "priority": 190,
+      "含有": "图纸签字;工程师签字;设计费;转图费;图纸费",
+      "不包含": "打印;复印"
+    },
+    {
+      "id": "r_ppe",
+      "l2_id": "L2_mgmt_ppe",
+      "priority": 185,
+      "含有": "劳保用品;劳保;安全帽;反光背心;安全带;工作服",
+      "不包含": ""
+    },
+    {
+      "id": "r_gas",
+      "l2_id": "L2_mgmt_gas",
+      "priority": 185,
+      "含有": "厨房煤气;食堂煤气;煤气费用;煤气;燃气费;液化气",
+      "不包含": ""
+    },
+    {
+      "id": "r_reimb",
+      "l2_id": "L2_mgmt_reimburse",
+      "priority": 80,
+      "含有": "报销费用;日常费用报销;郝阳报销;费用报销",
+      "不包含": "材料报销"
+    },
+    {
+      "id": "r_police",
+      "l2_id": "L2_mgmt_police",
+      "priority": 200,
+      "含有": "治安管理;治安管理费;治安管理付款",
+      "不包含": ""
+    },
+    {
+      "id": "r_permit_fee",
+      "l2_id": "L2_mgmt_permit_sign",
+      "priority": 195,
+      "含有": "施工许可;劳工部检查费;施工许可证",
+      "不包含": ""
+    },
+    {
+      "id": "r_brick",
+      "l2_id": "L2_mat_brick",
+      "priority": 180,
+      "含有": "实心砖;空心砖;加气块;砌块;水泥砖",
+      "不包含": ""
+    },
+    {
+      "id": "r_cement",
+      "l2_id": "L2_mat_cement",
+      "priority": 180,
+      "含有": "水泥采购;吨水泥;抹灰砂浆;砌筑砂浆;预拌砂浆",
+      "不包含": "混凝土"
+    },
+    {
+      "id": "r_cement2",
+      "l2_id": "L2_mat_cement",
+      "priority": 170,
+      "含有": "水泥;砂浆",
+      "不包含": "混凝土;水泥砖"
+    },
+    {
+      "id": "r_sand",
+      "l2_id": "L2_mat_sand",
+      "priority": 175,
+      "含有": "河沙;机制砂;黄沙;中砂;粗砂;沙子;砂子",
+      "不包含": "砂浆;砂石"
+    },
+    {
+      "id": "r_form",
+      "l2_id": "L2_mat_formwork",
+      "priority": 175,
+      "含有": "木模板;木方;建筑模板",
+      "不包含": "钢膜"
+    },
+    {
+      "id": "r_form2",
+      "l2_id": "L2_mat_formwork",
+      "priority": 160,
+      "含有": "模板",
+      "不包含": "钢膜"
+    },
+    {
+      "id": "r_admix",
+      "l2_id": "L2_mat_admix",
+      "priority": 185,
+      "含有": "苏博特;减水剂;外加剂",
+      "不包含": ""
+    },
+    {
+      "id": "r_slag",
+      "l2_id": "L2_mat_slag",
+      "priority": 175,
+      "含有": "炉渣款;炉渣;粉煤灰",
+      "不包含": ""
+    },
+    {
+      "id": "r_hw",
+      "l2_id": "L2_mat_hardware",
+      "priority": 120,
+      "含有": "hardware;DOHOME;HARDWAREHOUSE;五金采购;五金;零星材料",
+      "不包含": ""
+    },
+    {
+      "id": "r_eq_repair",
+      "l2_id": "L2_eq_repair",
+      "priority": 170,
+      "含有": "机具维修;机械维修;车辆维修费;车辆维修;设备维修;补胎;电镐维修;机具维修费",
+      "不包含": ""
+    },
+    {
+      "id": "r_loader",
+      "l2_id": "L2_eq_loader",
+      "priority": 165,
+      "含有": "装载机;铲车租赁;铲车",
+      "不包含": "维修;补胎"
+    },
+    {
+      "id": "r_steel_plate_buy",
+      "l2_id": "L2_mat_steel",
+      "priority": 155,
+      "含有": "钢板;工字钢;角钢;槽钢;型钢",
+      "不包含": "租赁;钢板租赁"
     }
   ]
 }

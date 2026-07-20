@@ -124,6 +124,121 @@ def step_health(paths: Paths) -> None:
     )
 
 
+def step_export_class_master(paths: Paths, out: Optional[Path] = None) -> str:
+    """导出付款分类总表（全量摘要+一二级）。"""
+    _banner("导出分类总表 export-class")
+    import shutil
+    import sys
+
+    root = Path(__file__).resolve().parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from learn_classify.class_master import export_class_master
+    from learn_classify.engine import ClassifyEngine
+
+    dest = Path(out) if out else paths.class_master_xlsx
+    engine = ClassifyEngine.from_data_dir(paths.classify_data)
+    path, n = export_class_master(
+        paths.std_dir, dest, paths.classify_data, engine=engine
+    )
+    # 同步一份到 C_财务付款_sum，方便业务侧打开
+    try:
+        paths.class_master_xlsx_sum.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, paths.class_master_xlsx_sum)
+        print(f"   副本: {paths.class_master_xlsx_sum}")
+    except Exception as e:
+        print(f"  ⚠️ 复制到 C_sum 失败: {e}")
+    print(f"✅ 分类总表: {path}  （{n} 行）")
+    return str(path)
+
+
+def step_apply_class_master(
+    paths: Paths,
+    master: Optional[Path] = None,
+    *,
+    reclassify: bool = True,
+    reexport: bool = True,
+) -> dict:
+    """按分类总表中的一二级调整：学习 + 重刷 std + 再导出总表。"""
+    _banner("应用分类总表 apply-class")
+    import shutil
+    import sys
+
+    root = Path(__file__).resolve().parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from learn_classify.class_master import apply_class_master
+
+    # 优先：用户指定 → data 下总表 → C_sum 副本
+    candidates = []
+    if master:
+        candidates.append(Path(master))
+    candidates.extend(
+        [paths.class_master_xlsx, paths.class_master_xlsx_sum]
+    )
+    src = None
+    for p in candidates:
+        if p and Path(p).is_file():
+            src = Path(p)
+            break
+    if src is None:
+        raise FileNotFoundError(
+            "未找到分类总表。请先运行: python 财务付款一体化.py export-class"
+        )
+
+    print(f"读取: {src}")
+    stats = apply_class_master(
+        src,
+        paths.std_dir,
+        paths.classify_data,
+        reclassify=reclassify,
+        reexport=reexport,
+        out_path=paths.class_master_xlsx,
+    )
+    if reexport and paths.class_master_xlsx.is_file():
+        try:
+            paths.class_master_xlsx_sum.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(paths.class_master_xlsx, paths.class_master_xlsx_sum)
+        except Exception:
+            pass
+    print(f"✅ 应用完成: {stats}")
+    return stats
+
+
+def step_export_taxonomy(paths: Paths, out: Optional[Path] = None) -> str:
+    """导出一级/二级科目体系 Excel（改下拉选项用）。"""
+    _banner("导出科目体系 export-taxonomy")
+    import sys
+
+    root = Path(__file__).resolve().parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from learn_classify.taxonomy_io import export_taxonomy_excel
+
+    dest = Path(out) if out else paths.taxonomy_xlsx
+    path = export_taxonomy_excel(paths.classify_data, dest)
+    print(f"✅ 科目体系: {path}")
+    print("   编辑后执行: python 财务付款一体化.py import-taxonomy")
+    return str(path)
+
+
+def step_import_taxonomy(paths: Paths, src: Optional[Path] = None) -> dict:
+    """从 Excel 导入科目体系 → taxonomy.json。"""
+    _banner("导入科目体系 import-taxonomy")
+    import sys
+
+    root = Path(__file__).resolve().parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from learn_classify.taxonomy_io import import_taxonomy_excel
+
+    excel = Path(src) if src else paths.taxonomy_xlsx
+    stats = import_taxonomy_excel(paths.classify_data, excel, backup=True)
+    print(f"✅ 已写入 taxonomy.json: {stats}")
+    print("   建议接着: export-class 或 dropdowns 刷新下拉")
+    return stats
+
+
 def run_pipeline(
     paths: Paths,
     *,
