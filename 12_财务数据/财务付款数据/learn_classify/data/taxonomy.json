@@ -1,6 +1,6 @@
 {
-  "version": "1.1.0",
-  "description": "据付款分类总表数据扩展材料/管理费二级；优化下拉选项",
+  "version": "1.2.0",
+  "description": "业务大类分类。下拉仅显示二级正式名称（不含别名/型号）。别名仅用于摘要匹配。",
   "default_l2_id": "L2_pending",
   "pending_l2_id": "L2_pending",
   "level1": [
@@ -105,9 +105,6 @@
       "order": 0,
       "active": true,
       "aliases": [
-        "C25",
-        "C30",
-        "C35",
         "商品混凝土",
         "商混",
         "砼"
@@ -130,8 +127,8 @@
       "order": 0,
       "active": true,
       "aliases": [
-        "待分类",
-        "(空白)"
+        "(空白)",
+        "待分类"
       ],
       "notes": "seed extra"
     },
@@ -449,9 +446,9 @@
       "name": "物资采购",
       "parent": "L1_mat",
       "order": 5,
-      "active": true,
+      "active": false,
       "aliases": [],
-      "notes": ""
+      "notes": " | 并入大类「材料采购」"
     },
     {
       "id": "L2_eq_loader",
@@ -460,9 +457,9 @@
       "order": 6,
       "active": true,
       "aliases": [
-        "铲车",
         "装载机",
-        "装载机租赁"
+        "装载机租赁",
+        "铲车"
       ],
       "notes": "含装载机"
     },
@@ -490,7 +487,11 @@
       "parent": "L1_mgmt",
       "order": 7,
       "active": true,
-      "aliases": [],
+      "aliases": [
+        "取现",
+        "开工仪式",
+        "换汇"
+      ],
       "notes": "兜底类，规则低优先级"
     },
     {
@@ -510,7 +511,6 @@
       "active": true,
       "aliases": [
         "95汽油",
-        "B7",
         "加油",
         "加油费",
         "柴油",
@@ -544,7 +544,8 @@
         "园区水费",
         "水费",
         "现场用水",
-        "电费"
+        "电费",
+        "饮用水付款"
       ],
       "notes": ""
     },
@@ -579,6 +580,7 @@
         "工作签",
         "工签",
         "签证",
+        "签证费",
         "落地签"
       ],
       "notes": ""
@@ -602,45 +604,45 @@
       "name": "飞签",
       "parent": "L1_mgmt",
       "order": 14,
-      "active": true,
+      "active": false,
       "aliases": [],
-      "notes": ""
+      "notes": " | 并入大类「差旅费」"
     },
     {
       "id": "L2_mgmt_water",
       "name": "饮用水付款",
       "parent": "L1_mgmt",
       "order": 15,
-      "active": true,
+      "active": false,
       "aliases": [],
-      "notes": ""
+      "notes": " | 并入大类「水电费」"
     },
     {
       "id": "L2_mgmt_workvisa",
       "name": "工作签",
       "parent": "L1_mgmt",
       "order": 16,
-      "active": true,
+      "active": false,
       "aliases": [],
-      "notes": ""
+      "notes": " | 并入大类「证件许可」"
     },
     {
       "id": "L2_mgmt_admin",
       "name": "行政用品",
       "parent": "L1_mgmt",
       "order": 17,
-      "active": true,
+      "active": false,
       "aliases": [],
-      "notes": ""
+      "notes": " | 并入大类「办公费」"
     },
     {
       "id": "L2_mgmt_ceremony",
       "name": "开工仪式",
       "parent": "L1_mgmt",
       "order": 18,
-      "active": true,
+      "active": false,
       "aliases": [],
-      "notes": ""
+      "notes": " | 并入大类「其他」"
     },
     {
       "id": "L2_mgmt_stamp",
@@ -665,27 +667,27 @@
       "name": "取现",
       "parent": "L1_mgmt",
       "order": 21,
-      "active": true,
+      "active": false,
       "aliases": [],
-      "notes": ""
+      "notes": " | 并入大类「其他」"
     },
     {
       "id": "L2_mgmt_fx",
       "name": "换汇",
       "parent": "L1_mgmt",
       "order": 22,
-      "active": true,
+      "active": false,
       "aliases": [],
-      "notes": ""
+      "notes": " | 并入大类「其他」"
     },
     {
       "id": "L2_mgmt_visa",
       "name": "签证费",
       "parent": "L1_mgmt",
       "order": 23,
-      "active": true,
+      "active": false,
       "aliases": [],
-      "notes": ""
+      "notes": " | 并入大类「证件许可」"
     },
     {
       "id": "L2_mgmt_test",
@@ -711,18 +713,18 @@
       "name": "过路费",
       "parent": "L1_mgmt",
       "order": 25,
-      "active": true,
+      "active": false,
       "aliases": [],
-      "notes": ""
+      "notes": " | 并入大类「车辆使用费」"
     },
     {
       "id": "L2_mgmt_perf_bond",
       "name": "履约保证金",
       "parent": "L1_mgmt",
       "order": 26,
-      "active": true,
+      "active": false,
       "aliases": [],
-      "notes": ""
+      "notes": " | 并入大类「投标保证金」"
     },
     {
       "id": "L2_mgmt_fuel2",
@@ -749,12 +751,12 @@
       "order": 30,
       "active": true,
       "aliases": [
-        "煤气",
-        "燃气",
         "厨房煤气",
-        "食堂煤气",
         "液化气",
-        "煤气费用"
+        "煤气",
+        "煤气费用",
+        "燃气",
+        "食堂煤气"
       ],
       "notes": "食堂/宿舍燃气；加油归燃料及动力"
     },
@@ -768,7 +770,8 @@
         "差旅",
         "机票",
         "机票款",
-        "酒店"
+        "酒店",
+        "飞签"
       ],
       "notes": "seed extra"
     },
@@ -792,7 +795,9 @@
       "parent": "L1_mgmt",
       "order": 82,
       "active": true,
-      "aliases": [],
+      "aliases": [
+        "履约保证金"
+      ],
       "notes": "seed extra"
     },
     {
@@ -802,11 +807,11 @@
       "order": 20,
       "active": true,
       "aliases": [
-        "实心砖",
-        "空心砖",
         "加气块",
+        "实心砖",
+        "水泥砖",
         "砌块",
-        "水泥砖"
+        "空心砖"
       ],
       "notes": "数据优化"
     },
@@ -817,9 +822,9 @@
       "order": 21,
       "active": true,
       "aliases": [
+        "抹灰砂浆",
         "水泥",
         "砂浆",
-        "抹灰砂浆",
         "砌筑砂浆",
         "预拌砂浆"
       ],
@@ -832,12 +837,12 @@
       "order": 22,
       "active": true,
       "aliases": [
-        "河沙",
-        "机制砂",
-        "黄沙",
-        "沙子",
         "中砂",
-        "粗砂"
+        "机制砂",
+        "沙子",
+        "河沙",
+        "粗砂",
+        "黄沙"
       ],
       "notes": ""
     },
@@ -848,9 +853,9 @@
       "order": 23,
       "active": true,
       "aliases": [
-        "模板",
         "木方",
         "木模板",
+        "模板",
         "胶合板"
       ],
       "notes": ""
@@ -862,9 +867,9 @@
       "order": 24,
       "active": true,
       "aliases": [
-        "苏博特",
         "减水剂",
-        "外加剂"
+        "外加剂",
+        "苏博特"
       ],
       "notes": ""
     },
@@ -888,12 +893,12 @@
       "order": 26,
       "active": true,
       "aliases": [
-        "五金",
-        "hardware",
         "DOHOME",
         "HARDWAREHOUSE",
-        "零星材料",
-        "辅材"
+        "hardware",
+        "五金",
+        "辅材",
+        "零星材料"
       ],
       "notes": ""
     },
@@ -906,9 +911,9 @@
       "aliases": [
         "机具维修",
         "机械维修",
-        "车辆维修",
+        "补胎",
         "设备维修",
-        "补胎"
+        "车辆维修"
       ],
       "notes": ""
     },
@@ -919,8 +924,8 @@
       "order": 10,
       "active": true,
       "aliases": [
-        "带关费",
         "保关费",
+        "带关费",
         "报关",
         "清关"
       ],
@@ -934,9 +939,9 @@
       "active": true,
       "aliases": [
         "手续费",
-        "银行转账手续费",
+        "电汇费",
         "转账手续费",
-        "电汇费"
+        "银行转账手续费"
       ],
       "notes": ""
     },
@@ -947,10 +952,10 @@
       "order": 25,
       "active": true,
       "aliases": [
-        "网费",
-        "网络费",
         "宽带",
         "电话费",
+        "网络费",
+        "网费",
         "通讯费"
       ],
       "notes": ""
@@ -962,10 +967,10 @@
       "order": 26,
       "active": true,
       "aliases": [
-        "邮寄费",
-        "邮寄费用",
+        "快递",
         "快递费",
-        "快递"
+        "邮寄费",
+        "邮寄费用"
       ],
       "notes": ""
     },
@@ -976,10 +981,10 @@
       "order": 27,
       "active": true,
       "aliases": [
-        "保险",
         "保费",
-        "车辆保险",
-        "工程保险"
+        "保险",
+        "工程保险",
+        "车辆保险"
       ],
       "notes": ""
     },
@@ -991,10 +996,10 @@
       "active": true,
       "aliases": [
         "图纸",
-        "设计费",
-        "转图",
         "图纸签字",
-        "工程师签字"
+        "工程师签字",
+        "设计费",
+        "转图"
       ],
       "notes": ""
     },
@@ -1006,11 +1011,11 @@
       "active": true,
       "aliases": [
         "劳保",
-        "安全帽",
-        "手套",
         "反光背心",
         "安全带",
-        "工作服"
+        "安全帽",
+        "工作服",
+        "手套"
       ],
       "notes": ""
     },
@@ -1035,8 +1040,8 @@
       "active": true,
       "aliases": [
         "治安管理",
-        "治安管理费",
-        "治安管理付款"
+        "治安管理付款",
+        "治安管理费"
       ],
       "notes": ""
     },
@@ -1047,11 +1052,26 @@
       "order": 33,
       "active": true,
       "aliases": [
-        "施工许可",
         "劳工部检查",
+        "施工许可",
         "签字费"
       ],
       "notes": ""
     }
-  ]
+  ],
+  "granularity": {
+    "level": "business_category",
+    "include": [
+      "材料品种大类",
+      "费用性质大类",
+      "机具类型大类"
+    ],
+    "exclude": [
+      "混凝土强度等级",
+      "钢筋牌号",
+      "构件截面尺寸",
+      "品牌型号"
+    ],
+    "note": "摘要里出现 C30/HRB400 等只用于识别「属于混凝土/钢筋」，不单独建类"
+  }
 }

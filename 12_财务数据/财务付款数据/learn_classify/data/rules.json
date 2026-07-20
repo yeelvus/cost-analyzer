@@ -1,6 +1,6 @@
 {
-  "version": "1.1.0",
-  "description": "2026-07 数据驱动扩展",
+  "version": "1.1.1",
+  "description": "关键词规则：命中后归到业务大类二级，不建立型号级分类。",
   "rules": [
     {
       "id": "r_L2_sub_pay",

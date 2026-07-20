@@ -33,7 +33,12 @@ def _ensure_learn_path() -> None:
 
 
 def load_taxonomy_options(data_dir: Optional[Path] = None):
-    """返回 (l1_names, l1_id_to_l2_names, l1_name_to_id)。仅 active。"""
+    """
+    返回 (l1_names, l1_id_to_l2_names, l1_name_to_id, tax)。
+
+    下拉选项 **只含业务大类正式名称**（level2.name），
+    **不含** aliases（别名仅用于规则/匹配，如「商混」「C30」不进下拉）。
+    """
     _ensure_learn_path()
     from learn_classify.taxonomy import Taxonomy
 
@@ -48,17 +53,17 @@ def load_taxonomy_options(data_dir: Optional[Path] = None):
     l1_name_to_id = {x.name: x.id for x in l1_sorted}
 
     l1_id_to_l2: Dict[str, List[str]] = {x.id: [] for x in l1_sorted}
-    for l2 in sorted(tax.level2.values(), key=lambda z: (z.order, z.id)):
+    for l2 in sorted(tax.level2.values(), key=lambda z: (z.order, z.name)):
         if not l2.active:
             continue
         if l2.parent not in l1_id_to_l2:
             continue
-        # 显示名去重保序
-        if l2.name not in l1_id_to_l2[l2.parent]:
-            l1_id_to_l2[l2.parent].append(l2.name)
-        for al in l2.aliases:
-            if al and al not in l1_id_to_l2[l2.parent]:
-                l1_id_to_l2[l2.parent].append(al)
+        # 仅正式大类名进入下拉，绝不展开别名
+        name = (l2.name or "").strip()
+        if not name:
+            continue
+        if name not in l1_id_to_l2[l2.parent]:
+            l1_id_to_l2[l2.parent].append(name)
 
     return l1_names, l1_id_to_l2, l1_name_to_id, tax
 
@@ -168,7 +173,7 @@ def _write_options_sheet(
             range_defs.append((def_name, attr))
         col += 1
 
-    # 对照表（便于人工查看，放在右侧较远列）
+    # 对照表：仅大类正式名（与下拉一致）
     ref_col = col + 1
     ws.cell(1, ref_col, "对照_一级")
     ws.cell(1, ref_col + 1, "对照_二级")
@@ -179,6 +184,16 @@ def _write_options_sheet(
             ws.cell(rr, ref_col, name)
             ws.cell(rr, ref_col + 1, l2)
             rr += 1
+
+    # 说明：别名不进下拉
+    note_col = ref_col + 3
+    ws.cell(1, note_col, "说明")
+    ws.cell(
+        2,
+        note_col,
+        "下拉仅含业务大类正式名称；商混/螺纹钢/手续费等别名只用于规则匹配，不出现在选项中。",
+    )
+    ws.column_dimensions[get_column_letter(note_col)].width = 60
 
     ws.sheet_state = "hidden"
 

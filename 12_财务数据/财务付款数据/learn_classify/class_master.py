@@ -217,6 +217,10 @@ def _apply_master_format(path: Path, data_dir: Path) -> None:
     tips = [
         "【付款分类总表 · 按摘要去重 · 学习专用】",
         "",
+        "【分类粒度】只到业务大类，不到型号/规格：",
+        "  ✓ 混凝土、钢筋、砖及砌块、泵车租赁、银行手续费",
+        "  ✗ C30混凝土、HRB400、350×350桩、某品牌型号（一律归到对应大类）",
+        "",
         "核心列（请维护）：",
         "  · 摘要          — 去重后的付款摘要（学习主键）",
         "  · 一级科目      — 下拉选择，可改",
@@ -231,11 +235,10 @@ def _apply_master_format(path: Path, data_dir: Path) -> None:
         "     → 按「摘要→一二级」写入记忆，并重刷 B_std",
         "  3. 重新导出：python 财务付款一体化.py export-class",
         "",
-        "下拉选项来源：learn_classify/data/taxonomy.json",
-        "  调整分类体系：export-taxonomy → 编辑 科目体系.xlsx → import-taxonomy",
-        "  然后再 export-class 刷新本表下拉。",
+        "下拉选项来源：科目体系.xlsx / taxonomy.json（大类清单）",
+        "  调整类目：export-taxonomy → 编辑 → import-taxonomy → export-class",
         "",
-        "说明：相同摘要只保留一行，避免重复学习；出现次数高的排在前面。",
+        "说明：相同摘要只保留一行；出现次数高的排在前面。",
     ]
     for i, t in enumerate(tips, 1):
         ws_r.cell(i, 1, t)
