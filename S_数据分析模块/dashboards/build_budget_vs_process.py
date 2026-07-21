@@ -42,7 +42,26 @@
   Desktop/code/common/budget_vs_process_config.json  （首次运行自动生成）
 """
 
+
 from __future__ import annotations
+
+# --- path bootstrap (S_数据分析模块) ---
+import sys
+from pathlib import Path as _PathForBootstrap
+try:
+    from S_数据分析模块._bootstrap import ensure_code_root, ensure_script_dir
+    ensure_code_root(_PathForBootstrap(__file__))
+    ensure_script_dir(__file__)
+except Exception:
+    _p = _PathForBootstrap(__file__).resolve()
+    for _c in [_p.parent, *_p.parents]:
+        if (_c / "settings.py").exists():
+            if str(_c) not in sys.path:
+                sys.path.insert(0, str(_c))
+            break
+    if str(_p.parent) not in sys.path:
+        sys.path.insert(0, str(_p.parent))
+# --- end bootstrap ---
 
 import argparse
 import html as html_lib
@@ -59,7 +78,7 @@ import pandas as pd
 try:
     from settings import CODE_ROOT, DATA_ROOT, REPORT_ROOT
 except Exception:
-    CODE_ROOT = Path(__file__).resolve().parent
+    CODE_ROOT = Path(__file__).resolve().parents[2]  # .../code
     DATA_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
     REPORT_ROOT = DATA_ROOT / "Z_report"
 

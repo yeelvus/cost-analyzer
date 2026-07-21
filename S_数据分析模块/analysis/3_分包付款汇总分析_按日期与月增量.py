@@ -1,3 +1,22 @@
+
+# --- path bootstrap (S_数据分析模块) ---
+import sys
+from pathlib import Path as _PathForBootstrap
+try:
+    from S_数据分析模块._bootstrap import ensure_code_root, ensure_script_dir
+    ensure_code_root(_PathForBootstrap(__file__))
+    ensure_script_dir(__file__)
+except Exception:
+    _p = _PathForBootstrap(__file__).resolve()
+    for _c in [_p.parent, *_p.parents]:
+        if (_c / "settings.py").exists():
+            if str(_c) not in sys.path:
+                sys.path.insert(0, str(_c))
+            break
+    if str(_p.parent) not in sys.path:
+        sys.path.insert(0, str(_p.parent))
+# --- end bootstrap ---
+
 import os
 import re
 from datetime import datetime
@@ -6,7 +25,8 @@ import importlib.util
 import pandas as pd
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent.parent  # Desktop 下一层
+_CODE_ROOT = _SCRIPT_DIR.parents[1]  # Desktop/code
+_PROJECT_ROOT = _CODE_ROOT.parent  # Desktop
 
 
 def _resolve_input_dir() -> Path:
@@ -23,7 +43,7 @@ def _resolve_input_dir() -> Path:
 
 def _resolve_format_util_path() -> Path | None:
     candidates = [
-        _SCRIPT_DIR.parent / "0_项目基本信息" / "excel_formatting_utils.py",
+        _CODE_ROOT / "0_项目基本信息" / "excel_formatting_utils.py",
         Path("/Users/wyattsun/Desktop/code/0_项目基本信息/excel_formatting_utils.py"),
         _PROJECT_ROOT / "code" / "0_项目基本信息" / "excel_formatting_utils.py",
         Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/19_代码/0_项目基本信息/excel_formatting_utils.py"),

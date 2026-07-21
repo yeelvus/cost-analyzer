@@ -10,12 +10,12 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 SCRIPT_SEQUENCE = [
     BASE_DIR / "成本_汇总按月收集成本统计.py",
-    BASE_DIR / "成本_数据分析.py",
-    BASE_DIR / "预计毛利率对比_数据统计与环比.py",
+    BASE_DIR / "成本_数据分析.py",  # shim → S_数据分析模块/analysis/
+    BASE_DIR / "预计毛利率对比_数据统计与环比.py",  # shim → S_数据分析模块/analysis/
 ]
 
 # 综合分析 HTML 生成器（位于 code 根目录）
-COMPREHENSIVE_HTML_SCRIPT = BASE_DIR.parent / "build_comprehensive_cost_analysis_html.py"
+COMPREHENSIVE_HTML_SCRIPT = BASE_DIR.parent / "S_数据分析模块" / "dashboards" / "build_comprehensive_cost_analysis_html.py"
 
 
 def parse_args() -> argparse.Namespace:
@@ -83,7 +83,7 @@ def main() -> None:
             subprocess.run(
                 [sys.executable, str(COMPREHENSIVE_HTML_SCRIPT)],
                 check=True,
-                cwd=COMPREHENSIVE_HTML_SCRIPT.parent,
+                cwd=str(BASE_DIR.parent),
             )
             print("[完成] 综合分析 HTML 报告已生成（默认输出到 Z_report/项目成本统计综合分析报告.html）")
         except subprocess.CalledProcessError as exc:
