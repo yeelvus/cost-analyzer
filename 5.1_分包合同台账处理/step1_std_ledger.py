@@ -2,52 +2,71 @@ import pandas as pd
 import re
 import os
 import sys
-import importlib.util
 from pathlib import Path
 from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter
 
-_CODE_ROOT = Path(__file__).resolve().parents[1]
-if str(_CODE_ROOT) not in sys.path:
-    sys.path.insert(0, str(_CODE_ROOT))
+from config import CODE_ROOT, PROJECT_INFO_XLSX, RAW_DIR, STD_DIR
 
-from common.project import (
+if str(CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(CODE_ROOT))
+
+from common.project import (  # noqa: E402
     build_standard_projects_from_dataframe,
     load_or_init_db,
     save_db,
-    get_project_lookup,
     add_mapping,
     match_project,
 )
-from common.excel import apply_common_excel_layout
-from settings import MATCH_DB_PATH
+from common.excel import apply_common_excel_layout  # noqa: E402
+from settings import MATCH_DB_PATH  # noqa: E402
 
-# ================= 配置区域 =================
-EXCEL_INFO_PATH = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx')
-
-# 新目录结构：5_合同管理/B_分包合同
-NEW_SUBPACKAGE_ROOT = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同')
-NEW_INPUT_DIR = NEW_SUBPACKAGE_ROOT / '/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/1_分包合同台账_raw'
-NEW_OUTPUT_DIR = NEW_SUBPACKAGE_ROOT / '2_分包合同台账_std'
-
-INPUT_DIR = NEW_INPUT_DIR
-OUTPUT_DIR = NEW_OUTPUT_DIR
-
+# ================= 配置区域（兼容旧变量名） =================
+EXCEL_INFO_PATH = PROJECT_INFO_XLSX
+INPUT_DIR = RAW_DIR
+OUTPUT_DIR = STD_DIR
 # ===========================================
 
-def smart_process_and_match():
+
+def process_raw_to_std(
+    input_dir: Path | str | None = None,
+    output_dir: Path | str | None = None,
+    excel_info_path: Path | str | None = None,
+) -> list[Path]:
+    """将 raw 台账标准化为月度明细 Excel，返回输出文件列表。"""
+    return smart_process_and_match(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        excel_info_path=excel_info_path,
+    )
+
+
+def smart_process_and_match(
+    input_dir: Path | str | None = None,
+    output_dir: Path | str | None = None,
+    excel_info_path: Path | str | None = None,
+) -> list[Path]:
+    global INPUT_DIR, OUTPUT_DIR, EXCEL_INFO_PATH
+
     print("=" * 60)
     print("🚀 批处理模式：自动扫描目录内所有月度台账并汇总")
 
-    if not os.path.exists(EXCEL_INFO_PATH) or not os.path.exists(INPUT_DIR):
-        print(f"❌ 错误：请检查路径设置是否正确！\n项目信息表: {EXCEL_INFO_PATH}\n输入目录: {INPUT_DIR}")
-        return
+    input_dir = Path(input_dir or INPUT_DIR)
+    output_dir = Path(output_dir or OUTPUT_DIR)
+    excel_info_path = Path(excel_info_path or EXCEL_INFO_PATH)
+    exported: list[Path] = []
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    if not excel_info_path.exists() or not input_dir.exists():
+        print(
+            f"❌ 错误：请检查路径设置是否正确！\n项目信息表: {excel_info_path}\n输入目录: {input_dir}"
+        )
+        return exported
+
+    os.makedirs(output_dir, exist_ok=True)
+    INPUT_DIR, OUTPUT_DIR, EXCEL_INFO_PATH = input_dir, output_dir, excel_info_path
 
     try:
         # 1. 从项目基本信息表 Excel 加载配置
-        info_df = pd.read_excel(EXCEL_INFO_PATH, sheet_name='在建项目')
+        info_df = pd.read_excel(excel_info_path, sheet_name='在建项目')
         info_df['项目编码'] = info_df['项目编码'].fillna('需手动核对').astype(str)
         if '项目状态' in info_df.columns:
             info_df['项目状态'] = info_df['项目状态'].fillna('需手动核对').astype(str)
@@ -60,20 +79,19 @@ def smart_process_and_match():
         info_df = info_df.dropna(subset=['项目名称'])
         config_data = build_standard_projects_from_dataframe(info_df)
         match_db = load_or_init_db(MATCH_DB_PATH, config_data)
-        project_lookup = get_project_lookup(match_db)
 
         # 2. 自动扫描所有台账文件（支持 xlsx/xlsm/xls）
         ledger_files = []
-        for fn in os.listdir(INPUT_DIR):
+        for fn in os.listdir(input_dir):
             if fn.startswith('~$'):
                 continue
             lower_fn = fn.lower()
             if lower_fn.endswith(('.xlsx', '.xlsm', '.xls')) and '台账' in fn:
-                ledger_files.append(os.path.join(INPUT_DIR, fn))
+                ledger_files.append(os.path.join(input_dir, fn))
 
         if not ledger_files:
-            print(f"❌ 未在目录中找到可处理的台账文件：{INPUT_DIR}")
-            return
+            print(f"❌ 未在目录中找到可处理的台账文件：{input_dir}")
+            return exported
 
         print(f"📂 检测到台账文件：{len(ledger_files)} 个")
         print(f"🗂️ 匹配库路径: {MATCH_DB_PATH}")
@@ -375,7 +393,7 @@ def smart_process_and_match():
 
         if not file_result_map:
             print("❌ 未生成任何月度汇总结果。")
-            return
+            return exported
 
         # 将本次新增匹配沉淀到持久化数据库
         save_db(MATCH_DB_PATH, match_db)
@@ -410,16 +428,24 @@ def smart_process_and_match():
 
             # 保留原始顺序与文本样貌，不做额外数值/日期格式转换
             output_name = f"分包签订合同汇总_{target_month}" if target_month else f"分包签订合同汇总_{os.path.splitext(os.path.basename(ledger_path))[0]}"
-            output_path = os.path.join(OUTPUT_DIR, f"{output_name}.xlsx")
+            output_path = os.path.join(str(output_dir), f"{output_name}.xlsx")
             export_df.to_excel(output_path, index=False)
             format_output_excel(output_path)
+            exported.append(Path(output_path))
             print(f"📁 已导出: {output_path}  (行数: {len(export_df)})")
 
         print("-" * 60)
         print(f"✅ 批处理完成！共输出 {len(file_result_map)} 个文件")
+        return exported
 
     except Exception as e:
         print(f"❌ 程序运行出错: {e}")
+        raise
+
+
+def main() -> None:
+    process_raw_to_std()
+
 
 if __name__ == "__main__":
-    smart_process_and_match()
+    main()
