@@ -1,133 +1,102 @@
-# 广联达预算人材机全流程处理工具 - 样式完整保留版（修复版）
-# 作者: Grok (基于用户反馈修复)
-# 日期: 2025-10-31
-# 修复内容:
-#   1. 修复 .xls 填充样式复制错误：`XFBackground` 无 `pattern` 属性 → 使用 `fill_pattern`
-#   2. 修复字体颜色类型错误：`openpyxl` 要求 `color` 为字符串 → 统一转为 hex
-#   3. 修复索引越界：主表样式复制时严格限制行列范围
-#   4. 增加异常捕获，防止单文件失败影响整体
-# 功能: 
-#   1. 直接处理 .xls/.xlsx，完整保留原始样式
-#   2. 输出 _processed.xlsx 包含：原始所有工作表（带样式） + 统计结果（主表保留原始列样式）
-#   3. 总汇总文件带时间戳
-# 使用:
-#   交互模式: python this_script.py (弹窗选择输入/输出文件夹和列)
-#   自动模式: 设置 AUTO_MODE = True 并填写 INPUT_DIR / OUTPUT_DIR / SELECTED_COLUMNS 后运行
-# 依赖: pandas, openpyxl, xlrd (<2.0), tkinter
+# 广联达预算人材机全流程处理（budget.glodon.pipeline）
+# 配置见 budget.config；单位换算见 budget.units
+
+from __future__ import annotations
 
 import os
 import json
-import pandas as pd
-import xlrd
+import logging
+import re
+import difflib
+from datetime import datetime
 from pathlib import Path
+
+import pandas as pd
+
+try:
+    import xlrd
+except ImportError:  # 仅处理 .xlsx 时可不装 xlrd
+    xlrd = None
+
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Font, Border, Side, Alignment, PatternFill, numbers
 from openpyxl.styles.colors import Color
+
 try:
     from tkinter import Tk, filedialog, messagebox, Listbox, MULTIPLE, Button, Scrollbar, END, RIGHT, Y
 except Exception:
     Tk = None
     filedialog = None
     messagebox = None
-import re
-import logging
-from datetime import datetime
-import difflib
+
+from budget.config import (  # noqa: E402
+    AGGREGATE_BULK_DENSITY_KG_PER_M3 as _CFG_AGG_DENS,
+    AUTO_MODE,
+    AMOUNT_COL,
+    BASE_COLUMNS,
+    CATEGORY_COL,
+    CODE_COL,
+    FALLBACK_TARGET_COL_NAME,
+    FINAL_COLUMNS,
+    GLODON_RAW_DIR,
+    GLODON_STD_DIR,
+    GROUP1,
+    GROUP2,
+    KEYWORD_IN_SHEETNAME,
+    MAIN_KEYWORDS,
+    MATERIAL_CATS,
+    MATERIAL_SUB_FILTERS,
+    MECH_CATS,
+    MORTAR_BULK_DENSITY_KG_PER_M3 as _CFG_MORTAR_DENS,
+    NAME_COL,
+    NEW_COL,
+    PEOPLE_CAT,
+    PIPE_CAT,
+    PRICE_COL_CANDIDATES,
+    PROJECT_CODE_MAPPING_XLSX,
+    QUANTITY_COL,
+    SELECTED_COLUMNS,
+    SUMMARY_SHEET_NAME,
+    TARGET_COL_NAME,
+    TOTAL_SUMMARY_PREFIX,
+    UNIT_COL,
+)
+from budget.units import (  # noqa: E402
+    MATERIAL_BASE_UNITS as MATERIAL_UNITS,
+    normalize_unit,
+    set_bulk_densities,
+    unit_matches_material,
+    to_base_quantity,
+    sum_quantities_to_base,
+)
+
+# 用 config 中的容重覆盖 units 默认值
+set_bulk_densities(
+    mortar_kg_per_m3=_CFG_MORTAR_DENS,
+    aggregate_kg_per_m3=_CFG_AGG_DENS,
+)
+
+# 兼容旧变量名
+PROJECT_CODE_MAPPING_PATH = str(PROJECT_CODE_MAPPING_XLSX)
+INPUT_DIR = str(GLODON_RAW_DIR)
+OUTPUT_DIR = str(GLODON_STD_DIR)
+CONFIG_FILE = "selected_columns_cache.json"
 
 # ==================== 日志配置 ====================
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("run.log", encoding="utf-8")
-    ]
+        logging.FileHandler(
+            str(Path(__file__).resolve().parents[2] / "run.log"),
+            encoding="utf-8",
+        ),
+    ],
 )
 logger = logging.getLogger(__name__)
-
-# ==================== 配置区 ====================
-PROJECT_CODE_MAPPING_PATH = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目编码名称汇总.xlsx"
-# 自动模式控制:
-#   AUTO_MODE = True 时不弹窗, 使用下面的 INPUT_DIR / OUTPUT_DIR / SELECTED_COLUMNS
-#   SELECTED_COLUMNS 为列名列表，None 或空列表表示全部保留。
-AUTO_MODE = True  # 修改为 False 可恢复原交互模式
-INPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/3_预算部分/1_广联达导出人材料机_raw"  # 请替换为实际输入目录
-OUTPUT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/3_预算部分/2_人材机_std"      # 请替换为实际输出目录
-SELECTED_COLUMNS = []  # 空列表表示保留全部；可填: ["编码", "类别", "名称", "单位", "含税市场价合计"]
-KEYWORD_IN_SHEETNAME = "标段人材机汇总"
-CODE_COL = "编码"
-CATEGORY_COL = "类别"
-NAME_COL = "名称"
-UNIT_COL = "单位"
-TARGET_COL_NAME = "不含税市场价合计"
-FALLBACK_TARGET_COL_NAME = "含税市场价合计"
-NEW_COL = "不含税市场价合计（万）"
-MATERIAL_CATS = {"材", "商浆", "商砼", "主"}
-PEOPLE_CAT = "人"
-PIPE_CAT = "管"
-MECH_CATS = {"设", "机"}
-CONFIG_FILE = "selected_columns_cache.json"
-
-MATERIAL_SUB_FILTERS = [
-    ("钢筋", ["钢筋"], [], ["t", "kg"]),
-    ("混凝土", ["混凝土"], [], ["m³", "m3", "立方米"]),
-    ("砂浆", ["砂浆"], ["踢脚线"], []),
-    ("碎石", ["碎石"], [], []),
-    ("砖", ["砖", "砌块"], ["釉面砖", "花岗岩地砖"], []),
-]
-
-# 材料单位映射
-MATERIAL_UNITS = {
-    "钢筋": "kg",
-    "混凝土": "m³",
-    "砂浆": "m³",
-    "碎石": "m³",
-    "砖": "块",
-    "其他材料": ""
-}
-
-# 单位转换规则（转换为标准单位）
-UNIT_CONVERSION = {
-    "t": 1000,      # 吨转kg
-    "kg": 1,        # kg保持不变
-    "m³": 1,        # 立方米保持不变
-    "m3": 1,        # m3 = m³
-    "立方米": 1,    # 立方米保持不变
-}
-
-SUMMARY_SHEET_NAME = "汇总_不含税市场价"
-AMOUNT_COL = "金额"
-TOTAL_SUMMARY_PREFIX = "【总汇总】所有标段_"
-
-BASE_COLUMNS = [
-    "标段人材机汇总", "人_明细", "管_明细", "设机_明细",
-    "材类明细", "其他类别_明细",
-    "钢筋", "混凝土", "砂浆", "碎石", "砖", "其他材料"
-]
-
-GROUP1 = ["人_明细", "管_明细", "设机_明细", "材类明细", "其他类别_明细"]
-GROUP2 = ["钢筋", "混凝土", "砂浆", "碎石", "砖", "其他材料"]
-
-FINAL_COLUMNS = (
-    ["序号", "项目编码", "项目名称", "币种"] +
-    BASE_COLUMNS
-)
-
-MAIN_KEYWORDS = ["标段人材机汇总", "人材机汇总", "汇总表"]
-QUANTITY_COL = "数量"  # 数量列名
-PRICE_COL_CANDIDATES = [
-    "不含税市场价",
-    "含税市场价",
-    "市场价",
-    "单价",
-    "材料单价",
-    "不含税市场价(元)",
-    "含税市场价(元)",
-    TARGET_COL_NAME,
-    FALLBACK_TARGET_COL_NAME,
-]
 
 # ==================== 工具函数 ====================
 def choose_folder(prompt="选择文件夹"):
@@ -347,35 +316,38 @@ def safe_color(color_obj, color_map):
         return ''.join(f'{x:02X}' for x in color_obj)
     return None
 
-def calculate_material_quantity(df_sub, sheet_name):
-    """计算材料数量（含单位转换）
+def calculate_material_quantity(df_sub, sheet_name, collect_anomalies: list | None = None):
+    """计算材料数量（含单位规范化与换算到基准单位）
     
     Args:
         df_sub: 材料子集DataFrame
         sheet_name: 材料名称（如"钢筋"、"混凝土"等）
+        collect_anomalies: 若传入 list，则追加未识别单位等异常行
     
     Returns:
-        (total_quantity, unit) 元组
+        (total_quantity, unit) 元组；数量已换算到 MATERIAL_UNITS 基准单位
     """
     try:
-        if df_sub.empty or QUANTITY_COL not in df_sub.columns or UNIT_COL not in df_sub.columns:
+        if df_sub.empty or QUANTITY_COL not in df_sub.columns:
             return 0.0, MATERIAL_UNITS.get(sheet_name, "")
-        
+
         df_sub = df_sub.copy()
         df_sub[QUANTITY_COL] = ensure_numeric_series(df_sub[QUANTITY_COL])
-        df_sub[UNIT_COL] = df_sub[UNIT_COL].astype(str).fillna("").str.strip()
-        
-        total = 0.0
-        for idx, row in df_sub.iterrows():
-            qty = row[QUANTITY_COL]
-            unit = row[UNIT_COL]
-            if pd.isna(qty) or qty == 0:
-                continue
-            
-            # 单位转换
-            conversion_factor = UNIT_CONVERSION.get(unit, 1)
-            total += qty * conversion_factor
-        
+        if UNIT_COL in df_sub.columns:
+            units = df_sub[UNIT_COL].astype(str).fillna("").tolist()
+        else:
+            units = [""] * len(df_sub)
+
+        qtys = df_sub[QUANTITY_COL].tolist()
+        total, anomalies = sum_quantities_to_base(qtys, units, sheet_name, require_positive_price=False)
+        if collect_anomalies is not None and anomalies:
+            for a in anomalies:
+                a = dict(a)
+                a.setdefault("材料", sheet_name)
+                collect_anomalies.append(a)
+            logger.warning(
+                f"  [{sheet_name}] 有 {len(anomalies)} 行单位无法识别，已排除出数量合计"
+            )
         return round(total, 2), MATERIAL_UNITS.get(sheet_name, "")
     except Exception as e:
         logger.debug(f"计算数量失败 {sheet_name}: {e}")
@@ -384,7 +356,7 @@ def calculate_material_quantity(df_sub, sheet_name):
 # ==================== 样式复制核心函数 ====================
 def copy_sheet_with_style(source_book, source_sheet_name, target_wb, target_name):
     """从 xlrd 或 openpyxl 复制 sheet 到 openpyxl，带完整样式"""
-    if isinstance(source_book, xlrd.Book):
+    if xlrd is not None and isinstance(source_book, xlrd.Book):
         # --- 处理 .xls ---
         xls_sheet = source_book.sheet_by_name(source_sheet_name)
         ws = target_wb.create_sheet(title=target_name)
@@ -530,6 +502,9 @@ def process_file(in_path, out_dir, selected_cols_global=None):
     is_xls = p.suffix.lower() == ".xls"
     try:
         if is_xls:
+            if xlrd is None:
+                logger.error("  处理 .xls 需要安装 xlrd（pip install 'xlrd<2'）")
+                return
             source_book = xlrd.open_workbook(str(p), formatting_info=True)
         else:
             source_book = load_workbook(str(p), data_only=False)
@@ -722,18 +697,23 @@ def process_file(in_path, out_dir, selected_cols_global=None):
         sub_totals = {}
         if NAME_COL in df_mat.columns and not df_mat.empty:
             name_series = df_mat[NAME_COL].astype(str).fillna("")
-            unit_series = df_mat[UNIT_COL].astype(str).fillna("") if UNIT_COL in df_mat.columns else pd.Series("", index=df_mat.index)
+            unit_series = (
+                df_mat[UNIT_COL].astype(str).fillna("")
+                if UNIT_COL in df_mat.columns
+                else pd.Series("", index=df_mat.index)
+            )
 
-            for sheet_name, include_kw, exclude_kw, unit_kw in MATERIAL_SUB_FILTERS:
+            for sheet_name, include_kw, exclude_kw, unit_codes in MATERIAL_SUB_FILTERS:
                 mask = pd.Series(False, index=df_mat.index)
                 for kw in include_kw:
                     mask |= name_series.str.contains(kw, case=False, na=False)
                 for kw in exclude_kw:
                     mask &= ~name_series.str.contains(kw, case=False, na=False)
-                if unit_kw:
-                    unit_mask = pd.Series(False, index=df_mat.index)
-                    for u in unit_kw:
-                        unit_mask |= unit_series.str.contains(u, case=False, na=False)
+                # 单位过滤：规范化后匹配（支持 吨/kg/t/m³ 等，见 units.py）
+                if unit_codes:
+                    unit_mask = unit_series.map(
+                        lambda u, mat=sheet_name: unit_matches_material(u, mat)
+                    )
                     mask &= unit_mask
 
                 df_sub = df_mat[mask].copy()
@@ -964,19 +944,20 @@ def generate_summary_report(folder):
 
             ws.freeze_panes = "A2"
 
-            # ============ 新增：材料数量统计表 ============
+            # ============ 材料数量统计表（单位统一换算） ============
             material_names = ["钢筋", "混凝土", "砂浆", "碎石", "砖", "其他材料"]
             material_summary_rows = []
-            
+            unit_anomaly_rows = []  # 未识别单位明细，供审计
+
             # 数据行
             for idx, file in enumerate(files, start=1):
                 file_path = os.path.join(folder, file)
                 project_code, project_name = extract_project_code_and_name(file)
                 if not project_code:
                     project_code = match_project_code(project_name, code_mapping)
-                
+
                 mat_row = {"项目编码": project_code or "", "项目名称": project_name}
-                
+
                 # 检测币种
                 currency = "Unknown"
                 try:
@@ -985,10 +966,10 @@ def generate_summary_report(folder):
                 except Exception as e:
                     logger.debug(f"检测币种失败 {file}: {e}")
                 mat_row["币种"] = currency
-                
+
                 try:
                     df_summary = pd.read_excel(file_path, sheet_name=SUMMARY_SHEET_NAME)
-                    
+
                     for mat in material_names:
                         # 获取金额
                         mat_amount = 0.0
@@ -998,46 +979,77 @@ def generate_summary_report(folder):
                                 pd.to_numeric(df_summary[AMOUNT_COL], errors='coerce').fillna(0)
                             ))
                             mat_amount = round(float(cat_to_amt.get(mat, 0.0)), 2)
-                        
-                        # 从对应的材料Sheet读取数量
+
+                        # 从对应材料 Sheet 读取数量（统一换算到基准单位）
                         mat_quantity = 0.0
+                        unknown_unit_count = 0
                         try:
-                            # 尝试读取材料对应的Sheet
                             df_mat_sheet = pd.read_excel(file_path, sheet_name=mat)
-                            
-                            if QUANTITY_COL in df_mat_sheet.columns and UNIT_COL in df_mat_sheet.columns:
-                                # 计算该材料的总数量
+
+                            if QUANTITY_COL in df_mat_sheet.columns:
                                 qty_series = ensure_numeric_series(df_mat_sheet[QUANTITY_COL])
-                                unit_series = df_mat_sheet[UNIT_COL].astype(str).fillna("").str.strip()
-                                price_col = next((col for col in PRICE_COL_CANDIDATES if col in df_mat_sheet.columns), None)
+                                if UNIT_COL in df_mat_sheet.columns:
+                                    unit_series = df_mat_sheet[UNIT_COL].astype(str).fillna("").str.strip()
+                                else:
+                                    unit_series = pd.Series([""] * len(df_mat_sheet))
+
+                                price_col = next(
+                                    (col for col in PRICE_COL_CANDIDATES if col in df_mat_sheet.columns),
+                                    None,
+                                )
                                 if price_col:
                                     price_series = ensure_numeric_series(df_mat_sheet[price_col]).fillna(0)
                                 else:
-                                    # 未找到价格列时保持原口径
-                                    price_series = pd.Series(1, index=df_mat_sheet.index, dtype=float)
-                                
-                                for q, u, price in zip(qty_series, unit_series, price_series):
-                                    # 排除价格为0(或无效)的数量
-                                    if pd.notna(q) and q > 0 and pd.notna(price) and price > 0:
-                                        conversion_factor = UNIT_CONVERSION.get(u, 1)
-                                        mat_quantity += q * conversion_factor
-                                
+                                    price_series = pd.Series(1.0, index=df_mat_sheet.index, dtype=float)
+
+                                # 名称列便于异常表追溯
+                                name_col_local = NAME_COL if NAME_COL in df_mat_sheet.columns else None
+
+                                for i, (q, u, price) in enumerate(
+                                    zip(qty_series, unit_series, price_series)
+                                ):
+                                    # 排除无效数量；价格<=0 时跳过（兼容原口径）
+                                    if not (pd.notna(q) and q > 0 and pd.notna(price) and price > 0):
+                                        continue
+                                    conv = to_base_quantity(q, u, mat)
+                                    if conv.ok:
+                                        mat_quantity += conv.quantity_base
+                                    else:
+                                        unknown_unit_count += 1
+                                        item_name = ""
+                                        if name_col_local:
+                                            item_name = str(df_mat_sheet.iloc[i].get(name_col_local, ""))
+                                        unit_anomaly_rows.append({
+                                            "项目编码": project_code or "",
+                                            "项目名称": project_name,
+                                            "材料": mat,
+                                            "明细名称": item_name,
+                                            "原始数量": q,
+                                            "原始单位": conv.unit_raw,
+                                            "标准码": conv.unit_code,
+                                            "原因": conv.message,
+                                            "来源文件": file,
+                                        })
+
                                 mat_quantity = round(mat_quantity, 2)
+                                if unknown_unit_count:
+                                    logger.warning(
+                                        f"  {project_name}/{mat}: {unknown_unit_count} 行单位未识别，未计入数量"
+                                    )
                         except Exception as e:
                             logger.debug(f"读取材料Sheet失败 {mat} ({file}): {e}")
                             mat_quantity = 0.0
-                        
-                        # 计算平均单价
+
                         avg_price = 0.0
                         if mat_quantity > 0:
                             avg_price = round(mat_amount / mat_quantity, 2)
-                        
-                        # 顺序：数量、单位、金额、平均单价
+
                         mat_row[f"{mat}_数量"] = mat_quantity
                         mat_row[f"{mat}_单位"] = MATERIAL_UNITS.get(mat, "")
                         mat_row[f"{mat}_金额"] = mat_amount
                         mat_row[f"{mat}_平均单价"] = avg_price
-                    
+                        mat_row[f"{mat}_单位异常行数"] = unknown_unit_count
+
                 except Exception as e:
                     logger.warning(f"读取文件失败 {file}: {e}")
                     for mat in material_names:
@@ -1045,38 +1057,61 @@ def generate_summary_report(folder):
                         mat_row[f"{mat}_单位"] = MATERIAL_UNITS.get(mat, "")
                         mat_row[f"{mat}_金额"] = 0.0
                         mat_row[f"{mat}_平均单价"] = 0.0
-                
+                        mat_row[f"{mat}_单位异常行数"] = 0
+
                 material_summary_rows.append(mat_row)
-            
+
             # 合计行
             total_mat_row = {"项目编码": "", "项目名称": "合计", "币种": "合计"}
             for mat in material_names:
                 total_quantity = round(sum(
-                    r.get(f"{mat}_数量", 0) for r in material_summary_rows 
+                    r.get(f"{mat}_数量", 0) for r in material_summary_rows
                     if isinstance(r.get(f"{mat}_数量", 0), (int, float))
                 ), 2)
                 total_amount = round(sum(
-                    r.get(f"{mat}_金额", 0) for r in material_summary_rows 
+                    r.get(f"{mat}_金额", 0) for r in material_summary_rows
                     if isinstance(r.get(f"{mat}_金额", 0), (int, float))
                 ), 2)
                 total_avg_price = 0.0
                 if total_quantity > 0:
                     total_avg_price = round(total_amount / total_quantity, 2)
-                
+                total_anomaly = int(sum(
+                    r.get(f"{mat}_单位异常行数", 0) for r in material_summary_rows
+                    if isinstance(r.get(f"{mat}_单位异常行数", 0), (int, float))
+                ))
+
                 total_mat_row[f"{mat}_数量"] = total_quantity
                 total_mat_row[f"{mat}_单位"] = MATERIAL_UNITS.get(mat, "")
                 total_mat_row[f"{mat}_金额"] = total_amount
                 total_mat_row[f"{mat}_平均单价"] = total_avg_price
+                total_mat_row[f"{mat}_单位异常行数"] = total_anomaly
             material_summary_rows.append(total_mat_row)
-            
-            # 写入新Sheet（按顺序：项目编码、项目名称、币种、钢筋_数量、钢筋_单位、钢筋_金额、钢筋_平均单价...）
+
+            # 写入材料汇总（含单位异常行数，便于审计）
             ordered_cols = ["项目编码", "项目名称", "币种"]
             for mat in material_names:
-                ordered_cols.extend([f"{mat}_数量", f"{mat}_单位", f"{mat}_金额", f"{mat}_平均单价"])
-            
-            material_df = pd.DataFrame(material_summary_rows)[ordered_cols]
+                ordered_cols.extend([
+                    f"{mat}_数量", f"{mat}_单位", f"{mat}_金额",
+                    f"{mat}_平均单价", f"{mat}_单位异常行数",
+                ])
+
+            material_df = pd.DataFrame(material_summary_rows)
+            for c in ordered_cols:
+                if c not in material_df.columns:
+                    material_df[c] = 0 if c.endswith(("数量", "金额", "平均单价", "异常行数")) else ""
+            material_df = material_df[ordered_cols]
             material_df.to_excel(writer, index=False, sheet_name="材料汇总")
             ws_mat = writer.sheets["材料汇总"]
+
+            # 单位异常明细 Sheet
+            if unit_anomaly_rows:
+                anomaly_df = pd.DataFrame(unit_anomaly_rows)
+                anomaly_df.to_excel(writer, index=False, sheet_name="单位异常明细")
+                logger.warning(f"单位异常明细共 {len(unit_anomaly_rows)} 行，已写入「单位异常明细」Sheet")
+            else:
+                pd.DataFrame([{"提示": "无单位异常，所有数量已按基准单位正确换算"}]).to_excel(
+                    writer, index=False, sheet_name="单位异常明细"
+                )
 
             # 每个材料分组（数量/单位/金额/平均单价）使用同一表头色，并区分不同材料
             material_group_colors = {
@@ -1146,35 +1181,56 @@ def generate_summary_report(folder):
         print(f"\n[错误] 保存失败：{e}\n")
 
 # ==================== 主入口 ====================
+def run_glodon_pipeline(
+    input_dir: str | Path | None = None,
+    output_dir: str | Path | None = None,
+    *,
+    skip_summary: bool = False,
+) -> Path:
+    """
+    批量处理广联达导出 → std 目录，并生成总汇总。
+    返回输出目录 Path。
+    """
+    in_dir = Path(input_dir or INPUT_DIR)
+    out_dir = Path(output_dir or OUTPUT_DIR)
+    if not in_dir.is_dir():
+        raise FileNotFoundError(f"INPUT_DIR 不存在: {in_dir}")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    exts = {".xls", ".xlsx", ".xlsm"}
+    files = [
+        str(in_dir / f)
+        for f in os.listdir(in_dir)
+        if Path(f).suffix.lower() in exts and not f.startswith("~$")
+    ]
+    if not files:
+        raise FileNotFoundError(f"输入目录中未找到 Excel 文件: {in_dir}")
+
+    selected_cols_global = None
+    for idx, f in enumerate(sorted(files)):
+        if idx == 0:
+            try:
+                cols = pd.read_excel(f, nrows=0).columns.tolist()
+            except Exception:
+                try:
+                    cols = pd.read_excel(f, sheet_name=0, nrows=0).columns.tolist()
+                except Exception:
+                    cols = []
+            selected_cols_global = choose_columns(cols if cols else [])
+        process_file(f, str(out_dir), selected_cols_global)
+
+    if not skip_summary:
+        generate_summary_report(str(out_dir))
+    print(f"[OK] 广联达处理完成，结果目录: {out_dir}")
+    return out_dir
+
+
 def main():
     if AUTO_MODE:
-        # 校验目录
-        if not INPUT_DIR or not os.path.isdir(INPUT_DIR):
-            print(f"[ERROR] INPUT_DIR 不存在: {INPUT_DIR}")
-            return
-        if not OUTPUT_DIR:
-            print("[ERROR] 未配置 OUTPUT_DIR")
-            return
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-        exts = {".xls", ".xlsx", ".xlsm"}
-        files = [os.path.join(INPUT_DIR, f) for f in os.listdir(INPUT_DIR) if Path(f).suffix.lower() in exts]
-        if not files:
-            print("[WARN] 输入目录中未找到 Excel 文件")
-            return
-        selected_cols_global = None
-        for idx, f in enumerate(files):
-            if idx == 0:
-                try:
-                    cols = pd.read_excel(f, nrows=0).columns.tolist()
-                except Exception:
-                    try:
-                        cols = pd.read_excel(f, sheet_name=0, nrows=0).columns.tolist()
-                    except Exception:
-                        cols = []
-                selected_cols_global = choose_columns(cols if cols else [])
-            process_file(f, OUTPUT_DIR, selected_cols_global)
-        generate_summary_report(OUTPUT_DIR)
-        print(f"[OK] 自动模式完成，结果目录: {OUTPUT_DIR}")
+        try:
+            run_glodon_pipeline()
+        except Exception as e:
+            print(f"[ERROR] {e}")
         return
     # 交互模式
     if Tk is None:

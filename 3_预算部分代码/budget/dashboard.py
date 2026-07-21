@@ -14,6 +14,8 @@ python 总汇总看板生成.py --run-source
 python 总汇总看板生成.py --summary-file /path/to/【总汇总】所有标段_20260313_120000.xlsx
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import re
@@ -24,20 +26,23 @@ from pathlib import Path
 
 import pandas as pd
 
-DEFAULT_SOURCE_SCRIPT = Path(
-    "/Users/wyattsun/Desktop/code/3_预算部分代码/广联达预算人材机文件统计.py"
+from budget.config import (
+    DASHBOARD_HTML_NAME,
+    GLODON_STD_DIR,
+    MATERIAL_NAMES,
+    MATERIAL_SHEET_NAME,
+    TOTAL_SUMMARY_PREFIX,
 )
-DEFAULT_OUTPUT_DIR = Path(
-    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/3_预算部分/2_人材机_std"
-)
-SUMMARY_PREFIX = "【总汇总】所有标段_"
+
+DEFAULT_SOURCE_SCRIPT = Path(__file__).resolve().parent / "glodon" / "pipeline.py"
+DEFAULT_OUTPUT_DIR = GLODON_STD_DIR
+SUMMARY_PREFIX = TOTAL_SUMMARY_PREFIX
 SUMMARY_SHEET = "总汇总"
-MATERIAL_SHEET = "材料汇总"
-DEFAULT_DASHBOARD_NAME = "总汇总项目看板.html"
+MATERIAL_SHEET = MATERIAL_SHEET_NAME
+DEFAULT_DASHBOARD_NAME = DASHBOARD_HTML_NAME
 TEXT_COLUMNS = {"序号", "项目编码", "项目名称", "币种"}
 SUMMARY_TOTAL_COLUMN = "标段人材机汇总"
 DETAIL_AMOUNT_COLUMNS = ["人_明细", "管_明细", "设机_明细", "材类明细", "其他类别_明细"]
-MATERIAL_NAMES = ["钢筋", "混凝土", "砂浆", "碎石", "砖", "其他材料"]
 OVERVIEW_COLUMNS = [SUMMARY_TOTAL_COLUMN, *DETAIL_AMOUNT_COLUMNS]
 SUMMARY_CARD_COLUMNS = [SUMMARY_TOTAL_COLUMN, *DETAIL_AMOUNT_COLUMNS]
 
@@ -49,11 +54,15 @@ def to_float(value):
     return float(num)
 
 
-def run_source_script(source_script: Path):
-    if not source_script.exists():
-        raise FileNotFoundError(f"源脚本不存在: {source_script}")
-    cmd = [sys.executable, str(source_script)]
-    subprocess.run(cmd, check=True)
+def run_source_script(source_script: Path | None = None):
+    """先跑广联达 pipeline，再生成看板。"""
+    if source_script and source_script.exists():
+        cmd = [sys.executable, str(source_script)]
+        subprocess.run(cmd, check=True)
+        return
+    from budget.glodon.pipeline import run_glodon_pipeline
+
+    run_glodon_pipeline()
 
 
 def extract_timestamp_from_name(file_name: str):
@@ -299,6 +308,52 @@ def build_html(payload):
       padding: 26px 20px 42px;
     }
 
+    .layout {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .content-col {
+      min-width: 0;
+    }
+
+    .toc {
+      position: sticky;
+      top: 14px;
+      max-height: calc(100vh - 28px);
+      overflow: auto;
+      padding: 12px;
+    }
+
+    .toc-title {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: #2f4338;
+      font-weight: 700;
+    }
+
+    .toc-links {
+      display: grid;
+      gap: 6px;
+    }
+
+    .toc-link {
+      display: block;
+      padding: 6px 8px;
+      border-radius: 8px;
+      color: #2a473c;
+      text-decoration: none;
+      font-size: 12px;
+      line-height: 1.35;
+      background: rgba(227, 237, 230, 0.4);
+    }
+
+    .toc-link:hover {
+      background: rgba(196, 106, 47, 0.18);
+    }
+
     .panel {
       background: var(--card);
       border: 1px solid rgba(255, 255, 255, 0.92);
@@ -398,63 +453,75 @@ def build_html(payload):
 
     .overview-shell {
       padding: 18px 24px 24px;
-      overflow: visible;
+      overflow: auto;
     }
 
-    .project-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
-      gap: 12px;
-    }
-
-    .project-item {
-      border-radius: var(--radius-lg);
-      border: 1px solid #dce8f2;
-      background: rgba(255, 255, 255, 0.84);
-      box-shadow: 0 10px 24px rgba(23, 50, 74, 0.08);
+    .overview-table {
+      min-width: 1460px;
+      border-radius: 24px;
       overflow: hidden;
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+      border: 1px solid #dce8f2;
+      background: rgba(255,255,255,0.78);
     }
 
-    .project-item:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 14px 28px rgba(23, 50, 74, 0.12);
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
     }
 
-    .project-item.active {
-      border-color: #7dd3c7;
-      box-shadow: 0 14px 30px rgba(15, 139, 141, 0.2);
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: rgba(247, 252, 255, 0.98);
+      color: var(--ink);
+      border-bottom: 1px solid #d9e6f0;
+      padding: 14px 12px;
+      font-size: 13px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    thead tr:first-child th {
+      background: linear-gradient(180deg, rgba(232,245,248,0.98), rgba(246,251,255,0.98));
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #0f5d63;
+    }
+
+    thead th.project-col,
+    tbody td.project-col {
+      position: sticky;
+      left: 0;
+      z-index: 4;
+      min-width: 250px;
+      text-align: left;
+      background: rgba(252, 254, 255, 0.98);
+      box-shadow: 8px 0 18px rgba(203, 220, 233, 0.24);
+    }
+
+    tbody td {
+      padding: 12px;
+      border-bottom: 1px solid #e4eef6;
+      background: rgba(255,255,255,0.74);
+    }
+
+    tbody tr:hover td {
+      background: rgba(246, 252, 255, 0.98);
     }
 
     .project-button {
       appearance: none;
       border: 0;
       background: transparent;
-      padding: 14px;
+      padding: 0;
       margin: 0;
       cursor: pointer;
       text-align: left;
       width: 100%;
       color: inherit;
-    }
-
-    .project-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: flex-start;
-      margin-bottom: 10px;
-    }
-
-    .project-total {
-      background: #ebfbf6;
-      border: 1px solid #c5eee2;
-      color: #0f766e;
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 700;
-      white-space: nowrap;
     }
 
     .project-name {
@@ -470,38 +537,17 @@ def build_html(payload):
       flex-wrap: wrap;
       font-size: 12px;
       color: var(--muted);
-      margin-bottom: 8px;
-    }
-
-    .metric-list {
-      display: grid;
-      gap: 8px;
-    }
-
-    .metric-row {
-      display: grid;
-      grid-template-columns: 96px minmax(0, 1fr);
-      gap: 8px;
-      align-items: center;
-    }
-
-    .metric-label {
-      font-size: 12px;
-      color: var(--muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .bar-cell {
       position: relative;
       min-width: 110px;
-      height: 32px;
+      height: 44px;
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      padding: 0 10px;
-      border-radius: 10px;
+      padding: 0 12px;
+      border-radius: 14px;
       background: #f6fbff;
       overflow: hidden;
       border: 1px solid #e6eff7;
@@ -512,7 +558,7 @@ def build_html(payload):
       left: 0;
       top: 0;
       bottom: 0;
-      border-radius: 10px;
+      border-radius: 14px;
       opacity: 0.96;
     }
 
@@ -532,9 +578,42 @@ def build_html(payload):
       position: relative;
       z-index: 1;
       font-variant-numeric: tabular-nums;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 700;
       color: #0f2b42;
+    }
+
+    .detail-card-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .project-detail-card {
+      border-radius: 20px;
+      background: var(--card-solid);
+      border: 1px solid #e2edf6;
+      box-shadow: 0 10px 26px rgba(22, 54, 83, 0.08);
+      padding: 18px;
+      scroll-margin-top: 16px;
+    }
+
+    .detail-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .detail-card-head h3 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .detail-card-head p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 13px;
     }
 
     .detail-hero {
@@ -852,6 +931,19 @@ def build_html(payload):
         padding-right: 14px;
       }
 
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .toc {
+        position: static;
+        max-height: none;
+      }
+
+      .toc-links {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
       .hero,
       .detail-hero {
         flex-direction: column;
@@ -875,89 +967,63 @@ def build_html(payload):
         justify-content: flex-start;
       }
 
-      .project-grid {
-        grid-template-columns: 1fr;
+      .overview-table {
+        min-width: 1320px;
       }
     }
   </style>
 </head>
 <body>
   <main class="container">
-    <section class="panel hero">
-      <div>
-        <p class="eyebrow">预算汇总看板</p>
-        <h1>主材总汇总总览与项目详情</h1>
-        <p id="metaInfo"></p>
-      </div>
-      <div class="hero-stats">
-        <article class="hero-stat">
-          <span>项目数量</span>
-          <strong id="projectCountChip">0</strong>
-        </article>
-        <article class="hero-stat">
-          <span>全项目总额</span>
-          <strong id="overallTotalChip">0</strong>
-        </article>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div class="section-head">
-        <div>
-          <div class="section-kicker">1. 全项目看板</div>
-          <h2>项目总览卡片（万元）</h2>
-          <p>每个项目一张卡片，展示汇总金额与五类金额数据条（单位：万元）。点击卡片后跳转到下方详情。</p>
-        </div>
-      </div>
-      <div class="overview-shell">
-        <div class="overview-table" id="overviewTable"></div>
-      </div>
-    </section>
-
-    <section class="panel detail-hero" id="projectDetailSection">
-      <div>
-        <div class="section-kicker">2. 项目详情</div>
-        <h2 id="detailTitle"></h2>
-        <p id="detailMeta"></p>
-      </div>
-      <div class="chip-wrap">
-        <span class="chip" id="detailTotalChip"></span>
-        <span class="chip alt" id="detailRatioChip"></span>
-      </div>
-    </section>
-
-    <section class="panel cards-shell">
-      <div class="cards-grid" id="amountCards"></div>
-    </section>
-
-    <section class="panel visual-shell">
-      <div class="visual-grid">
-        <article class="visual-card">
-          <h3 class="panel-title">五类结构金额占比</h3>
-          <div class="donut-panel">
-            <div class="donut-shell">
-              <div class="donut" id="donut">
-                <div class="donut-center">
-                  <div class="big" id="donutTotal">0</div>
-                  <div class="small">项目总额</div>
-                </div>
-              </div>
-            </div>
-            <div class="legend-list" id="legendList"></div>
+    <div class="layout">
+      <aside class="panel toc">
+        <h3 class="toc-title">项目目录 TOC</h3>
+        <div class="toc-links" id="tocLinks"></div>
+      </aside>
+      <div class="content-col">
+        <section class="panel hero">
+          <div>
+            <p class="eyebrow">预算汇总看板</p>
+            <h1>主材总汇总总览与项目详情</h1>
+            <p id="metaInfo"></p>
           </div>
-        </article>
+          <div class="hero-stats">
+            <article class="hero-stat">
+              <span>项目数量</span>
+              <strong id="projectCountChip">0</strong>
+            </article>
+            <article class="hero-stat">
+              <span>全项目总额</span>
+              <strong id="overallTotalChip">0</strong>
+            </article>
+          </div>
+        </section>
 
-        <article class="visual-card">
-          <h3 class="panel-title">主材金额条形图</h3>
-          <div class="material-bar-grid" id="materialBarGrid"></div>
-        </article>
+        <section class="panel">
+          <div class="section-head">
+            <div>
+              <div class="section-kicker">1. 全项目看板</div>
+              <h2>项目总览数据条（万元）</h2>
+              <p>纵向列出所有项目，横向固定展示汇总金额和五类金额（单位：万元）。点击项目名称后跳转到下方详情。</p>
+            </div>
+          </div>
+          <div class="overview-shell">
+            <div class="overview-table" id="overviewTable"></div>
+          </div>
+        </section>
+
+        <section class="panel cards-shell" id="projectDetailSection">
+          <div class="section-head" style="padding-top: 0;">
+            <div>
+              <div class="section-kicker">2. 项目详情</div>
+              <h2>项目卡片清单（一行一个项目）</h2>
+              <p>每个项目一个独立详情卡片，内容包含金额卡片、结构占比、主材金额条形图与主材数量/金额卡片。</p>
+            </div>
+          </div>
+          <div class="detail-card-list" id="detailCards"></div>
+        </section>
       </div>
-    </section>
-
-    <section class="panel materials-shell">
-      <h3 class="panel-title">主材数量与金额卡片</h3>
-      <div class="materials-grid" id="materialsGrid"></div>
-    </section>
+    </div>
   </main>
 
   <script>
@@ -975,8 +1041,6 @@ def build_html(payload):
     const overviewCols = DASHBOARD_DATA.columns.overview_cols;
     const columnMax = DASHBOARD_DATA.columns.column_max || {};
     const projects = DASHBOARD_DATA.projects || [];
-
-    let selectedProjectIndex = 0;
 
     function esc(text) {
       return String(text || '')
@@ -1019,10 +1083,6 @@ def build_html(payload):
       return `${code}${project['项目名称'] || '未命名项目'}`;
     }
 
-    function currentProject() {
-      return projects[selectedProjectIndex] || projects[0];
-    }
-
     function barWidth(value, maxValue) {
       const v = num(value);
       const m = num(maxValue);
@@ -1036,19 +1096,8 @@ def build_html(payload):
       return 'material';
     }
 
-    function syncHash(index) {
-      const project = projects[index];
-      if (!project) return;
-      window.history.replaceState(null, '', `#project-${project.id}`);
-    }
-
-    function resolveSelectionFromHash() {
-      const hash = window.location.hash || '';
-      const match = hash.match(/^#project-(\\d+)$/);
-      if (!match) return 0;
-      const id = Number(match[1]);
-      const foundIndex = projects.findIndex((item) => Number(item.id) === id);
-      return foundIndex >= 0 ? foundIndex : 0;
+    function detailId(project) {
+      return `detail-project-${project.id}`;
     }
 
     function initHeader() {
@@ -1059,69 +1108,70 @@ def build_html(payload):
       document.getElementById('overallTotalChip').textContent = fmtWan(meta.overall_total || 0);
     }
 
+    function renderTOC() {
+      const html = projects.map((project) => {
+        return `<a class="toc-link" href="#${detailId(project)}">${esc(projectDisplayName(project))}</a>`;
+      }).join('');
+      document.getElementById('tocLinks').innerHTML = html;
+    }
+
     function renderOverviewTable() {
-      const cardsHtml = projects.map((project, index) => {
-        const bars = overviewCols.map((column) => {
+      const rowsHtml = projects.map((project) => {
+        const cells = overviewCols.map((column) => {
           const value = num(project.metrics[column]);
           const width = barWidth(value, columnMax[column]);
           const tone = columnTone(column);
           return `
-            <div class="metric-row">
-              <span class="metric-label">${esc(column)}</span>
+            <td>
               <div class="bar-cell tone-${tone}">
                 <span class="bar-fill" style="width:${width}%"></span>
                 <span class="bar-value">${esc(fmtWan(value))}</span>
               </div>
-            </div>
+            </td>
           `;
         }).join('');
 
         const sequence = project['序号'] ? `序号 ${esc(project['序号'])}` : '未标序号';
         const currency = project['币种'] || '未标币种';
-        const totalValue = num(project.metrics[totalCol]);
 
         return `
-          <article class="project-item ${index === selectedProjectIndex ? 'active' : ''}">
-            <button class="project-button" type="button" data-project-index="${index}">
-              <div class="project-head">
+          <tr>
+            <td class="project-col">
+              <a class="project-button" href="#${detailId(project)}">
                 <div class="project-name">${esc(projectDisplayName(project))}</div>
-                <span class="project-total">${esc(fmtWan(totalValue))}</span>
-              </div>
-              <div class="project-meta">
-                <span>${sequence}</span>
-                <span>${esc(currency)}</span>
-              </div>
-              <div class="metric-list">
-                ${bars}
-              </div>
-            </button>
-          </article>
+                <div class="project-meta">
+                  <span>${sequence}</span>
+                  <span>${esc(currency)}</span>
+                </div>
+              </a>
+            </td>
+            ${cells}
+          </tr>
         `;
       }).join('');
 
+      const headerCells = overviewCols.map((column) => `<th>${esc(column)}</th>`).join('');
+
       document.getElementById('overviewTable').innerHTML = `
-        <div class="project-grid">
-          ${cardsHtml}
-        </div>
+        <table>
+          <thead>
+            <tr>
+              <th class="project-col" rowspan="2">项目名称</th>
+              <th colspan="1">汇总金额（万）</th>
+              <th colspan="${detailCols.length}">五类金额（万）</th>
+            </tr>
+            <tr>
+              ${headerCells}
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
       `;
     }
 
-    function renderDetailHeader() {
-      const project = currentProject();
-      const totalValue = num(project.metrics[totalCol]);
-      const allTotal = num(DASHBOARD_DATA.meta.overall_total);
-      const code = project['项目编码'] ? `项目编码: ${project['项目编码']}` : '项目编码: 未填写';
-      const currency = project['币种'] ? `币种: ${project['币种']}` : '币种: 未填写';
-      const sequence = project['序号'] ? `序号: ${project['序号']}` : '序号: 未填写';
-
-      document.getElementById('detailTitle').textContent = projectDisplayName(project);
-      document.getElementById('detailMeta').textContent = `${code} | ${currency} | ${sequence}`;
-      document.getElementById('detailTotalChip').textContent = `项目总额 ${fmtWan(totalValue)}`;
-      document.getElementById('detailRatioChip').textContent = `占全项目 ${pct(totalValue, allTotal)}`;
-    }
-
-    function renderAmountCards() {
-      const project = currentProject();
+    function renderAmountCardsForProject(project) {
       const totalValue = num(project.metrics[totalCol]);
       const allTotal = num(DASHBOARD_DATA.meta.overall_total);
       const detailSum = detailCols.reduce((sum, column) => sum + num(project.metrics[column]), 0);
@@ -1144,7 +1194,7 @@ def build_html(payload):
         sub: `五类合计 / 项目总额 ${pct(detailSum, totalValue)}`,
       });
 
-      document.getElementById('amountCards').innerHTML = defs.map((item) => `
+      return defs.map((item) => `
         <article class="summary-card">
           <p class="label">${esc(item.label)}</p>
           <div class="value">${esc(fmtWan(item.value))}</div>
@@ -1153,8 +1203,7 @@ def build_html(payload):
       `).join('');
     }
 
-    function renderDonutAndLegend() {
-      const project = currentProject();
+    function renderDonutAndLegendForProject(project) {
       const totalValue = num(project.metrics[totalCol]);
       const parts = detailCols
         .map((column, index) => ({
@@ -1164,15 +1213,20 @@ def build_html(payload):
         }))
         .filter((item) => item.value > 0);
 
-      const donut = document.getElementById('donut');
-      const donutTotal = document.getElementById('donutTotal');
-      const legend = document.getElementById('legendList');
-      donutTotal.textContent = fmtWan(totalValue);
-
       if (!parts.length || totalValue <= 0) {
-        donut.style.background = 'conic-gradient(#d8e1ea 0% 100%)';
-        legend.innerHTML = '<div class="empty-tip">当前项目暂无五类结构金额数据</div>';
-        return;
+        return `
+          <div class="donut-panel">
+            <div class="donut-shell">
+              <div class="donut" style="background:conic-gradient(#d8e1ea 0% 100%)">
+                <div class="donut-center">
+                  <div class="big">${esc(fmtWan(totalValue))}</div>
+                  <div class="small">项目总额</div>
+                </div>
+              </div>
+            </div>
+            <div class="legend-list"><div class="empty-tip">当前项目暂无五类结构金额数据</div></div>
+          </div>
+        `;
       }
 
       let cursor = 0;
@@ -1189,8 +1243,7 @@ def build_html(payload):
         segments.push(`#d8e1ea ${cursor}% 100%`);
       }
 
-      donut.style.background = `conic-gradient(${segments.join(', ')})`;
-      legend.innerHTML = parts
+      const legendHtml = parts
         .sort((a, b) => b.value - a.value)
         .map((part) => `
           <div class="legend-item">
@@ -1201,6 +1254,20 @@ def build_html(payload):
           </div>
         `)
         .join('');
+
+      return `
+        <div class="donut-panel">
+          <div class="donut-shell">
+            <div class="donut" style="background:conic-gradient(${segments.join(', ')})">
+              <div class="donut-center">
+                <div class="big">${esc(fmtWan(totalValue))}</div>
+                <div class="small">项目总额</div>
+              </div>
+            </div>
+          </div>
+          <div class="legend-list">${legendHtml}</div>
+        </div>
+      `;
     }
 
     function materialAmountFromProject(project, materialName) {
@@ -1210,22 +1277,19 @@ def build_html(payload):
       return num(material ? material.amount : 0);
     }
 
-    function renderMaterialBars() {
-      const project = currentProject();
+    function renderMaterialBarsForProject(project) {
       const barItems = materialCols.map((label) => ({
         label,
         value: materialAmountFromProject(project, label),
       }));
       const maxValue = barItems.length ? Math.max(...barItems.map((item) => item.value)) : 0;
       const hasData = barItems.some((item) => item.value > 0);
-      const box = document.getElementById('materialBarGrid');
 
       if (!hasData) {
-        box.innerHTML = '<div class="empty-tip">当前项目暂无主材金额数据</div>';
-        return;
+        return '<div class="empty-tip">当前项目暂无主材金额数据</div>';
       }
 
-      box.innerHTML = barItems.map((item) => {
+      return barItems.map((item) => {
         const height = maxValue > 0 ? Math.max(6, (item.value / maxValue) * 100) : 6;
         return `
           <div class="material-bar-item">
@@ -1239,18 +1303,15 @@ def build_html(payload):
       }).join('');
     }
 
-    function renderMaterialCards() {
-      const project = currentProject();
+    function renderMaterialCardsForProject(project) {
       const materials = (project.materials || []).map((item) => ({ ...item }));
       const hasData = materials.some((item) => num(item.amount) > 0 || num(item.quantity) > 0);
-      const box = document.getElementById('materialsGrid');
 
       if (!materials.length || !hasData) {
-        box.innerHTML = '<div class="empty-tip">当前项目暂无材料数量/金额数据，请确认总汇总文件中包含“材料汇总”工作表并已汇总到对应项目。</div>';
-        return;
+        return '<div class="empty-tip">当前项目暂无材料数量/金额数据，请确认总汇总文件中包含“材料汇总”工作表并已汇总到对应项目。</div>';
       }
 
-      box.innerHTML = materials.map((item) => {
+      return materials.map((item) => {
         const unit = item.unit || '';
         return `
           <article class="material-card">
@@ -1263,40 +1324,44 @@ def build_html(payload):
       }).join('');
     }
 
-    function renderAll() {
-      renderOverviewTable();
-      renderDetailHeader();
-      renderAmountCards();
-      renderDonutAndLegend();
-      renderMaterialBars();
-      renderMaterialCards();
-    }
-
-    function selectProject(index, shouldScroll) {
-      selectedProjectIndex = Number(index) || 0;
-      renderAll();
-      syncHash(selectedProjectIndex);
-      if (shouldScroll) {
-        document.getElementById('projectDetailSection').scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
-      }
-    }
-
-    function bindOverviewEvents() {
-      document.getElementById('overviewTable').addEventListener('click', (event) => {
-        const button = event.target.closest('[data-project-index]');
-        if (!button) return;
-        selectProject(Number(button.dataset.projectIndex), true);
-      });
-
-      window.addEventListener('hashchange', () => {
-        const index = resolveSelectionFromHash();
-        if (index !== selectedProjectIndex) {
-          selectProject(index, false);
-        }
-      });
+    function renderDetailCards() {
+      const allTotal = num(DASHBOARD_DATA.meta.overall_total);
+      const html = projects.map((project) => {
+        const totalValue = num(project.metrics[totalCol]);
+        const code = project['项目编码'] ? `项目编码: ${project['项目编码']}` : '项目编码: 未填写';
+        const currency = project['币种'] ? `币种: ${project['币种']}` : '币种: 未填写';
+        const sequence = project['序号'] ? `序号: ${project['序号']}` : '序号: 未填写';
+        return `
+          <article class="project-detail-card" id="${detailId(project)}">
+            <div class="detail-card-head">
+              <div>
+                <h3>${esc(projectDisplayName(project))}</h3>
+                <p>${esc(`${code} | ${currency} | ${sequence}`)}</p>
+              </div>
+              <div class="chip-wrap">
+                <span class="chip">项目总额 ${esc(fmtWan(totalValue))}</span>
+                <span class="chip alt">占全项目 ${esc(pct(totalValue, allTotal))}</span>
+              </div>
+            </div>
+            <div class="cards-grid">${renderAmountCardsForProject(project)}</div>
+            <div class="visual-grid" style="margin-top: 12px;">
+              <article class="visual-card">
+                <h3 class="panel-title">五类结构金额占比</h3>
+                ${renderDonutAndLegendForProject(project)}
+              </article>
+              <article class="visual-card">
+                <h3 class="panel-title">主材金额条形图</h3>
+                <div class="material-bar-grid">${renderMaterialBarsForProject(project)}</div>
+              </article>
+            </div>
+            <div style="margin-top: 12px;">
+              <h3 class="panel-title">主材数量与金额卡片</h3>
+              <div class="materials-grid">${renderMaterialCardsForProject(project)}</div>
+            </div>
+          </article>
+        `;
+      }).join('');
+      document.getElementById('detailCards').innerHTML = html;
     }
 
     function bootstrap() {
@@ -1305,11 +1370,10 @@ def build_html(payload):
         return;
       }
 
-      selectedProjectIndex = resolveSelectionFromHash();
       initHeader();
-      bindOverviewEvents();
-      renderAll();
-      syncHash(selectedProjectIndex);
+      renderTOC();
+      renderOverviewTable();
+      renderDetailCards();
     }
 
     bootstrap();
