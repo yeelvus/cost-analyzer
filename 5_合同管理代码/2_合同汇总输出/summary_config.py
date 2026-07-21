@@ -22,6 +22,11 @@ AMOUNT_OUTPUT_NAME = "合同管理_总包分包汇总.xlsx"
 # 合并输出
 MERGED_OUTPUT_NAME = "合同管理_总包分包全量汇总.xlsx"
 
+# 分包台账标准化目录（用于与文件夹汇总的分包额交叉核对）
+SUBPACKAGE_STD_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_分包合同台账_std"
+# 分包额对比容差（万泰铢）；超过则着色标注
+SUBPACKAGE_COMPARE_TOLERANCE_WAN = 0.01
+
 COLUMN_ORDER_FILE = str(Path(__file__).resolve().parent / "column_order.txt")
 
 SETTLEMENT_CHECKS = [
@@ -73,3 +78,12 @@ def get_project_db() -> str:
         return PROJECT_CODE_DB
     alt = os.path.expanduser("~/Desktop/code/0_项目基本信息/project_name_match_db.json")
     return alt if os.path.isfile(alt) else PROJECT_CODE_DB
+
+
+def get_subpackage_std_dir() -> str:
+    return resolve_existing_path(
+        SUBPACKAGE_STD_DIR,
+        [
+            os.path.expanduser("~/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_分包合同台账_std"),
+        ],
+    )

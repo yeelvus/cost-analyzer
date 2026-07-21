@@ -19,9 +19,11 @@ from openpyxl.workbook.workbook import Workbook
 
 from summary_config import (
     GENERAL_CONTRACT_DIR,
+    SUBPACKAGE_COMPARE_TOLERANCE_WAN,
     SUBPACKAGE_CONTRACT_DIR,
     get_contract_root,
     get_project_db,
+    get_subpackage_std_dir,
 )
 
 
@@ -253,6 +255,155 @@ def scan_all_projects(
     return projects_data
 
 
+def find_latest_subpackage_std_file(std_dir: str | None = None) -> str | None:
+    """定位 2_分包合同台账_std 下最新的「分包签订合同汇总_*.xlsx」。"""
+    std_dir = std_dir or get_subpackage_std_dir()
+    if not os.path.isdir(std_dir):
+        print(f"⚠️  分包台账 std 目录不存在: {std_dir}")
+        return None
+    candidates = []
+    for name in os.listdir(std_dir):
+        if name.startswith("~$") or "钢结构" in name:
+            continue
+        if not name.endswith((".xlsx", ".xls")):
+            continue
+        if "分包签订合同汇总" not in name and "分包" not in name:
+            # 仍允许其它 xlsx，但优先带汇总字样
+            pass
+        path = os.path.join(std_dir, name)
+        if os.path.isfile(path) and "分包签订合同汇总" in name:
+            candidates.append(path)
+    if not candidates:
+        # 回退：目录下任意非临时 xlsx
+        for name in os.listdir(std_dir):
+            if name.startswith("~$") or not name.endswith((".xlsx", ".xls")):
+                continue
+            if "钢结构" in name:
+                continue
+            candidates.append(os.path.join(std_dir, name))
+    if not candidates:
+        print(f"⚠️  未在 {std_dir} 找到分包签订合同汇总文件")
+        return None
+    latest = max(candidates, key=os.path.getmtime)
+    print(f"📂 用于对比的最新分包台账: {os.path.basename(latest)}")
+    return latest
+
+
+def load_ledger_subpackage_by_code(std_file: str | None = None) -> tuple[dict[str, float], str | None]:
+    """
+    从最新标准化分包台账按项目编码汇总合同额（万泰铢）。
+    返回 (code -> 万泰铢, 源文件名)
+    """
+    path = std_file or find_latest_subpackage_std_file()
+    if not path or not os.path.isfile(path):
+        return {}, None
+
+    try:
+        df = pd.read_excel(path)
+    except Exception as e:
+        print(f"⚠️  读取分包台账失败: {path} | {e}")
+        return {}, None
+
+    code_col = None
+    for c in ["项目编码", "项目编码(匹配)", "项目代码"]:
+        if c in df.columns:
+            code_col = c
+            break
+    amount_col = None
+    for c in ["合同额（泰铢）", "分包合同额（泰铢）", "合同金额", "合同额"]:
+        if c in df.columns:
+            amount_col = c
+            break
+    if not code_col or not amount_col:
+        print(f"⚠️  分包台账缺少项目编码或合同额列: {list(df.columns)}")
+        return {}, os.path.basename(path)
+
+    tmp = df[[code_col, amount_col]].copy()
+    tmp[code_col] = tmp[code_col].fillna("").astype(str).str.strip()
+    tmp = tmp[(tmp[code_col] != "") & (tmp[code_col].str.lower() != "nan")]
+    tmp[amount_col] = pd.to_numeric(tmp[amount_col], errors="coerce").fillna(0)
+    # 泰铢 → 万泰铢
+    grouped = tmp.groupby(code_col, as_index=True)[amount_col].sum() / 10000.0
+    mapping = {str(k).strip(): round(float(v), 2) for k, v in grouped.items()}
+    print(f"  台账按项目编码汇总: {len(mapping)} 个项目, 合计 {sum(mapping.values()):,.2f} 万泰铢")
+    return mapping, os.path.basename(path)
+
+
+def enrich_with_ledger_subpackage(
+    df: pd.DataFrame,
+    ledger_map: dict[str, float],
+    tolerance: float | None = None,
+) -> pd.DataFrame:
+    """
+    在「1_总包分包汇总(全部)」上增加台账对比列。
+    - 台账分包合同额(万泰铢): 来自最新 分包签订合同汇总
+    - 差额(万泰铢): 文件夹汇总分包额 - 台账分包额
+    - 对比结果: 一致 / 有差异 / 台账无此项目 / 文件夹无台账金额
+    """
+    if df is None or df.empty:
+        return df
+    tolerance = SUBPACKAGE_COMPARE_TOLERANCE_WAN if tolerance is None else tolerance
+    out = df.copy()
+
+    def _lookup(code) -> float | None:
+        code = str(code or "").strip()
+        if not code or code.lower() == "nan":
+            return None
+        if code in ledger_map:
+            return ledger_map[code]
+        return None
+
+    ledger_vals = []
+    diffs = []
+    statuses = []
+    for _, row in out.iterrows():
+        name = str(row.get("项目名称", "")).strip()
+        if name == "总计":
+            ledger_vals.append(None)  # 稍后填合计
+            diffs.append(None)
+            statuses.append("")
+            continue
+        code = row.get("项目编码", "")
+        folder_amt = float(pd.to_numeric(row.get("分包合同额(万泰铢)"), errors="coerce") or 0)
+        ledger_amt = _lookup(code)
+        if ledger_amt is None:
+            ledger_vals.append(None)
+            diffs.append(None)
+            if folder_amt > tolerance:
+                statuses.append("台账无此项目")
+            else:
+                statuses.append("台账无此项目")
+        else:
+            ledger_vals.append(round(ledger_amt, 2))
+            diff = round(folder_amt - ledger_amt, 2)
+            diffs.append(diff)
+            if abs(diff) <= tolerance:
+                statuses.append("一致")
+            else:
+                statuses.append("有差异")
+
+    out["台账分包合同额(万泰铢)"] = ledger_vals
+    out["差额(万泰铢)"] = diffs
+    out["对比结果"] = statuses
+
+    # 总计行：台账合计、差额合计
+    total_mask = out["项目名称"].astype(str).str.strip() == "总计"
+    if total_mask.any():
+        # 仅对非总计行求和
+        data_part = out.loc[~total_mask]
+        ledger_sum = pd.to_numeric(data_part["台账分包合同额(万泰铢)"], errors="coerce").fillna(0).sum()
+        folder_sum = pd.to_numeric(data_part["分包合同额(万泰铢)"], errors="coerce").fillna(0).sum()
+        out.loc[total_mask, "台账分包合同额(万泰铢)"] = round(float(ledger_sum), 2)
+        out.loc[total_mask, "差额(万泰铢)"] = round(float(folder_sum - ledger_sum), 2)
+        out.loc[total_mask, "对比结果"] = (
+            "有差异"
+            if abs(folder_sum - ledger_sum) > tolerance
+            else "一致"
+        )
+
+    return out
+
+
 def build_amount_dataframes(projects_data: list[dict]) -> dict[str, pd.DataFrame]:
     """构建金额汇总各 Sheet 的 DataFrame。"""
     if not projects_data:
@@ -272,11 +423,28 @@ def build_amount_dataframes(projects_data: list[dict]) -> dict[str, pd.DataFrame
             "总包合同额(万泰铢)": df["总包合同额(万泰铢)"].sum(),
             "分包合同额(万泰铢)": df["分包合同额(万泰铢)"].sum(),
         }
+        # 保留可能已有的对比列占位
+        for col in df.columns:
+            if col not in total_row:
+                total_row[col] = ""
         return pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
 
-    df_sheet1 = with_total(
-        df_all[display_columns].copy().sort_values(by="项目编码", ascending=False)
-    )
+    base = df_all[display_columns].copy().sort_values(by="项目编码", ascending=False)
+
+    # 仅「全部」Sheet 增加台账对比列
+    ledger_map, ledger_file = load_ledger_subpackage_by_code()
+    df_sheet1 = with_total(base)
+    if ledger_map:
+        df_sheet1 = enrich_with_ledger_subpackage(df_sheet1, ledger_map)
+        if ledger_file:
+            # 在列名旁不改名，打印来源即可
+            print(f"  已写入台账对比列（源: {ledger_file}）")
+        n_diff = int((df_sheet1["对比结果"] == "有差异").sum()) if "对比结果" in df_sheet1.columns else 0
+        n_miss = int((df_sheet1["对比结果"] == "台账无此项目").sum()) if "对比结果" in df_sheet1.columns else 0
+        print(f"  对比结果: 有差异 {n_diff} 行, 台账无此项目 {n_miss} 行")
+    else:
+        print("  未加载到台账数据，跳过对比列")
+
     sheets["1_总包分包汇总(全部)"] = df_sheet1
 
     df_cny = df_all[df_all["_currency_type"] == "CNY"]
@@ -336,12 +504,19 @@ def format_amount_sheets(workbook: Workbook, sheet_names: list[str] | None = Non
         header_font = Font(color="FFFFFF", bold=True, size=12)
         total_fill = PatternFill(start_color="FFD966", end_color="FFD966", fill_type="solid")
         total_font = Font(bold=True, size=11)
+        # 差异行：橙红；台账缺失：浅橙
+        diff_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        miss_fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
         thin_border = Border(
             left=Side(style="thin"),
             right=Side(style="thin"),
             top=Side(style="thin"),
             bottom=Side(style="thin"),
         )
+
+        # 表头映射
+        headers = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
+        header_idx = {h: i + 1 for i, h in enumerate(headers) if h}
 
         ws.row_dimensions[1].height = 40
         for cell in ws[1]:
@@ -350,14 +525,30 @@ def format_amount_sheets(workbook: Workbook, sheet_names: list[str] | None = Non
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
             cell.border = thin_border
 
+        status_col = header_idx.get("对比结果")
+        name_col = header_idx.get("项目名称", 3)
+
         for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
             for cell in row:
                 cell.border = thin_border
                 cell.alignment = Alignment(vertical="center")
 
+            r_idx = row[0].row
+            name_val = ws.cell(r_idx, name_col).value
+            if name_val == "总计":
+                continue
+            if status_col:
+                status = ws.cell(r_idx, status_col).value
+                if status == "有差异":
+                    for cell in row:
+                        cell.fill = diff_fill
+                elif status == "台账无此项目":
+                    for cell in row:
+                        cell.fill = miss_fill
+
         last_row = ws.max_row
         # 仅当最后一行是「总计」时高亮
-        name_cell = ws.cell(row=last_row, column=3).value
+        name_cell = ws.cell(row=last_row, column=name_col).value
         if name_cell == "总计":
             for col_idx, cell in enumerate(ws[last_row], start=1):
                 cell.fill = total_fill
@@ -367,17 +558,30 @@ def format_amount_sheets(workbook: Workbook, sheet_names: list[str] | None = Non
                     horizontal="center" if col_idx <= 3 else "right", vertical="center"
                 )
 
-        for col_idx in [4, 5]:
-            if col_idx > ws.max_column:
+        # 金额列数字格式（从第4列起，排除「对比结果」文本列）
+        for col_idx in range(4, ws.max_column + 1):
+            header = headers[col_idx - 1] if col_idx - 1 < len(headers) else None
+            if header == "对比结果":
                 continue
             col_letter = get_column_letter(col_idx)
             for cell in ws[col_letter][1:]:
                 if cell.value is not None and isinstance(cell.value, (int, float)):
                     cell.number_format = "#,##0.00"
 
-        column_widths = {"A": 20, "B": 18, "C": 50, "D": 18, "E": 18}
-        for col, width in column_widths.items():
-            ws.column_dimensions[col].width = width
+        # 列宽
+        default_widths = {
+            "项目状态": 16,
+            "项目编码": 16,
+            "项目名称": 28,
+            "总包合同额(万泰铢)": 16,
+            "分包合同额(万泰铢)": 16,
+            "台账分包合同额(万泰铢)": 18,
+            "差额(万泰铢)": 12,
+            "对比结果": 14,
+        }
+        for col_idx, header in enumerate(headers, start=1):
+            letter = get_column_letter(col_idx)
+            ws.column_dimensions[letter].width = default_widths.get(header, 14)
 
         ws.freeze_panes = "A2"
         ws.auto_filter.ref = ws.dimensions
