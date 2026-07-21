@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-, -*-.
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import os
 import re
+import glob
 
 # ================== 自动加载系统中文字体 ==================
 plt.rcParams['font.sans-serif'] = [
@@ -267,4 +268,15 @@ else:
     output_path = os.path.join(output_dir, f"在建项目甘特图_{date_tag}.png")
 
     fig.savefig(output_path, dpi=350, bbox_inches='tight', facecolor='white')
+
+    # 生成完成后删除旧图，只保留最新图片
+    existing_files = glob.glob(os.path.join(output_dir, "在建项目甘特图_*.png"))
+    for old_path in existing_files:
+        if os.path.abspath(old_path) != os.path.abspath(output_path):
+            try:
+                os.remove(old_path)
+                print(f"已删除旧图片：{old_path}")
+            except OSError as e:
+                print(f"删除旧图片失败：{old_path}，原因：{e}")
+
     print(f"高颜值甘特图已保存：{output_path}")
