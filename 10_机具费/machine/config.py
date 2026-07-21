@@ -1,8 +1,18 @@
 # -*- coding: utf-8 -*-
-"""机具费统一配置。"""
+"""机具费统一配置。
+
+数据目录按字母顺序（10_机具费🚜/）：
+  A_机具费_raw/              原始台账
+  B_机具费_raw_sum/          机具费_raw合并.xlsx（过程全量合并 + 项目匹配）
+  C_机具费_raw_split/        原始拆分：{编码}_{项目}_机具费.xlsx
+  D_机具费_std_sum/          标准汇总：机具费汇总_全量标准化_汇总.xlsx
+  E_机具费_std_split/        标准拆分：标准汇总按项目拆分
+  F_机具费_report/           分析报告 HTML / Excel
+"""
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -29,13 +39,112 @@ def first_existing(*candidates: Path) -> Path:
 
 
 MACHINE_ROOT = first_existing(DATA_ROOT / "10_机具费🚜", DATA_ROOT / "10_机具费")
-RAW_DIR = MACHINE_ROOT / "A_机具费_raw"
-STD_DIR = MACHINE_ROOT / "B_机具费_std"
-SUM_DIR = MACHINE_ROOT / "B_机具费_sum"
-REPORT_DIR = MACHINE_ROOT / "C_机具租赁分析报告"
+
+# ---------- 数据目录（A→F 顺序）----------
+RAW_DIR = MACHINE_ROOT / "A_机具费_raw"                 # A 原始台账
+RAW_SUM_DIR = MACHINE_ROOT / "B_机具费_raw_sum"         # B 过程合并
+RAW_SPLIT_DIR = MACHINE_ROOT / "C_机具费_raw_split"     # C 原始拆分
+STD_SUM_DIR = MACHINE_ROOT / "D_机具费_std_sum"         # D 标准汇总
+STD_SPLIT_DIR = MACHINE_ROOT / "E_机具费_std_split"     # E 标准拆分
+REPORT_DIR = MACHINE_ROOT / "F_机具费_report"           # F 分析报告
+
+# 兼容旧路径（回退查找 / 迁移源）
+LEGACY_PATHS = {
+    "RAW_SUM": [
+        MACHINE_ROOT / "机具费_raw_sum",
+        MACHINE_ROOT / "B_机具费_std",
+    ],
+    "RAW_SPLIT": [
+        MACHINE_ROOT / "原始拆分",
+        MACHINE_ROOT / "B_机具费_std",
+    ],
+    "STD_SUM": [
+        MACHINE_ROOT / "标准汇总",
+        MACHINE_ROOT / "B_机具费_sum",
+    ],
+    "STD_SPLIT": [
+        MACHINE_ROOT / "标准拆分",
+    ],
+    "REPORT": [
+        MACHINE_ROOT / "C_机具租赁分析报告",
+    ],
+}
+
+LEGACY_STD_DIR = MACHINE_ROOT / "B_机具费_std"
+LEGACY_SUM_DIR = MACHINE_ROOT / "B_机具费_sum"
+
+# 别名
+STD_DIR = RAW_SPLIT_DIR
+SUM_DIR = STD_SUM_DIR
+
+
+def ensure_data_dirs() -> None:
+    """创建 A→F 流水线目录。"""
+    for d in (RAW_DIR, RAW_SUM_DIR, RAW_SPLIT_DIR, STD_SUM_DIR, STD_SPLIT_DIR, REPORT_DIR):
+        d.mkdir(parents=True, exist_ok=True)
+
+
+def migrate_legacy_dirs(*, move_files: bool = True) -> list[str]:
+    """把旧目录中的文件迁移到新 A→F 目录（若新目录尚空且旧目录有内容）。"""
+    ensure_data_dirs()
+    logs: list[str] = []
+
+    migrations = [
+        (RAW_SUM_DIR, LEGACY_PATHS["RAW_SUM"], ("机具费_raw合并.xlsx", "clean_机具费_raw合并.xlsx")),
+        (RAW_SPLIT_DIR, LEGACY_PATHS["RAW_SPLIT"], None),  # 全部 *_机具费.xlsx
+        (STD_SUM_DIR, LEGACY_PATHS["STD_SUM"], None),
+        (STD_SPLIT_DIR, LEGACY_PATHS["STD_SPLIT"], None),
+        (REPORT_DIR, LEGACY_PATHS["REPORT"], None),
+    ]
+
+    for new_dir, old_dirs, only_names in migrations:
+        new_dir.mkdir(parents=True, exist_ok=True)
+        for old in old_dirs:
+            if not old.exists() or old.resolve() == new_dir.resolve():
+                continue
+            # 原始拆分不要从 B_std 整包搬（含合并过程文件）
+            if new_dir == RAW_SPLIT_DIR and old.name in ("B_机具费_std",):
+                for f in old.glob("*_机具费.xlsx"):
+                    if "合并" in f.name:
+                        continue
+                    dest = new_dir / f.name
+                    if not dest.exists():
+                        if move_files:
+                            shutil.move(str(f), str(dest))
+                        else:
+                            shutil.copy2(f, dest)
+                        logs.append(f"{f.name} → {new_dir.name}/")
+                continue
+
+            if only_names:
+                for name in only_names:
+                    src = old / name
+                    dest = new_dir / name
+                    if src.exists() and not dest.exists():
+                        if move_files:
+                            shutil.move(str(src), str(dest))
+                        else:
+                            shutil.copy2(src, dest)
+                        logs.append(f"{name} → {new_dir.name}/")
+            else:
+                for f in old.iterdir():
+                    if not f.is_file() or f.name.startswith("."):
+                        continue
+                    dest = new_dir / f.name
+                    if not dest.exists():
+                        if move_files:
+                            shutil.move(str(f), str(dest))
+                        else:
+                            shutil.copy2(f, dest)
+                        logs.append(f"{f.name} → {new_dir.name}/")
+    return logs
+
 
 MACHINE_MAPPING_JSON = first_existing(MACHINE_CODE_DIR / "机具映射表.json")
-REGION_MAPPING_JSON = first_existing(MACHINE_CODE_DIR / "区域映射表.json", MACHINE_CODE_DIR / "机具映射表.json")
+REGION_MAPPING_JSON = first_existing(
+    MACHINE_CODE_DIR / "区域映射表.json",
+    MACHINE_CODE_DIR / "机具映射表.json",
+)
 REGION_MAPPING_TXT = first_existing(MACHINE_CODE_DIR / "区域映射表.txt")
 MACHINE_MAPPING_TXT = first_existing(MACHINE_CODE_DIR / "机具映射表.txt")
 PROJECT_INFO_XLSX = first_existing(
@@ -49,11 +158,13 @@ EXCEL_FILE_OVERRIDE = os.environ.get("MACHINE_EXCEL_OVERRIDE", "")
 OUTPUT_FILENAME_PREFIX = "机具费汇总"
 OUTPUT_FILE_SUFFIX = "汇总"
 RAW_MERGE_NAME = "机具费_raw合并.xlsx"
-LEGACY_CLEAN_MERGE_NAME = "clean_机具费_raw合并.xlsx"  # 废弃，不再生成
-PROJECT_STD_SUFFIX = "_机具费.xlsx"  # 按项目拆分后的文件名后缀
+LEGACY_CLEAN_MERGE_NAME = "clean_机具费_raw合并.xlsx"
+PROJECT_STD_SUFFIX = "_机具费.xlsx"
 FULL_SUMMARY_BASENAME = f"{OUTPUT_FILENAME_PREFIX}_全量标准化"
+FULL_SUMMARY_FILENAME = f"{FULL_SUMMARY_BASENAME}_{OUTPUT_FILE_SUFFIX}.xlsx"
 
 SUMMARY_SHEET_NAME = "汇总"
 PROJECT_SUMMARY_SHEET_NAME = "项目汇总机具费"
 PROJECT_MONTHLY_CHANGE_SHEET_NAME = "项目月度金额增量"
 PROJECT_MONTHLY_WIDE_SHEET_NAME = "项目月份金额宽表"
+PROCESS_REPORT_SHEET_NAME = "处理报告"

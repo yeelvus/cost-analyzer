@@ -2,7 +2,13 @@
 """
 python -m machine [command]
 
-  merge-raw | summarize | split-sum | split-ledger | report | all | paths
+  merge-raw      A_raw → B_raw_sum + C_raw_split
+  summarize      C_raw_split → D_std_sum + E_std_split
+  split-ledger   仅：B_raw_sum 合并 → C_raw_split
+  split-sum      仅：D_std_sum → E_std_split
+  report         D_std_sum → F_report
+  all            全流程
+  paths          打印路径
 """
 from __future__ import annotations
 
@@ -34,13 +40,13 @@ def cmd_summarize(args):
 
 
 def cmd_split_sum(args):
-    from machine.split import split_summary_by_project
-    raise SystemExit(split_summary_by_project(args.source, args.target_dir, args.cols))
+    from machine.split import split_std_summary_by_project
+    raise SystemExit(split_std_summary_by_project(args.source, args.target_dir, args.cols))
 
 
 def cmd_split_ledger(args):
-    from machine.split import split_ledger_by_project
-    split_ledger_by_project(args.input, args.output_dir)
+    from machine.split import split_raw_merge_by_project
+    split_raw_merge_by_project(args.input, args.output_dir)
 
 
 def cmd_report(args):
@@ -49,12 +55,18 @@ def cmd_report(args):
 
 
 def cmd_all(args):
-    print("=" * 60 + "\n全流程 1/3 merge-raw\n" + "=" * 60)
+    print("=" * 60 + "\n全流程 1/4 merge-raw（B_raw_sum + C_raw_split）\n" + "=" * 60)
     cmd_merge_raw(args)
-    print("\n" + "=" * 60 + "\n全流程 2/3 summarize\n" + "=" * 60)
+    print("\n" + "=" * 60 + "\n全流程 2/4 summarize（D_std_sum）\n" + "=" * 60)
     from machine.summarize import run_summarize_batch
     run_summarize_batch()
-    print("\n" + "=" * 60 + "\n全流程 3/3 report\n" + "=" * 60)
+    print("\n" + "=" * 60 + "\n全流程 3/4 确保 E_std_split\n" + "=" * 60)
+    try:
+        from machine.split import split_std_summary_by_project
+        split_std_summary_by_project()
+    except Exception as e:
+        print(f"⚠️ 标准拆分: {e}")
+    print("\n" + "=" * 60 + "\n全流程 4/4 report\n" + "=" * 60)
     from machine.report import run_report
     try:
         run_report()
@@ -65,54 +77,61 @@ def cmd_all(args):
 
 def cmd_paths(args):
     from machine import config as c
+    from machine.config import ensure_data_dirs, migrate_legacy_dirs
+    ensure_data_dirs()
+    logs = migrate_legacy_dirs()
+    if logs:
+        print("已迁移旧目录文件:")
+        for line in logs[:30]:
+            print(" ", line)
     rows = [
-        ("CODE_ROOT", c.CODE_ROOT),
-        ("DATA_ROOT", c.DATA_ROOT),
         ("MACHINE_ROOT", c.MACHINE_ROOT),
-        ("RAW_DIR", c.RAW_DIR),
-        ("STD_DIR", c.STD_DIR),
-        ("SUM_DIR", c.SUM_DIR),
-        ("REPORT_DIR", c.REPORT_DIR),
-        ("MACHINE_MAPPING_JSON", c.MACHINE_MAPPING_JSON),
-        ("PROJECT_MATCH_DB", c.PROJECT_MATCH_DB),
+        ("RAW_DIR (原始台账)", c.RAW_DIR),
+        ("B RAW_SUM_DIR", c.RAW_SUM_DIR),
+        ("C RAW_SPLIT_DIR", c.RAW_SPLIT_DIR),
+        ("D STD_SUM_DIR", c.STD_SUM_DIR),
+        ("E STD_SPLIT_DIR", c.STD_SPLIT_DIR),
+        ("F REPORT_DIR", c.REPORT_DIR),
+        ("RAW_MERGE_NAME", c.RAW_MERGE_NAME),
+        ("FULL_SUMMARY_FILENAME", c.FULL_SUMMARY_FILENAME),
         ("RUN_MODE", c.RUN_MODE),
     ]
-    print("机具费路径:\n")
+    print("机具费数据目录:\n")
     for k, v in rows:
         mark = ""
         if isinstance(v, Path):
-            mark = " ✓" if v.exists() else " ✗"
-        print(f"  {k:22s} {v}{mark}")
+            mark = " ✓" if v.exists() else " （将创建）"
+        print(f"  {k:36s} {v}{mark}")
 
 
 def build_parser():
-    p = argparse.ArgumentParser(prog="machine", description="机具费处理（重构版）")
+    p = argparse.ArgumentParser(prog="machine", description="机具费处理（目录结构化）")
     sub = p.add_subparsers(dest="command")
 
-    sub.add_parser("merge-raw", help="raw→机具费_raw合并→按项目拆分").set_defaults(func=cmd_merge_raw)
+    sub.add_parser("merge-raw", help="A_raw → B_raw_sum + C_raw_split").set_defaults(func=cmd_merge_raw)
 
-    s = sub.add_parser("summarize", help="std → sum 汇总")
-    s.add_argument("--file", default=None, help="指定 std 文件或留空批量")
+    s = sub.add_parser("summarize", help="C_raw_split → D_std_sum (+E_std_split)")
+    s.add_argument("--file", default=None)
     s.add_argument("--basename", default=None)
     s.set_defaults(func=cmd_summarize)
 
-    s = sub.add_parser("split-sum", help="汇总按项目拆 workbook")
+    s = sub.add_parser("split-sum", help="D_std_sum → E_std_split")
     s.add_argument("--source", default=None)
     s.add_argument("--target_dir", default=None)
     s.add_argument("--cols", nargs="*", default=None)
     s.set_defaults(func=cmd_split_sum)
 
-    s = sub.add_parser("split-ledger", help="机具费_raw合并.xlsx 按项目拆（一般 merge-raw 已自动执行）")
+    s = sub.add_parser("split-ledger", help="B 合并文件 → C_raw_split")
     s.add_argument("--input", default=None)
     s.add_argument("--output-dir", default=None)
     s.set_defaults(func=cmd_split_ledger)
 
-    s = sub.add_parser("report", help="HTML/Excel 分析报告")
+    s = sub.add_parser("report", help="D_std_sum → F_report")
     s.add_argument("--file", default=None)
     s.add_argument("--output-dir", default=None)
     s.set_defaults(func=cmd_report)
 
-    sub.add_parser("all", help="merge-raw + summarize + report").set_defaults(func=cmd_all)
+    sub.add_parser("all", help="全流程").set_defaults(func=cmd_all)
     sub.add_parser("paths", help="打印路径").set_defaults(func=cmd_paths)
     return p
 

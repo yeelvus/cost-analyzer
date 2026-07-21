@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 """raw 多月 Excel 合并 + 列标准化 + 项目匹配。
 
-过程文件（仅一份）：
-  B_机具费_std/机具费_raw合并.xlsx
-
-随后按项目拆分为：
-  B_机具费_std/{项目编码}_{项目名称}_机具费.xlsx
+  B_机具费_raw_sum/机具费_raw合并.xlsx   ← 过程全量合并
+  C_机具费_raw_split/{编码}_{项目}_机具费.xlsx  ← 按项目拆分（仅明细）
 """
 from __future__ import annotations
 
@@ -20,7 +17,9 @@ from machine.config import (
     PROJECT_MATCH_DB,
     RAW_DIR,
     RAW_MERGE_NAME,
-    STD_DIR,
+    RAW_SPLIT_DIR,
+    RAW_SUM_DIR,
+    ensure_data_dirs,
 )
 
 
@@ -185,11 +184,15 @@ def run_merge_raw(
     *,
     split_by_project: bool = True,
 ) -> Path:
-    """合并 raw → 机具费_raw合并.xlsx，并默认按项目拆到 std。"""
+    """合并 raw → B_B_机具费_raw_sum/机具费_raw合并.xlsx，并按项目拆到 C_机具费_raw_split。"""
+    ensure_data_dirs()
     raw_dir = Path(raw_dir or RAW_DIR)
-    out_dir = Path(out_dir or STD_DIR)
+    out_dir = Path(out_dir or RAW_SUM_DIR)
     out_dir.mkdir(parents=True, exist_ok=True)
     _cleanup_legacy_clean(out_dir)
+    # 同步清理旧 std 目录下的废弃 clean 副本
+    from machine.config import LEGACY_STD_DIR
+    _cleanup_legacy_clean(LEGACY_STD_DIR)
 
     files = sorted(
         f for f in raw_dir.iterdir()
@@ -262,9 +265,9 @@ def run_merge_raw(
     if split_by_project:
         from machine.split import split_raw_merge_by_project
         print(f"\n{'='*60}")
-        print("按项目拆分过程文件 → 项目 std 明细")
+        print("按项目拆分 → C_机具费_raw_split/")
         print("=" * 60)
-        split_raw_merge_by_project(out_path, out_dir)
+        split_raw_merge_by_project(out_path, RAW_SPLIT_DIR)
 
     return out_path
 

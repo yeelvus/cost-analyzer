@@ -20,16 +20,20 @@ from machine.config import (
     MACHINE_MAPPING_TXT,
     OUTPUT_FILE_SUFFIX,
     OUTPUT_FILENAME_PREFIX,
+    PROCESS_REPORT_SHEET_NAME,
     PROJECT_MATCH_DB,
     PROJECT_MONTHLY_CHANGE_SHEET_NAME,
     PROJECT_MONTHLY_WIDE_SHEET_NAME,
     PROJECT_SUMMARY_SHEET_NAME,
+    RAW_SPLIT_DIR,
     REGION_MAPPING_JSON,
     REGION_MAPPING_TXT,
     RUN_MODE,
     STD_DIR,
+    STD_SUM_DIR,
     SUM_DIR,
     SUMMARY_SHEET_NAME,
+    ensure_data_dirs,
 )
 from machine.columns import (
     extract_project_info,
@@ -74,9 +78,10 @@ from machine.validate import (
     validate_total_amount,
 )
 
-# 兼容旧全局名
-STANDARDIZED_INPUT_DIR = str(STD_DIR)
-OUTPUT_FOLDER = str(SUM_DIR)
+# 输入：原始拆分；输出：标准汇总
+ensure_data_dirs()
+STANDARDIZED_INPUT_DIR = str(RAW_SPLIT_DIR if RAW_SPLIT_DIR.exists() else STD_DIR)
+OUTPUT_FOLDER = str(STD_SUM_DIR)
 PROJECT_MAPPING_JSON = str(REGION_MAPPING_JSON)
 MACHINE_MAPPING_JSON_PATH = str(MACHINE_MAPPING_JSON)
 PROJECT_MAPPING_TXT_LEGACY = str(REGION_MAPPING_TXT) if REGION_MAPPING_TXT.exists() else None
@@ -171,6 +176,7 @@ def main(excel_path_override=None, output_basename_override=None):
         PROJECT_SUMMARY_SHEET_NAME,
         PROJECT_MONTHLY_CHANGE_SHEET_NAME,
         PROJECT_MONTHLY_WIDE_SHEET_NAME,
+        PROCESS_REPORT_SHEET_NAME,
         "处理报告",
     }
 
@@ -1025,19 +1031,16 @@ def main(excel_path_override=None, output_basename_override=None):
     output_filename = f"{output_basename}_{OUTPUT_FILE_SUFFIX}.xlsx"
     output_path = Path(OUTPUT_FOLDER) / output_filename
 
-    # 先收集旧汇总文件，待新文件输出成功后再删除
+    # D 目录策略：写完目标文件后，只保留全量标准化汇总（见 _keep_only_full_summary_in_d）
     old_summary_files = []
-    old_summary_patterns = [
-        f"{output_basename}_*.xlsx",
-        f"{primary_excel_path.stem}_已汇总*.xlsx",
-    ]
-    for pattern in old_summary_patterns:
-        for old_file in Path(OUTPUT_FOLDER).glob(pattern):
-            if old_file != output_path and old_file not in old_summary_files:
-                old_summary_files.append(old_file)
+    for old_file in Path(OUTPUT_FOLDER).glob("*.xlsx"):
+        if old_file.name.startswith("~$"):
+            continue
+        if old_file != output_path:
+            old_summary_files.append(old_file)
 
     if old_summary_files:
-        print(f"检测到 {len(old_summary_files)} 个旧汇总文件，输出成功后将自动删除")
+        print(f"检测到 {len(old_summary_files)} 个旧/多余汇总文件，输出成功后将删除")
     
     # 定义填充颜色
     pink_fill = PatternFill(start_color="FFC0CB", end_color="FFC0CB", fill_type="solid")  # 粉红色：本次费用合计错误
@@ -1103,15 +1106,11 @@ def main(excel_path_override=None, output_basename_override=None):
         print(f"\n✅ 所有数据验证通过，无计算错误")
 
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-        # 先写入重点sheet（放在最前）
+        # Sheet 顺序：汇总 置首，再项目汇总 / 月份宽表 / 处理报告
+        summary_df.to_excel(writer, sheet_name=SUMMARY_SHEET_NAME, index=False)
         project_summary_df.to_excel(writer, sheet_name=PROJECT_SUMMARY_SHEET_NAME, index=False)
         project_monthly_wide_report.to_excel(writer, sheet_name=PROJECT_MONTHLY_WIDE_SHEET_NAME, index=False)
-
-        # 写入报告表
-        report_df.to_excel(writer, sheet_name="处理报告", index=False)
-
-        # 写入汇总表
-        summary_df.to_excel(writer, sheet_name=SUMMARY_SHEET_NAME, index=False)
+        report_df.to_excel(writer, sheet_name=PROCESS_REPORT_SHEET_NAME, index=False)
         
 
         from openpyxl.styles import Alignment, Font
@@ -1281,7 +1280,7 @@ def main(excel_path_override=None, output_basename_override=None):
         format_monthly_report_sheet(ws_project_monthly_wide, project_monthly_wide_report)
         
         # 美化报告表
-        ws_report = writer.sheets["处理报告"]
+        ws_report = writer.sheets[PROCESS_REPORT_SHEET_NAME]
         
         # 设置首行格式：高度40，自动换行
         ws_report.row_dimensions[1].height = 40
@@ -1341,11 +1340,11 @@ def main(excel_path_override=None, output_basename_override=None):
         amount_str = f"{item.get('费用合计(泰铢)', 0):,.2f}" if item["状态"] == "成功" else "0.00"
         print(f"  {status_icon} {item['sheet名称']}: {item['状态']} - {item.get('数据行数', 0)} 行 - {amount_str} 泰铢")
     print(f"\n  💰 总计: {report_total:,.2f} 泰铢")
-    print(f"\n已生成4个工作表：")
-    print(f"  1. '{PROJECT_SUMMARY_SHEET_NAME}' - 项目汇总机具使用费")
-    print(f"  2. '{PROJECT_MONTHLY_WIDE_SHEET_NAME}' - 各项目按年月横向金额宽表")
-    print(f"  3. '处理报告' - 各项目处理情况统计 (包含错误率、差异金额)")
-    print(f"  4. '{SUMMARY_SHEET_NAME}' - 所有数据汇总 (共 {len(summary_df)} 行)")
+    print(f"\n已生成4个工作表（汇总置首）：")
+    print(f"  1. '{SUMMARY_SHEET_NAME}' - 所有数据明细 (共 {len(summary_df)} 行)")
+    print(f"  2. '{PROJECT_SUMMARY_SHEET_NAME}' - 项目汇总机具使用费")
+    print(f"  3. '{PROJECT_MONTHLY_WIDE_SHEET_NAME}' - 各项目按年月横向金额宽表")
+    print(f"  4. '{PROCESS_REPORT_SHEET_NAME}' - 各项目处理情况统计")
     
     # 9. 生成筛选分析
     print(f"\n{'='*60}")
@@ -1379,10 +1378,36 @@ def main(excel_path_override=None, output_basename_override=None):
 
 
 
+def _keep_only_full_summary_in_d() -> None:
+    """D_机具费_std_sum 仅保留 机具费汇总_全量标准化_汇总.xlsx。"""
+    from machine.config import FULL_SUMMARY_FILENAME, STD_SUM_DIR
+
+    keep_name = FULL_SUMMARY_FILENAME
+    out_dir = Path(STD_SUM_DIR)
+    if not out_dir.exists():
+        return
+    removed = 0
+    for f in out_dir.glob("*.xlsx"):
+        if f.name.startswith("~$"):
+            continue
+        if f.name != keep_name:
+            try:
+                f.unlink()
+                removed += 1
+                print(f"  已清理 D 多余文件: {f.name}")
+            except Exception as e:
+                print(f"  ⚠️ 无法删除 {f.name}: {e}")
+    if removed:
+        print(f"  D_机具费_std_sum 现仅保留: {keep_name}（已删 {removed} 个）")
+    else:
+        print(f"  D_机具费_std_sum 仅保留: {keep_name}")
+
+
 def run_summarize_batch() -> None:
-    """按 RUN_MODE 批量汇总 std 目录。"""
+    """按 RUN_MODE 批量汇总：D 仅输出全量标准化汇总。"""
     if EXCEL_FILE_OVERRIDE and str(EXCEL_FILE_OVERRIDE).strip():
         main()
+        _keep_only_full_summary_in_d()
         return
 
     all_input_files = list_all_standardized_files(STANDARDIZED_INPUT_DIR)
@@ -1391,26 +1416,22 @@ def run_summarize_batch() -> None:
         return
 
     if RUN_MODE == "all":
-        project_to_files, unmatched_files = group_files_by_project(all_input_files)
-        if unmatched_files:
-            print(f"以下 {len(unmatched_files)} 个文件未识别到项目名，已跳过按项目汇总：")
-            for skipped_file in unmatched_files:
-                print(f"  - {skipped_file.name}")
-
-        if not project_to_files:
-            print("未找到可按项目分组的标准化文件，请检查文件命名格式（如 202604_伟隆项目机具费.xlsx）。")
-        else:
-            print(f"自动发现标准化文件 {len(all_input_files)} 个，按项目构建汇总任务 {len(project_to_files)} 个...")
-            sorted_jobs = sorted(project_to_files.items(), key=lambda item: item[0])
-            for idx, (project_name, project_files) in enumerate(sorted_jobs, start=1):
-                print(f"\n[{idx}/{len(sorted_jobs)}] 项目汇总：{project_name}（{len(project_files)} 个文件）")
-                project_output_basename = build_project_output_basename(
-                    project_name, load_or_init_db(PROJECT_MATCH_DB_PATH, [])
-                )
-                main(project_files, output_basename_override=project_output_basename)
-
-            print(f"\n[总汇总] 基于全部标准化文件生成总汇总...")
-            main(all_input_files, output_basename_override=f"{OUTPUT_FILENAME_PREFIX}_全量标准化")
+        # D_机具费_std_sum 只保留「机具费汇总_全量标准化_汇总.xlsx」
+        # 按项目的结果在 E_机具费_std_split，不再在 D 写单项目汇总
+        print(
+            f"自动发现原始拆分文件 {len(all_input_files)} 个，"
+            f"一次汇总写入 D_机具费_std_sum（仅全量标准化汇总）..."
+        )
+        main(all_input_files, output_basename_override=f"{OUTPUT_FILENAME_PREFIX}_全量标准化")
+        _keep_only_full_summary_in_d()
+        try:
+            from machine.split import split_std_summary_by_project
+            print(f"\n{'='*60}")
+            print("标准拆分：D_std_sum → E_std_split/")
+            print("=" * 60)
+            split_std_summary_by_project()
+        except Exception as e:
+            print(f"⚠️ 标准拆分跳过/失败: {e}")
     else:
         print(f"自动发现标准化文件 {len(all_input_files)} 个，开始按月份组合汇总...")
         month_to_files = {}
