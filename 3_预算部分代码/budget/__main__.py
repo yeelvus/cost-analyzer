@@ -5,8 +5,8 @@ python -m budget [command]
 commands:
   glodon         广联达导出 → 人材机 std + 总汇总 Excel
   dashboard      读取最新总汇总 → HTML 看板
-  all            glodon + dashboard（默认）
   responsibility 责任成本处理
+  all            glodon + dashboard + responsibility（默认）
   units-test     运行单位换算自检
 """
 
@@ -65,8 +65,22 @@ def cmd_dashboard(args):
     print(f"看板已生成: {out_html}")
 
 
+def cmd_responsibility(args):
+    from budget.responsibility import main as resp_main
+
+    resp_main()
+
+
 def cmd_all(args):
+    """一次性完成：广联达 → 看板 → 责任成本。"""
+    print("=" * 60)
+    print("全流程 1/3：广联达人材机处理")
+    print("=" * 60)
     cmd_glodon(args)
+
+    print("\n" + "=" * 60)
+    print("全流程 2/3：生成 HTML 看板")
+    print("=" * 60)
 
     class _DashArgs:
         run_source = False
@@ -76,11 +90,14 @@ def cmd_all(args):
 
     cmd_dashboard(_DashArgs())
 
+    print("\n" + "=" * 60)
+    print("全流程 3/3：责任成本处理")
+    print("=" * 60)
+    cmd_responsibility(args)
 
-def cmd_responsibility(args):
-    from budget.responsibility import main as resp_main
-
-    resp_main()
+    print("\n" + "=" * 60)
+    print("全流程完成（广联达 + 看板 + 责任成本）")
+    print("=" * 60)
 
 
 def cmd_units_test(args):
@@ -121,14 +138,17 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("-o", "--output", default=None, help="输出 HTML 路径")
     d.set_defaults(func=cmd_dashboard)
 
-    a = sub.add_parser("all", help="广联达处理 + 看板（默认）")
+    r = sub.add_parser("responsibility", help="责任成本处理")
+    r.set_defaults(func=cmd_responsibility)
+
+    a = sub.add_parser(
+        "all",
+        help="全流程：广联达 + 看板 + 责任成本（默认）",
+    )
     a.add_argument("-i", "--input", default=None)
     a.add_argument("-o", "--output", default=None)
     a.add_argument("--skip-summary", action="store_true")
     a.set_defaults(func=cmd_all)
-
-    r = sub.add_parser("responsibility", help="责任成本处理")
-    r.set_defaults(func=cmd_responsibility)
 
     u = sub.add_parser("units-test", help="单位换算自检")
     u.set_defaults(func=cmd_units_test)
@@ -141,7 +161,7 @@ def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
     if not args.command:
-        # 默认全流程
+        # 默认全流程（含责任成本）
         args = parser.parse_args(["all"])
     args.func(args)
 

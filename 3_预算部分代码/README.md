@@ -36,16 +36,21 @@
         │  budget dashboard
         ▼
 总汇总项目看板.html
+
+3.1_责任成本/1_责任成本_raw
+        │  budget responsibility
+        ▼
+3.1_责任成本/2_责任成本_std + 完整处理报告.xlsx
 ```
 
-责任成本为独立流水线（`3.1_责任成本`），命令：`responsibility`。
+默认 `all` 会按顺序跑完：**广联达 → 看板 → 责任成本**。
 
 ## 用法
 
 ```bash
 cd "/Users/wyattsun/Desktop/code/3_预算部分代码"
 
-# 默认：广联达处理 + 看板
+# 默认全流程：广联达 + 看板 + 责任成本
 python3 00_预算处理入口.py
 # 或
 python3 -m budget all
@@ -58,8 +63,10 @@ python3 -m budget glodon -i /path/raw -o /path/std
 python3 -m budget dashboard
 python3 -m budget dashboard --summary-file /path/to/总汇总.xlsx
 
-# 责任成本
+# 仅责任成本
 python3 -m budget responsibility
+# 或兼容旧脚本
+python3 process_responsibility_costs_complete.py
 
 # 单位换算自检
 python3 -m budget units-test
