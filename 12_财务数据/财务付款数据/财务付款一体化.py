@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!.usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 财务付款一体化入口（推荐使用这个文件）

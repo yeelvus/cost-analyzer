@@ -41,9 +41,6 @@ MASTER_COLUMNS = [
     "供应商名称",
     # —— 以下为辅助 ——
     "出现次数",
-    "金额合计",
-    "示例项目",
-    "示例科目",
     "命中层",
     "分类ID",
     "备注",
@@ -151,7 +148,6 @@ def build_deduped_master(
     rows: List[Dict[str, Any]] = []
     for summ, items in sorted(groups.items(), key=lambda x: (-len(x[1]), x[0])):
         n = len(items)
-        amt_sum = sum(float(x.get("实付金额") or 0) for x in items)
 
         # 供应商众数
         vend_counter = Counter(
@@ -174,33 +170,23 @@ def build_deduped_master(
         else:
             l1, l2, l3 = "", "", ""
 
-        # 示例
-        proj_counter = Counter(x["项目名称"] for x in items if x.get("项目名称"))
-        subj_counter = Counter(x["科目"] for x in items if x.get("科目"))
         layer_counter = Counter(x["命中层"] for x in items if x.get("命中层"))
         id_counter = Counter(x["分类ID"] for x in items if x.get("分类ID"))
+        subj_counter = Counter(x["科目"] for x in items if x.get("科目"))
 
         # 引擎补全
         cid = id_counter.most_common(1)[0][0] if id_counter else ""
         layer = layer_counter.most_common(1)[0][0] if layer_counter else ""
+        sample_subj = subj_counter.most_common(1)[0][0] if subj_counter else ""
         if engine is not None and (not l1 or not l2):
-            r = engine.classify(
-                subj_counter.most_common(1)[0][0] if subj_counter else "",
-                summ,
-                vendor,
-            )
+            r = engine.classify(sample_subj, summ, vendor)
             l1 = l1 or r.l1_name
             l2 = l2 or r.l2_name
             l3 = l3 or r.l3_name
             cid = cid or (r.l3_id or r.l2_id)
             layer = layer or r.layer
         elif engine is not None and l2 and not l3:
-            # 有二级无三级时尝试引擎补三级
-            r = engine.classify(
-                subj_counter.most_common(1)[0][0] if subj_counter else "",
-                summ,
-                vendor,
-            )
+            r = engine.classify(sample_subj, summ, vendor)
             if r.l2_name == l2 and r.l3_name:
                 l3 = r.l3_name
                 cid = r.l3_id or cid
@@ -213,9 +199,6 @@ def build_deduped_master(
                 "三级科目": l3,
                 "供应商名称": vendor,
                 "出现次数": n,
-                "金额合计": round(amt_sum, 2),
-                "示例项目": proj_counter.most_common(1)[0][0] if proj_counter else "",
-                "示例科目": subj_counter.most_common(1)[0][0] if subj_counter else "",
                 "命中层": layer,
                 "分类ID": cid,
                 "备注": "",
@@ -245,7 +228,7 @@ def _apply_master_format(path: Path, data_dir: Path) -> None:
         "核心列（请维护）：",
         "  · 摘要、一级科目、二级科目、三级科目、供应商名称",
         "",
-        "辅助列：出现次数 / 金额合计 / 示例项目 / 示例科目 / 命中层 / 分类ID / 备注",
+        "辅助列：出现次数 / 命中层 / 分类ID / 备注",
         "",
         "操作：",
         "  1. 下拉修改一/二/三级后保存",
@@ -291,9 +274,6 @@ def _apply_master_format(path: Path, data_dir: Path) -> None:
         "三级科目": 14,
         "供应商名称": 22,
         "出现次数": 10,
-        "金额合计": 14,
-        "示例项目": 16,
-        "示例科目": 12,
         "命中层": 12,
         "分类ID": 14,
         "备注": 18,
@@ -430,7 +410,7 @@ def apply_class_master(
             vend = _safe_str(row.get(cols["供应商名称"]))
         elif "供应商" in cols:
             vend = _safe_str(row.get(cols["供应商"]))
-        subj = _safe_str(row.get(cols["示例科目"])) if "示例科目" in cols else ""
+        subj = ""
 
         if not summ or not l2:
             skipped += 1
