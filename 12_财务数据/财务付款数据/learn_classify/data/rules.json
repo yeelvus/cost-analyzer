@@ -1,6 +1,6 @@
 {
-  "version": "1.1.1",
-  "description": "关键词规则：命中后归到业务大类二级，不建立型号级分类。",
+  "version": "2.0.0",
+  "description": "支持 l3_id；办公费下三级",
   "rules": [
     {
       "id": "r_L2_sub_pay",
@@ -416,20 +416,6 @@
       "不包含": "塔吊"
     },
     {
-      "id": "r_net",
-      "l2_id": "L2_mgmt_net",
-      "priority": 200,
-      "含有": "网费;网络费;宽带费;网络;宽带",
-      "不包含": ""
-    },
-    {
-      "id": "r_post",
-      "l2_id": "L2_mgmt_post",
-      "priority": 200,
-      "含有": "邮寄费;邮寄费用;快递费;快递",
-      "不包含": ""
-    },
-    {
       "id": "r_ins",
       "l2_id": "L2_mgmt_insurance",
       "priority": 200,
@@ -561,6 +547,38 @@
       "priority": 155,
       "含有": "钢板;工字钢;角钢;槽钢;型钢",
       "不包含": "租赁;钢板租赁"
+    },
+    {
+      "id": "r_office_net",
+      "l2_id": "L2_mgmt_office",
+      "l3_id": "L3_office_net",
+      "priority": 200,
+      "含有": "网费;网络费;宽带费;网络;宽带;通讯费;电话费",
+      "不包含": ""
+    },
+    {
+      "id": "r_office_post",
+      "l2_id": "L2_mgmt_office",
+      "l3_id": "L3_office_post",
+      "priority": 200,
+      "含有": "邮寄费;邮寄费用;快递费;快递",
+      "不包含": ""
+    },
+    {
+      "id": "r_office_supplies",
+      "l2_id": "L2_mgmt_office",
+      "l3_id": "L3_office_supplies",
+      "priority": 180,
+      "含有": "办公用品;行政采购;行政用品;文具;硒鼓;打印纸;办公物品",
+      "不包含": "宿舍用品"
+    },
+    {
+      "id": "r_office_gen",
+      "l2_id": "L2_mgmt_office",
+      "l3_id": "L3_office_other",
+      "priority": 90,
+      "含有": "办公费",
+      "不包含": "网费;邮寄;快递;用品"
     }
   ]
 }

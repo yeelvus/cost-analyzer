@@ -50,7 +50,10 @@ def classify_dataframe(
 
     out["一级科目"] = [r.l1_name for r in results]
     out["二级科目"] = [r.l2_name for r in results]
-    out["分类ID"] = [r.l2_id for r in results]
+    out["三级科目"] = [getattr(r, "l3_name", "") or "" for r in results]
+    out["分类ID"] = [
+        (getattr(r, "l3_id", None) or r.l2_id or "") for r in results
+    ]
     out["命中层"] = [r.layer for r in results]
     out["置信度"] = [r.confidence for r in results]
     out["原因"] = [r.reason for r in results]
@@ -140,6 +143,7 @@ def update_excel_classification_columns(
     vendor_col: str = "供应商名称",
     level1_col: str = "一级科目",
     level2_col: str = "二级科目",
+    level3_col: str = "三级科目",
     extra_cols: bool = True,
 ) -> int:
     """更新已有 Excel 的分类列（保留其它内容）。"""
@@ -174,6 +178,7 @@ def update_excel_classification_columns(
 
         lvl1_idx = ensure_col(level1_col)
         lvl2_idx = ensure_col(level2_col)
+        lvl3_idx = ensure_col(level3_col)
         id_idx = conf_idx = layer_idx = None
         if extra_cols:
             id_idx = ensure_col("分类ID")
@@ -189,8 +194,10 @@ def update_excel_classification_columns(
             result = engine.classify(subject_value, summary_value, vendor_value)
             ws.cell(row=r, column=lvl1_idx, value=result.l1_name)
             ws.cell(row=r, column=lvl2_idx, value=result.l2_name)
+            ws.cell(row=r, column=lvl3_idx, value=getattr(result, "l3_name", "") or "")
             if id_idx:
-                ws.cell(row=r, column=id_idx, value=result.l2_id)
+                leaf = getattr(result, "l3_id", None) or result.l2_id
+                ws.cell(row=r, column=id_idx, value=leaf)
             if layer_idx:
                 ws.cell(row=r, column=layer_idx, value=result.layer)
             if conf_idx:

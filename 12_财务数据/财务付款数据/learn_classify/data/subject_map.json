@@ -69,5 +69,7 @@
   "不计入成本": "L2_exclude_other",
   "手续费": "L2_mgmt_bank_fee",
   "检测费": "L2_mgmt_test",
-  "试验费": "L2_mgmt_test"
+  "试验费": "L2_mgmt_test",
+  "办公用品": "L3_office_supplies",
+  "行政采购": "L3_office_supplies"
 }

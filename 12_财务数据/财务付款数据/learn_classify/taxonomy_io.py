@@ -20,6 +20,7 @@ from .taxonomy import Taxonomy
 
 L1_SHEET = "一级科目"
 L2_SHEET = "二级科目"
+L3_SHEET = "三级科目"
 README_SHEET = "使用说明"
 DEFAULT_NAME = "科目体系.xlsx"
 
@@ -79,35 +80,41 @@ def export_taxonomy_excel(data_dir: Path, out_path: Optional[Path] = None) -> Pa
             }
         )
 
+    l3_rows = []
+    for x in sorted(tax.level3.values(), key=lambda z: (z.order, z.id)):
+        parent_name = tax.level2[x.parent].name if x.parent in tax.level2 else x.parent
+        l3_rows.append(
+            {
+                "ID": x.id,
+                "名称": x.name,
+                "所属二级ID": x.parent,
+                "所属二级名称": parent_name,
+                "排序": x.order,
+                "启用": "是" if x.active else "否",
+                "别名": ";".join(x.aliases or []),
+                "备注": x.notes or "",
+            }
+        )
+
     wb = Workbook()
     # 说明
     ws0 = wb.active
     ws0.title = README_SHEET
     tips = [
-        "【一级/二级科目体系】编辑说明",
+        "【科目体系 · 三级分类】",
         "",
-        "【分类粒度原则 — 必须遵守】",
-        "  ✓ 只设业务大类：如 混凝土、钢筋、砖及砌块、泵车租赁、银行手续费",
-        "  ✗ 不要设型号/规格/强度：如 C25/C30、HRB400、350×350、Q355B、某品牌型号",
-        "  摘要里出现「C30混凝土」→ 仍归「混凝土」，不新建「C30」类。",
+        "结构：一级 → 二级 → 三级（可选）",
+        "  例：6_管理费 → 办公费 → 网络通讯费 / 邮寄快递费 / 办公物品采购 / 其他办公",
         "",
-        "1. 本文件控制分类总表与 B_std 中「一级/二级」下拉选项。",
-        "2. 改完保存后执行：",
-        "     python 财务付款一体化.py import-taxonomy",
-        "   会写回 learn_classify/data/taxonomy.json，并可用于刷新下拉。",
-        "3. 导出最新体系：",
-        "     python 财务付款一体化.py export-taxonomy",
+        "粒度：业务大类，不要型号规格（C30/HRB400 等）。",
         "",
-        "【一级科目】表",
-        "  - ID：稳定标识，尽量不要改（改了需做 migrate 迁移旧记忆）",
-        "  - 名称：界面显示名，可改",
-        "  - 排序：数字越小越靠前",
-        "  - 启用：是/否（否=下拉中隐藏，旧数据仍可保留）",
+        "1. 改完保存后：python 财务付款一体化.py import-taxonomy",
+        "2. 导出：python 财务付款一体化.py export-taxonomy",
+        "3. 刷新总表下拉：python 财务付款一体化.py export-class",
         "",
-        "【二级科目】表",
-        "  - 所属一级名称：必填，须与一级表「名称」一致（或填所属一级ID）",
-        "  - 新增二级：ID 可留空，导入时自动生成",
-        "  - 别名：同义词/俗称（实心砖、商混），不要写强度等级或型号",
+        "【一级】ID / 名称 / 排序 / 启用 / 备注",
+        "【二级】所属一级名称或ID；别名用分号分隔",
+        "【三级】所属二级名称或ID；无三级的二级可不建三级",
         "",
         f"当前版本: {tax.version}",
         f"待复核二级ID: {tax.pending_l2_id}",
@@ -158,6 +165,11 @@ def export_taxonomy_excel(data_dir: Path, out_path: Optional[Path] = None) -> Pa
         l2_rows,
         ["ID", "名称", "所属一级ID", "所属一级名称", "排序", "启用", "别名", "备注"],
     )
+    _write_sheet(
+        L3_SHEET,
+        l3_rows,
+        ["ID", "名称", "所属二级ID", "所属二级名称", "排序", "启用", "别名", "备注"],
+    )
 
     # 元数据
     meta = wb.create_sheet("_meta")
@@ -198,6 +210,10 @@ def import_taxonomy_excel(
 
     l1_df = pd.read_excel(excel_path, sheet_name=L1_SHEET)
     l2_df = pd.read_excel(excel_path, sheet_name=L2_SHEET)
+    try:
+        l3_df = pd.read_excel(excel_path, sheet_name=L3_SHEET)
+    except Exception:
+        l3_df = pd.DataFrame()
 
     def colmap(df):
         return {str(c).strip(): c for c in df.columns}
@@ -301,6 +317,54 @@ def import_taxonomy_excel(
     if not level1 or not level2:
         raise ValueError("一级或二级为空，请检查 Excel")
 
+    # 三级
+    level3: List[Dict[str, Any]] = []
+    cmap3 = colmap(l3_df) if not l3_df.empty else {}
+    name_to_l2_id = {x["name"]: x["id"] for x in level2}
+    name_to_l2_id.update({x["name"].lower(): x["id"] for x in level2})
+    if not l3_df.empty:
+        for _, row in l3_df.iterrows():
+            name = str(cell(row, cmap3, "名称", "name", default="")).strip()
+            if not name:
+                continue
+            parent_id = str(cell(row, cmap3, "所属二级ID", "parent", default="")).strip()
+            parent_name = str(cell(row, cmap3, "所属二级名称", default="")).strip()
+            if not parent_id and parent_name:
+                parent_id = name_to_l2_id.get(parent_name) or name_to_l2_id.get(
+                    parent_name.lower()
+                ) or ""
+            if not parent_id:
+                raise ValueError(f"三级「{name}」缺少所属二级")
+            rid = str(cell(row, cmap3, "ID", "id", default="")).strip()
+            if not rid:
+                rid = _slug_id("L3", name, existing_ids)
+            else:
+                existing_ids.add(rid)
+            order = cell(row, cmap3, "排序", "order", default=0)
+            try:
+                order = int(float(order))
+            except Exception:
+                order = 0
+            active = yes(cell(row, cmap3, "启用", "active", default="是"))
+            aliases_raw = str(cell(row, cmap3, "别名", "aliases", default="") or "")
+            aliases = [
+                a.strip()
+                for a in aliases_raw.replace("；", ";").split(";")
+                if a.strip()
+            ]
+            notes = str(cell(row, cmap3, "备注", "notes", default="") or "")
+            level3.append(
+                {
+                    "id": rid,
+                    "name": name,
+                    "parent": parent_id,
+                    "order": order,
+                    "active": active,
+                    "aliases": aliases,
+                    "notes": notes,
+                }
+            )
+
     # pending / default
     l2_ids = {x["id"] for x in level2}
     l2_names = {x["name"]: x["id"] for x in level2}
@@ -311,11 +375,12 @@ def import_taxonomy_excel(
 
     data = {
         "version": version,
-        "description": "财务付款分析分类树；Excel 科目体系导入",
+        "description": "财务付款三级分类树；Excel 科目体系导入",
         "default_l2_id": default_l2,
         "pending_l2_id": pending,
         "level1": level1,
         "level2": level2,
+        "level3": level3,
     }
     # validate
     Taxonomy(data)
@@ -325,6 +390,7 @@ def import_taxonomy_excel(
         "path": str(tax_path),
         "level1": len(level1),
         "level2": len(level2),
+        "level3": len(level3),
         "version": version,
         "pending_l2_id": pending,
     }

@@ -1,6 +1,6 @@
 {
-  "version": "1.2.0",
-  "description": "业务大类分类。下拉仅显示二级正式名称（不含别名/型号）。别名仅用于摘要匹配。",
+  "version": "2.0.0",
+  "description": "三级分类：一级/二级/三级。管理费-办公费下设网络通讯、邮寄快递、办公物品等三级。下拉仅正式名。",
   "default_l2_id": "L2_pending",
   "pending_l2_id": "L2_pending",
   "level1": [
@@ -284,12 +284,9 @@
       "order": 2,
       "active": true,
       "aliases": [
-        "办公用品",
-        "生活用品",
-        "行政用品",
-        "行政采购"
+        "办公费"
       ],
-      "notes": ""
+      "notes": "管理费下二级；其下有三级：网络/邮寄/办公物品/其他办公"
     },
     {
       "id": "L2_eq_crane",
@@ -946,35 +943,6 @@
       "notes": ""
     },
     {
-      "id": "L2_mgmt_net",
-      "name": "网络通讯费",
-      "parent": "L1_mgmt",
-      "order": 25,
-      "active": true,
-      "aliases": [
-        "宽带",
-        "电话费",
-        "网络费",
-        "网费",
-        "通讯费"
-      ],
-      "notes": ""
-    },
-    {
-      "id": "L2_mgmt_post",
-      "name": "邮寄快递费",
-      "parent": "L1_mgmt",
-      "order": 26,
-      "active": true,
-      "aliases": [
-        "快递",
-        "快递费",
-        "邮寄费",
-        "邮寄费用"
-      ],
-      "notes": ""
-    },
-    {
       "id": "L2_mgmt_insurance",
       "name": "保险费",
       "parent": "L1_mgmt",
@@ -1060,18 +1028,67 @@
     }
   ],
   "granularity": {
-    "level": "business_category",
-    "include": [
-      "材料品种大类",
-      "费用性质大类",
-      "机具类型大类"
-    ],
-    "exclude": [
-      "混凝土强度等级",
-      "钢筋牌号",
-      "构件截面尺寸",
-      "品牌型号"
-    ],
-    "note": "摘要里出现 C30/HRB400 等只用于识别「属于混凝土/钢筋」，不单独建类"
-  }
+    "level": "business_category_l3",
+    "note": "三级仍为大类拆分，非型号规格"
+  },
+  "level3": [
+    {
+      "id": "L3_office_net",
+      "name": "网络通讯费",
+      "parent": "L2_mgmt_office",
+      "order": 1,
+      "active": true,
+      "aliases": [
+        "宽带",
+        "电话费",
+        "网络",
+        "网络费",
+        "网费",
+        "通讯费"
+      ],
+      "notes": "由原二级迁入办公费三级"
+    },
+    {
+      "id": "L3_office_post",
+      "name": "邮寄快递费",
+      "parent": "L2_mgmt_office",
+      "order": 2,
+      "active": true,
+      "aliases": [
+        "快递",
+        "快递费",
+        "邮寄费",
+        "邮寄费用"
+      ],
+      "notes": "由原二级迁入办公费三级"
+    },
+    {
+      "id": "L3_office_supplies",
+      "name": "办公物品采购",
+      "parent": "L2_mgmt_office",
+      "order": 3,
+      "aliases": [
+        "办公用品",
+        "行政采购",
+        "行政用品",
+        "文具",
+        "打印耗材",
+        "硒鼓",
+        "纸张"
+      ],
+      "active": true,
+      "notes": "办公费三级"
+    },
+    {
+      "id": "L3_office_other",
+      "name": "其他办公",
+      "parent": "L2_mgmt_office",
+      "order": 99,
+      "aliases": [
+        "生活用品"
+      ],
+      "active": true,
+      "notes": "办公费兜底三级"
+    }
+  ]
 }

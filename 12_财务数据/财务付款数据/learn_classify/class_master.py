@@ -37,6 +37,7 @@ MASTER_COLUMNS = [
     "摘要",
     "一级科目",
     "二级科目",
+    "三级科目",
     "供应商名称",
     # —— 以下为辅助 ——
     "出现次数",
@@ -99,6 +100,7 @@ def _collect_raw_lines(std_dir: Path) -> List[Dict[str, Any]]:
         c_amt = col("实付金额")
         c_l1 = col("一级科目")
         c_l2 = col("二级科目")
+        c_l3 = col("三级科目")
         c_id = col("分类ID")
         c_layer = col("命中层")
 
@@ -118,6 +120,7 @@ def _collect_raw_lines(std_dir: Path) -> List[Dict[str, Any]]:
                     "供应商名称": _safe_str(row.get(c_vend)) if c_vend else "",
                     "一级科目": _safe_str(row.get(c_l1)) if c_l1 else "",
                     "二级科目": _safe_str(row.get(c_l2)) if c_l2 else "",
+                    "三级科目": _safe_str(row.get(c_l3)) if c_l3 else "",
                     "分类ID": _safe_str(row.get(c_id)) if c_id else "",
                     "命中层": _safe_str(row.get(c_layer)) if c_layer else "",
                     "科目": _safe_str(row.get(c_subj)) if c_subj else "",
@@ -156,16 +159,20 @@ def build_deduped_master(
         )
         vendor = vend_counter.most_common(1)[0][0] if vend_counter else ""
 
-        # 一二级众数
+        # 一/二/三级众数
         pair_counter = Counter()
         for x in items:
-            l1, l2 = x.get("一级科目") or "", x.get("二级科目") or ""
-            if l1 or l2:
-                pair_counter[(l1, l2)] += 1
+            l1, l2, l3 = (
+                x.get("一级科目") or "",
+                x.get("二级科目") or "",
+                x.get("三级科目") or "",
+            )
+            if l1 or l2 or l3:
+                pair_counter[(l1, l2, l3)] += 1
         if pair_counter:
-            (l1, l2), _ = pair_counter.most_common(1)[0]
+            (l1, l2, l3), _ = pair_counter.most_common(1)[0]
         else:
-            l1, l2 = "", ""
+            l1, l2, l3 = "", "", ""
 
         # 示例
         proj_counter = Counter(x["项目名称"] for x in items if x.get("项目名称"))
@@ -184,14 +191,26 @@ def build_deduped_master(
             )
             l1 = l1 or r.l1_name
             l2 = l2 or r.l2_name
-            cid = cid or r.l2_id
+            l3 = l3 or r.l3_name
+            cid = cid or (r.l3_id or r.l2_id)
             layer = layer or r.layer
+        elif engine is not None and l2 and not l3:
+            # 有二级无三级时尝试引擎补三级
+            r = engine.classify(
+                subj_counter.most_common(1)[0][0] if subj_counter else "",
+                summ,
+                vendor,
+            )
+            if r.l2_name == l2 and r.l3_name:
+                l3 = r.l3_name
+                cid = r.l3_id or cid
 
         rows.append(
             {
                 "摘要": summ,
                 "一级科目": l1,
                 "二级科目": l2,
+                "三级科目": l3,
                 "供应商名称": vendor,
                 "出现次数": n,
                 "金额合计": round(amt_sum, 2),
@@ -217,28 +236,23 @@ def _apply_master_format(path: Path, data_dir: Path) -> None:
     tips = [
         "【付款分类总表 · 按摘要去重 · 学习专用】",
         "",
-        "【分类粒度】只到业务大类，不到型号/规格：",
-        "  ✓ 混凝土、钢筋、砖及砌块、泵车租赁、银行手续费",
-        "  ✗ C30混凝土、HRB400、350×350桩、某品牌型号（一律归到对应大类）",
+        "【三级分类】一级 → 二级 → 三级（均可下拉修改）",
+        "  例：6_管理费 → 办公费 → 网络通讯费 / 邮寄快递费 / 办公物品采购 / 其他办公",
+        "  无三级的二级：三级列可留空。",
+        "",
+        "【粒度】业务大类，不到型号规格（C30/HRB400 等）。",
         "",
         "核心列（请维护）：",
-        "  · 摘要          — 去重后的付款摘要（学习主键）",
-        "  · 一级科目      — 下拉选择，可改",
-        "  · 二级科目      — 下拉选择（随一级联动），可改",
-        "  · 供应商名称    — 参考；学习时会一并记入",
+        "  · 摘要、一级科目、二级科目、三级科目、供应商名称",
         "",
         "辅助列：出现次数 / 金额合计 / 示例项目 / 示例科目 / 命中层 / 分类ID / 备注",
         "",
         "操作：",
-        "  1. 修改「一级科目」「二级科目」后保存",
+        "  1. 下拉修改一/二/三级后保存",
         "  2. python 财务付款一体化.py apply-class",
-        "     → 按「摘要→一二级」写入记忆，并重刷 B_std",
-        "  3. 重新导出：python 财务付款一体化.py export-class",
+        "  3. python 财务付款一体化.py export-class  （可选，刷新总表）",
         "",
-        "下拉选项来源：科目体系.xlsx / taxonomy.json（大类清单）",
-        "  调整类目：export-taxonomy → 编辑 → import-taxonomy → export-class",
-        "",
-        "说明：相同摘要只保留一行；出现次数高的排在前面。",
+        "类目维护：export-taxonomy → 编辑科目体系 → import-taxonomy",
     ]
     for i, t in enumerate(tips, 1):
         ws_r.cell(i, 1, t)
@@ -272,8 +286,9 @@ def _apply_master_format(path: Path, data_dir: Path) -> None:
     }
     widths = {
         "摘要": 48,
-        "一级科目": 16,
-        "二级科目": 16,
+        "一级科目": 14,
+        "二级科目": 14,
+        "三级科目": 14,
         "供应商名称": 22,
         "出现次数": 10,
         "金额合计": 14,
@@ -289,7 +304,7 @@ def _apply_master_format(path: Path, data_dir: Path) -> None:
 
     # 核心列高亮
     core_fill = PatternFill("solid", fgColor="FFF2CC")
-    for name in ("摘要", "一级科目", "二级科目", "供应商名称", "备注"):
+    for name in ("摘要", "一级科目", "二级科目", "三级科目", "供应商名称", "备注"):
         if name not in headers:
             continue
         col = headers[name]
@@ -409,6 +424,7 @@ def apply_class_master(
         summ = _safe_str(row.get(cols["摘要"]))
         l2 = _safe_str(row.get(cols["二级科目"]))
         l1 = _safe_str(row.get(cols["一级科目"])) if "一级科目" in cols else ""
+        l3 = _safe_str(row.get(cols["三级科目"])) if "三级科目" in cols else ""
         vend = ""
         if "供应商名称" in cols:
             vend = _safe_str(row.get(cols["供应商名称"]))
@@ -434,8 +450,9 @@ def apply_class_master(
                 vendor=vend,
                 new_l1=l1,
                 new_l2=l2,
+                new_l3=l3,
                 source="class_master",
-                notes="分类总表(摘要去重)",
+                notes="分类总表(摘要去重/三级)",
                 also_summary_only=True,
             )
             learned += 1

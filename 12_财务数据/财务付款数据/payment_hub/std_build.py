@@ -193,39 +193,45 @@ def append_subject_levels(df: pd.DataFrame, mapper) -> pd.DataFrame:
         else ("供应商" if "供应商" in enriched.columns else None)
     )
 
-    l1s, l2s, ids, layers, confs = [], [], [], [], []
+    l1s, l2s, l3s, ids, layers, confs = [], [], [], [], [], []
     for _, row in enriched.iterrows():
         vendor = row.get(vendor_col) if vendor_col else None
         try:
             if hasattr(mapper, "classify_full"):
                 r = mapper.classify_full(row.get("科目"), row.get("摘要"), vendor)
                 l1, l2 = r.l1_name, r.l2_name
-                ids.append(r.l2_id)
+                l3 = getattr(r, "l3_name", "") or ""
+                leaf = getattr(r, "l3_id", "") or getattr(r, "l2_id", "") or ""
+                ids.append(leaf)
                 layers.append(r.layer)
                 confs.append(r.confidence)
             else:
                 l1, l2 = mapper.classify(row.get("科目"), row.get("摘要"))
+                l3 = ""
                 ids.append("")
                 layers.append("")
                 confs.append(None)
         except Exception:
-            l1, l2 = DEFAULT_CATEGORY, "待复核"
+            l1, l2, l3 = DEFAULT_CATEGORY, "待复核", ""
             ids.append("")
             layers.append("error")
             confs.append(0.0)
 
         l1 = str(l1 or "").strip() or DEFAULT_CATEGORY
         l2 = str(l2 or "").strip() or "待复核"
+        l3 = str(l3 or "").strip()
         l1s.append(l1)
         l2s.append(l2)
+        l3s.append(l3)
 
     enriched["一级科目"] = l1s
     enriched["二级科目"] = l2s
+    enriched["三级科目"] = l3s
     enriched["分类ID"] = ids
     enriched["命中层"] = layers
     enriched["置信度"] = confs
 
-    prefer = ["一级科目", "二级科目", "分类ID", "命中层", "置信度"]
+    prefer = ["一级科目", "二级科目", "三级科目", "分类ID", "命中层", "置信度"]
     cols = [c for c in enriched.columns if c not in prefer]
     if "摘要" in cols:
         i = cols.index("摘要")

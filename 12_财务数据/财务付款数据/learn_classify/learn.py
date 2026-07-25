@@ -37,23 +37,35 @@ def learn_one(
     vendor: str = "",
     new_l1: str = "",
     new_l2: str = "",
+    new_l3: str = "",
     old_l2_id: str = "",
     source: str = "review",
     notes: str = "",
     also_summary_only: bool = True,
-) -> Tuple[str, str]:
+) -> Tuple[str, str, str]:
     """
-    学习一条纠正。返回 (l1_name, l2_name)。
-    new_l1/new_l2 可为显示名或 id。
+    学习一条纠正。返回 (l1_name, l2_name, l3_name)。
+    名称/ID 均可；有三级时记忆存 leaf=l3_id，否则 l2_id。
     """
-    l1_id, l2_id = taxonomy.resolve_pair(new_l1 or None, new_l2 or None)
-    if not l2_id:
-        raise ValueError(f"无法解析二级分类: l1={new_l1!r} l2={new_l2!r}")
+    l1_id, l2_id, l3_id = taxonomy.resolve_triple(
+        new_l1 or None, new_l2 or None, new_l3 or None
+    )
+    # 若只给了二级名但其实是三级正式名
+    if not l3_id and new_l2:
+        l3_try = taxonomy.resolve_l3_id(new_l2)
+        if l3_try:
+            l3_id = l3_try
+            l2_id = taxonomy.level3[l3_id].parent
+            l1_id = taxonomy.level2[l2_id].parent
 
-    l1_name, l2_name = taxonomy.display(l2_id)
+    if not l2_id and not l3_id:
+        raise ValueError(f"无法解析分类: l1={new_l1!r} l2={new_l2!r} l3={new_l3!r}")
+
+    leaf_id = l3_id or l2_id
+    l1_name, l2_name, l3_name = taxonomy.display_triple(leaf_id)
     old_l1_name, old_l2_name = ("", "")
-    if old_l2_id and old_l2_id in taxonomy.level2:
-        old_l1_name, old_l2_name = taxonomy.display(old_l2_id)
+    if old_l2_id:
+        old_l1_name, old_l2_name, _ = taxonomy.display_triple(old_l2_id)
 
     corrections.append(
         CorrectionEvent(
@@ -62,11 +74,11 @@ def learn_one(
             summary=summary or "",
             vendor=vendor or "",
             old_l2_id=old_l2_id or "",
-            new_l2_id=l2_id,
+            new_l2_id=leaf_id,  # 存 leaf
             old_l1_name=old_l1_name,
             old_l2_name=old_l2_name,
             new_l1_name=l1_name,
-            new_l2_name=l2_name,
+            new_l2_name=l2_name + (f"/{l3_name}" if l3_name else ""),
             source=source,
             notes=notes,
         )
@@ -82,7 +94,7 @@ def learn_one(
         memory.upsert(
             MemoryEntry(
                 key=key,
-                l2_id=l2_id,
+                l2_id=leaf_id,
                 subject=subject or "",
                 summary=summary or "",
                 vendor=vendor or "",
@@ -93,10 +105,10 @@ def learn_one(
         )
 
     if vendor_stats is not None and vendor:
-        vendor_stats.observe(normalize_text(vendor), l2_id, 1)
+        vendor_stats.observe(normalize_text(vendor), leaf_id, 1)
         vendor_stats.save()
 
-    return l1_name, l2_name
+    return l1_name, l2_name, l3_name
 
 
 def import_corrections_excel(
