@@ -55,6 +55,13 @@ class Paths:
     taxonomy_xlsx: Path = field(
         default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "科目体系.xlsx"
     )
+    # 每次 apply-class 生成的可读学习报告
+    learn_log_xlsx: Path = field(
+        default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "学习记录.xlsx"
+    )
+    learn_log_xlsx_sum: Path = field(
+        default_factory=lambda: PAY_ROOT / "C_财务付款_sum" / "学习记录.xlsx"
+    )
 
     def ensure_output_parents(self) -> None:
         self.std_dir.mkdir(parents=True, exist_ok=True)
@@ -64,3 +71,5 @@ class Paths:
         self.classify_data.mkdir(parents=True, exist_ok=True)
         self.class_master_xlsx.parent.mkdir(parents=True, exist_ok=True)
         self.class_master_xlsx_sum.parent.mkdir(parents=True, exist_ok=True)
+        self.learn_log_xlsx.parent.mkdir(parents=True, exist_ok=True)
+        self.learn_log_xlsx_sum.parent.mkdir(parents=True, exist_ok=True)

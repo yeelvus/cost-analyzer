@@ -25,6 +25,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 from .engine import ClassifyEngine
 from .learn import learn_one
+from .normalize import memory_key
 from .review import reclassify_std_dir
 from .store import CorrectionStore, MemoryStore, VendorStats
 from .taxonomy import Taxonomy
@@ -33,7 +34,9 @@ MASTER_SHEET = "分类总表"
 README_SHEET = "使用说明"
 
 # 核心列（学习焦点）+ 辅助列
+# 确认状态：确认 = 已认可，参与学习；待分类 = 需人工处理，不写入记忆
 MASTER_COLUMNS = [
+    "确认状态",
     "摘要",
     "一级科目",
     "二级科目",
@@ -45,6 +48,12 @@ MASTER_COLUMNS = [
     "分类ID",
     "备注",
 ]
+
+STATUS_CONFIRMED = "确认"
+STATUS_PENDING = "待分类"
+_CONFIRM_VALUES = {STATUS_CONFIRMED, "已确认", "是", "Y", "y", "1", "true", "True"}
+# 不算有效分类、不写入记忆的二级名
+_SKIP_L2 = {"", "待复核", "其他", "(空白)", "待分类", "—", "-"}
 
 
 def _safe_str(v: Any) -> str:
@@ -128,15 +137,113 @@ def _collect_raw_lines(std_dir: Path) -> List[Dict[str, Any]]:
     return lines
 
 
+def _is_confirmed(val: Any) -> bool:
+    s = _safe_str(val)
+    return s in _CONFIRM_VALUES or s == STATUS_CONFIRMED
+
+
+def _is_learnable_l2(l2: str) -> bool:
+    """二级是否可作为有效分类写入记忆。"""
+    return _safe_str(l2) not in _SKIP_L2
+
+
+def resolve_leaf_from_row(
+    tax: Taxonomy,
+    l1: str = "",
+    l2: str = "",
+    l3: str = "",
+) -> str:
+    """
+    只解析「最后一级叶子科目」ID。
+
+    优先级：三级 > 二级列里的三级名 > 二级 > 其它可解析叶子。
+    一二级显示名由 taxonomy.display_triple(leaf) 向上补全，不必单独学习。
+    """
+    l1, l2, l3 = _safe_str(l1), _safe_str(l2), _safe_str(l3)
+    # 1) 明确的三级
+    if l3 and l3 not in _SKIP_L2:
+        lid = tax.resolve_l3_id(l3) or tax.resolve_leaf_id(l3)
+        if lid:
+            return lid
+    # 2) 二级列：可能是三级正式名，也可能是二级
+    if l2 and l2 not in _SKIP_L2:
+        lid = tax.resolve_l3_id(l2) or tax.resolve_l2_id(l2) or tax.resolve_leaf_id(l2)
+        if lid:
+            return lid
+    # 3) 一级单独不能当叶子
+    return ""
+
+
+def _is_learnable_leaf(tax: Taxonomy, leaf_id: str) -> bool:
+    if not leaf_id:
+        return False
+    if leaf_id == getattr(tax, "pending_l2_id", "") or leaf_id == "pending":
+        return False
+    l1, l2, l3 = tax.display_triple(leaf_id)
+    leaf_name = l3 or l2
+    if leaf_name in _SKIP_L2:
+        return False
+    return True
+
+
+def load_labels_from_master(path: Path) -> Dict[str, Dict[str, str]]:
+    """
+    从已有总表读取**有效分类**行（有二级科目即可，不要求「确认」）：
+    摘要 → 一/二/三级/供应商/备注/确认状态。
+    再次 export 时保留，避免被自动分类覆盖。
+    """
+    path = Path(path)
+    if not path.is_file():
+        return {}
+    try:
+        df = pd.read_excel(path, sheet_name=MASTER_SHEET)
+    except Exception:
+        try:
+            df = pd.read_excel(path, sheet_name=0)
+        except Exception:
+            return {}
+    cols = {str(c).strip(): c for c in df.columns}
+    if "摘要" not in cols:
+        return {}
+    status_col = cols.get("确认状态") or cols.get("确认")
+    out: Dict[str, Dict[str, str]] = {}
+    for _, row in df.iterrows():
+        summ = _safe_str(row.get(cols["摘要"]))
+        if not summ:
+            continue
+        l2 = _safe_str(row.get(cols["二级科目"])) if "二级科目" in cols else ""
+        l3 = _safe_str(row.get(cols["三级科目"])) if "三级科目" in cols else ""
+        if not _is_learnable_l2(l2) and not l3:
+            continue
+        st = _safe_str(row.get(status_col)) if status_col else ""
+        out[summ] = {
+            "一级科目": _safe_str(row.get(cols["一级科目"])) if "一级科目" in cols else "",
+            "二级科目": l2,
+            "三级科目": l3,
+            "供应商名称": _safe_str(row.get(cols["供应商名称"])) if "供应商名称" in cols else "",
+            "备注": _safe_str(row.get(cols["备注"])) if "备注" in cols else "",
+            "确认状态": st if st else STATUS_CONFIRMED,
+        }
+    return out
+
+
+# 兼容旧名
+load_confirmed_from_master = load_labels_from_master
+
+
 def build_deduped_master(
     std_dir: Path,
     engine: Optional[ClassifyEngine] = None,
+    *,
+    previous_confirmed: Optional[Dict[str, Dict[str, str]]] = None,
 ) -> pd.DataFrame:
     """
     按「摘要」完全相同去重。
-    一级/二级：取该摘要下出现最多的组合；若文件无分类则用引擎补全。
-    供应商：取出现最多的非空供应商。
+
+    - 上一版总表里已有有效二级/三级：沿用（人工调整不被自动覆盖）
+    - 其余：用文件/引擎建议
     """
+    previous_labels = previous_confirmed or {}
     lines = _collect_raw_lines(std_dir)
     if not lines:
         return pd.DataFrame(columns=MASTER_COLUMNS)
@@ -146,7 +253,7 @@ def build_deduped_master(
         groups[ln["摘要"]].append(ln)
 
     rows: List[Dict[str, Any]] = []
-    for summ, items in sorted(groups.items(), key=lambda x: (-len(x[1]), x[0])):
+    for summ, items in groups.items():
         n = len(items)
 
         # 供应商众数
@@ -174,25 +281,48 @@ def build_deduped_master(
         id_counter = Counter(x["分类ID"] for x in items if x.get("分类ID"))
         subj_counter = Counter(x["科目"] for x in items if x.get("科目"))
 
-        # 引擎补全
         cid = id_counter.most_common(1)[0][0] if id_counter else ""
         layer = layer_counter.most_common(1)[0][0] if layer_counter else ""
         sample_subj = subj_counter.most_common(1)[0][0] if subj_counter else ""
-        if engine is not None and (not l1 or not l2):
-            r = engine.classify(sample_subj, summ, vendor)
-            l1 = l1 or r.l1_name
-            l2 = l2 or r.l2_name
-            l3 = l3 or r.l3_name
-            cid = cid or (r.l3_id or r.l2_id)
-            layer = layer or r.layer
-        elif engine is not None and l2 and not l3:
-            r = engine.classify(sample_subj, summ, vendor)
-            if r.l2_name == l2 and r.l3_name:
-                l3 = r.l3_name
-                cid = r.l3_id or cid
+        note = ""
+        status = STATUS_PENDING
+
+        # 上一版总表已有有效分类：保留人工调整
+        if summ in previous_labels:
+            prev = previous_labels[summ]
+            if prev.get("二级科目") or prev.get("三级科目"):
+                l1 = prev.get("一级科目") or l1
+                l2 = prev.get("二级科目") or l2
+                l3 = prev.get("三级科目") or l3
+                if prev.get("供应商名称"):
+                    vendor = prev["供应商名称"]
+                note = prev.get("备注") or ""
+                status = prev.get("确认状态") or STATUS_CONFIRMED
+                if not _is_confirmed(status):
+                    status = STATUS_CONFIRMED  # 来自总表的有效分类视为已采用
+                layer = "master"
+                cid = cid or ""
+        else:
+            # 引擎补全建议
+            if engine is not None and (not l1 or not l2):
+                r = engine.classify(sample_subj, summ, vendor)
+                l1 = l1 or r.l1_name
+                l2 = l2 or r.l2_name
+                l3 = l3 or r.l3_name
+                cid = cid or (r.l3_id or r.l2_id)
+                layer = layer or r.layer
+            elif engine is not None and l2 and not l3:
+                r = engine.classify(sample_subj, summ, vendor)
+                if r.l2_name == l2 and r.l3_name:
+                    l3 = r.l3_name
+                    cid = r.l3_id or cid
+            # 无有效二级 → 待分类
+            if not _is_learnable_l2(l2):
+                status = STATUS_PENDING
 
         rows.append(
             {
+                "确认状态": status,
                 "摘要": summ,
                 "一级科目": l1,
                 "二级科目": l2,
@@ -201,13 +331,15 @@ def build_deduped_master(
                 "出现次数": n,
                 "命中层": layer,
                 "分类ID": cid,
-                "备注": "",
+                "备注": note,
             }
         )
 
-    # 出现次数多的排前面，方便先改高频摘要
     df = pd.DataFrame(rows, columns=MASTER_COLUMNS)
-    return df
+    # 待分类优先，再按出现次数降序
+    df["_ord"] = df["确认状态"].map({STATUS_PENDING: 0, STATUS_CONFIRMED: 1}).fillna(0)
+    df = df.sort_values(["_ord", "出现次数"], ascending=[True, False]).drop(columns=["_ord"])
+    return df.reset_index(drop=True)
 
 
 def _apply_master_format(path: Path, data_dir: Path) -> None:
@@ -217,25 +349,35 @@ def _apply_master_format(path: Path, data_dir: Path) -> None:
         del wb[README_SHEET]
     ws_r = wb.create_sheet(README_SHEET, 0)
     tips = [
-        "【付款分类总表 · 按摘要去重 · 学习专用】",
+        "【付款分类总表 · 叶子科目变更才学习】",
         "",
-        "【三级分类】一级 → 二级 → 三级（均可下拉修改）",
-        "  例：6_管理费 → 办公费 → 网络通讯费 / 邮寄快递费 / 办公物品采购 / 其他办公",
-        "  无三级的二级：三级列可留空。",
+        "核心：只看「最后一级科目」是否变化。一二级随叶子自动带出，不必单独记。",
+        "· 有三级时：叶子 = 三级（如 网络通讯费）",
+        "· 无三级时：叶子 = 二级（如 差旅费）",
+        "· 叶子与记忆相同 → 跳过；叶子变了 → 写入记忆",
         "",
-        "【粒度】业务大类，不到型号规格（C30/HRB400 等）。",
+        "1. 怎么改分类",
+        "   · 优先改最末级（三级有则改三级，否则改二级）",
+        "   · 一级/二级下拉会跟着体系联动，仅辅助查看",
+        "   · 叶子为空 / 待复核 → 不学习",
         "",
-        "核心列（请维护）：",
-        "  · 摘要、一级科目、二级科目、三级科目、供应商名称",
+        "2. 命令（默认入口 = apply-class）",
+        "   · python 财务付款一体化.py              # 等同 apply-class",
+        "   · export-class  导出/刷新本表（表内有效分类会保留）",
+        "   · apply-class   仅学叶子变更 → 写学习文件 → 重刷 B_std → 再导出",
         "",
-        "辅助列：出现次数 / 命中层 / 分类ID / 备注",
+        "3. 学习生成的文件",
+        "   · 学习记录.xlsx   本次叶子变更 + 记忆库摘要",
+        "   · memory.jsonl    引擎记忆（下次自动命中）",
+        "   · corrections.jsonl 纠错日志",
         "",
-        "操作：",
-        "  1. 下拉修改一/二/三级后保存",
-        "  2. python 财务付款一体化.py apply-class",
-        "  3. python 财务付款一体化.py export-class  （可选，刷新总表）",
+        "4. 建议节奏",
+        "   打开表 → 改高频摘要的末级科目 → 保存 → 直接运行一体化.py → 循环",
         "",
-        "类目维护：export-taxonomy → 编辑科目体系 → import-taxonomy",
+        "5. 三级示例：管理费 → 办公费 → 网络通讯费（学的是「网络通讯费」这个叶子）",
+        "   无三级的二级：三级列可留空。粒度到业务大类，不到型号规格。",
+        "",
+        "6. 类目字典：export-taxonomy / import-taxonomy（科目体系.xlsx）",
     ]
     for i, t in enumerate(tips, 1):
         ws_r.cell(i, 1, t)
@@ -268,6 +410,7 @@ def _apply_master_format(path: Path, data_dir: Path) -> None:
         if ws.cell(1, c).value is not None
     }
     widths = {
+        "确认状态": 10,
         "摘要": 48,
         "一级科目": 14,
         "二级科目": 14,
@@ -284,14 +427,40 @@ def _apply_master_format(path: Path, data_dir: Path) -> None:
 
     # 核心列高亮
     core_fill = PatternFill("solid", fgColor="FFF2CC")
-    for name in ("摘要", "一级科目", "二级科目", "三级科目", "供应商名称", "备注"):
+    ok_fill = PatternFill("solid", fgColor="C6EFCE")  # 确认-绿
+    pending_fill = PatternFill("solid", fgColor="FCE4D6")  # 待分类-橙
+    for name in ("确认状态", "摘要", "一级科目", "二级科目", "三级科目", "供应商名称", "备注"):
         if name not in headers:
             continue
         col = headers[name]
         for r in range(2, ws.max_row + 1):
-            ws.cell(r, col).fill = core_fill
+            if name == "确认状态":
+                val = str(ws.cell(r, col).value or "")
+                ws.cell(r, col).fill = ok_fill if val == STATUS_CONFIRMED else pending_fill
+            else:
+                ws.cell(r, col).fill = core_fill
 
-    # 下拉
+    last = max(ws.max_row, 2) + 200
+
+    # 确认状态下拉
+    if "确认状态" in headers:
+        c_st = headers["确认状态"]
+        dv_st = DataValidation(
+            type="list",
+            formula1=f'"{STATUS_CONFIRMED},{STATUS_PENDING}"',
+            allow_blank=False,
+            showDropDown=False,
+            showErrorMessage=True,
+            errorTitle="确认状态",
+            error="请选择：确认 或 待分类",
+            promptTitle="确认状态",
+            prompt="确认=写入学习；待分类=仅人工暂存",
+            showInputMessage=True,
+        )
+        dv_st.add(f"{get_column_letter(c_st)}2:{get_column_letter(c_st)}{last}")
+        ws.add_data_validation(dv_st)
+
+    # 一/二/三级下拉
     try:
         root = Path(__file__).resolve().parent.parent
         if str(root) not in sys.path:
@@ -311,7 +480,6 @@ def _apply_master_format(path: Path, data_dir: Path) -> None:
             for i, n in enumerate(l2s, 1):
                 opt.cell(i, 2, n)
             opt.sheet_state = "hidden"
-            last = max(ws.max_row, 2) + 200
             c1, c2 = headers.get("一级科目"), headers.get("二级科目")
             if c1 and l1s:
                 dv1 = DataValidation(
@@ -346,20 +514,116 @@ def export_class_master(
     data_dir: Path,
     *,
     engine: Optional[ClassifyEngine] = None,
+    preserve_path: Optional[Path] = None,
 ) -> Tuple[Path, int]:
+    """
+    导出总表。preserve_path / out_path 上已有**有效二级**的行会保留其分类标签。
+    """
     data_dir = Path(data_dir)
+    out_path = Path(out_path)
     if engine is None:
         engine = ClassifyEngine.from_data_dir(data_dir)
 
-    df = build_deduped_master(std_dir, engine=engine)
-    out_path = Path(out_path)
+    # 合并多来源总表标签（有效二级即保留，不要求「确认」）
+    prev: Dict[str, Dict[str, str]] = {}
+    for p in (preserve_path, out_path):
+        if p and Path(p).is_file():
+            prev.update(load_labels_from_master(Path(p)))
+
+    df = build_deduped_master(std_dir, engine=engine, previous_confirmed=prev)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n_ok = int((df["确认状态"] == STATUS_CONFIRMED).sum()) if len(df) else 0
+    n_pending = int((df["确认状态"] == STATUS_PENDING).sum()) if len(df) else 0
+    n_learnable = 0
+    if len(df):
+        n_learnable = int(df["二级科目"].map(_is_learnable_l2).sum())
+    print(f"   有效分类 {n_learnable} 条 · 表内确认标记 {n_ok} · 待分类标记 {n_pending}")
 
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         df.to_excel(writer, sheet_name=MASTER_SHEET, index=False)
 
     _apply_master_format(out_path, data_dir)
     return out_path, len(df)
+
+
+def _export_learn_report(
+    data_dir: Path,
+    out_path: Path,
+    *,
+    session_rows: List[Dict[str, Any]],
+    memory: MemoryStore,
+    tax: Taxonomy,
+    stats: Dict[str, Any],
+) -> Path:
+    """生成可读的学习记录 Excel（本次学习 + 记忆库摘要 + 文件路径）。"""
+    from datetime import datetime
+
+    data_dir = Path(data_dir)
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    df_session = pd.DataFrame(
+        session_rows
+        or [
+            {
+                "摘要": "（本次无确认行写入）",
+                "一级科目": "",
+                "二级科目": "",
+                "三级科目": "",
+                "供应商名称": "",
+                "分类ID": "",
+                "来源": "",
+                "学习时间": ts,
+            }
+        ]
+    )
+
+    mem_rows: List[Dict[str, Any]] = []
+    for e in sorted(memory.entries.values(), key=lambda x: x.updated_at or "", reverse=True):
+        l1, l2, l3 = tax.display_triple(e.l2_id)
+        mem_rows.append(
+            {
+                "摘要": e.summary,
+                "供应商名称": e.vendor,
+                "一级科目": l1,
+                "二级科目": l2,
+                "三级科目": l3,
+                "分类ID": e.l2_id,
+                "来源": e.source,
+                "置信度": e.confidence,
+                "命中次数": e.hit_count,
+                "更新时间": e.updated_at,
+                "备注": e.notes,
+            }
+        )
+    df_mem = pd.DataFrame(mem_rows)
+
+    paths_info = [
+        {"说明": "本次学习时间", "路径或内容": ts},
+        {"说明": "本次叶子变更条数", "路径或内容": stats.get("learned", 0)},
+        {"说明": "叶子未变跳过", "路径或内容": stats.get("skipped_unchanged", 0)},
+        {"说明": "无效叶子跳过", "路径或内容": stats.get("skipped_invalid", 0)},
+        {"说明": "记忆库(jsonl)", "路径或内容": str(data_dir / "memory.jsonl")},
+        {"说明": "纠错日志(jsonl)", "路径或内容": str(data_dir / "corrections.jsonl")},
+        {"说明": "供应商统计", "路径或内容": str(data_dir / "vendor_stats.json")},
+        {"说明": "科目体系", "路径或内容": str(data_dir / "taxonomy.json")},
+        {"说明": "分类总表", "路径或内容": str(data_dir / "付款分类总表.xlsx")},
+        {"说明": "本学习记录", "路径或内容": str(out_path)},
+        {
+            "说明": "用法",
+            "路径或内容": "只改末级科目 → 保存 → apply-class（仅叶子变化才写入记忆，一二级自动带出）",
+        },
+    ]
+    df_paths = pd.DataFrame(paths_info)
+
+    with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
+        df_session.to_excel(writer, sheet_name="本次学习", index=False)
+        df_mem.to_excel(writer, sheet_name="记忆库摘要", index=False)
+        df_paths.to_excel(writer, sheet_name="文件路径", index=False)
+
+    return out_path
 
 
 def apply_class_master(
@@ -370,10 +634,19 @@ def apply_class_master(
     reclassify: bool = True,
     reexport: bool = True,
     out_path: Optional[Path] = None,
+    only_confirmed: bool = False,
+    learn_log_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """
-    从分类总表学习：摘要 → 一级/二级（去重后每摘要一行）。
+    从分类总表学习：只关心 **最后一级叶子科目是否变化**。
+
+    - 有三级 → 叶子=三级；无三级 → 叶子=二级
+    - 一二级由科目体系按叶子向上补全，不单独作为学习条件
+    - 叶子与现有记忆相同 → 跳过；不同 → 写入记忆
+    - only_confirmed=True 时额外要求「确认状态=确认」
     """
+    from datetime import datetime
+
     master_path = Path(master_path)
     data_dir = Path(data_dir)
     if not master_path.is_file():
@@ -385,9 +658,11 @@ def apply_class_master(
         df = pd.read_excel(master_path, sheet_name=0)
 
     cols = {str(c).strip(): c for c in df.columns}
-    if "摘要" not in cols or "二级科目" not in cols:
+    if "摘要" not in cols:
+        raise ValueError(f"分类总表需含「摘要」列，当前={list(df.columns)}")
+    if "二级科目" not in cols and "三级科目" not in cols:
         raise ValueError(
-            f"分类总表需含「摘要」「二级科目」列，当前={list(df.columns)}"
+            f"分类总表需含「二级科目」或「三级科目」，当前={list(df.columns)}"
         )
 
     tax = Taxonomy.load(data_dir / "taxonomy.json")
@@ -397,12 +672,18 @@ def apply_class_master(
 
     learned = 0
     skipped = 0
+    skipped_invalid = 0
+    skipped_unchanged = 0
+    skipped_pending = 0
     errors = 0
     seen = set()
+    session_rows: List[Dict[str, Any]] = []
+    status_col = cols.get("确认状态") or cols.get("确认")
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     for _, row in df.iterrows():
         summ = _safe_str(row.get(cols["摘要"]))
-        l2 = _safe_str(row.get(cols["二级科目"]))
+        l2 = _safe_str(row.get(cols["二级科目"])) if "二级科目" in cols else ""
         l1 = _safe_str(row.get(cols["一级科目"])) if "一级科目" in cols else ""
         l3 = _safe_str(row.get(cols["三级科目"])) if "三级科目" in cols else ""
         vend = ""
@@ -410,14 +691,36 @@ def apply_class_master(
             vend = _safe_str(row.get(cols["供应商名称"]))
         elif "供应商" in cols:
             vend = _safe_str(row.get(cols["供应商"]))
-        subj = ""
+        status = _safe_str(row.get(status_col)) if status_col else ""
 
-        if not summ or not l2:
+        if not summ:
             skipped += 1
+            continue
+        if only_confirmed and not _is_confirmed(status):
+            skipped_pending += 1
             continue
         if summ in seen:
             continue
         seen.add(summ)
+
+        # 只解析叶子：三级优先，否则二级（一二级跟着叶子走）
+        leaf_id = resolve_leaf_from_row(tax, l1, l2, l3)
+        if not _is_learnable_leaf(tax, leaf_id):
+            skipped_invalid += 1
+            continue
+
+        # 与记忆比较：叶子未变则不学
+        mkey = memory_key("", summ, None)
+        old_entry = memory.get(mkey)
+        old_leaf = (old_entry.l2_id if old_entry else "") or ""
+        if old_leaf == leaf_id:
+            skipped_unchanged += 1
+            continue
+
+        l1_name, l2_name, l3_name = tax.display_triple(leaf_id)
+        leaf_name = l3_name or l2_name
+        old_l1, old_l2, old_l3 = tax.display_triple(old_leaf) if old_leaf else ("", "", "")
+        old_leaf_name = (old_l3 or old_l2) if old_leaf else ""
 
         try:
             learn_one(
@@ -425,15 +728,31 @@ def apply_class_master(
                 memory=memory,
                 corrections=corrections,
                 vendor_stats=vendor_stats,
-                subject=subj,
+                subject="",
                 summary=summ,
                 vendor=vend,
-                new_l1=l1,
-                new_l2=l2,
-                new_l3=l3,
-                source="class_master",
-                notes="分类总表(摘要去重/三级)",
+                new_l1=l1_name,
+                new_l2=l2_name,
+                new_l3=l3_name,
+                old_l2_id=old_leaf,
+                source="class_master_leaf",
+                notes=f"叶子变更: {old_leaf_name or '∅'} → {leaf_name}",
                 also_summary_only=True,
+            )
+            session_rows.append(
+                {
+                    "摘要": summ,
+                    "原叶子科目": old_leaf_name or "（无）",
+                    "新叶子科目": leaf_name,
+                    "一级科目": l1_name,
+                    "二级科目": l2_name,
+                    "三级科目": l3_name,
+                    "供应商名称": vend,
+                    "分类ID": leaf_id,
+                    "原分类ID": old_leaf,
+                    "来源": "class_master_leaf",
+                    "学习时间": ts,
+                }
             )
             learned += 1
         except Exception:
@@ -442,9 +761,41 @@ def apply_class_master(
     stats: Dict[str, Any] = {
         "learned": learned,
         "skipped": skipped,
+        "skipped_invalid": skipped_invalid,
+        "skipped_unchanged": skipped_unchanged,
+        "skipped_pending": skipped_pending,
         "errors": errors,
-        "unique_summaries": len(seen),
+        "unique_scanned": len(seen),
+        "only_confirmed": only_confirmed,
+        "learn_mode": "leaf_change",
+        "memory_file": str(data_dir / "memory.jsonl"),
+        "corrections_file": str(data_dir / "corrections.jsonl"),
+        "vendor_stats_file": str(data_dir / "vendor_stats.json"),
     }
+    print(
+        f"   叶子变更学习 {learned} 条 · 叶子未变跳过 {skipped_unchanged} · "
+        f"无效叶子 {skipped_invalid} · 确认过滤 {skipped_pending} · "
+        f"缺摘要 {skipped} · 失败 {errors}"
+    )
+    print(f"   记忆文件: {stats['memory_file']}")
+    print(f"   纠错日志: {stats['corrections_file']}")
+
+    # 可读学习报告（始终生成，便于核对）
+    log_path = Path(learn_log_path) if learn_log_path else data_dir / "学习记录.xlsx"
+    try:
+        report = _export_learn_report(
+            data_dir,
+            log_path,
+            session_rows=session_rows,
+            memory=memory,
+            tax=tax,
+            stats=stats,
+        )
+        stats["learn_log"] = str(report)
+        print(f"   学习记录: {report}")
+    except Exception as e:
+        print(f"  ⚠️ 学习记录导出失败: {e}")
+        stats["learn_log_error"] = str(e)
 
     if reclassify:
         engine = ClassifyEngine.from_data_dir(data_dir)
@@ -453,7 +804,14 @@ def apply_class_master(
     if reexport:
         dest = Path(out_path) if out_path else master_path
         engine = ClassifyEngine.from_data_dir(data_dir)
-        path, n = export_class_master(std_dir, dest, data_dir, engine=engine)
+        # 保留本次总表里所有确认行（含刚学的 + 未改动的确认）
+        path, n = export_class_master(
+            std_dir,
+            dest,
+            data_dir,
+            engine=engine,
+            preserve_path=master_path,
+        )
         stats["reexport"] = str(path)
         stats["reexport_rows"] = n
 

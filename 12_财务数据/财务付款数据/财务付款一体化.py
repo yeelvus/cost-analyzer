@@ -10,8 +10,10 @@
   · learn_classify 可持续学习 / 分类迁移
 
 快速开始：
-  python 财务付款一体化.py              # 直接跑全流程（无需 all）
-  python 财务付款一体化.py --skip-std   # 只汇总 + HTML
+  python 财务付款一体化.py              # 默认 = apply-class（总表有效分类全部学习）
+  python 财务付款一体化.py apply-class  # 同上
+  python 财务付款一体化.py export-class # 导出付款分类总表
+  python 财务付款一体化.py all          # 全流程 std → summary → cashflow
   python 财务付款一体化.py help-guide
   python 财务付款一体化.py show-paths
 """

@@ -138,8 +138,18 @@ def step_export_class_master(paths: Paths, out: Optional[Path] = None) -> str:
 
     dest = Path(out) if out else paths.class_master_xlsx
     engine = ClassifyEngine.from_data_dir(paths.classify_data)
+    # 保留已有总表（data / C_sum）中「确认」标签
+    preserve = None
+    for cand in (dest, paths.class_master_xlsx, paths.class_master_xlsx_sum):
+        if cand and Path(cand).is_file():
+            preserve = Path(cand)
+            break
     path, n = export_class_master(
-        paths.std_dir, dest, paths.classify_data, engine=engine
+        paths.std_dir,
+        dest,
+        paths.classify_data,
+        engine=engine,
+        preserve_path=preserve,
     )
     # 同步一份到 C_财务付款_sum，方便业务侧打开
     try:
@@ -158,8 +168,9 @@ def step_apply_class_master(
     *,
     reclassify: bool = True,
     reexport: bool = True,
+    only_confirmed: bool = False,
 ) -> dict:
-    """按分类总表中的一二级调整：学习 + 重刷 std + 再导出总表。"""
+    """按分类总表有效一/二/三级：全部学习 + 写学习文件 + 重刷 std + 再导出总表。"""
     _banner("应用分类总表 apply-class")
     import shutil
     import sys
@@ -168,6 +179,8 @@ def step_apply_class_master(
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
     from learn_classify.class_master import apply_class_master
+
+    paths.ensure_output_parents()
 
     # 优先：用户指定 → data 下总表 → C_sum 副本
     candidates = []
@@ -187,6 +200,11 @@ def step_apply_class_master(
         )
 
     print(f"读取: {src}")
+    print(
+        "学习规则: 只学「最后一级叶子科目」变更"
+        "（有三级看三级，否则看二级；一二级随叶子自动带出）"
+        + ("；且仅确认行" if only_confirmed else "")
+    )
     stats = apply_class_master(
         src,
         paths.std_dir,
@@ -194,6 +212,8 @@ def step_apply_class_master(
         reclassify=reclassify,
         reexport=reexport,
         out_path=paths.class_master_xlsx,
+        learn_log_path=paths.learn_log_xlsx,
+        only_confirmed=only_confirmed,
     )
     if reexport and paths.class_master_xlsx.is_file():
         try:
@@ -201,7 +221,19 @@ def step_apply_class_master(
             shutil.copy2(paths.class_master_xlsx, paths.class_master_xlsx_sum)
         except Exception:
             pass
-    print(f"✅ 应用完成: {stats}")
+    # 同步学习记录到 C_sum
+    if paths.learn_log_xlsx.is_file():
+        try:
+            paths.learn_log_xlsx_sum.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(paths.learn_log_xlsx, paths.learn_log_xlsx_sum)
+            print(f"   学习记录副本: {paths.learn_log_xlsx_sum}")
+        except Exception as e:
+            print(f"  ⚠️ 复制学习记录失败: {e}")
+    print(f"✅ 应用完成: learned={stats.get('learned')} pending跳过={stats.get('skipped_pending')}")
+    if stats.get("learn_log"):
+        print(f"   📂 学习记录 Excel: {stats['learn_log']}")
+    if stats.get("memory_file"):
+        print(f"   📂 记忆 jsonl: {stats['memory_file']}")
     return stats
 
 

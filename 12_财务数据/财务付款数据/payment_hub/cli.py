@@ -68,35 +68,55 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 常用示例:
-  python 财务付款一体化.py                   # 直接跑全流程（默认）
-  python 财务付款一体化.py --skip-std        # 跳过标准化，只汇总+HTML
-  python 财务付款一体化.py --reclassify      # 全流程且汇总前重刷分类
+  python 财务付款一体化.py                   # 默认 = apply-class（总表有效分类全部学习）
+  python 财务付款一体化.py apply-class       # 同上：表内改好的一/二/三级 → 记忆/学习记录 → 重刷
+  python 财务付款一体化.py export-class      # 导出「付款分类总表」(摘要去重)
+  python 财务付款一体化.py all               # 全流程 std → summary → cashflow
+  python 财务付款一体化.py all --skip-std    # 跳过标准化，只汇总+HTML
   python 财务付款一体化.py std               # 仅原始→标准
   python 财务付款一体化.py summary           # 仅汇总
   python 财务付款一体化.py cashflow          # 仅 HTML
-  python 财务付款一体化.py review            # 导出待复核
-  python 财务付款一体化.py export-class      # 导出「付款分类总表」(摘要去重)
-  python 财务付款一体化.py apply-class       # 按总表学习并重刷分类
-  python 财务付款一体化.py export-taxonomy   # 导出一级/二级科目体系 Excel
-  python 财务付款一体化.py import-taxonomy   # 导入科目体系(改下拉选项)
+  python 财务付款一体化.py export-taxonomy   # 导出科目体系 Excel
+  python 财务付款一体化.py import-taxonomy   # 导入科目体系
   python 财务付款一体化.py help-guide
         """,
     )
-    # 无子命令时默认全流程；以下为全流程可用参数（写在主 parser 上）
+    # 无子命令时默认 apply-class；全流程参数仍挂在主 parser（兼容旧习惯）
     _add_path_args(p)
-    p.add_argument("--skip-std", action="store_true", help="跳过标准化（已有 B_std）")
-    p.add_argument("--skip-summary", action="store_true")
-    p.add_argument("--skip-cashflow", action="store_true")
+    p.add_argument(
+        "-i",
+        "--input",
+        default=None,
+        help="分类总表路径（默认自动找 data 或 C_sum 下的 付款分类总表.xlsx）",
+    )
+    p.add_argument(
+        "--no-reclassify",
+        action="store_true",
+        help="默认 apply-class 时：只学习，不重刷 B_std",
+    )
+    p.add_argument(
+        "--no-reexport",
+        action="store_true",
+        help="默认 apply-class 时：应用后不重新导出总表",
+    )
+    p.add_argument(
+        "--only-confirmed",
+        action="store_true",
+        help="仅学习「确认状态=确认」的行（默认关闭：表内有效二级全部学）",
+    )
+    p.add_argument("--skip-std", action="store_true", help="[all] 跳过标准化（已有 B_std）")
+    p.add_argument("--skip-summary", action="store_true", help="[all] 跳过汇总")
+    p.add_argument("--skip-cashflow", action="store_true", help="[all] 跳过 HTML")
     p.add_argument(
         "--reclassify",
         action="store_true",
-        help="汇总前用当前分类体系重刷 B_std",
+        help="[all] 汇总前用当前分类体系重刷 B_std",
     )
     p.add_argument(
         "--steps",
         nargs="+",
         default=None,
-        help="自定义步骤序列: std reclassify summary cashflow review learn health",
+        help="[all] 自定义步骤: std reclassify summary cashflow review learn health",
     )
 
     sub = p.add_subparsers(dest="cmd", required=False)
@@ -191,7 +211,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     c = sub.add_parser(
         "apply-class",
-        help="读取分类总表中的一二级 → 学习记忆 → 重刷 B_std → 再导出总表",
+        help="读取分类总表有效一/二/三级 → 全部学习 → 重刷 B_std → 再导出总表",
     )
     _add_path_args(c)
     c.add_argument(
@@ -209,6 +229,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-reexport",
         action="store_true",
         help="应用后不重新导出总表",
+    )
+    c.add_argument(
+        "--only-confirmed",
+        action="store_true",
+        help="仅学习「确认状态=确认」的行（默认关闭：表内有效二级全部学）",
     )
 
     c = sub.add_parser(
@@ -252,11 +277,36 @@ def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    # 无子命令：直接跑全流程
+    # 无子命令：默认 apply-class（总表有效分类全部学习 + 生成学习记录）
     if not args.cmd:
         paths = _paths_from_args(args)
         try:
-            return _run_all(paths, args)
+            # 没有总表时先导出，再提示用户去改分类
+            master = Path(args.input) if getattr(args, "input", None) else None
+            candidates = []
+            if master:
+                candidates.append(master)
+            candidates.extend(
+                [paths.class_master_xlsx, paths.class_master_xlsx_sum]
+            )
+            has_master = any(p and Path(p).is_file() for p in candidates)
+            if not has_master:
+                print("未找到付款分类总表，先执行 export-class …")
+                step_export_class_master(paths)
+                print(
+                    "\n下一步：打开 付款分类总表.xlsx → "
+                    "调整一/二/三级科目 → 保存 → "
+                    "再运行: python 财务付款一体化.py"
+                )
+                return 0
+            step_apply_class_master(
+                paths,
+                master,
+                reclassify=not getattr(args, "no_reclassify", False),
+                reexport=not getattr(args, "no_reexport", False),
+                only_confirmed=bool(getattr(args, "only_confirmed", False)),
+            )
+            return 0
         except Exception as e:
             print(f"❌ {e}", file=sys.stderr)
             return 1
@@ -368,6 +418,7 @@ def main(argv=None) -> int:
                 Path(args.input) if args.input else None,
                 reclassify=not args.no_reclassify,
                 reexport=not args.no_reexport,
+                only_confirmed=bool(getattr(args, "only_confirmed", False)),
             )
             return 0
 
