@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
-步骤4：汇总 STD 目录下全部 Excel → SUM 目录。
+步骤4：汇总 STD → 纯合并到 C_raw_sum，标准化到 D_sum。
 
-默认输出三份：
-  1) 采购部采购台账_merged.xlsx              — 纯合并（不改内容）
-  2) 采购部采购台账_std_merged.xlsx          — 内容标准化后合并
-  3) 采购部采购台账_std_merged_对比.xlsx    — 标准化对比版
-     原始物品名称/规格/单位 | 转换单位/计算数量 | 标准化后列
-     转换规则见 单位转换/（网片 m2→kg、砖块→m3）
+默认输出：
+  1) C_采购部采购台账_raw_sum/采购部采购台账_merged.xlsx — 纯合并
+  2) D_采购部采购台账_sum/采购部采购台账_std_merged.xlsx — 标准化
+  3) D_…/对比版（可选）
+  4) 将 std「采购总金额」同步到 D_…/项目采购分类汇总.xlsx
 
 不改动 STD 目录下的单项目 *_processed.xlsx。
 可用 --plain-only / --std-only / --no-compare 控制输出。
@@ -36,7 +35,11 @@ for _p in (str(_PKG_ROOT), str(_CODE_ROOT)):
 from common.excel import apply_common_excel_layout
 
 from _采购路径 import (
+    CATEGORY_SUMMARY_NAME,
     CONTENT_STD_UTILS,
+    MERGED_PLAIN_NAME,
+    MERGED_STD_NAME,
+    RAW_SUM_DIR,
     STD_DIR,
     SUM_DIR,
     UNIT_PIPELINE,
@@ -60,8 +63,8 @@ COMPARE_OUTPUT_COLUMNS = [
     "标准日期", "供货商名称", "备注", "年月", "签订日期",
 ]
 
-OUTPUT_PLAIN = "采购部采购台账_merged.xlsx"
-OUTPUT_WITH_STD = "采购部采购台账_std_merged.xlsx"
+OUTPUT_PLAIN = MERGED_PLAIN_NAME
+OUTPUT_WITH_STD = MERGED_STD_NAME
 OUTPUT_COMPARE = "采购部采购台账_std_merged_对比.xlsx"
 UNIT_CONV_PIPELINE = UNIT_PIPELINE
 
@@ -531,17 +534,107 @@ def merge_standardized_excels(
     return formal_out, compare_out
 
 
+def sync_monthly_total_to_category_summary(
+    std_merged_path: Path,
+    category_summary_path: Path,
+) -> bool:
+    """
+    把 std_merged 的「采购总金额」sheet（项目×月份宽表）写入
+    项目采购分类汇总.xlsx（存在则替换该 sheet，保留其它 sheet）。
+    """
+    std_merged_path = Path(std_merged_path)
+    category_summary_path = Path(category_summary_path)
+    if not std_merged_path.is_file():
+        print(f"  ⚠️ 无 std 汇总，跳过同步采购总金额: {std_merged_path}")
+        return False
+
+    try:
+        total_df = pd.read_excel(std_merged_path, sheet_name="采购总金额")
+    except Exception as exc:
+        print(f"  ⚠️ 读取「采购总金额」失败: {exc}")
+        return False
+
+    if total_df is None or total_df.empty:
+        print("  ⚠️ 「采购总金额」为空，跳过同步")
+        return False
+
+    category_summary_path.parent.mkdir(parents=True, exist_ok=True)
+    sheet_name = "采购总金额"
+
+    if category_summary_path.is_file():
+        try:
+            book = openpyxl.load_workbook(category_summary_path)
+        except Exception as exc:
+            print(f"  ⚠️ 打开分类汇总失败，将新建: {exc}")
+            book = openpyxl.Workbook()
+            # 去掉默认空表，后面统一建
+            if book.active and book.active.max_row == 1 and book.active.max_column == 1:
+                pass
+    else:
+        book = openpyxl.Workbook()
+
+    if sheet_name in book.sheetnames:
+        del book[sheet_name]
+    # 若仅有一个空 Sheet，可先删再建
+    if len(book.sheetnames) == 1:
+        only = book.sheetnames[0]
+        ws0 = book[only]
+        if ws0.max_row <= 1 and (ws0.max_column or 1) <= 1 and not ws0["A1"].value:
+            del book[only]
+
+    ws = book.create_sheet(sheet_name)
+    headers = [str(c) for c in total_df.columns.tolist()]
+    ws.append(headers)
+    for row in total_df.itertuples(index=False, name=None):
+        cleaned = []
+        for v in row:
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                try:
+                    if pd.isna(v):
+                        cleaned.append(None)
+                    else:
+                        cleaned.append(float(v))
+                except Exception:
+                    cleaned.append(v)
+            else:
+                cleaned.append("" if _is_excel_error_token(v) else v)
+        ws.append(cleaned)
+
+    # 金额列格式：从第 3 列起多为月份金额
+    for r in range(2, (ws.max_row or 1) + 1):
+        for c in range(3, (ws.max_column or 2) + 1):
+            cell = ws.cell(r, c)
+            if isinstance(cell.value, (int, float)):
+                cell.number_format = "#,##0.00"
+
+    ws.freeze_panes = "C2"
+    if ws.max_row and ws.max_column:
+        ws.auto_filter.ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
+    ws.row_dimensions[1].height = 36
+    for cell in ws[1]:
+        cell.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
+
+    try:
+        apply_unified_workbook_format(book)
+    except Exception:
+        pass
+
+    book.save(category_summary_path)
+    print(f"已同步「采购总金额」→ {category_summary_path}")
+    return True
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="汇总采购部 std 台账（融入内容标准化）")
     parser.add_argument(
         "--plain-only",
         action="store_true",
-        help="只输出纯合并文件（不跑内容标准化）",
+        help="只输出纯合并文件到 C_raw_sum（不跑内容标准化）",
     )
     parser.add_argument(
         "--std-only",
         action="store_true",
-        help="只输出内容标准化后的汇总文件（含对比版，除非 --no-compare）",
+        help="只输出内容标准化后的汇总到 D_sum（含对比版，除非 --no-compare）",
     )
     parser.add_argument(
         "--no-compare",
@@ -549,35 +642,50 @@ def main() -> None:
         help="不生成对比版 Excel",
     )
     parser.add_argument("--input", default="", help="覆盖输入目录，默认 STD_DIR")
-    parser.add_argument("--output-dir", default="", help="覆盖输出目录，默认 SUM_DIR")
+    parser.add_argument(
+        "--output-dir",
+        default="",
+        help="覆盖 std 输出目录，默认 SUM_DIR（D_sum）；纯合并仍写 RAW_SUM_DIR",
+    )
+    parser.add_argument(
+        "--raw-sum-dir",
+        default="",
+        help="纯合并输出目录，默认 C_采购部采购台账_raw_sum",
+    )
     args = parser.parse_args()
 
     in_dir = Path(args.input).expanduser() if args.input else STD_DIR
     out_dir = Path(args.output_dir).expanduser() if args.output_dir else SUM_DIR
+    raw_sum_dir = (
+        Path(args.raw_sum_dir).expanduser() if args.raw_sum_dir else RAW_SUM_DIR
+    )
     if not in_dir.is_dir():
         raise FileNotFoundError(f"输入目录不存在: {in_dir}")
     out_dir.mkdir(parents=True, exist_ok=True)
+    raw_sum_dir.mkdir(parents=True, exist_ok=True)
 
     print("汇总模式")
-    print(f"- 输入: {in_dir}")
-    print(f"- 输出: {out_dir}")
+    print(f"- 输入 STD:     {in_dir}")
+    print(f"- 纯合并输出:   {raw_sum_dir / OUTPUT_PLAIN}")
+    print(f"- 标准化输出:   {out_dir / OUTPUT_WITH_STD}")
     print(f"- 内容标准化工具: {CONTENT_STD_UTILS}")
 
     if args.plain_only and args.std_only:
         raise SystemExit("不能同时指定 --plain-only 与 --std-only")
 
-    # jobs: (use_std, formal_filename, include_compare)
+    # jobs: (use_std, formal_filename, include_compare, dest_dir)
     if args.plain_only:
-        jobs = [(False, OUTPUT_PLAIN, False)]
+        jobs = [(False, OUTPUT_PLAIN, False, raw_sum_dir)]
     elif args.std_only:
-        jobs = [(True, OUTPUT_WITH_STD, not args.no_compare)]
+        jobs = [(True, OUTPUT_WITH_STD, not args.no_compare, out_dir)]
     else:
         jobs = [
-            (False, OUTPUT_PLAIN, False),
-            (True, OUTPUT_WITH_STD, not args.no_compare),
+            (False, OUTPUT_PLAIN, False, raw_sum_dir),
+            (True, OUTPUT_WITH_STD, not args.no_compare, out_dir),
         ]
 
-    for use_std, filename, include_compare in jobs:
+    std_merged_path: Path | None = None
+    for use_std, filename, include_compare, dest in jobs:
         formal_wb, compare_wb = merge_standardized_excels(
             in_dir,
             use_content_standardization=use_std,
@@ -587,16 +695,25 @@ def main() -> None:
             print(f"未产生有效数据: {filename}")
             continue
 
-        out_path = out_dir / filename
+        dest.mkdir(parents=True, exist_ok=True)
+        out_path = dest / filename
         apply_unified_workbook_format(formal_wb)
         formal_wb.save(out_path)
         print(f"已输出: {out_path}")
+
+        if use_std and filename == OUTPUT_WITH_STD:
+            std_merged_path = out_path
 
         if compare_wb is not None:
             compare_path = out_dir / OUTPUT_COMPARE
             apply_unified_workbook_format(compare_wb)
             compare_wb.save(compare_path)
             print(f"已输出对比版: {compare_path}")
+
+    # std 汇总的「采购总金额」→ 项目采购分类汇总.xlsx
+    if std_merged_path and std_merged_path.is_file():
+        cat_path = out_dir / CATEGORY_SUMMARY_NAME
+        sync_monthly_total_to_category_summary(std_merged_path, cat_path)
 
 
 if __name__ == "__main__":

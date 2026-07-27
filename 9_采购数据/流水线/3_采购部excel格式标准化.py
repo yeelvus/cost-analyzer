@@ -102,45 +102,70 @@ def load_project_config() -> list[dict]:
 
 
 def resolve_project(raw_name: str, projects: list[dict], match_db) -> dict | None:
-    hit = _matcher.match_project(raw_name, match_db)
+    """优先匹配库（含模糊）；再回落项目表精确/包含。"""
+    hit = _matcher.match_project(raw_name, match_db, fuzzy=True, skip_marked_unmatched=True)
     if hit:
         return {
-            "project_code": hit.get("project_code", ""),
+            "project_code": hit.get("project_code", "") or "",
             "project_name": hit.get("project_name", raw_name),
+            "source": hit.get("source", ""),
         }
     for p in projects:
         if p["project_name"] == raw_name:
-            return p
-    for p in projects:
-        if raw_name in p["project_name"] or p["project_name"] in raw_name:
-            return p
+            return {**p, "source": "config_exact"}
+    # 唯一包含再接受
+    contain = [
+        p
+        for p in projects
+        if raw_name and (raw_name in p["project_name"] or p["project_name"] in raw_name)
+    ]
+    if len(contain) == 1:
+        return {**contain[0], "source": "config_contain"}
     return None
 
 
-def preload_project_matches(files: list[Path], projects: list[dict], match_db) -> None:
-    unmatched = []
-    for f in files:
-        name = extract_project_name(f.name)
+def preload_project_matches(
+    files: list[Path],
+    projects: list[dict],
+    match_db,
+    *,
+    interactive: bool = True,
+) -> None:
+    """
+    批量处理未匹配项目。
+    - 已匹配 / 模糊可判 / 曾选「保留原名」的 → 不再弹窗
+    - interactive=False → 静默 mark_unmatched，适合无人值守
+    """
+    names = [extract_project_name(f.name) for f in files]
+    # 先让匹配库吃一遍模糊，写入别名
+    still = []
+    for name in names:
+        if not name:
+            continue
         if resolve_project(name, projects, match_db):
             continue
-        if name not in unmatched:
-            unmatched.append(name)
-    if not unmatched:
+        still.append(name)
+
+    need_prompt = _matcher.collect_names_needing_prompt(still, match_db, fuzzy=True)
+    if not need_prompt:
+        print("项目匹配: 全部可自动处理（精确/模糊/历史保留），无需弹窗")
         return
 
-    print(f"\n发现 {len(unmatched)} 个未识别项目，打开批量匹配…")
+    print(f"\n发现 {len(need_prompt)} 个新未识别项目" + ("，打开批量匹配…" if interactive else "（非交互，保留原名）"))
     results = _matcher.prompt_unmatched_project_mappings(
-        unmatched, match_db, window_title="采购-批量项目匹配"
+        need_prompt,
+        match_db,
+        window_title="采购-批量项目匹配",
+        db_path=str(MATCH_DB_PATH),
+        interactive=interactive,
     )
     lookup = _matcher.get_project_lookup(match_db)
     for raw, std in results.items():
         if std:
-            _matcher.add_mapping(match_db, raw, std)
             code, _ = lookup.get(std, ("", ""))
             print(f"  ✓ {raw} -> [{code}] {std}")
         else:
-            _matcher.mark_unmatched(match_db, raw)
-            print(f"  - 留空: {raw}")
+            print(f"  - 保留原名(下次不再弹): {raw}")
 
 
 # ── 表头 / 行提取 ─────────────────────────────────────────
@@ -191,7 +216,11 @@ def is_summary_row(ws, row_idx: int, amount_col: int) -> bool:
 
 
 def extract_rows(file_path: Path, project_code: str, project_name: str):
-    fwb = openpyxl.load_workbook(file_path, data_only=False)
+    """
+    两遍读取：先公式模式找汇总行，再 data_only 取数值。
+    第二遍使用 read_only 加速大表。
+    """
+    fwb = openpyxl.load_workbook(file_path, data_only=False, read_only=False)
     fws = fwb.active
     if fws is None:
         fwb.close()
@@ -213,48 +242,54 @@ def extract_rows(file_path: Path, project_code: str, project_name: str):
         return [], "缺少含税金额列"
 
     amount_col = hmap["含税金额"] + 1
+    max_row = fws.max_row or header_row
     summary = {
-        r for r in range(header_row + 1, fws.max_row + 1) if is_summary_row(fws, r, amount_col)
+        r for r in range(header_row + 1, max_row + 1) if is_summary_row(fws, r, amount_col)
     }
     fwb.close()
 
-    vwb = openpyxl.load_workbook(file_path, data_only=True)
-    vws = vwb.active
-    if vws is None:
-        vwb.close()
-        return [], "未找到活动工作表"
+    # data_only + read_only：显著加快大文件数值读取
+    vwb = openpyxl.load_workbook(file_path, data_only=True, read_only=True)
+    try:
+        vws = vwb.active
+        if vws is None:
+            return [], "未找到活动工作表"
 
-    key_cols = [hmap[c] for c in ("物品名称", "规格", "单位", "数量", "单价", "不含税金额") if c in hmap]
-    rows = []
-    for ridx, vals in enumerate(
-        vws.iter_rows(min_row=header_row + 1, max_row=vws.max_row, values_only=True),
-        start=header_row + 1,
-    ):
-        if ridx in summary:
-            continue
-        if all(v is None or str(v).strip() == "" for v in vals):
-            continue
-        if not any(
-            (vals[i] is not None and str(vals[i]).strip() != "")
-            for i in key_cols
-            if i < len(vals)
+        key_cols = [
+            hmap[c]
+            for c in ("物品名称", "规格", "单位", "数量", "单价", "不含税金额")
+            if c in hmap
+        ]
+        rows = []
+        for ridx, vals in enumerate(
+            vws.iter_rows(min_row=header_row + 1, values_only=True),
+            start=header_row + 1,
         ):
-            continue
+            if ridx in summary:
+                continue
+            if not vals:
+                continue
+            if all(v is None or str(v).strip() == "" for v in vals):
+                continue
+            if not any(
+                (i < len(vals) and vals[i] is not None and str(vals[i]).strip() != "")
+                for i in key_cols
+            ):
+                continue
 
-        obj = {"项目编码": project_code, "项目名称": project_name}
-        for col in STANDARD_COLUMNS:
-            if col in hmap and hmap[col] < len(vals):
-                v = vals[hmap[col]]
-                # 单位原样保留（仅 strip 字符串空白），不做纠错/补全
-                if col == "单位":
-                    obj[col] = "" if v is None else str(v).strip()
+            obj = {"项目编码": project_code, "项目名称": project_name}
+            for col in STANDARD_COLUMNS:
+                if col in hmap and hmap[col] < len(vals):
+                    v = vals[hmap[col]]
+                    if col == "单位":
+                        obj[col] = "" if v is None else str(v).strip()
+                    else:
+                        obj[col] = "" if v is None else v
                 else:
-                    obj[col] = "" if v is None else v
-            else:
-                obj[col] = ""
-        rows.append(obj)
-
-    vwb.close()
+                    obj[col] = ""
+            rows.append(obj)
+    finally:
+        vwb.close()
     return rows, ""
 
 
@@ -353,7 +388,12 @@ def process_one(file_path: Path, projects: list[dict], match_db) -> tuple[bool, 
     matched = resolve_project(raw_name, projects, match_db)
     if matched:
         code, name = matched.get("project_code", ""), matched.get("project_name", raw_name)
-        _matcher.add_mapping(match_db, raw_name, name)
+        src = matched.get("source", "")
+        # 已是标准映射时不必反复 add；新模糊命中才写入
+        if src not in ("unmatched_keep",) and name and name != raw_name:
+            _matcher.add_mapping(match_db, raw_name, name)
+        if src and src not in ("alias", "config_exact"):
+            print(f"  项目匹配[{src}]: {raw_name} → {name}")
     else:
         code, name = "", raw_name
         _matcher.mark_unmatched(match_db, raw_name)
@@ -384,11 +424,26 @@ def process_one(file_path: Path, projects: list[dict], match_db) -> tuple[bool, 
 
     out_path = STD_DIR / f"{file_path.stem}{OUTPUT_SUFFIX}.xlsx"
     write_output(df, out_path)
-    print(f"  ✓ {out_path.name}")
+    print(f"  ✓ {out_path.name}  ({len(df)} 行)")
     return True, ""
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="采购台账 Excel 格式标准化 → std")
+    parser.add_argument(
+        "--no-prompt",
+        action="store_true",
+        help="不弹项目匹配窗：新未匹配名保留原名并记入库，下次也不再弹",
+    )
+    parser.add_argument(
+        "--force-prompt",
+        action="store_true",
+        help="强制对所有当前无法精确/模糊匹配的名弹窗（忽略历史「保留原名」）",
+    )
+    args = parser.parse_args(argv)
+
     if not EXTRACT_DIR.is_dir():
         raise FileNotFoundError(f"提取目录不存在: {EXTRACT_DIR}")
     STD_DIR.mkdir(parents=True, exist_ok=True)
@@ -396,6 +451,7 @@ def main() -> None:
     print(f"输入(提取): {EXTRACT_DIR}")
     print(f"输出(标准): {STD_DIR}")
     print(f"项目匹配: {_MATCHER_PATH}")
+    print(f"弹窗: {'关闭' if args.no_prompt else ('强制' if args.force_prompt else '仅新未匹配')}")
 
     projects = load_project_config()
     match_db = _matcher.load_or_init_db(str(MATCH_DB_PATH), projects)
@@ -405,7 +461,28 @@ def main() -> None:
         print("未发现 Excel，结束")
         return
 
-    preload_project_matches(files, projects, match_db)
+    if args.force_prompt:
+        # 清空与当前文件相关的「保留原名」记录，允许重新弹窗
+        names = {extract_project_name(f.name) for f in files}
+        names = {n for n in names if n}
+        before = list(match_db.get("unmatched_aliases", []))
+        match_db["unmatched_aliases"] = [
+            n
+            for n in before
+            if n not in names
+            and _matcher._normalize_key(n)
+            not in {_matcher._normalize_key(x) for x in names}
+        ]
+        print(
+            f"强制弹窗: 已清除 {len(before) - len(match_db['unmatched_aliases'])} 条历史保留原名"
+        )
+
+    preload_project_matches(
+        files,
+        projects,
+        match_db,
+        interactive=not args.no_prompt,
+    )
 
     ok = skip = 0
     skipped = []

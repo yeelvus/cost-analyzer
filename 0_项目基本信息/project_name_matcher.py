@@ -1,6 +1,8 @@
 import json
 import os
 import re
+from difflib import SequenceMatcher
+
 import pandas as pd
 
 try:
@@ -9,6 +11,10 @@ try:
 except Exception:
     tk = None
     ttk = None
+
+# 运行期缓存：避免每次 match 都重建别名表
+_ALIAS_CACHE: dict[int, dict] = {}
+_FUZZY_CACHE: dict[tuple[int, str], dict | None] = {}
 
 
 def _clean_name(text):
@@ -19,6 +25,7 @@ def _clean_name(text):
         return ""
     s = re.sub(r"（.*?）|\(.*?\)", "", s)
     s = s.replace("泰国", "").replace("项目", "").replace("工程", "")
+    s = re.sub(r"\s+", "", s)
     return s.strip().lower()
 
 
@@ -26,6 +33,30 @@ def _normalize_key(text):
     if text is None:
         return ""
     return re.sub(r"\s+", "", str(text)).strip().lower()
+
+
+def _invalidate_db_caches(db=None):
+    """映射变更后清缓存。"""
+    global _ALIAS_CACHE, _FUZZY_CACHE
+    if db is None:
+        _ALIAS_CACHE.clear()
+        _FUZZY_CACHE.clear()
+        return
+    _ALIAS_CACHE.pop(id(db), None)
+    # 模糊缓存按 db id 前缀清理
+    kid = id(db)
+    drop = [k for k in _FUZZY_CACHE if k[0] == kid]
+    for k in drop:
+        _FUZZY_CACHE.pop(k, None)
+
+
+def _cached_alias_map(db) -> dict:
+    key = id(db)
+    m = _ALIAS_CACHE.get(key)
+    if m is None:
+        m = _build_alias_map(db)
+        _ALIAS_CACHE[key] = m
+    return m
 
 
 def _iter_project_alias_pairs(db):
@@ -224,6 +255,7 @@ def add_mapping(db, match_name, standard_name):
     if match_name not in aliases and match_name != standard_name:
         aliases.append(match_name)
     clear_unmatched_aliases(db, match_name)
+    _invalidate_db_caches(db)
 
 
 def mark_unmatched(db, raw_name):
@@ -234,13 +266,18 @@ def mark_unmatched(db, raw_name):
     if not raw_name:
         return
 
-    std_name = _build_alias_map(db).get(raw_name)
+    std_name = _cached_alias_map(db).get(raw_name)
     if std_name and std_name in db.get("projects", {}):
         return
 
     unmatched_aliases = db.setdefault("unmatched_aliases", [])
-    if raw_name not in unmatched_aliases:
-        unmatched_aliases.append(raw_name)
+    # 归一化去重，避免同名不同空格反复写入
+    raw_key = _normalize_key(raw_name)
+    for name in unmatched_aliases:
+        if _normalize_key(name) == raw_key:
+            return
+    unmatched_aliases.append(raw_name)
+    _invalidate_db_caches(db)
 
 
 def clear_unmatched_aliases(db, raw_name=None):
@@ -271,7 +308,104 @@ def is_unmatched_alias(db, raw_name):
     return False
 
 
-def match_project(raw_name, db):
+def _result(raw_name, std_name, meta, source):
+    return {
+        "raw_name": raw_name,
+        "project_name": std_name,
+        "project_code": meta.get("project_code", "需手动核对"),
+        "target_status": meta.get("target_status", "需手动核对"),
+        "source": source,
+    }
+
+
+def _fuzzy_match_project(raw_name: str, db, *, min_ratio: float = 0.82):
+    """
+    软匹配：清洗后全等 / 唯一子串包含 / 高相似度唯一最优。
+    仅在唯一命中时返回，避免误绑。
+    """
+    cache_key = (id(db), _normalize_key(raw_name))
+    if cache_key in _FUZZY_CACHE:
+        return _FUZZY_CACHE[cache_key]
+
+    projects = db.get("projects", {}) or {}
+    if not projects:
+        _FUZZY_CACHE[cache_key] = None
+        return None
+
+    raw_clean = _clean_name(raw_name)
+    raw_key = _normalize_key(raw_name)
+    if not raw_clean and not raw_key:
+        _FUZZY_CACHE[cache_key] = None
+        return None
+
+    # 清洗后全等（标准名或别名）
+    alias_map = _cached_alias_map(db)
+    clean_hits = []
+    for alias, std in alias_map.items():
+        if std not in projects:
+            continue
+        if _clean_name(alias) == raw_clean or _normalize_key(alias) == raw_key:
+            clean_hits.append(std)
+    clean_hits = list(dict.fromkeys(clean_hits))
+    if len(clean_hits) == 1:
+        std = clean_hits[0]
+        res = _result(raw_name, std, projects[std], "fuzzy_clean_exact")
+        _FUZZY_CACHE[cache_key] = res
+        return res
+
+    # 唯一子串包含（长度足够，避免短词误伤）
+    if len(raw_clean) >= 4:
+        contain = []
+        for std in projects.keys():
+            sc = _clean_name(std)
+            if not sc:
+                continue
+            if raw_clean in sc or sc in raw_clean:
+                # 较短一方至少 4 字，且覆盖率较高
+                shorter, longer = (raw_clean, sc) if len(raw_clean) <= len(sc) else (sc, raw_clean)
+                if len(shorter) >= 4 and len(shorter) / max(len(longer), 1) >= 0.5:
+                    contain.append(std)
+        contain = list(dict.fromkeys(contain))
+        if len(contain) == 1:
+            std = contain[0]
+            res = _result(raw_name, std, projects[std], "fuzzy_contain")
+            _FUZZY_CACHE[cache_key] = res
+            return res
+
+    # 相似度：取唯一最高且 ≥ 阈值
+    best_std, best_r, second_r = None, 0.0, 0.0
+    for std in projects.keys():
+        sc = _clean_name(std) or _normalize_key(std)
+        if not sc:
+            continue
+        r = SequenceMatcher(None, raw_clean or raw_key, sc).ratio()
+        if r > best_r:
+            second_r = best_r
+            best_r = r
+            best_std = std
+        elif r > second_r:
+            second_r = r
+    if (
+        best_std
+        and best_r >= min_ratio
+        and (best_r - second_r) >= 0.05  # 与第二名拉开差距，避免双候选
+    ):
+        res = _result(raw_name, best_std, projects[best_std], f"fuzzy_ratio_{best_r:.2f}")
+        _FUZZY_CACHE[cache_key] = res
+        return res
+
+    _FUZZY_CACHE[cache_key] = None
+    return None
+
+
+def match_project(raw_name, db, *, fuzzy: bool = True, skip_marked_unmatched: bool = True):
+    """
+    匹配项目名。
+
+    - fuzzy: 启用清洗/包含/相似度软匹配
+    - skip_marked_unmatched: 若曾在弹窗中「保留原名」写入 unmatched_aliases，
+      则不再返回 None 触发重复弹窗，而是以原名静默通过（source=unmatched_keep）
+    """
     if raw_name is None:
         return None
 
@@ -280,19 +414,12 @@ def match_project(raw_name, db):
         return None
 
     projects = db.get("projects", {})
-    alias_map = _build_alias_map(db)
+    alias_map = _cached_alias_map(db)
 
     # 1) Exact alias map.
     std_name = alias_map.get(raw_name)
     if std_name and std_name in projects:
-        meta = projects[std_name]
-        return {
-            "raw_name": raw_name,
-            "project_name": std_name,
-            "project_code": meta.get("project_code", "需手动核对"),
-            "target_status": meta.get("target_status", "需手动核对"),
-            "source": "alias",
-        }
+        return _result(raw_name, std_name, projects[std_name], "alias")
 
     # 2) Normalized exact.
     raw_key = _normalize_key(raw_name)
@@ -300,50 +427,103 @@ def match_project(raw_name, db):
         if _normalize_key(alias) == raw_key and std in projects:
             meta = projects[std]
             add_mapping(db, raw_name, std)
-            return {
-                "raw_name": raw_name,
-                "project_name": std,
-                "project_code": meta.get("project_code", "需手动核对"),
-                "target_status": meta.get("target_status", "需手动核对"),
-                "source": "normalized_alias",
-            }
+            return _result(raw_name, std, meta, "normalized_alias")
+
+    # 3) Fuzzy
+    if fuzzy:
+        hit = _fuzzy_match_project(raw_name, db)
+        if hit:
+            # 自动写入别名，下次精确命中
+            add_mapping(db, raw_name, hit["project_name"])
+            return hit
+
+    # 4) 已标记「不匹配/保留原名」→ 静默用原名，避免反复弹窗
+    if skip_marked_unmatched and is_unmatched_alias(db, raw_name):
+        return {
+            "raw_name": raw_name,
+            "project_name": raw_name,
+            "project_code": "",
+            "target_status": "未匹配保留",
+            "source": "unmatched_keep",
+        }
 
     return None
 
 
-def prompt_unmatched_project_mappings(unmatched_names, db, window_title="手动项目匹配", db_path=None):
+def collect_names_needing_prompt(raw_names, db, *, fuzzy: bool = True) -> list[str]:
+    """筛出真正需要弹窗的名称（已匹配 / 已保留原名的不再弹出）。"""
+    need = []
+    seen = set()
+    for raw in raw_names:
+        name = str(raw or "").strip()
+        if not name:
+            continue
+        key = _normalize_key(name)
+        if key in seen:
+            continue
+        seen.add(key)
+        if match_project(name, db, fuzzy=fuzzy, skip_marked_unmatched=True):
+            continue
+        need.append(name)
+    return sorted(need)
+
+
+def prompt_unmatched_project_mappings(
+    unmatched_names,
+    db,
+    window_title="手动项目匹配",
+    db_path=None,
+    *,
+    interactive: bool = True,
+):
     """
     为未匹配项目弹窗选择标准项目，并将映射写入 db。
-    新增 db_path 参数：如果传入，则手动匹配后自动保存到文件。
+
+    interactive=False：不弹窗，全部 mark_unmatched 并返回空映射。
+    弹窗内默认选中模糊建议（若有），减少手工选择。
     """
     unmatched_names = [str(n).strip() for n in unmatched_names if str(n).strip()]
-    unmatched_names = sorted(set(unmatched_names))
+    # 再过滤一轮：模糊已能匹配的不再弹
+    unmatched_names = collect_names_needing_prompt(unmatched_names, db, fuzzy=True)
     if not unmatched_names:
         return {}
 
-    if tk is None or ttk is None:
+    if not interactive or tk is None or ttk is None:
+        for name in unmatched_names:
+            mark_unmatched(db, name)
+        if db_path and os.path.exists(os.path.dirname(db_path) or "."):
+            save_db(db_path, db)
         return {name: "" for name in unmatched_names}
 
     options = get_project_options(db)
     if not options:
+        for name in unmatched_names:
+            mark_unmatched(db, name)
         return {name: "" for name in unmatched_names}
+
+    # 预计算建议
+    suggestions: dict[str, str] = {}
+    for raw in unmatched_names:
+        # 临时关闭 skip，仅看 fuzzy（未写入别名）
+        hit = _fuzzy_match_project(raw, db, min_ratio=0.72)
+        if hit:
+            suggestions[raw] = hit["project_name"]
 
     root = tk.Tk()
     root.withdraw()
 
     win = tk.Toplevel(root)
-    win.title(f"{window_title}（{len(unmatched_names)}项）")
-    win.geometry("960x640")
+    win.title(f"{window_title}（{len(unmatched_names)}项，已自动过滤已知项）")
+    win.geometry("980x660")
     win.lift()
     win.attributes("-topmost", True)
     win.after_idle(win.attributes, "-topmost", False)
 
-    tk.Label(
-        win,
-        text="以下项目未自动匹配，请选择标准项目（可留空保持原名称）",
-        font=("Arial", 12, "bold"),
-        pady=10,
-    ).pack()
+    tip = (
+        "以下为新出现的未匹配项目。下拉可改；灰色建议已预填。"
+        "选「保持原名称」后下次不再弹窗。"
+    )
+    tk.Label(win, text=tip, font=("Arial", 11, "bold"), pady=8, wraplength=900, justify="left").pack()
 
     canvas = tk.Canvas(win)
     scrollbar = tk.Scrollbar(win, orient="vertical", command=canvas.yview)
@@ -355,24 +535,30 @@ def prompt_unmatched_project_mappings(unmatched_names, db, window_title="手动�
     scrollbar.pack(side="right", fill="y")
 
     blank_option = "（保持原名称，不匹配）"
-    display_options = [blank_option]
-    option_to_standard = {}
-
-    for std_name in options:
-        display_options.append(std_name)
-        option_to_standard[std_name] = std_name
+    display_options = [blank_option] + list(options)
+    option_to_standard = {s: s for s in options}
 
     var_map = {}
     for raw_name in unmatched_names:
         row = tk.Frame(frame, relief=tk.RIDGE, borderwidth=1)
         row.pack(fill="x", padx=8, pady=4)
 
-        tk.Label(row, text=raw_name, font=("Arial", 11, "bold"), width=30, anchor="w").pack(side="left", padx=8, pady=6)
+        tk.Label(row, text=raw_name, font=("Arial", 11, "bold"), width=28, anchor="w").pack(
+            side="left", padx=8, pady=6
+        )
         tk.Label(row, text="→", font=("Arial", 12)).pack(side="left")
 
-        var = tk.StringVar(value=blank_option)
-        combo = ttk.Combobox(row, textvariable=var, values=display_options, width=70, state="readonly")
+        suggest = suggestions.get(raw_name, "")
+        default = suggest if suggest in option_to_standard else blank_option
+        var = tk.StringVar(value=default)
+        combo = ttk.Combobox(
+            row, textvariable=var, values=display_options, width=68, state="readonly"
+        )
         combo.pack(side="left", padx=8, pady=6, fill="x", expand=True)
+        if suggest:
+            tk.Label(row, text=f"建议:{suggest[:20]}", fg="#666", font=("Arial", 9)).pack(
+                side="left", padx=4
+            )
         var_map[raw_name] = var
 
     result = {"ok": False}
@@ -387,21 +573,21 @@ def prompt_unmatched_project_mappings(unmatched_names, db, window_title="手动�
 
     btns = tk.Frame(win)
     btns.pack(pady=10)
-    tk.Button(btns, text="确定并应用", command=on_confirm, width=16, bg="#4CAF50", fg="white").pack(side="left", padx=10)
-    tk.Button(btns, text="全部保留原名称", command=on_skip_all, width=16).pack(side="left", padx=10)
+    tk.Button(
+        btns, text="确定并应用", command=on_confirm, width=16, bg="#4CAF50", fg="white"
+    ).pack(side="left", padx=10)
+    tk.Button(btns, text="全部保留原名称", command=on_skip_all, width=16).pack(
+        side="left", padx=10
+    )
 
     win.protocol("WM_DELETE_WINDOW", on_skip_all)
     root.wait_window(win)
     root.destroy()
 
-    # ====================== 核心修改部分 ======================
     selected_map = {}
-    any_mapped = False
-
     for raw_name, var in var_map.items():
         selected = var.get().strip()
         if not result["ok"] or selected == blank_option or not selected:
-            # 跳过匹配时仅标记为未匹配，不创建同名“伪项目”。
             mark_unmatched(db, raw_name)
             selected_map[raw_name] = ""
             continue
@@ -410,12 +596,12 @@ def prompt_unmatched_project_mappings(unmatched_names, db, window_title="手动�
         selected_map[raw_name] = std_name
         if std_name:
             add_mapping(db, raw_name, std_name)
-            any_mapped = True
 
-    # 如果进行了任何映射（含"保留原名"），并且传入了 db_path，则立即保存到文件
-    if db_path and selected_map and os.path.exists(os.path.dirname(db_path)):
-        save_db(db_path, db)
-        print(f"✅ 手动匹配结果已自动保存到数据库: {db_path}")
+    if db_path and selected_map:
+        parent = os.path.dirname(db_path)
+        if parent and os.path.exists(parent):
+            save_db(db_path, db)
+            print(f"✅ 手动匹配结果已保存: {db_path}")
 
     return selected_map
 

@@ -62,13 +62,29 @@ UNIT_PIPELINE = UNIT_DIR / "0_统一转换流水线.py"
 SPEC_PIPELINE = SPEC_DIR / "0_统一标准化流水线.py"
 ANALYSIS_BATCH = ANALYSIS_CODE_DIR / "0_汇总分析批量运行.py"
 
-# ── 数据目录（9_采购台账📦 下，忽略 A_/B_/D_ 前缀）────────
+# ── 数据目录（9_采购台账📦 下，忽略 A_/B_/C_/D_ 前缀）────
 RAW_DIR = find_data_dir("采购部采购台账_raw")
 EXTRACT_DIR = find_data_dir("采购台账提取")
 STD_DIR = find_data_dir("采购部采购台账_std")
 SUM_DIR = find_data_dir("采购部采购台账_sum")
 STD_SPLIT_DIR = find_data_dir("采购部采购台账_std_split")
 SIMPLIFY_DIR = find_data_dir("采购部采购台账_simplify")
+
+
+def _resolve_or_create_data_dir(keyword: str, create_name: str) -> Path:
+    """优先匹配已有目录（含前缀），否则在 9_采购台账📦 下创建 create_name。"""
+    found = find_data_dir(keyword)
+    if found.is_dir():
+        return found
+    target = _DATA_BASE / create_name
+    target.mkdir(parents=True, exist_ok=True)
+    return target
+
+
+# 纯合并（未内容标准化）输出目录：C_采购部采购台账_raw_sum
+RAW_SUM_DIR = _resolve_or_create_data_dir(
+    "采购部采购台账_raw_sum", "C_采购部采购台账_raw_sum"
+)
 
 # ── 项目主数据 / 分析输出 ─────────────────────────────────
 PROJECT_INFO_FILE = data_path("0_项目基本信息情况") / "项目基本信息表.xlsx"
@@ -82,6 +98,7 @@ except Exception:
 MERGED_PLAIN_NAME = "采购部采购台账_merged.xlsx"
 MERGED_STD_NAME = "采购部采购台账_std_merged.xlsx"
 MERGED_COMPARE_NAME = "采购部采购台账_std_merged_对比.xlsx"
+CATEGORY_SUMMARY_NAME = "项目采购分类汇总.xlsx"
 
 
 def is_excel(path: Path) -> bool:

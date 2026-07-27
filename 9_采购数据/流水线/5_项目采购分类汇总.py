@@ -33,17 +33,21 @@ for _p in (str(_PKG_ROOT), str(_CODE_ROOT)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from _采购路径 import SUM_DIR, UNIT_PIPELINE
+from _采购路径 import (
+    CATEGORY_SUMMARY_NAME,
+    MERGED_STD_NAME,
+    SUM_DIR,
+    UNIT_PIPELINE,
+)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 UNIT_CONV_PIPELINE = UNIT_PIPELINE
 
 PREFERRED_INPUTS = [
     "采购部采购台账_std_merged_对比.xlsx",
-    "采购部采购台账_std_merged.xlsx",
-    "采购部采购台账_merged.xlsx",
+    MERGED_STD_NAME,
 ]
-DEFAULT_OUTPUT = "项目采购分类汇总.xlsx"
+DEFAULT_OUTPUT = CATEGORY_SUMMARY_NAME
 
 # 分类定义：(分类名, 数量列名, 金额列名, 数量单位说明)
 CLASS_SPECS = [
@@ -366,12 +370,24 @@ def _style_sheet(ws, *, qty_headers: set[str] | None = None, amount_headers: set
         ws.auto_filter.ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
 
 
+def _load_monthly_total_from_std(std_path: Path) -> pd.DataFrame | None:
+    """从 std_merged 读取「采购总金额」按月宽表。"""
+    try:
+        df = pd.read_excel(std_path, sheet_name="采购总金额")
+        return df if df is not None and not df.empty else None
+    except Exception as exc:
+        print(f"  ⚠️ 未读到源文件「采购总金额」: {exc}")
+        return None
+
+
 def write_output(
     out_path: Path,
     wide: pd.DataFrame,
     class_sum: pd.DataFrame,
     detail: pd.DataFrame,
     source: Path,
+    *,
+    monthly_total: pd.DataFrame | None = None,
 ) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     wb = Workbook()
@@ -448,6 +464,38 @@ def write_output(
         amount_headers={"含税金额"},
     )
 
+    # 采购总金额（来自 std_merged 按月宽表）
+    if monthly_total is not None and not monthly_total.empty:
+        ws4 = wb.create_sheet("采购总金额")
+        ws4.append([str(c) for c in monthly_total.columns.tolist()])
+        for row in monthly_total.itertuples(index=False, name=None):
+            cleaned = []
+            for v in row:
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    try:
+                        cleaned.append(None if pd.isna(v) else float(v))
+                    except Exception:
+                        cleaned.append(v)
+                else:
+                    cleaned.append("" if v is None or (isinstance(v, float) and pd.isna(v)) else v)
+            ws4.append(cleaned)
+        # 月份金额列
+        for r in range(2, (ws4.max_row or 1) + 1):
+            for c in range(3, (ws4.max_column or 2) + 1):
+                cell = ws4.cell(r, c)
+                if isinstance(cell.value, (int, float)):
+                    cell.number_format = "#,##0.00"
+        ws4.freeze_panes = "C2"
+        if ws4.max_row and ws4.max_column:
+            ws4.auto_filter.ref = (
+                f"A1:{get_column_letter(ws4.max_column)}{ws4.max_row}"
+            )
+        ws4.row_dimensions[1].height = 36
+        for cell in ws4[1]:
+            cell.alignment = Alignment(
+                wrap_text=True, horizontal="center", vertical="center"
+            )
+
     wb.save(out_path)
 
 
@@ -480,7 +528,17 @@ def main() -> None:
         print("无有效数据，结束")
         return
 
-    write_output(out, wide, class_sum, detail, src)
+    # 优先从同目录 std_merged 取「采购总金额」按月宽表
+    monthly = None
+    std_merged = sum_dir / MERGED_STD_NAME
+    if src.name == MERGED_STD_NAME or "std_merged" in src.name:
+        monthly = _load_monthly_total_from_std(src)
+    if monthly is None and std_merged.is_file():
+        monthly = _load_monthly_total_from_std(std_merged)
+    if monthly is not None:
+        print(f"已附带「采购总金额」按月宽表: {len(monthly)} 行")
+
+    write_output(out, wide, class_sum, detail, src, monthly_total=monthly)
 
     print("\n—— 分类金额概览 ——")
     if not class_sum.empty:
