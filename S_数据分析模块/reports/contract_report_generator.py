@@ -57,7 +57,7 @@ BASE_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
 
 INPUT_PATHS = {
     "合同管理": BASE_DIR / "5_合同管理📑",
-    "采购明细": BASE_DIR / "9_采购台账📦/B_采购部采购台账_sum/2026年03月_采购台账_std_merged.xlsx",
+    "采购明细": BASE_DIR / "9_采购台账📦/E_采购部采购台账_sum/2026年03月_采购台账_std_merged.xlsx",
     "材料欠款": BASE_DIR / "9.1_材料欠款/B_材料欠款_std/泰国子公司材料采购欠款汇总_标准化.xlsx",
     "商混混凝土": [BASE_DIR / "9.1_商混站🚛/B_商混站_std/搅拌站混凝土汇总报表_202604.xlsx"],
     "机具使用费": BASE_DIR / "10_机具费🚜/B_机具费_sum/2026年02月租赁机具台账_汇总.xlsx",
@@ -239,8 +239,8 @@ def resolve_input_paths() -> Dict:
 
     procurement_default = INPUT_PATHS.get("采购明细")
     proc_latest = pick_latest_existing([
-        (BASE_DIR / "9_采购台账📦/B_采购部采购台账_sum", "*_采购台账_std_merged.xlsx", False),
-        (BASE_DIR / "9_采购台账📦/B_采购部采购台账_sum", "*.xlsx", False),
+        (BASE_DIR / "9_采购台账📦/E_采购部采购台账_sum", "*_采购台账_std_merged.xlsx", False),
+        (BASE_DIR / "9_采购台账📦/E_采购部采购台账_sum", "*.xlsx", False),
         (BASE_DIR / "9_采购台账📦/C_数据分析", "*_merged_标准化汇总.xlsx", True),
         (BASE_DIR / "9_采购台账📦", "*_采购台账_std_merged.xlsx", True),
     ])

@@ -40,7 +40,7 @@ CONFIG = {
 "finance_payment_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰",
 "contract_management_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑",
 "contract_management_sheet": "1_总包分包汇总(全部)",
-"procurement_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/B_采购部采购台账_sum",
+"procurement_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/E_采购部采购台账_sum",
 "tool_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_sum",
 "labor_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std",
 "concrete_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_商混站🚛/B_商混站_std",

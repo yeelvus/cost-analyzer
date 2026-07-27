@@ -3,11 +3,11 @@
 """
 采购台账一键流水线（推荐入口）
 
-默认日常（依赖已有 B_std）：
+默认日常（依赖已有 C_std）：
   04a raw_sum 纯合并 → 04b std_sum 汇总 → 06 按项目拆分
 
 手动准备（不进默认）：
-  01 重命名、02 月度去重、03 excel 格式标准化 → B_std
+  01 重命名、02 月度去重、03 excel 格式标准化 → C_std
 
 用法：
   python3 0_run_采购全流程.py                 # 默认 04a→04b→06
@@ -56,11 +56,11 @@ from _采购路径 import (  # noqa: E402
 ALL_STEPS: list[tuple[str, str, Path, bool]] = [
     ("01", "重命名月度文件（手动）", PIPELINE_DIR / "01_重命名月度文件.py", False),
     ("02", "月度去重提取（手动）", PIPELINE_DIR / "02_月度去重提取.py", False),
-    ("03", "Excel格式标准化→B_std（手动）", PIPELINE_DIR / "03_excel格式标准化.py", False),
-    ("04a", "raw_sum 纯合并", PIPELINE_DIR / "04a_raw_sum纯合并.py", True),
-    ("04b", "std_sum 汇总", PIPELINE_DIR / "04b_std_sum汇总.py", True),
+    ("03", "Excel格式标准化→C_std（手动）", PIPELINE_DIR / "03_excel格式标准化.py", False),
+    ("04a", "raw_sum 纯合并→D_raw_sum", PIPELINE_DIR / "04a_raw_sum纯合并.py", True),
+    ("04b", "std_sum 汇总→E_sum", PIPELINE_DIR / "04b_std_sum汇总.py", True),
     ("05", "分类汇总刷新（可选）", PIPELINE_DIR / "05_分类汇总刷新.py", False),
-    ("06", "按项目拆分std_sum→E_std_split", PIPELINE_DIR / "06_按项目拆分.py", True),
+    ("06", "按项目拆分std_sum→F_split", PIPELINE_DIR / "06_按项目拆分.py", True),
 ]
 
 # 兼容旧步骤号：04 / 4 → 04b
@@ -119,12 +119,12 @@ def _print_tree() -> None:
                 print(f"  │     {d.name}/")
     print("\n数据目录")
     for name, path in [
-        ("RAW", RAW_DIR),
-        ("EXTRACT", EXTRACT_DIR),
-        ("STD(B)", STD_DIR),
-        ("RAW_SUM(C)", RAW_SUM_DIR),
-        ("SUM(D)", SUM_DIR),
-        ("SPLIT(E)", STD_SPLIT_DIR),
+        ("A_raw", RAW_DIR),
+        ("B_extract", EXTRACT_DIR),
+        ("C_std", STD_DIR),
+        ("D_raw_sum", RAW_SUM_DIR),
+        ("E_sum", SUM_DIR),
+        ("F_split", STD_SPLIT_DIR),
         ("ANALYSIS", ANALYSIS_DIR),
     ]:
         flag = "✓" if path.exists() else "·"
@@ -132,7 +132,8 @@ def _print_tree() -> None:
     print(f"\n  raw_sum  → {RAW_SUM_DIR / RAW_SUM_FILE_NAME}")
     print(f"  std_sum  → {SUM_DIR / STD_SUM_FILE_NAME}")
     print(f"  split    → {STD_SPLIT_DIR}/{{编码}}_{{名称}}_采购数据.xlsx")
-    print("\n默认日常: 04a → 04b → 06")
+    print("\n目录顺序: A_raw → B_extract → C_std → D_raw_sum → E_sum → F_split")
+    print("默认日常: 04a → 04b → 06")
     print("手动准备: 01 / 02 / 03")
 
 
@@ -177,11 +178,11 @@ def main(argv: list[str] | None = None) -> int:
 步骤编号：
   01  重命名月度文件          （手动）
   02  月度去重提取            （手动）
-  03  Excel 格式标准化→B_std （手动）
-  04a B_std→C_raw_sum 纯合并 （默认）
-  04b C_raw_sum→D_std_sum    （默认；旧号 04 仍可用）
+  03  Excel 格式标准化→C_std （手动）
+  04a C_std→D_raw_sum 纯合并 （默认）
+  04b D_raw_sum→E_sum        （默认；旧号 04 仍可用）
   05  刷新 std_sum 分类 sheet （可选）
-  06  按项目拆分→E_std_split （默认）
+  06  按项目拆分→F_std_split （默认）
 
 示例：
   %(prog)s                    # 04a → 04b → 06
@@ -211,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--no-raw-sum",
         action="store_true",
-        help="默认流程中不跑 04a（要求 C_raw_sum 已存在）",
+        help="默认流程中不跑 04a（要求 D_raw_sum 已存在）",
     )
     p.add_argument("--with-analysis", action="store_true", help="跑钢筋/桩分析看板")
     p.add_argument("--show-paths", action="store_true")
@@ -250,10 +251,10 @@ def main(argv: list[str] | None = None) -> int:
     print("=" * 60)
     print("采购台账流水线")
     print(f"  步骤: {' → '.join(s[0] + ' ' + s[1].split('（')[0] for s in order)}")
-    print(f"  B_std:  {STD_DIR}")
-    print(f"  C_raw:  {RAW_SUM_DIR}")
-    print(f"  D_sum:  {SUM_DIR}")
-    print(f"  E_split:{STD_SPLIT_DIR}")
+    print(f"  C_std:   {STD_DIR}")
+    print(f"  D_raw:   {RAW_SUM_DIR}")
+    print(f"  E_sum:   {SUM_DIR}")
+    print(f"  F_split: {STD_SPLIT_DIR}")
     print("=" * 60)
 
     t_all = time.time()

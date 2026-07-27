@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-B_采购部采购台账_std → C_采购部采购台账_raw_sum/采购部采购台账_raw_sum.xlsx
+C_采购部采购台账_std → D_采购部采购台账_raw_sum/采购部采购台账_raw_sum.xlsx
 
 纯合并：不改内容、不跑规格/单位标准化。
-与「04b_std_sum汇总」（C_raw_sum → D_sum/std_sum 对比结构）分离，需单独手动运行。
+与「04b_std_sum汇总」（D_raw_sum → E_sum/std_sum 对比结构）分离，需单独手动运行。
 
 用法：
   python3 流水线/04a_raw_sum纯合并.py
@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     mod = _load_step4()
 
     parser = argparse.ArgumentParser(
-        description="B_std 纯合并 → C_raw_sum/采购部采购台账_raw_sum.xlsx（无内容标准化）"
+        description="C_std 纯合并 → D_raw_sum/采购部采购台账_raw_sum.xlsx（无内容标准化）"
     )
     parser.add_argument("--input", default="", help=f"输入目录，默认 STD_DIR={STD_DIR}")
     parser.add_argument(
@@ -63,7 +63,7 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print("raw_sum 纯合并（无内容标准化）")
-    print(f"- 输入 B_std: {in_dir}")
+    print(f"- 输入 C_std: {in_dir}")
     print(f"- 输出:       {out_dir / args.output_name}")
 
     formal_wb, _ = mod.merge_standardized_excels(

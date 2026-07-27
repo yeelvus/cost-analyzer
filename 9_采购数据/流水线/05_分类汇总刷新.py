@@ -522,7 +522,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="将分类项目汇总写回 std_sum（不再生成独立 项目采购分类汇总.xlsx）"
     )
-    parser.add_argument("--input", default="", help="输入 std_sum Excel，默认 D_sum/std_sum")
+    parser.add_argument("--input", default="", help="输入 std_sum Excel，默认 E_sum/std_sum")
     parser.add_argument("--sum-dir", default="", help="汇总目录")
     args = parser.parse_args()
 

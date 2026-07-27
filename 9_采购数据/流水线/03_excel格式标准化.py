@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-步骤3：读取 EXTRACT_DIR 去重后的台账 → 列映射/项目匹配/日期
-→ 写出 STD_DIR/*_processed.xlsx。
+步骤3：读取 EXTRACT_DIR（B_采购部采购台账_extract）去重后的台账
+→ 列映射/项目匹配/日期 → 写出 STD_DIR（C_std）/*_processed.xlsx。
 
 不做：
 - 单位纠错/补全

@@ -11,7 +11,7 @@ import pandas as pd
 from flask import Flask, jsonify, request
 
 EXCEL_PATH = Path(
-    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/D_采购部采购台账_sum/采购台账_simplify_std_merged.xlsx"
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/E_采购部采购台账_sum/采购台账_simplify_std_merged.xlsx"
 )
 JSON_DB_PATH = Path(__file__).with_name("procurement_query_db.json")
 

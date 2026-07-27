@@ -16,7 +16,7 @@
 数据来源：
 - 主表：2_成本统计收集/B_成本统计_sum/项目统计数据汇总_全月份.xlsx
 - 具体人/机数据：11_人工费.../按项目拆分/*_人工费.xlsx + 10_机具费.../*_机具费_汇总.xlsx
-- 采购：D_采购部采购台账_sum
+- 采购：E_采购部采购台账_sum
 
 运行后输出：Z_report/成本控制看板_最新.html （可直接发给管理层）
 
@@ -60,7 +60,7 @@ Z_REPORT = DATA_ROOT / "Z_report"
 MASTER_SUMMARY = DATA_ROOT / "2_成本统计收集/B_成本统计_sum/项目统计数据汇总_全月份.xlsx"
 LABOR_SPLIT_DIR = DATA_ROOT / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std/按项目拆分"
 MACHINE_SUM_DIR = DATA_ROOT / "10_机具费🚜/B_机具费_sum"
-PROC_SUM_DIR = DATA_ROOT / "9_采购台账📦/D_采购部采购台账_sum"
+PROC_SUM_DIR = DATA_ROOT / "9_采购台账📦/E_采购部采购台账_sum"
 
 OUTPUT_HTML = Z_REPORT / "成本控制看板_最新.html"
 

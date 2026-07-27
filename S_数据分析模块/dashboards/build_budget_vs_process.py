@@ -85,7 +85,7 @@ except Exception:
 BUDGET_STD_DIR = DATA_ROOT / "3_预算部分" / "2_人材机_std"
 INDEX_XLSX = DATA_ROOT / "18_output" / "项目汇总索引.xlsx"
 LABOR_XLSX = REPORT_ROOT / "人工费汇总.xlsx"
-PROC_SUM = DATA_ROOT / "9_采购台账📦" / "D_采购部采购台账_sum" / "采购部采购台账_std_merged.xlsx"
+PROC_SUM = DATA_ROOT / "9_采购台账📦" / "E_采购部采购台账_sum" / "采购部采购台账_std_merged.xlsx"
 MACH_SUM = DATA_ROOT / "10_机具费🚜" / "B_机具费_sum" / "机具费汇总_全量标准化_汇总.xlsx"
 READY_MIX_DIR = REPORT_ROOT
 CONFIG_PATH = CODE_ROOT / "common" / "budget_vs_process_config.json"

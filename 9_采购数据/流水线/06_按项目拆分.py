@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-按项目拆分 D_sum/采购部采购台账_std_sum.xlsx（已含标准化、汇率换算等）
-→ E_采购部采购台账_std_split/{项目编码}_{项目名称}_采购数据.xlsx
+按项目拆分 E_sum/采购部采购台账_std_sum.xlsx（已含标准化、汇率换算等）
+→ F_采购部采购台账_std_split/{项目编码}_{项目名称}_采购数据.xlsx
 
 默认数据源为最新 std_sum「合并数据」sheet（含汇率填入、含税金额换算及绿色填充）。
 拆分时保留全部列与绿色高亮样式。
@@ -287,7 +287,7 @@ def main(argv: list[str] | None = None) -> int:
     default_std = _default_std_sum_path()
     parser = argparse.ArgumentParser(
         description=(
-            "按项目拆分 std_sum → E_std_split/{编码}_{名称}_采购数据.xlsx"
+            "按项目拆分 std_sum → F_std_split/{编码}_{名称}_采购数据.xlsx"
             "（保留汇率换算与绿色填充）"
         )
     )

@@ -32,7 +32,7 @@ try:
 except Exception:
     _PROJECT_ROOT = Path.home() / "Desktop" / "邯郸中材" / "01成本统计"
     _DATA_ROOT = _PROJECT_ROOT / "9_采购台账📦"
-    SUMMARY_INPUT_ROOT = _DATA_ROOT / "D_采购部采购台账_sum"
+    SUMMARY_INPUT_ROOT = _DATA_ROOT / "E_采购部采购台账_sum"
     ANALYSIS_OUTPUT_ROOT = _PROJECT_ROOT / "Z_report" / "C_采购数据分析"
 INPUT_GLOB = "*std_sum*.xlsx"
 DEFAULT_SHEET_NAME = "合并数据"

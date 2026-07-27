@@ -10,8 +10,8 @@
     规格标准化/ / 单位转换/ / 内容标准化/
     分析看板/ / 工具/
 
-数据目录（磁盘 9_采购台账📦）：
-  A_raw → A_提取 → B_std → C_raw_sum → D_std_sum → E_split
+数据目录（磁盘 9_采购台账📦，前缀按流水线顺序）：
+  A_raw → B_extract → C_std → D_raw_sum → E_sum → F_std_split
 """
 from __future__ import annotations
 
@@ -37,6 +37,14 @@ EXCEL_EXTS = {".xlsx", ".xls", ".xlsm"}
 MONTH_CN_RE = re.compile(r"((?:19|20)\d{2})年(0?[1-9]|1[0-2])月")
 MONTH_ISO_RE = re.compile(r"((?:19|20)\d{2})-(0[1-9]|1[0-2])")
 
+# 流水线目录正式名（前缀 A–F 与步骤顺序一致）
+DIR_RAW = "A_采购部采购台账_raw"
+DIR_EXTRACT = "B_采购部采购台账_extract"
+DIR_STD = "C_采购部采购台账_std"
+DIR_RAW_SUM = "D_采购部采购台账_raw_sum"
+DIR_SUM = "E_采购部采购台账_sum"
+DIR_STD_SPLIT = "F_采购部采购台账_std_split"
+
 
 def find_data_dir(keyword: str) -> Path:
     return find_child_dir(_DATA_BASE, keyword)
@@ -59,32 +67,97 @@ UNIT_PIPELINE = UNIT_DIR / "0_统一转换流水线.py"
 SPEC_PIPELINE = SPEC_DIR / "0_统一标准化流水线.py"
 ANALYSIS_BATCH = ANALYSIS_CODE_DIR / "0_汇总分析批量运行.py"
 
-# ── 数据目录（9_采购台账📦 下，忽略 A_/B_/C_/D_ 前缀）────
-RAW_DIR = find_data_dir("采购部采购台账_raw")
-EXTRACT_DIR = find_data_dir("采购台账提取")
-STD_DIR = find_data_dir("采购部采购台账_std")
-SUM_DIR = find_data_dir("采购部采购台账_sum")
-SIMPLIFY_DIR = find_data_dir("采购部采购台账_simplify")
 
-
-def _resolve_or_create_data_dir(keyword: str, create_name: str) -> Path:
-    """优先匹配已有目录（含前缀），否则在 9_采购台账📦 下创建 create_name。"""
+def _resolve_or_create_data_dir(
+    keyword: str,
+    create_name: str,
+    *,
+    legacy_names: tuple[str, ...] = (),
+) -> Path:
+    """
+    优先匹配 keyword 目录；若正式前缀目录存在但名不一致则尽量迁到 create_name；
+    再尝试 legacy 旧名迁移；否则创建 create_name。
+    """
+    # 1) 关键字命中且已是目标名 / 含关键字的现有目录
     found = find_data_dir(keyword)
-    if found.is_dir():
+    if found.is_dir() and keyword in found.name:
+        target = _DATA_BASE / create_name
+        # 旧前缀（如 D_…_sum）→ 新前缀（E_…_sum）
+        if found.name != create_name and not target.exists():
+            try:
+                found.rename(target)
+                print(f"已迁移目录: {found.name} → {create_name}")
+                return target
+            except OSError as exc:
+                print(f"⚠️ 无法重命名 {found.name} → {create_name}: {exc}")
+                return found
         return found
+
+    # 2) 精确旧全名迁移
+    for legacy in legacy_names:
+        legacy_path = _DATA_BASE / legacy
+        if not legacy_path.is_dir():
+            continue
+        target = _DATA_BASE / create_name
+        if legacy_path.resolve() == target.resolve():
+            return target
+        if not target.exists():
+            try:
+                legacy_path.rename(target)
+                print(f"已迁移目录: {legacy} → {create_name}")
+                return target
+            except OSError as exc:
+                print(f"⚠️ 无法重命名 {legacy} → {create_name}: {exc}")
+                return legacy_path
+        return legacy_path
+
+    # 3) 新建
     target = _DATA_BASE / create_name
     target.mkdir(parents=True, exist_ok=True)
     return target
 
 
-# 纯合并（未内容标准化）输出目录：C_采购部采购台账_raw_sum
+# ── 数据目录（按流水线 A→F）────────────────────────────────
+# A 原始 → B 去重提取 → C 格式标准 → D 纯合并 → E 标准汇总 → F 按项目拆分
+RAW_DIR = _resolve_or_create_data_dir(
+    "采购部采购台账_raw",
+    DIR_RAW,
+    legacy_names=("A_采购部采购台账_raw",),
+)
+EXTRACT_DIR = _resolve_or_create_data_dir(
+    "采购部采购台账_extract",
+    DIR_EXTRACT,
+    legacy_names=(
+        "A_采购部采购台账_extract",  # 旧：与 raw 同为 A_
+        "A_采购台账提取",
+        "B_采购台账提取",
+    ),
+)
+STD_DIR = _resolve_or_create_data_dir(
+    "采购部采购台账_std",
+    DIR_STD,
+    legacy_names=("B_采购部采购台账_std",),  # 旧 B_
+)
+# 注意：keyword 用 raw_sum / sum / std_split，避免「_std」误匹配 std_split
 RAW_SUM_DIR = _resolve_or_create_data_dir(
-    "采购部采购台账_raw_sum", "C_采购部采购台账_raw_sum"
+    "采购部采购台账_raw_sum",
+    DIR_RAW_SUM,
+    legacy_names=("C_采购部采购台账_raw_sum",),  # 旧 C_
 )
-# 按项目拆分输出：E_采购部采购台账_std_split
+SUM_DIR = _resolve_or_create_data_dir(
+    "采购部采购台账_sum",
+    DIR_SUM,
+    legacy_names=(
+        "D_采购部采购台账_sum",  # 旧 D_
+        "B_采购部采购台账_sum",  # 更早历史
+    ),
+)
 STD_SPLIT_DIR = _resolve_or_create_data_dir(
-    "采购部采购台账_std_split", "E_采购部采购台账_std_split"
+    "采购部采购台账_std_split",
+    DIR_STD_SPLIT,
+    legacy_names=("E_采购部采购台账_std_split",),  # 旧 E_
 )
+SIMPLIFY_DIR = find_data_dir("采购部采购台账_simplify")
 
 # ── 项目主数据 / 分析输出 ─────────────────────────────────
 PROJECT_INFO_FILE = data_path("0_项目基本信息情况") / "项目基本信息表.xlsx"
@@ -97,11 +170,11 @@ try:
 except Exception:
     ANALYSIS_DIR = data_path("Z_report") / "C_采购数据分析"
 
-# 纯合并（B_std 直接拼表，无内容标准化）→ C_raw_sum
+# 纯合并（C_std 直接拼表，无内容标准化）→ D_raw_sum
 RAW_SUM_FILE_NAME = "采购部采购台账_raw_sum.xlsx"
 # 兼容旧名引用
 MERGED_PLAIN_NAME = RAW_SUM_FILE_NAME
-# 标准化+对比（唯一 D_sum 主文件，数据源 C_raw_sum）
+# 标准化+对比（唯一 E_sum 主文件，数据源 D_raw_sum）
 STD_SUM_FILE_NAME = "采购部采购台账_std_sum.xlsx"
 MERGED_STD_NAME = STD_SUM_FILE_NAME
 MERGED_COMPARE_NAME = STD_SUM_FILE_NAME  # 已与主文件合一，不再单独出「对比」文件

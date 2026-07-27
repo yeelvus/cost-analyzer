@@ -26,7 +26,7 @@
 3. 人/材/机具体数据：
    - 「人」：11_人工费.../B_人工费台账_std/按项目拆分/*_人工费.xlsx （月度汇总 sheet 含 中方正式工铢、中方劳务工铢、
      子公司属地工铢、劳务公司铢、签证费、总人工费 等明细 + 原始数据）。
-   - 「材」：9_采购台账.../D_采购部采购台账_sum/采购部采购台账_std_merged.xlsx （项目汇总 总采购金额） + master 中的
+   - 「材」：9_采购台账.../E_采购部采购台账_sum/采购部采购台账_std_merged.xlsx （项目汇总 总采购金额） + master 中的
      材料采购实际已发生 / 采购部采购金额 / 项目部采购金额 + 模板里的 2材料汇总 行项目。
    - 「机」：10_机具费.../B_机具费_sum/*_机具费_汇总.xlsx（费用合计、使用次数、机具种类数、出租单位） + 模板 6机具费 sheet
      的类目/机具名称/型号/已发生/后续预估。
@@ -449,8 +449,8 @@ def normalize_project_code(value):
     return code
 
 def load_procurement_map() -> Dict[str, float]:
-    """加载最新采购项目汇总（材）。优先 D_采购部采购台账_sum 下的 merged/标准版。"""
-    base = DATA_ROOT / "9_采购台账📦" / "D_采购部采购台账_sum"
+    """加载最新采购项目汇总（材）。优先 E_采购部采购台账_sum 下的 merged/标准版。"""
+    base = DATA_ROOT / "9_采购台账📦" / "E_采购部采购台账_sum"
     candidates = [
         base / "采购部采购台账_std_merged.xlsx",
         base / "采购部采购台账_标准版.xlsx",

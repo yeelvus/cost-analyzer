@@ -2,16 +2,14 @@
 """
 步骤4（默认日常）：只输出「对比结构」标准化汇总。
 
-数据源：C_raw_sum/采购部采购台账_raw_sum.xlsx（需先跑 4a）
+数据源：D_raw_sum/采购部采购台账_raw_sum.xlsx（需先跑 4a）
 输出唯一主文件：
-  D_sum/采购部采购台账_std_sum.xlsx
+  E_sum/采购部采购台账_std_sum.xlsx
   （含：原始名称/规格/单位 + 标准化后列 + 转换单位/计算数量
    + 项目汇总 + 采购总金额）
 
-并同步「采购总金额」→ D_sum/项目采购分类汇总.xlsx
-
 纯合并请手动运行：
-  流水线/04a_raw_sum纯合并.py → C_raw_sum/*_raw_sum.xlsx
+  流水线/04a_raw_sum纯合并.py → D_raw_sum/*_raw_sum.xlsx
 """
 from __future__ import annotations
 
@@ -696,7 +694,7 @@ def merge_standardized_excels(
     从 folder（B_std）合并正式汇总工作簿。
 
     注意：对比版不再由此函数从 B_std 生成，请用
-    build_compare_workbook_from_raw_sum()（数据源 C_raw_sum）。
+    build_compare_workbook_from_raw_sum()（数据源 D_raw_sum）。
     include_compare 参数保留兼容，恒忽略。
     """
     del include_compare  # 对比版改由 raw_sum 生成
@@ -792,7 +790,7 @@ def build_compare_workbook_from_raw_sum(
     raw_sum_path: Path | None = None,
 ) -> openpyxl.Workbook | None:
     """
-    对比版数据源：C_采购部采购台账_raw_sum/采购部采购台账_raw_sum.xlsx
+    对比版数据源：D_采购部采购台账_raw_sum/采购部采购台账_raw_sum.xlsx
 
     流程：
       1) 读取 raw_sum「合并数据」→ 作为原始列
@@ -810,7 +808,7 @@ def build_compare_workbook_from_raw_sum(
         return None
 
     print("\n" + "=" * 72)
-    print(f"【对比版】数据源 C_raw_sum: {raw_sum_path}")
+    print(f"【对比版】数据源 D_raw_sum: {raw_sum_path}")
     print("=" * 72 + "\n")
 
     try:
@@ -1077,12 +1075,12 @@ def inject_category_summary_into_workbook(wb: openpyxl.Workbook) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="C_raw_sum → D_sum/采购部采购台账_std_sum.xlsx（含分类项目汇总，单文件）"
+        description="D_raw_sum → E_sum/采购部采购台账_std_sum.xlsx（含分类项目汇总，单文件）"
     )
     parser.add_argument(
         "--output-dir",
         default="",
-        help="覆盖输出目录，默认 SUM_DIR（D_sum）",
+        help="覆盖输出目录，默认 SUM_DIR（E_sum）",
     )
     parser.add_argument(
         "--raw-sum",
@@ -1105,8 +1103,8 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print("标准化汇总 std_sum（对比结构 + 分类项目汇总，单文件）")
-    print(f"- 数据源 C_raw_sum: {raw_sum_path}")
-    print(f"- 输出 D_sum:       {out_dir / args.output_name}")
+    print(f"- 数据源 D_raw_sum: {raw_sum_path}")
+    print(f"- 输出 E_sum:       {out_dir / args.output_name}")
     print(f"- 内容标准化:       {CONTENT_STD_UTILS}")
     print(f"- 汇率表:           {FX_RATE_FILE}")
     print("  （非泰铢 + 含税空 + 不含税有值 → 月度汇率换算，含税/汇率标绿）")

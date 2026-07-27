@@ -451,7 +451,7 @@ def main():
 
     default_merged = Path(
         "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/"
-        "D_采购部采购台账_sum/采购部采购台账_merged.xlsx"
+        "E_采购部采购台账_sum/采购部采购台账_merged.xlsx"
     )
     input_file = Path(args.input_file).expanduser() if args.input_file else default_merged
     if not input_file.exists():
