@@ -24,15 +24,46 @@ SKIP_NAME_KEYWORDS = (
 )
 
 PHI_PATTERN = re.compile(r"[φΦØø]\s*(\d+(?:\.\d+)?)")
-# D16 / d16 直径写法（避免把 SD40 里的 D 误吃掉，要求 D 前非字母数字或在边界）
+# D16 / d16 直径写法（避免把 SD40 / DB40 里的 D 误吃掉，要求 D 前非字母数字或在边界）
 D_DIA_PATTERN = re.compile(r"(?<![A-Za-z0-9])[Dd]\s*(\d{1,2}(?:\.\d+)?)(?!\d)")
 HRB_DIA_PATTERN = re.compile(
-    r"(hrb|hpb|rrb)\s*[- ]?\s*(\d{3,4})([a-zA-Z]*)\s*[- ]?\s*(\d{1,2}(?:\.\d+)?)",
+    r"(hrb|hpb|rrb)\s*[- ]?\s*(\d{3})([a-zA-Z]*)\s*[- ]?\s*(\d{1,2}(?:\.\d+)?)",
     re.IGNORECASE,
 )
-GRADE_PATTERN = re.compile(r"(hrb|hpb|rrb)\s*[- ]?\s*(\d{3,4})([a-zA-Z]*)", re.IGNORECASE)
-# 泰国螺纹钢牌号 SD40 / SD40T / SD50
-SD_GRADE_PATTERN = re.compile(r"(SD\s*\d{2,3}\s*T?)", re.IGNORECASE)
+GRADE_PATTERN = re.compile(r"(hrb|hpb|rrb)\s*[- ]?\s*(\d{3})([a-zA-Z]*)", re.IGNORECASE)
+# 泰国螺纹钢 / 圆钢牌号
+#   SD40 / SD40T / SD50
+#   DB40T / DB40 / DB50T  （Deformed Bar，台账常见 DB40T10*12M）
+#   SR24 / SR30           （Smooth Round，台账常见 SR24 6*10M）
+# 强度位固定两位（40/50/24…），避免 SR246x10m 把 SR246 整段当成牌号
+SD_GRADE_PATTERN = re.compile(r"(SD\s*\d{2}\s*T?)", re.IGNORECASE)
+DB_GRADE_PATTERN = re.compile(r"(DB\s*\d{2}\s*T?)", re.IGNORECASE)
+SR_GRADE_PATTERN = re.compile(r"(SR\s*\d{2})", re.IGNORECASE)
+# 紧凑写法（牌号+直径+定尺）优先整体解析，避免把牌号里的 40 当成直径
+#   DB40T10*12M → DB40T / 10 / 12
+#   SD40T16x12  → SD40T / 16 / 12
+#   SR24 6*10M → SR24 / 6 / 10  （去空格后 SR246x10m）
+COMPACT_DB_SD_PATTERN = re.compile(
+    r"(?P<grade>(?:DB|SD)\s*\d{2}\s*T?)"
+    r"(?P<dia>\d{1,2}(?:\.\d+)?)"
+    r"\s*[xX*×＊]\s*"
+    r"(?P<len>\d+(?:\.\d+)?)\s*m?",
+    re.IGNORECASE,
+)
+COMPACT_SR_PATTERN = re.compile(
+    r"(?P<grade>SR\s*\d{2})"
+    r"\s*"
+    r"(?P<dia>\d{1,2}(?:\.\d+)?)"
+    r"\s*[xX*×＊]\s*"
+    r"(?P<len>\d+(?:\.\d+)?)\s*m?",
+    re.IGNORECASE,
+)
+# 仅牌号+直径（无长度）：DB40T16、SR246（SR24+Φ6）
+GRADE_DIA_ONLY_PATTERN = re.compile(
+    r"(?P<grade>(?:DB|SD)\s*\d{2}\s*T?|SR\s*\d{2})"
+    r"(?P<dia>\d{1,2}(?:\.\d+)?)(?!\d)",
+    re.IGNORECASE,
+)
 MM_DIA_PATTERN = re.compile(r"(?<!\d)(\d{1,2}(?:\.\d+)?)\s*(?:mm|毫米)\b", re.IGNORECASE)
 RAW_DIA_PATTERN = re.compile(r"(?<!\d)(\d{1,2}(?:\.\d+)?)(?!\d)")
 # 显式带 m/米 的长度
@@ -51,6 +82,10 @@ SHEET_SIZE_PATTERN = re.compile(r"(?<!\d)(\d+(?:\.\d+)?)\s*[xX×*＊]\s*(\d+(?:\
 
 # 常见定尺（米）；也允许 6~18 的整数米
 COMMON_REBAR_LENGTHS_M = {6, 8, 9, 10, 11, 12, 15}
+# 常见棒材直径（mm），用于紧凑牌号解析校验
+COMMON_REBAR_DIA_MM = {
+    6, 8, 9, 10, 12, 13, 14, 16, 18, 20, 22, 25, 28, 32, 36, 40, 50,
+}
 
 def format_number(value: float) -> str:
     rounded = round(value)
@@ -73,6 +108,9 @@ def normalize_text(value: object) -> str:
     text = text.replace("Ｘ", "x").replace("×", "x").replace("＊", "x").replace("*", "x")
     text = text.replace("Ｍ", "m").replace("ｍ", "m")
     text = text.replace("毫米", "mm").replace("米", "m")
+    # 数字后的 M/m 视为米单位（DB40T10*12M、SR24 6*10M）
+    text = re.sub(r"(?<=\d)[Mm]\b", "m", text)
+    text = re.sub(r"(?<=\d)[Mm](?=[xX*×＊\d]|$)", "m", text)
     text = re.sub(r"\s+", "", text)
     return text
 
@@ -87,9 +125,69 @@ def _is_rebar_length_m(val: float) -> bool:
     return False
 
 
+def _norm_thai_grade(raw: str) -> str:
+    """统一泰国牌号空格与大小写：DB40T / SD40T / SR24。"""
+    g = re.sub(r"\s+", "", (raw or "").upper())
+    # DB40 / SD40 可选 T
+    m = re.fullmatch(r"(DB|SD)(\d{2})(T?)", g)
+    if m:
+        return f"{m.group(1)}{m.group(2)}{m.group(3)}"
+    m = re.fullmatch(r"(SR)(\d{2})", g)
+    if m:
+        return f"{m.group(1)}{m.group(2)}"
+    return g
+
+
+def parse_compact_thai_rebar(text: str) -> dict[str, float | str] | None:
+    """
+    解析泰国紧凑规格：
+      DB40T10*12M  → grade=DB40T, dia=10, len=12
+      DB40T16*12M  → grade=DB40T, dia=16, len=12
+      SR24 6*10M   → grade=SR24,  dia=6,  len=10
+      SD40T16x12   → grade=SD40T, dia=16, len=12
+    """
+    if not text:
+        return None
+
+    for pat in (COMPACT_DB_SD_PATTERN, COMPACT_SR_PATTERN):
+        m = pat.search(text)
+        if not m:
+            continue
+        grade = _norm_thai_grade(m.group("grade"))
+        dia = float(m.group("dia"))
+        length = float(m.group("len"))
+        # 直径合理且定尺像米
+        if not (4 <= dia <= 50):
+            continue
+        if dia not in COMMON_REBAR_DIA_MM and not (4 <= dia <= 50):
+            continue
+        if not _is_rebar_length_m(length) and not (1 <= length <= 18):
+            # 仍允许 1~18m 显式米
+            if not (1 <= length <= 18):
+                continue
+        return {"grade": grade, "diameter": dia, "length_m": length}
+
+    # 无长度：DB40T16 / SR246（SR24+Φ6）
+    m = GRADE_DIA_ONLY_PATTERN.search(text)
+    if m:
+        grade = _norm_thai_grade(m.group("grade"))
+        dia = float(m.group("dia"))
+        if 4 <= dia <= 50 and (dia in COMMON_REBAR_DIA_MM or 6 <= dia <= 40):
+            # 避免把 DB40 的 40 当成直径：牌号已含数字时 dia 不能等于牌号强度位
+            strength = re.search(r"(\d{2,3})", grade)
+            if strength and math.isclose(dia, float(strength.group(1)), abs_tol=1e-6):
+                return None
+            return {"grade": grade, "diameter": dia, "length_m": None}
+    return None
+
+
 def find_diameter(text: str, *, prefer_mesh: bool = False) -> float | None:
     if not text:
         return None
+
+    compact = parse_compact_thai_rebar(text)
+    if compact is not None:
+        return float(compact["diameter"])  # type: ignore[arg-type]
 
     match = PHI_PATTERN.search(text)
     if match:
@@ -110,8 +208,10 @@ def find_diameter(text: str, *, prefer_mesh: bool = False) -> float | None:
     if match:
         return float(match.group(1))
 
-    # 去掉牌号数字后再扫裸数字，避免 SD40T16x12 把 40 当成直径
+    # 去掉牌号数字后再扫裸数字，避免 SD40T16x12 / DB40T16x12 把 40 当成直径
     stripped = SD_GRADE_PATTERN.sub(" ", text)
+    stripped = DB_GRADE_PATTERN.sub(" ", stripped)
+    stripped = SR_GRADE_PATTERN.sub(" ", stripped)
     stripped = GRADE_PATTERN.sub(" ", stripped)
 
     # 钢筋直径通常在 4~50mm，网片钢丝常见 3~12mm
@@ -124,6 +224,10 @@ def find_diameter(text: str, *, prefer_mesh: bool = False) -> float | None:
 
 
 def find_grade(text: str) -> str | None:
+    compact = parse_compact_thai_rebar(text)
+    if compact is not None and compact.get("grade"):
+        return str(compact["grade"])
+
     match = GRADE_PATTERN.search(text)
     if match:
         prefix = match.group(1).upper()
@@ -131,13 +235,10 @@ def find_grade(text: str) -> str | None:
         suffix = match.group(3).upper() if match.group(3) else ""
         return f"{prefix}{level}{suffix}"
 
-    match = SD_GRADE_PATTERN.search(text)
-    if match:
-        # 统一 SD40T / SD40 t → SD40T
-        g = re.sub(r"\s+", "", match.group(1).upper())
-        if not g.endswith("T") and re.fullmatch(r"SD\d{2,3}", g):
-            return g
-        return g
+    for pat in (DB_GRADE_PATTERN, SD_GRADE_PATTERN, SR_GRADE_PATTERN):
+        match = pat.search(text)
+        if match:
+            return _norm_thai_grade(match.group(1))
     return None
 
 
@@ -146,11 +247,16 @@ def find_length_m(text: str, diameter: float | None = None) -> float | None:
     解析钢筋长度（米）。
 
     支持：
-      - 显式单位：φ12x12m、12米、12m
+      - 显式单位：φ12x12m、12米、12m、12M
       - 台账常见无单位写法：φ12*12、φ16x12、16*12（第二段为定尺米数）
+      - 泰国紧凑：DB40T10*12M、SR24 6*10M
     """
     if not text:
         return None
+
+    compact = parse_compact_thai_rebar(text)
+    if compact is not None and compact.get("length_m") is not None:
+        return float(compact["length_m"])  # type: ignore[arg-type]
 
     # 1) 显式 m（normalize 后 米→m）
     for m in LENGTH_M_PATTERN.finditer(text):
@@ -184,12 +290,22 @@ def standardize_rebar_or_steel(spec_value: object) -> str | None:
     if not text:
         return None
 
-    diameter = find_diameter(text, prefer_mesh=False)
-    if diameter is None:
-        return None
-
-    grade = find_grade(text)
-    length = find_length_m(text, diameter=diameter)
+    # 优先泰国紧凑牌号（DB40T10*12M / SR24 6*10M）
+    compact = parse_compact_thai_rebar(text)
+    if compact is not None:
+        diameter = float(compact["diameter"])  # type: ignore[arg-type]
+        grade = str(compact["grade"]) if compact.get("grade") else None
+        length = (
+            float(compact["length_m"])  # type: ignore[arg-type]
+            if compact.get("length_m") is not None
+            else None
+        )
+    else:
+        diameter = find_diameter(text, prefer_mesh=False)
+        if diameter is None:
+            return None
+        grade = find_grade(text)
+        length = find_length_m(text, diameter=diameter)
 
     base = f"Φ{format_number(diameter)}"
     if length is not None:
@@ -245,26 +361,39 @@ def standardize_mesh(spec_value: object) -> str | None:
     return f"Φ{format_number(diameter)}"
 
 
-def detect_category(item_name: object) -> str | None:
-    if item_name is None:
+def looks_like_thai_rebar_code(text: object) -> bool:
+    """规格/名称是否像泰国钢筋编码（DB40T… / SR24… / SD40T…）。"""
+    t = normalize_text(text)
+    if not t:
+        return False
+    if parse_compact_thai_rebar(t) is not None:
+        return True
+    if DB_GRADE_PATTERN.search(t) or SR_GRADE_PATTERN.search(t) or SD_GRADE_PATTERN.search(t):
+        return True
+    return False
+
+
+def detect_category(item_name: object, spec_value: object = None) -> str | None:
+    if item_name is None and spec_value is None:
         return None
 
-    item_text = str(item_name).strip()
-    if not item_text:
-        return None
+    item_text = str(item_name).strip() if item_name is not None else ""
 
     # 网片单独处理
-    if any(keyword in item_text for keyword in MESH_KEYWORDS):
+    if item_text and any(keyword in item_text for keyword in MESH_KEYWORDS):
         return "mesh"
 
     # 排除套筒/设备/桩等，避免误改规格
-    if any(k in item_text for k in SKIP_NAME_KEYWORDS):
+    if item_text and any(k in item_text for k in SKIP_NAME_KEYWORDS):
         return None
 
-    if any(keyword in item_text for keyword in REBAR_KEYWORDS):
+    if item_text and any(keyword in item_text for keyword in REBAR_KEYWORDS):
         return "rebar"
-    if "钢筋" in item_text:
+    if item_text and "钢筋" in item_text:
         return "steel"
+    # 物品名称仅为编码或规格列是 DB40T/SR24 等
+    if looks_like_thai_rebar_code(item_text) or looks_like_thai_rebar_code(spec_value):
+        return "rebar"
     return None
 
 
@@ -296,17 +425,21 @@ def process_worksheet(worksheet):
 
     for row_idx in range(2, worksheet.max_row + 1):
         item_name = worksheet.cell(row_idx, item_col).value
-        category = detect_category(item_name)
+        spec_cell = worksheet.cell(row_idx, spec_col)
+        category = detect_category(item_name, spec_cell.value)
         if category is None:
             continue
 
         matched_rows += 1
-        spec_cell = worksheet.cell(row_idx, spec_col)
 
         if category == "mesh":
             standardized = standardize_mesh(spec_cell.value)
         else:
-            standardized = standardize_rebar_or_steel(spec_cell.value)
+            # 规格为空时，尝试用物品名称里的泰国编码
+            raw_spec = spec_cell.value
+            standardized = standardize_rebar_or_steel(raw_spec)
+            if standardized is None and looks_like_thai_rebar_code(item_name):
+                standardized = standardize_rebar_or_steel(item_name)
 
         if standardized is None:
             unresolved_rows.append(
