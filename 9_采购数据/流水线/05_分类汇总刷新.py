@@ -4,8 +4,8 @@
 
 按项目汇总钢筋/砂浆水泥/砖/模板/碎石/其他 数量与金额。
 
-日常由「04_std_sum汇总」写入 std_sum 的 sheet：
-  项目汇总 / 分类合计 / 分类明细
+日常由「04b_std_sum汇总」写入 std_sum 的 sheet：
+  项目汇总（分类宽表）
 不再单独生成 项目采购分类汇总.xlsx。
 
 本脚本仍可单独运行：把分类 sheet 写回 std_sum.xlsx（覆盖同名 sheet）。
@@ -236,7 +236,7 @@ def find_input_file(sum_dir: Path, explicit: str = "") -> Path:
         if p.exists():
             return p
     raise FileNotFoundError(
-        f"在 {sum_dir} 未找到汇总源文件，请先运行 04_std_sum汇总.py\n"
+        f"在 {sum_dir} 未找到汇总源文件，请先运行 04b_std_sum汇总.py\n"
         f"期望之一: {PREFERRED_INPUTS}"
     )
 
@@ -533,14 +533,14 @@ def main() -> None:
         src = sum_dir / STD_SUM_FILE_NAME
     if not src.is_file():
         raise FileNotFoundError(
-            f"未找到 {src}，请先运行 04_std_sum汇总.py 生成 std_sum"
+            f"未找到 {src}，请先运行 04b_std_sum汇总.py 生成 std_sum"
         )
 
     print(f"刷新分类 sheet → {src}")
-    # 用合并数据重算并注入（与步骤4一致）
+    # 用合并数据重算并注入（与步骤4b一致）
     import importlib.util
 
-    step4 = Path(__file__).resolve().parent / "04_std_sum汇总.py"
+    step4 = Path(__file__).resolve().parent / "04b_std_sum汇总.py"
     spec = importlib.util.spec_from_file_location("proc_step4_inj", str(step4))
     mod = importlib.util.module_from_spec(spec)
     assert spec and spec.loader

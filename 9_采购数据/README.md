@@ -49,7 +49,7 @@ B_采购部采购台账_std          各项目标准明细
 │   ├── 02_月度去重提取.py
 │   ├── 03_excel格式标准化.py
 │   ├── 04a_raw_sum纯合并.py
-│   ├── 04_std_sum汇总.py
+│   ├── 04b_std_sum汇总.py
 │   ├── 05_分类汇总刷新.py
 │   └── 06_按项目拆分.py
 │
@@ -72,9 +72,9 @@ B_采购部采购台账_std          各项目标准明细
 | **02** | `02_月度去重提取.py` | 手动 | 对比上月，剔除未更新台账；每项目保留 1 份 → `A_采购台账提取` |
 | **03** | `03_excel格式标准化.py` | 手动 | 列映射、项目匹配、日期 → `B_std/*_processed.xlsx`；支持 `--no-prompt` 不弹窗 |
 | **04a** | `04a_raw_sum纯合并.py` | **默认** | B_std 直接拼表，不改内容 → `C_raw_sum/采购部采购台账_raw_sum.xlsx` |
-| **04** | `04_std_sum汇总.py` | **默认** | 以 **C_raw_sum** 为源：内容标准化 + 原始对照 + 单位转换 + 分类「项目汇总」→ `D_sum/采购部采购台账_std_sum.xlsx` |
+| **04b** | `04b_std_sum汇总.py` | **默认** | 以 **C_raw_sum** 为源：内容标准化 + 原始对照 + 单位转换 + 非泰铢汇率换算 + 分类「项目汇总」→ `D_sum/采购部采购台账_std_sum.xlsx` |
 | **05** | `05_分类汇总刷新.py` | 可选 | 仅刷新 std_sum 内「项目汇总」sheet（日常已由 04 写入） |
-| **06** | `06_按项目拆分.py` | **默认** | 按项目编码拆 raw_sum → `E_std_split/{编码}_{名称}_采购数据.xlsx` |
+| **06** | `06_按项目拆分.py` | **默认** | 按项目拆 **D_sum/std_sum**（含汇率换算与绿色填充）→ `E_std_split/{编码}_{名称}_采购数据.xlsx` |
 
 ### std_sum.xlsx 内 sheet
 
@@ -151,8 +151,9 @@ PYTHONPATH=.. python3 0_run_采购全流程.py --with-analysis
 
 ```bash
 PYTHONPATH=..:. python3 流水线/04a_raw_sum纯合并.py
-PYTHONPATH=..:. python3 流水线/04_std_sum汇总.py
+PYTHONPATH=..:. python3 流水线/04b_std_sum汇总.py
 PYTHONPATH=..:. python3 流水线/06_按项目拆分.py --clear
+# 默认读 D_sum/采购部采购台账_std_sum.xlsx；旧源可用 --from-raw-sum
 ```
 
 ---

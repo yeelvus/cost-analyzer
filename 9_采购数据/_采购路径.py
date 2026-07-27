@@ -88,6 +88,8 @@ STD_SPLIT_DIR = _resolve_or_create_data_dir(
 
 # ── 项目主数据 / 分析输出 ─────────────────────────────────
 PROJECT_INFO_FILE = data_path("0_项目基本信息情况") / "项目基本信息表.xlsx"
+# 月度汇率：年月 / 人民币对泰铢 / 美元对泰铢 / 人民币对美元
+FX_RATE_FILE = data_path("0_项目基本信息情况") / "汇率三表.xlsx"
 try:
     from common.paths import report_path as _report_path
 

@@ -4,16 +4,16 @@
 采购台账一键流水线（推荐入口）
 
 默认日常（依赖已有 B_std）：
-  04a raw_sum 纯合并 → 04 std_sum 汇总 → 06 按项目拆分
+  04a raw_sum 纯合并 → 04b std_sum 汇总 → 06 按项目拆分
 
 手动准备（不进默认）：
   01 重命名、02 月度去重、03 excel 格式标准化 → B_std
 
 用法：
-  python3 0_run_采购全流程.py                 # 默认 04a→04→06
-  python3 0_run_采购全流程.py --no-split      # 只要 04a→04
+  python3 0_run_采购全流程.py                 # 默认 04a→04b→06
+  python3 0_run_采购全流程.py --no-split      # 只要 04a→04b
   python3 0_run_采购全流程.py --only 06       # 只拆分
-  python3 0_run_采购全流程.py --with-prep     # 01→02→03→04a→04→06
+  python3 0_run_采购全流程.py --with-prep     # 01→02→03→04a→04b→06
   python3 0_run_采购全流程.py --tree
 """
 from __future__ import annotations
@@ -58,20 +58,17 @@ ALL_STEPS: list[tuple[str, str, Path, bool]] = [
     ("02", "月度去重提取（手动）", PIPELINE_DIR / "02_月度去重提取.py", False),
     ("03", "Excel格式标准化→B_std（手动）", PIPELINE_DIR / "03_excel格式标准化.py", False),
     ("04a", "raw_sum 纯合并", PIPELINE_DIR / "04a_raw_sum纯合并.py", True),
-    ("04", "std_sum 汇总", PIPELINE_DIR / "04_std_sum汇总.py", True),
+    ("04b", "std_sum 汇总", PIPELINE_DIR / "04b_std_sum汇总.py", True),
     ("05", "分类汇总刷新（可选）", PIPELINE_DIR / "05_分类汇总刷新.py", False),
-    ("06", "按项目拆分→E_std_split", PIPELINE_DIR / "06_按项目拆分.py", True),
+    ("06", "按项目拆分std_sum→E_std_split", PIPELINE_DIR / "06_按项目拆分.py", True),
 ]
 
-# 兼容旧步骤号
+# 兼容旧步骤号：04 / 4 → 04b
 _LEGACY_ID = {
-    "1": "01",
-    "2": "02",
-    "3": "03",
-    "4": "04",
+    "4": "04b",
+    "04": "04b",
     "4a": "04a",
-    "5": "05",
-    "6": "06",
+    "4b": "04b",
 }
 
 
@@ -135,7 +132,7 @@ def _print_tree() -> None:
     print(f"\n  raw_sum  → {RAW_SUM_DIR / RAW_SUM_FILE_NAME}")
     print(f"  std_sum  → {SUM_DIR / STD_SUM_FILE_NAME}")
     print(f"  split    → {STD_SPLIT_DIR}/{{编码}}_{{名称}}_采购数据.xlsx")
-    print("\n默认日常: 04a → 04 → 06")
+    print("\n默认日常: 04a → 04b → 06")
     print("手动准备: 01 / 02 / 03")
 
 
@@ -145,11 +142,11 @@ def _resolve_order(args) -> list[tuple[str, str, Path]]:
     if args.only:
         sid = _norm_id(args.only)
         if sid not in by_id:
-            raise SystemExit(f"未知步骤: {args.only}（可选 01/02/03/04a/04/05/06）")
+            raise SystemExit(f"未知步骤: {args.only}（可选 01/02/03/04a/04b/04/05/06）")
         return [by_id[sid]]
 
     if args.with_prep:
-        ids = ["01", "02", "03", "04a", "04", "06"]
+        ids = ["01", "02", "03", "04a", "04b", "06"]
     else:
         # 默认日常
         ids = [s[0] for s in ALL_STEPS if s[3]]
@@ -159,9 +156,12 @@ def _resolve_order(args) -> list[tuple[str, str, Path]]:
             ids = [i for i in ids if i != "04a"]
 
     if args.with_5 and "05" not in ids:
-        # 插在 04 之后、06 之前
-        if "04" in ids:
-            i = ids.index("04") + 1
+        # 插在 04b 之后、06 之前
+        if "04b" in ids:
+            i = ids.index("04b") + 1
+            ids.insert(i, "05")
+        elif "04a" in ids:
+            i = ids.index("04a") + 1
             ids.insert(i, "05")
         else:
             ids.append("05")
@@ -171,7 +171,7 @@ def _resolve_order(args) -> list[tuple[str, str, Path]]:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
-        description="采购台账流水线（默认 04a→04→06；01/02/03 手动）",
+        description="采购台账流水线（默认 04a→04b→06；01/02/03 手动）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 步骤编号：
@@ -179,30 +179,30 @@ def main(argv: list[str] | None = None) -> int:
   02  月度去重提取            （手动）
   03  Excel 格式标准化→B_std （手动）
   04a B_std→C_raw_sum 纯合并 （默认）
-  04  C_raw_sum→D_std_sum    （默认）
+  04b C_raw_sum→D_std_sum    （默认；旧号 04 仍可用）
   05  刷新 std_sum 分类 sheet （可选）
   06  按项目拆分→E_std_split （默认）
 
 示例：
-  %(prog)s                    # 04a → 04 → 06
-  %(prog)s --no-split         # 04a → 04
+  %(prog)s                    # 04a → 04b → 06
+  %(prog)s --no-split         # 04a → 04b
   %(prog)s --only 06          # 只拆分
-  %(prog)s --with-prep        # 01→02→03→04a→04→06
+  %(prog)s --with-prep        # 01→02→03→04a→04b→06
   %(prog)s --no-prompt        # 若跑到 03：不弹项目匹配窗
         """,
     )
-    p.add_argument("--only", default=None, help="只跑某一步：01/02/03/04a/04/05/06")
+    p.add_argument("--only", default=None, help="只跑某一步：01/02/03/04a/04b/04/05/06")
     p.add_argument(
         "--with-prep",
         action="store_true",
-        help="含手动准备 01+02+03，再跑 04a→04→06",
+        help="含手动准备 01+02+03，再跑 04a→04b→06",
     )
     p.add_argument(
         "--with-1-2",
         action="store_true",
         help="同 --with-prep（兼容旧参数）",
     )
-    p.add_argument("--with-5", action="store_true", help="在 04 后额外刷新分类 sheet")
+    p.add_argument("--with-5", action="store_true", help="在 04b 后额外刷新分类 sheet")
     p.add_argument(
         "--no-split",
         action="store_true",

@@ -4,7 +4,7 @@
 B_采购部采购台账_std → C_采购部采购台账_raw_sum/采购部采购台账_raw_sum.xlsx
 
 纯合并：不改内容、不跑规格/单位标准化。
-与「04_std_sum汇总」（C_raw_sum → D_sum/std_sum 对比结构）分离，需单独手动运行。
+与「04b_std_sum汇总」（C_raw_sum → D_sum/std_sum 对比结构）分离，需单独手动运行。
 
 用法：
   python3 流水线/04a_raw_sum纯合并.py
@@ -27,7 +27,8 @@ from _采购路径 import RAW_SUM_DIR, RAW_SUM_FILE_NAME, STD_DIR
 
 
 def _load_step4():
-    step4 = Path(__file__).resolve().parent / "04_std_sum汇总.py"
+    """复用 04b 中的 merge / 格式化工具。"""
+    step4 = Path(__file__).resolve().parent / "04b_std_sum汇总.py"
     spec = importlib.util.spec_from_file_location("proc_step4_merge", str(step4))
     if spec is None or spec.loader is None:
         raise ImportError(f"无法加载: {step4}")
