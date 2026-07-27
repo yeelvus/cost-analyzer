@@ -17,11 +17,24 @@ import plotly.graph_objects as go
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计')
-_DATA_ROOT = _PROJECT_ROOT / "9_采购台账📦"
-SUMMARY_INPUT_ROOT = _DATA_ROOT / "B_采购部采购台账_sum"
-ANALYSIS_OUTPUT_ROOT = _PROJECT_ROOT / "Z_report" / "C_采购数据分析"
-INPUT_GLOB = "*_采购台账_std_merged.xlsx"
+import sys
+
+_PKG = SCRIPT_DIR.parent
+_CODE = _PKG.parent
+for _p in (str(_PKG), str(_CODE)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+try:
+    from _采购路径 import ANALYSIS_DIR, SUM_DIR
+
+    SUMMARY_INPUT_ROOT = SUM_DIR
+    ANALYSIS_OUTPUT_ROOT = ANALYSIS_DIR
+except Exception:
+    _PROJECT_ROOT = Path.home() / "Desktop" / "邯郸中材" / "01成本统计"
+    _DATA_ROOT = _PROJECT_ROOT / "9_采购台账📦"
+    SUMMARY_INPUT_ROOT = _DATA_ROOT / "D_采购部采购台账_sum"
+    ANALYSIS_OUTPUT_ROOT = _PROJECT_ROOT / "Z_report" / "C_采购数据分析"
+INPUT_GLOB = "*std_merged*.xlsx"
 DEFAULT_SHEET_NAME = "合并数据"
 OUTPUT_EXCEL_SUFFIX = "_钢筋价格趋势分析"
 OUTPUT_HTML_SUFFIX = "_钢筋价格趋势分析"

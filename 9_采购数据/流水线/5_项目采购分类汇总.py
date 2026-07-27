@@ -27,14 +27,16 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 
-_CODE_ROOT = Path(__file__).resolve().parents[1]
-if str(_CODE_ROOT) not in sys.path:
-    sys.path.insert(0, str(_CODE_ROOT))
+_PKG_ROOT = Path(__file__).resolve().parents[1]
+_CODE_ROOT = Path(__file__).resolve().parents[2]
+for _p in (str(_PKG_ROOT), str(_CODE_ROOT)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
-from _采购路径 import SUM_DIR
+from _采购路径 import SUM_DIR, UNIT_PIPELINE
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-UNIT_CONV_PIPELINE = SCRIPT_DIR / "单位数量转换" / "0_统一转换流水线.py"
+UNIT_CONV_PIPELINE = UNIT_PIPELINE
 
 PREFERRED_INPUTS = [
     "采购部采购台账_std_merged_对比.xlsx",

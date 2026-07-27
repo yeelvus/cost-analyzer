@@ -7,6 +7,13 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
+
+_PKG_ROOT = Path(__file__).resolve().parents[1]
+_CODE_ROOT = Path(__file__).resolve().parents[2]
+for _p in (str(_PKG_ROOT), str(_CODE_ROOT)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from _采购路径 import RAW_DIR, extract_month_cn, extract_project_name, is_excel
 

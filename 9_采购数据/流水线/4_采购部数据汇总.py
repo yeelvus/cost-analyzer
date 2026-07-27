@@ -7,7 +7,7 @@
   2) 采购部采购台账_std_merged.xlsx          — 内容标准化后合并
   3) 采购部采购台账_std_merged_对比.xlsx    — 标准化对比版
      原始物品名称/规格/单位 | 转换单位/计算数量 | 标准化后列
-     转换规则见 单位数量转换/（网片 m2→kg、砖块→m3）
+     转换规则见 单位转换/（网片 m2→kg、砖块→m3）
 
 不改动 STD 目录下的单项目 *_processed.xlsx。
 可用 --plain-only / --std-only / --no-compare 控制输出。
@@ -27,13 +27,21 @@ import pandas as pd
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 
-_CODE_ROOT = Path(__file__).resolve().parents[1]
-if str(_CODE_ROOT) not in sys.path:
-    sys.path.insert(0, str(_CODE_ROOT))
+_PKG_ROOT = Path(__file__).resolve().parents[1]
+_CODE_ROOT = Path(__file__).resolve().parents[2]
+for _p in (str(_PKG_ROOT), str(_CODE_ROOT)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from common.excel import apply_common_excel_layout
 
-from _采购路径 import STD_DIR, SUM_DIR, is_excel
+from _采购路径 import (
+    CONTENT_STD_UTILS,
+    STD_DIR,
+    SUM_DIR,
+    UNIT_PIPELINE,
+    is_excel,
+)
 
 # 正式输出列（merged / std_merged 不变）
 FINAL_OUTPUT_COLUMNS = [
@@ -55,8 +63,7 @@ COMPARE_OUTPUT_COLUMNS = [
 OUTPUT_PLAIN = "采购部采购台账_merged.xlsx"
 OUTPUT_WITH_STD = "采购部采购台账_std_merged.xlsx"
 OUTPUT_COMPARE = "采购部采购台账_std_merged_对比.xlsx"
-CONTENT_STD_UTILS = Path(__file__).resolve().parent / "采购内容标准化_utils.py"
-UNIT_CONV_PIPELINE = Path(__file__).resolve().parent / "单位数量转换" / "0_统一转换流水线.py"
+UNIT_CONV_PIPELINE = UNIT_PIPELINE
 
 AMOUNT_FIELD_NAMES = {"单价", "不含税金额", "7%增值税", "含税金额", "数量", "计算数量", "汇率"}
 # Excel 错误字面量 / 非数值，写入或汇总时当作空

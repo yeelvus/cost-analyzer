@@ -9,9 +9,22 @@ from openpyxl import load_workbook
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-SUMMARY_INPUT_ROOT = SCRIPT_DIR / "B_汇总数据"
-ANALYSIS_OUTPUT_ROOT = SCRIPT_DIR / "C_数据分析"
-INPUT_GLOB = "*_材料采购_merged.xlsx"
+import sys
+
+_PKG = SCRIPT_DIR.parent
+_CODE = _PKG.parent
+for _p in (str(_PKG), str(_CODE)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+try:
+    from _采购路径 import ANALYSIS_DIR, SUM_DIR
+
+    SUMMARY_INPUT_ROOT = SUM_DIR
+    ANALYSIS_OUTPUT_ROOT = ANALYSIS_DIR
+except Exception:
+    SUMMARY_INPUT_ROOT = SCRIPT_DIR / "B_汇总数据"
+    ANALYSIS_OUTPUT_ROOT = SCRIPT_DIR / "C_数据分析"
+INPUT_GLOB = "*_std_merged.xlsx"
 OUTPUT_SUFFIX = "_钢筋规格标准化"
 
 TARGET_KEYWORDS = ("钢筋网片", "螺纹钢", "钢筋")

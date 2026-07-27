@@ -7,7 +7,7 @@
    - fill_missing_units：空单位按同物品+单价相似行补全
    - build_global_unit_ref：跨文件单位参考库
    - standardize_unit：调用 unit_map_utils，别名 → 标准单位
-2. 物品名称/规格规则流水线（物品名称规格标准化/*）
+2. 物品名称/规格规则流水线（规格标准化/*）
 """
 from __future__ import annotations
 
@@ -20,9 +20,10 @@ import openpyxl
 import pandas as pd
 
 CURRENT_DIR = Path(__file__).resolve().parent
-CODE_ROOT = CURRENT_DIR.parent
+PACKAGE_ROOT = CURRENT_DIR.parent  # 9_采购数据
+CODE_ROOT = PACKAGE_ROOT.parent  # Desktop/code
 UNIT_MAP_UTILS_PATH = CODE_ROOT / "0_项目基本信息" / "unit_map_utils.py"
-STANDARDIZATION_PIPELINE_DIR = CURRENT_DIR / "物品名称规格标准化"
+STANDARDIZATION_PIPELINE_DIR = PACKAGE_ROOT / "规格标准化"
 
 _PIPELINE_CONTEXT = None
 # 跨文件单位兜底：{物品名称: 最常见单位}
@@ -359,7 +360,7 @@ def apply_standardization_pipeline(
     """
     对单个 Excel：
       1) 单位错位纠错 / 空单位补全 / unit_map 标准化
-      2) 物品名称规格规则（桩/钢筋/网片/砂浆…）
+      2) 规格标准化规则（桩/钢筋/网片/砂浆…）
     """
     workbook = openpyxl.load_workbook(excel_path)
 

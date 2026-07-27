@@ -19,6 +19,13 @@ from pathlib import Path
 import openpyxl
 import pandas as pd
 from openpyxl.utils import get_column_letter
+import sys
+
+_PKG_ROOT = Path(__file__).resolve().parents[1]
+_CODE_ROOT = Path(__file__).resolve().parents[2]
+for _p in (str(_PKG_ROOT), str(_CODE_ROOT)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from _采购路径 import (
     EXTRACT_DIR,

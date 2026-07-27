@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_INFO_UTIL = SCRIPT_DIR.parents[1] / "0_项目基本信息" / "excel_formatting_utils.py"
+_PROJECT_INFO_UTIL = SCRIPT_DIR.parents[2] / "0_项目基本信息" / "excel_formatting_utils.py"
 
 
 def _load_module_from_path(module_name: str, module_path: Path):
@@ -27,15 +27,29 @@ _excel_formatting_utils = _load_module_from_path("excel_formatting_utils", _PROJ
 apply_common_excel_layout = _excel_formatting_utils.apply_common_excel_layout
 
 
-_PROJECT_ROOT = Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计')
-_DATA_ROOT = _PROJECT_ROOT / "9_采购台账📦"
-DEFAULT_SUMMARY_FILE = _DATA_ROOT / "D_采购部采购台账_sum" / "采购部采购台账_std_merged.xlsx"
-SUMMARY_INPUT_ROOTS = [
-    _DATA_ROOT / "D_采购部采购台账_sum",
-    _DATA_ROOT / "B_采购部采购台账_sum",
-]
-ANALYSIS_OUTPUT_ROOT = _PROJECT_ROOT / "Z_report" / "C_采购数据分析"
-INPUT_GLOB = "*_采购台账_std_merged.xlsx"
+import sys as _sys
+
+_PKG = Path(__file__).resolve().parent.parent
+_CODE = _PKG.parent
+for _p in (str(_PKG), str(_CODE)):
+    if _p not in _sys.path:
+        _sys.path.insert(0, _p)
+try:
+    from _采购路径 import ANALYSIS_DIR, MERGED_STD_NAME, SUM_DIR
+
+    DEFAULT_SUMMARY_FILE = SUM_DIR / MERGED_STD_NAME
+    SUMMARY_INPUT_ROOTS = [SUM_DIR]
+    ANALYSIS_OUTPUT_ROOT = ANALYSIS_DIR
+except Exception:
+    _PROJECT_ROOT = Path.home() / "Desktop" / "邯郸中材" / "01成本统计"
+    _DATA_ROOT = _PROJECT_ROOT / "9_采购台账📦"
+    DEFAULT_SUMMARY_FILE = _DATA_ROOT / "D_采购部采购台账_sum" / "采购部采购台账_std_merged.xlsx"
+    SUMMARY_INPUT_ROOTS = [
+        _DATA_ROOT / "D_采购部采购台账_sum",
+        _DATA_ROOT / "B_采购部采购台账_sum",
+    ]
+    ANALYSIS_OUTPUT_ROOT = _PROJECT_ROOT / "Z_report" / "C_采购数据分析"
+INPUT_GLOB = "*std_merged*.xlsx"
 DEFAULT_SHEET_NAME = "合并数据"
 OUTPUT_SUFFIX = "_桩成本分析看板"
 
