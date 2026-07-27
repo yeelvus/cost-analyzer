@@ -34,7 +34,7 @@ except Exception:
     _DATA_ROOT = _PROJECT_ROOT / "9_采购台账📦"
     SUMMARY_INPUT_ROOT = _DATA_ROOT / "D_采购部采购台账_sum"
     ANALYSIS_OUTPUT_ROOT = _PROJECT_ROOT / "Z_report" / "C_采购数据分析"
-INPUT_GLOB = "*std_merged*.xlsx"
+INPUT_GLOB = "*std_sum*.xlsx"
 DEFAULT_SHEET_NAME = "合并数据"
 OUTPUT_EXCEL_SUFFIX = "_钢筋价格趋势分析"
 OUTPUT_HTML_SUFFIX = "_钢筋价格趋势分析"

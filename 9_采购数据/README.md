@@ -11,7 +11,8 @@
 │   ├── 1_rename_…py        ★ 手动
 │   ├── 2_采购台账月度去重.py ★ 手动
 │   ├── 3_采购部excel格式标准化.py ★ 手动
-│   ├── 4_采购部数据汇总.py        ← 默认只跑这一步
+│   ├── 4_采购部数据汇总.py        ← 默认：std 标准化汇总 → D_sum
+│   ├── 4a_采购台账_raw_sum合并.py ★ 手动：B_std 纯合并 → C_raw_sum/*_raw_sum.xlsx
 │   └── 5_项目采购分类汇总.py
 │
 ├── 规格标准化/             物品名称/规格规则（桩、钢筋、网片、砖…）
@@ -29,8 +30,8 @@
 | A_…_raw | 月度原始台账 |
 | A_采购台账提取 | 去重后每项目 1 文件 |
 | B_…_std | 标准化明细 `*_processed.xlsx` |
-| C_…_raw_sum | 纯合并 `采购部采购台账_merged.xlsx` |
-| D_…_sum | 标准化汇总 `*_std_merged.xlsx`、`项目采购分类汇总.xlsx`（含按月「采购总金额」） |
+| C_…_raw_sum | 纯合并 `采购部采购台账_raw_sum.xlsx`（4a 手动）→ **std_sum 数据源** |
+| D_…_sum | 仅 `采购部采购台账_std_sum.xlsx`（对比结构一份）+ `项目采购分类汇总.xlsx` |
 | Z_report/C_采购数据分析 | 分析输出 |
 
 ## 用法
@@ -52,7 +53,7 @@ PYTHONPATH=.. python3 0_run_采购全流程.py --only 4
 PYTHONPATH=.. python3 0_run_采购全流程.py --only 1   # 重命名
 PYTHONPATH=.. python3 0_run_采购全流程.py --only 2   # 月度去重
 PYTHONPATH=.. python3 0_run_采购全流程.py --only 3   # 格式标准化→std
-# 或: python3 流水线/1_….py / 2_….py / 3_….py
+PYTHONPATH=..:. python3 流水线/4a_采购台账_raw_sum合并.py  # B_std 纯合并 → *_raw_sum.xlsx
 
 # 一次跑完准备+汇总：1→2→3→4
 PYTHONPATH=.. python3 0_run_采购全流程.py --with-prep

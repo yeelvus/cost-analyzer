@@ -49,12 +49,12 @@ from _采购路径 import (  # noqa: E402
     CATEGORY_SUMMARY_NAME,
     CONTENT_DIR,
     EXTRACT_DIR,
-    MERGED_PLAIN_NAME,
-    MERGED_STD_NAME,
     PACKAGE_ROOT,
     PIPELINE_DIR,
     RAW_DIR,
     RAW_SUM_DIR,
+    RAW_SUM_FILE_NAME,
+    STD_SUM_FILE_NAME,
     SPEC_DIR,
     STD_DIR,
     SUM_DIR,
@@ -125,13 +125,13 @@ def _print_tree() -> None:
     ]:
         flag = "✓" if path.exists() else "·"
         print(f"  {flag} {name:12} {path}")
-    print(f"\n  plain_merged → {RAW_SUM_DIR / MERGED_PLAIN_NAME}")
-    print(f"  std_merged   → {SUM_DIR / MERGED_STD_NAME}")
-    print(f"  分类汇总     → {SUM_DIR / CATEGORY_SUMMARY_NAME}")
+    print(f"\n  raw_sum（手动 4a）→ {RAW_SUM_DIR / RAW_SUM_FILE_NAME}")
+    print(f"  std_sum（步骤4）  → {SUM_DIR / STD_SUM_FILE_NAME}")
+    print(f"  分类汇总           → {SUM_DIR / CATEGORY_SUMMARY_NAME}")
     print("\n运行约定")
-    print("  默认全流程: 仅 4 汇总（不跑 1 重命名、2 去重、3 格式标准化）")
-    print("  手动步骤:   1 / 2 / 3 → python3 0_run_采购全流程.py --only 1|2|3")
-    print("              或: python3 流水线/1_….py / 2_….py / 3_….py")
+    print("  默认全流程: 仅 4 标准化汇总（不跑 1/2/3/4a）")
+    print("  手动步骤:   1 重命名 / 2 去重 / 3 格式std / 4a raw_sum 纯合并")
+    print("              python3 流水线/4a_采购台账_raw_sum合并.py")
     print("  一次准备全跑: --with-prep  → 1→2→3→4")
 
 
@@ -221,7 +221,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.tree or args.show_paths:
         _print_tree()
         if args.show_paths:
-            print(f"\n  std_merged → {SUM_DIR / MERGED_STD_NAME}")
+            print(f"\n  std_sum → {SUM_DIR / STD_SUM_FILE_NAME}")
         return 0
 
     os.environ["PYTHONPATH"] = os.pathsep.join(

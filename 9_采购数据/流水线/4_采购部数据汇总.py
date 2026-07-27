@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
-步骤4：汇总 STD → 纯合并到 C_raw_sum，标准化到 D_sum。
+步骤4（默认日常）：只输出「对比结构」标准化汇总。
 
-默认输出：
-  1) C_采购部采购台账_raw_sum/采购部采购台账_merged.xlsx — 纯合并
-  2) D_采购部采购台账_sum/采购部采购台账_std_merged.xlsx — 标准化
-  3) D_…/对比版（可选）
-  4) 将 std「采购总金额」同步到 D_…/项目采购分类汇总.xlsx
+数据源：C_raw_sum/采购部采购台账_raw_sum.xlsx（需先跑 4a）
+输出唯一主文件：
+  D_sum/采购部采购台账_std_sum.xlsx
+  （含：原始名称/规格/单位 + 标准化后列 + 转换单位/计算数量
+   + 项目汇总 + 采购总金额）
 
-不改动 STD 目录下的单项目 *_processed.xlsx。
-可用 --plain-only / --std-only / --no-compare 控制输出。
+并同步「采购总金额」→ D_sum/项目采购分类汇总.xlsx
+
+纯合并请手动运行：
+  流水线/4a_采购台账_raw_sum合并.py → C_raw_sum/*_raw_sum.xlsx
 """
 from __future__ import annotations
 
@@ -37,10 +39,10 @@ from common.excel import apply_common_excel_layout
 from _采购路径 import (
     CATEGORY_SUMMARY_NAME,
     CONTENT_STD_UTILS,
-    MERGED_PLAIN_NAME,
-    MERGED_STD_NAME,
     RAW_SUM_DIR,
+    RAW_SUM_FILE_NAME,
     STD_DIR,
+    STD_SUM_FILE_NAME,
     SUM_DIR,
     UNIT_PIPELINE,
     is_excel,
@@ -63,9 +65,7 @@ COMPARE_OUTPUT_COLUMNS = [
     "标准日期", "供货商名称", "备注", "年月", "签订日期",
 ]
 
-OUTPUT_PLAIN = MERGED_PLAIN_NAME
-OUTPUT_WITH_STD = MERGED_STD_NAME
-OUTPUT_COMPARE = "采购部采购台账_std_merged_对比.xlsx"
+OUTPUT_STD_SUM = STD_SUM_FILE_NAME
 UNIT_CONV_PIPELINE = UNIT_PIPELINE
 
 AMOUNT_FIELD_NAMES = {"单价", "不含税金额", "7%增值税", "含税金额", "数量", "计算数量", "汇率"}
@@ -368,19 +368,21 @@ def merge_standardized_excels(
     include_compare: bool = False,
 ) -> tuple[openpyxl.Workbook | None, openpyxl.Workbook | None]:
     """
-    返回 (正式汇总工作簿, 对比版工作簿)。
-    对比版仅在 use_content_standardization 且 include_compare 时生成。
+    从 folder（B_std）合并正式汇总工作簿。
+
+    注意：对比版不再由此函数从 B_std 生成，请用
+    build_compare_workbook_from_raw_sum()（数据源 C_raw_sum）。
+    include_compare 参数保留兼容，恒忽略。
     """
+    del include_compare  # 对比版改由 raw_sum 生成
     excel_paths = list_std_excels(folder)
     std_utils = None
-    build_compare = bool(use_content_standardization and include_compare)
 
     if use_content_standardization:
         std_utils = _load_procurement_standardization_utils()
         if std_utils is None:
             print("⚠️ 内容标准化不可用，本轮回退为纯汇总")
             use_content_standardization = False
-            build_compare = False
         else:
             try:
                 unit_ref = std_utils.build_global_unit_ref(folder)
@@ -390,8 +392,6 @@ def merge_standardized_excels(
                 print(f"⚠️ 全局单位库构建失败（将仅用文件内补全）: {exc}")
 
     mode = "启用采购内容标准化" if use_content_standardization else "纯汇总"
-    if build_compare:
-        mode += " + 对比版"
     print("\n" + "=" * 72)
     print(f"【{mode}】目录: {folder}")
     print(f"【{mode}】文件数: {len(excel_paths)}")
@@ -402,40 +402,16 @@ def merge_standardized_excels(
         return None, None
 
     formal_wb, formal_ws = _new_merge_workbook(FINAL_OUTPUT_COLUMNS)
-    compare_wb = compare_ws = None
-    unit_conv = None
-    if build_compare:
-        compare_wb, compare_ws = _new_merge_workbook(COMPARE_OUTPUT_COLUMNS)
-        unit_conv = _load_unit_conversion_pipeline()
-        if unit_conv is None:
-            print("⚠️ 单位转换不可用：对比版「转换单位/计算数量」将为空")
-
     formal_row = 2
-    compare_row = 2
     project_totals: dict[tuple[str, str], float] = defaultdict(float)
-    compare_totals: dict[tuple[str, str], float] = defaultdict(float)
 
     for idx, file_path in enumerate(excel_paths, start=1):
         print(f"[{idx}/{len(excel_paths)}] {file_path.name}")
         read_path = file_path
         temp_dir = None
-        orig_snapshot = None
 
         if use_content_standardization and std_utils is not None:
             try:
-                # 标准化前快照原始 物品名称/规格/单位（按行序，供对比版）
-                if build_compare:
-                    try:
-                        orig_df = pd.read_excel(file_path)
-                        for c in ("物品名称", "规格", "单位"):
-                            if c not in orig_df.columns:
-                                orig_df[c] = ""
-                        orig_snapshot = orig_df[["物品名称", "规格", "单位"]].copy()
-                        orig_snapshot.columns = ["原始物品名称", "原始规格", "原始单位"]
-                    except Exception as exc:
-                        print(f"  ⚠️ 读取原始列失败，对比版该文件将无原始值: {exc}")
-                        orig_snapshot = None
-
                 temp_dir = tempfile.mkdtemp(prefix="procurement_std_")
                 temp_file = Path(temp_dir) / file_path.name
                 shutil.copy2(file_path, temp_file)
@@ -465,46 +441,11 @@ def merge_standardized_excels(
             if col not in df.columns:
                 df[col] = ""
 
-        # 清洗源文件里残留的 #VALUE! 等错误字面量
         for col in list(df.columns):
             if col in AMOUNT_FIELD_NAMES or str(col).endswith("金额"):
                 df[col] = df[col].map(coerce_amount)
 
-        # 对齐原始快照行数
-        if build_compare:
-            if orig_snapshot is None or len(orig_snapshot) != len(df):
-                orig_snapshot = pd.DataFrame(
-                    {
-                        "原始物品名称": df["物品名称"].values,
-                        "原始规格": df["规格"].values,
-                        "原始单位": df["单位"].values,
-                    }
-                )
-            else:
-                orig_snapshot = orig_snapshot.reset_index(drop=True)
-            df = df.reset_index(drop=True)
-            df = pd.concat([orig_snapshot, df], axis=1)
-
-            # 单位数量转换：用标准化后的 名称/规格/单位/数量 计算
-            conv_units: list = []
-            conv_qtys: list = []
-            for _, r in df.iterrows():
-                if unit_conv is not None and hasattr(unit_conv, "convert_row"):
-                    cr = unit_conv.convert_row(
-                        item_name=r.get("物品名称", ""),
-                        spec=r.get("规格", ""),
-                        unit=r.get("单位", ""),
-                        qty=r.get("数量", ""),
-                    )
-                    conv_units.append(cr.get("转换单位", ""))
-                    conv_qtys.append(cr.get("计算数量", ""))
-                else:
-                    conv_units.append("")
-                    conv_qtys.append("")
-            df["转换单位"] = conv_units
-            df["计算数量"] = conv_qtys
-
-        for i, row in df.iterrows():
+        for _, row in df.iterrows():
             formal_data = {c: row[c] for c in FINAL_OUTPUT_COLUMNS}
             _append_data_row(formal_ws, formal_row, FINAL_OUTPUT_COLUMNS, formal_data)
 
@@ -515,23 +456,154 @@ def merge_standardized_excels(
                 project_totals[(code, name)] += float(amt)
             formal_row += 1
 
-            if build_compare and compare_ws is not None:
-                compare_data = {c: row[c] if c in row.index else "" for c in COMPARE_OUTPUT_COLUMNS}
-                _append_data_row(compare_ws, compare_row, COMPARE_OUTPUT_COLUMNS, compare_data)
-                if amt is not None:
-                    compare_totals[(code, name)] += float(amt)
-                compare_row += 1
-
     formal_out = _finalize_workbook(formal_wb, FINAL_OUTPUT_COLUMNS, project_totals, formal_row - 1)
-    compare_out = None
-    if build_compare and compare_wb is not None:
-        compare_out = _finalize_workbook(
-            compare_wb, COMPARE_OUTPUT_COLUMNS, compare_totals, compare_row - 1
-        )
-
     if formal_out is None:
         print("⚠️ 没有有效数据")
-    return formal_out, compare_out
+    return formal_out, None
+
+
+def build_compare_workbook_from_raw_sum(
+    raw_sum_path: Path | None = None,
+) -> openpyxl.Workbook | None:
+    """
+    对比版数据源：C_采购部采购台账_raw_sum/采购部采购台账_raw_sum.xlsx
+
+    流程：
+      1) 读取 raw_sum「合并数据」→ 作为原始列
+      2) 对副本做内容标准化 → 标准化后列
+      3) 单位转换 → 转换单位/计算数量
+      4) 写出对比版结构
+    """
+    raw_sum_path = Path(raw_sum_path) if raw_sum_path else (RAW_SUM_DIR / RAW_SUM_FILE_NAME)
+    if not raw_sum_path.is_file():
+        print(
+            f"⚠️ 对比版跳过：未找到 raw_sum 源文件\n"
+            f"   期望: {raw_sum_path}\n"
+            f"   请先运行: 流水线/4a_采购台账_raw_sum合并.py"
+        )
+        return None
+
+    print("\n" + "=" * 72)
+    print(f"【对比版】数据源 C_raw_sum: {raw_sum_path}")
+    print("=" * 72 + "\n")
+
+    try:
+        try:
+            orig_df = pd.read_excel(raw_sum_path, sheet_name="合并数据")
+        except Exception:
+            orig_df = pd.read_excel(raw_sum_path, sheet_name=0)
+    except Exception as exc:
+        print(f"⚠️ 读取 raw_sum 失败: {exc}")
+        return None
+
+    if orig_df.empty:
+        print("⚠️ raw_sum 无数据，跳过对比版")
+        return None
+
+    for col in FINAL_OUTPUT_COLUMNS:
+        if col not in orig_df.columns:
+            orig_df[col] = ""
+
+    # 原始三列（标准化前）
+    for c in ("物品名称", "规格", "单位"):
+        if c not in orig_df.columns:
+            orig_df[c] = ""
+    orig_snapshot = orig_df[["物品名称", "规格", "单位"]].copy()
+    orig_snapshot.columns = ["原始物品名称", "原始规格", "原始单位"]
+    orig_snapshot = orig_snapshot.reset_index(drop=True)
+
+    std_utils = _load_procurement_standardization_utils()
+    unit_conv = _load_unit_conversion_pipeline()
+    if unit_conv is None:
+        print("⚠️ 单位转换不可用：对比版「转换单位/计算数量」将为空")
+
+    temp_dir = tempfile.mkdtemp(prefix="procurement_compare_rawsum_")
+    try:
+        temp_file = Path(temp_dir) / "from_raw_sum.xlsx"
+        # 写一张可被规格流水线处理的表
+        with pd.ExcelWriter(temp_file, engine="openpyxl") as writer:
+            orig_df.to_excel(writer, sheet_name="合并数据", index=False)
+
+        if std_utils is not None:
+            try:
+                # 单位参考：用 raw_sum 所在目录扫不到多文件时，用文件内逻辑
+                try:
+                    unit_ref = std_utils.build_global_unit_ref(raw_sum_path.parent)
+                    std_utils.set_global_unit_ref(unit_ref)
+                except Exception:
+                    pass
+                std_utils.apply_standardization_pipeline(
+                    str(temp_file),
+                    auto_prompt_units=False,
+                    resolve_pending=False,
+                )
+            except Exception as exc:
+                print(f"⚠️ 对 raw_sum 做内容标准化失败，对比版标准化列将接近原始: {exc}")
+
+        try:
+            std_df = pd.read_excel(temp_file, sheet_name="合并数据")
+        except Exception:
+            std_df = pd.read_excel(temp_file, sheet_name=0)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+    for col in FINAL_OUTPUT_COLUMNS:
+        if col not in std_df.columns:
+            std_df[col] = ""
+
+    for col in list(std_df.columns):
+        if col in AMOUNT_FIELD_NAMES or str(col).endswith("金额"):
+            std_df[col] = std_df[col].map(coerce_amount)
+
+    std_df = std_df.reset_index(drop=True)
+    # 行数对齐
+    n = min(len(orig_snapshot), len(std_df))
+    if len(orig_snapshot) != len(std_df):
+        print(
+            f"  ⚠️ raw 与标准化后行数不一致: raw={len(orig_snapshot)} std={len(std_df)}，按 {n} 行对齐"
+        )
+    orig_snapshot = orig_snapshot.iloc[:n].reset_index(drop=True)
+    std_df = std_df.iloc[:n].reset_index(drop=True)
+
+    conv_units: list = []
+    conv_qtys: list = []
+    for _, r in std_df.iterrows():
+        if unit_conv is not None and hasattr(unit_conv, "convert_row"):
+            cr = unit_conv.convert_row(
+                item_name=r.get("物品名称", ""),
+                spec=r.get("规格", ""),
+                unit=r.get("单位", ""),
+                qty=r.get("数量", ""),
+            )
+            conv_units.append(cr.get("转换单位", ""))
+            conv_qtys.append(cr.get("计算数量", ""))
+        else:
+            conv_units.append("")
+            conv_qtys.append("")
+    std_df["转换单位"] = conv_units
+    std_df["计算数量"] = conv_qtys
+
+    compare_df = pd.concat([orig_snapshot, std_df], axis=1)
+
+    compare_wb, compare_ws = _new_merge_workbook(COMPARE_OUTPUT_COLUMNS)
+    compare_row = 2
+    compare_totals: dict[tuple[str, str], float] = defaultdict(float)
+
+    for _, row in compare_df.iterrows():
+        compare_data = {
+            c: row[c] if c in row.index else "" for c in COMPARE_OUTPUT_COLUMNS
+        }
+        _append_data_row(compare_ws, compare_row, COMPARE_OUTPUT_COLUMNS, compare_data)
+        code = "" if pd.isna(row.get("项目编码", "")) else str(row.get("项目编码", "")).strip()
+        name = "" if pd.isna(row.get("项目名称", "")) else str(row.get("项目名称", "")).strip()
+        amt = coerce_amount(row.get("含税金额"))
+        if amt is not None:
+            compare_totals[(code, name)] += float(amt)
+        compare_row += 1
+
+    return _finalize_workbook(
+        compare_wb, COMPARE_OUTPUT_COLUMNS, compare_totals, compare_row - 1
+    )
 
 
 def sync_monthly_total_to_category_summary(
@@ -625,95 +697,54 @@ def sync_monthly_total_to_category_summary(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="汇总采购部 std 台账（融入内容标准化）")
-    parser.add_argument(
-        "--plain-only",
-        action="store_true",
-        help="只输出纯合并文件到 C_raw_sum（不跑内容标准化）",
+    parser = argparse.ArgumentParser(
+        description="C_raw_sum → D_sum/采购部采购台账_std_sum.xlsx（仅保留对比结构一份）"
     )
-    parser.add_argument(
-        "--std-only",
-        action="store_true",
-        help="只输出内容标准化后的汇总到 D_sum（含对比版，除非 --no-compare）",
-    )
-    parser.add_argument(
-        "--no-compare",
-        action="store_true",
-        help="不生成对比版 Excel",
-    )
-    parser.add_argument("--input", default="", help="覆盖输入目录，默认 STD_DIR")
     parser.add_argument(
         "--output-dir",
         default="",
-        help="覆盖 std 输出目录，默认 SUM_DIR（D_sum）；纯合并仍写 RAW_SUM_DIR",
+        help="覆盖输出目录，默认 SUM_DIR（D_sum）",
     )
     parser.add_argument(
-        "--raw-sum-dir",
+        "--raw-sum",
         default="",
-        help="纯合并输出目录，默认 C_采购部采购台账_raw_sum",
+        help=f"数据源 raw_sum 文件，默认 {RAW_SUM_DIR / RAW_SUM_FILE_NAME}",
+    )
+    parser.add_argument(
+        "--output-name",
+        default=OUTPUT_STD_SUM,
+        help=f"输出文件名，默认 {OUTPUT_STD_SUM}",
     )
     args = parser.parse_args()
 
-    in_dir = Path(args.input).expanduser() if args.input else STD_DIR
     out_dir = Path(args.output_dir).expanduser() if args.output_dir else SUM_DIR
-    raw_sum_dir = (
-        Path(args.raw_sum_dir).expanduser() if args.raw_sum_dir else RAW_SUM_DIR
+    raw_sum_path = (
+        Path(args.raw_sum).expanduser()
+        if args.raw_sum
+        else (RAW_SUM_DIR / RAW_SUM_FILE_NAME)
     )
-    if not in_dir.is_dir():
-        raise FileNotFoundError(f"输入目录不存在: {in_dir}")
     out_dir.mkdir(parents=True, exist_ok=True)
-    raw_sum_dir.mkdir(parents=True, exist_ok=True)
 
-    print("汇总模式")
-    print(f"- 输入 STD:     {in_dir}")
-    print(f"- 纯合并输出:   {raw_sum_dir / OUTPUT_PLAIN}")
-    print(f"- 标准化输出:   {out_dir / OUTPUT_WITH_STD}")
-    print(f"- 内容标准化工具: {CONTENT_STD_UTILS}")
+    print("标准化汇总 std_sum（仅对比结构，一份文件）")
+    print(f"- 数据源 C_raw_sum: {raw_sum_path}")
+    print(f"- 输出 D_sum:       {out_dir / args.output_name}")
+    print(f"- 内容标准化:       {CONTENT_STD_UTILS}")
+    print("- 若无 raw_sum，请先: 流水线/4a_采购台账_raw_sum合并.py")
 
-    if args.plain_only and args.std_only:
-        raise SystemExit("不能同时指定 --plain-only 与 --std-only")
+    # 唯一输出：对比结构 → std_sum.xlsx
+    wb = build_compare_workbook_from_raw_sum(raw_sum_path)
+    if wb is None:
+        print(f"未产生有效数据: {args.output_name}")
+        return
 
-    # jobs: (use_std, formal_filename, include_compare, dest_dir)
-    if args.plain_only:
-        jobs = [(False, OUTPUT_PLAIN, False, raw_sum_dir)]
-    elif args.std_only:
-        jobs = [(True, OUTPUT_WITH_STD, not args.no_compare, out_dir)]
-    else:
-        jobs = [
-            (False, OUTPUT_PLAIN, False, raw_sum_dir),
-            (True, OUTPUT_WITH_STD, not args.no_compare, out_dir),
-        ]
+    out_path = out_dir / args.output_name
+    apply_unified_workbook_format(wb)
+    wb.save(out_path)
+    print(f"已输出: {out_path}")
 
-    std_merged_path: Path | None = None
-    for use_std, filename, include_compare, dest in jobs:
-        formal_wb, compare_wb = merge_standardized_excels(
-            in_dir,
-            use_content_standardization=use_std,
-            include_compare=include_compare,
-        )
-        if formal_wb is None:
-            print(f"未产生有效数据: {filename}")
-            continue
-
-        dest.mkdir(parents=True, exist_ok=True)
-        out_path = dest / filename
-        apply_unified_workbook_format(formal_wb)
-        formal_wb.save(out_path)
-        print(f"已输出: {out_path}")
-
-        if use_std and filename == OUTPUT_WITH_STD:
-            std_merged_path = out_path
-
-        if compare_wb is not None:
-            compare_path = out_dir / OUTPUT_COMPARE
-            apply_unified_workbook_format(compare_wb)
-            compare_wb.save(compare_path)
-            print(f"已输出对比版: {compare_path}")
-
-    # std 汇总的「采购总金额」→ 项目采购分类汇总.xlsx
-    if std_merged_path and std_merged_path.is_file():
-        cat_path = out_dir / CATEGORY_SUMMARY_NAME
-        sync_monthly_total_to_category_summary(std_merged_path, cat_path)
+    # 「采购总金额」→ 项目采购分类汇总.xlsx
+    cat_path = out_dir / CATEGORY_SUMMARY_NAME
+    sync_monthly_total_to_category_summary(out_path, cat_path)
 
 
 if __name__ == "__main__":

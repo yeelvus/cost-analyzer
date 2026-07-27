@@ -12,7 +12,7 @@
 
 数量列使用整数数字格式（无小数位）；金额保留两位小数。
 
-数据源优先：对比版 → std_merged → merged
+数据源优先：std_sum（含原始+标准化对比列）
 输出：SUM/项目采购分类汇总.xlsx
 """
 from __future__ import annotations
@@ -35,7 +35,7 @@ for _p in (str(_PKG_ROOT), str(_CODE_ROOT)):
 
 from _采购路径 import (
     CATEGORY_SUMMARY_NAME,
-    MERGED_STD_NAME,
+    STD_SUM_FILE_NAME,
     SUM_DIR,
     UNIT_PIPELINE,
 )
@@ -44,8 +44,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 UNIT_CONV_PIPELINE = UNIT_PIPELINE
 
 PREFERRED_INPUTS = [
+    STD_SUM_FILE_NAME,
+    "采购部采购台账_std_sum.xlsx",
+    # 兼容旧文件名
     "采购部采购台账_std_merged_对比.xlsx",
-    MERGED_STD_NAME,
+    "采购部采购台账_std_merged.xlsx",
 ]
 DEFAULT_OUTPUT = CATEGORY_SUMMARY_NAME
 
@@ -528,13 +531,13 @@ def main() -> None:
         print("无有效数据，结束")
         return
 
-    # 优先从同目录 std_merged 取「采购总金额」按月宽表
+    # 优先从同目录 std_sum 取「采购总金额」按月宽表
     monthly = None
-    std_merged = sum_dir / MERGED_STD_NAME
-    if src.name == MERGED_STD_NAME or "std_merged" in src.name:
+    std_sum = sum_dir / STD_SUM_FILE_NAME
+    if src.name == STD_SUM_FILE_NAME or "std_sum" in src.name or "std_merged" in src.name:
         monthly = _load_monthly_total_from_std(src)
-    if monthly is None and std_merged.is_file():
-        monthly = _load_monthly_total_from_std(std_merged)
+    if monthly is None and std_sum.is_file():
+        monthly = _load_monthly_total_from_std(std_sum)
     if monthly is not None:
         print(f"已附带「采购总金额」按月宽表: {len(monthly)} 行")
 

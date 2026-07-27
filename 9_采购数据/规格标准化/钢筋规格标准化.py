@@ -24,7 +24,7 @@ try:
 except Exception:
     SUMMARY_INPUT_ROOT = SCRIPT_DIR / "B_汇总数据"
     ANALYSIS_OUTPUT_ROOT = SCRIPT_DIR / "C_数据分析"
-INPUT_GLOB = "*_std_merged.xlsx"
+INPUT_GLOB = "*std_sum*.xlsx"
 OUTPUT_SUFFIX = "_钢筋规格标准化"
 
 TARGET_KEYWORDS = ("钢筋网片", "螺纹钢", "钢筋")

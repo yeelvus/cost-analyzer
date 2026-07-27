@@ -95,9 +95,14 @@ try:
 except Exception:
     ANALYSIS_DIR = data_path("Z_report") / "C_采购数据分析"
 
-MERGED_PLAIN_NAME = "采购部采购台账_merged.xlsx"
-MERGED_STD_NAME = "采购部采购台账_std_merged.xlsx"
-MERGED_COMPARE_NAME = "采购部采购台账_std_merged_对比.xlsx"
+# 纯合并（B_std 直接拼表，无内容标准化）→ C_raw_sum
+RAW_SUM_FILE_NAME = "采购部采购台账_raw_sum.xlsx"
+# 兼容旧名引用
+MERGED_PLAIN_NAME = RAW_SUM_FILE_NAME
+# 标准化+对比（唯一 D_sum 主文件，数据源 C_raw_sum）
+STD_SUM_FILE_NAME = "采购部采购台账_std_sum.xlsx"
+MERGED_STD_NAME = STD_SUM_FILE_NAME
+MERGED_COMPARE_NAME = STD_SUM_FILE_NAME  # 已与主文件合一，不再单独出「对比」文件
 CATEGORY_SUMMARY_NAME = "项目采购分类汇总.xlsx"
 
 
@@ -117,11 +122,14 @@ def list_excels(folder: Path, *, recursive: bool = False) -> list[Path]:
     return sorted(p for p in it if is_excel(p))
 
 
-def latest_sum_file(pattern: str = "*std_merged*.xlsx") -> Path | None:
+def latest_sum_file(pattern: str = "*std_sum*.xlsx") -> Path | None:
     """SUM_DIR 下按修改时间取最新匹配文件。"""
     if not SUM_DIR.is_dir():
         return None
     cands = [p for p in SUM_DIR.glob(pattern) if is_excel(p)]
+    if not cands:
+        # 兼容旧名
+        cands = [p for p in SUM_DIR.glob("*std_merged*.xlsx") if is_excel(p)]
     if not cands:
         cands = [p for p in SUM_DIR.glob("*.xlsx") if is_excel(p)]
     return max(cands, key=lambda p: p.stat().st_mtime) if cands else None

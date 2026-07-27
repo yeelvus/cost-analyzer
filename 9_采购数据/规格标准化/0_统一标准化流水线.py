@@ -26,7 +26,7 @@ try:
 except Exception:
     SUMMARY_INPUT_ROOT = SCRIPT_DIR.parent.parent / "9_采购台账📦" / "D_采购部采购台账_sum"
     ANALYSIS_OUTPUT_ROOT = Path.home() / "Desktop" / "邯郸中材" / "01成本统计" / "Z_report" / "C_采购数据分析"
-INPUT_GLOB = "*_std_merged.xlsx"
+INPUT_GLOB = "*std_sum*.xlsx"
 DEFAULT_OUTPUT_SUFFIX = "_标准化汇总"
 DEFAULT_RULES = [
     "桩规格标准化.py",
