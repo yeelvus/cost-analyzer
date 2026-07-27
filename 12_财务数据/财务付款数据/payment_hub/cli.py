@@ -237,6 +237,45 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     c = sub.add_parser(
+        "pending-dropdowns",
+        help="给「分类修正记录.xlsx / 仍待人工_高频」加一/二/三级联动下拉",
+    )
+    _add_path_args(c)
+    c.add_argument(
+        "-i",
+        "--input",
+        default=None,
+        help="分类修正记录路径（默认 C_sum 或 data 下 分类修正记录.xlsx）",
+    )
+
+    c = sub.add_parser(
+        "apply-pending-fixes",
+        help="把「仍待人工_高频」中确认行写回总表并学习叶子变更",
+    )
+    _add_path_args(c)
+    c.add_argument(
+        "-i",
+        "--input",
+        default=None,
+        help="分类修正记录路径",
+    )
+    c.add_argument(
+        "--master",
+        default=None,
+        help="付款分类总表路径",
+    )
+    c.add_argument(
+        "--all-rows",
+        action="store_true",
+        help="不要求确认状态，凡有效二级都合并（默认仅确认）",
+    )
+    c.add_argument(
+        "--no-reclassify",
+        action="store_true",
+        help="合并学习后不重刷 B_std",
+    )
+
+    c = sub.add_parser(
         "export-taxonomy",
         help="导出一级/二级科目体系 Excel（编辑下拉选项）",
     )
@@ -420,6 +459,99 @@ def main(argv=None) -> int:
                 reexport=not args.no_reexport,
                 only_confirmed=bool(getattr(args, "only_confirmed", False)),
             )
+            return 0
+
+        if args.cmd == "pending-dropdowns":
+            from learn_classify.class_master import apply_dropdowns_to_pending_report
+
+            candidates = []
+            if getattr(args, "input", None):
+                candidates.append(Path(args.input))
+            candidates.extend(
+                [
+                    paths.class_fix_report_xlsx_sum,
+                    paths.class_fix_report_xlsx,
+                ]
+            )
+            src = next((p for p in candidates if p and Path(p).is_file()), None)
+            if not src:
+                raise FileNotFoundError(
+                    "未找到 分类修正记录.xlsx。请先生成审计/修正报告。"
+                )
+            n = apply_dropdowns_to_pending_report(src, paths.classify_data)
+            # 同步副本
+            import shutil
+
+            for dest in (paths.class_fix_report_xlsx, paths.class_fix_report_xlsx_sum):
+                if dest.resolve() != src.resolve():
+                    try:
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(src, dest)
+                    except Exception:
+                        pass
+            print(f"✅ 仍待人工_高频 下拉已就绪: {src} （{n} 表）")
+            return 0
+
+        if args.cmd == "apply-pending-fixes":
+            from learn_classify.class_master import (
+                merge_pending_fixes_into_master,
+                apply_class_master,
+            )
+            import shutil
+
+            pend_cands = []
+            if getattr(args, "input", None):
+                pend_cands.append(Path(args.input))
+            pend_cands.extend(
+                [paths.class_fix_report_xlsx_sum, paths.class_fix_report_xlsx]
+            )
+            pend = next((p for p in pend_cands if p and Path(p).is_file()), None)
+            if not pend:
+                raise FileNotFoundError("未找到 分类修正记录.xlsx")
+
+            master_cands = []
+            if getattr(args, "master", None):
+                master_cands.append(Path(args.master))
+            master_cands.extend(
+                [paths.class_master_xlsx_sum, paths.class_master_xlsx]
+            )
+            master = next((p for p in master_cands if p and Path(p).is_file()), None)
+            if not master:
+                raise FileNotFoundError("未找到 付款分类总表.xlsx")
+
+            print(f"待人工表: {pend}")
+            print(f"分类总表: {master}")
+            stats = merge_pending_fixes_into_master(
+                pend,
+                master,
+                paths.classify_data,
+                only_confirmed=not bool(getattr(args, "all_rows", False)),
+            )
+            print(f"   合并: {stats}")
+            # 同步 data/C_sum 总表
+            for dest in (paths.class_master_xlsx, paths.class_master_xlsx_sum):
+                if dest.resolve() != master.resolve() and master.is_file():
+                    try:
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(master, dest)
+                    except Exception:
+                        pass
+            # 学习叶子变更
+            learn_stats = apply_class_master(
+                master,
+                paths.std_dir,
+                paths.classify_data,
+                reclassify=not bool(getattr(args, "no_reclassify", False)),
+                reexport=True,
+                out_path=paths.class_master_xlsx,
+                learn_log_path=paths.learn_log_xlsx,
+            )
+            if paths.class_master_xlsx.is_file():
+                try:
+                    shutil.copy2(paths.class_master_xlsx, paths.class_master_xlsx_sum)
+                except Exception:
+                    pass
+            print(f"✅ 待人工确认已写回并学习: learned={learn_stats.get('learned')}")
             return 0
 
         if args.cmd == "export-taxonomy":

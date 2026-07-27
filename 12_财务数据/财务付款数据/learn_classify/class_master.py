@@ -816,3 +816,265 @@ def apply_class_master(
         stats["reexport_rows"] = n
 
     return stats
+
+
+PENDING_SHEET = "仍待人工_高频"
+
+
+def apply_dropdowns_to_pending_report(
+    report_path: Path,
+    data_dir: Path,
+    *,
+    sheet_name: str = PENDING_SHEET,
+) -> int:
+    """
+    给修正记录里的「仍待人工_高频」加确认状态 + 一/二/三级联动下拉。
+    返回应用了下拉的工作表数量。
+    """
+    from openpyxl import load_workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    report_path = Path(report_path)
+    data_dir = Path(data_dir)
+    if not report_path.is_file():
+        raise FileNotFoundError(f"报告不存在: {report_path}")
+
+    wb = load_workbook(report_path)
+    if sheet_name not in wb.sheetnames:
+        raise ValueError(f"未找到工作表: {sheet_name}，现有={wb.sheetnames}")
+
+    ws = wb[sheet_name]
+    ws.freeze_panes = "A2"
+    if ws.max_row and ws.max_column:
+        ws.auto_filter.ref = ws.dimensions
+
+    header_fill = PatternFill("solid", fgColor="1F4E79")
+    header_font = Font(color="FFFFFF", bold=True)
+    core_fill = PatternFill("solid", fgColor="FFF2CC")
+    pending_fill = PatternFill("solid", fgColor="FCE4D6")
+    ok_fill = PatternFill("solid", fgColor="C6EFCE")
+
+    headers = {
+        str(ws.cell(1, c).value).strip(): c
+        for c in range(1, (ws.max_column or 1) + 1)
+        if ws.cell(1, c).value is not None
+    }
+    for c in range(1, (ws.max_column or 1) + 1):
+        cell = ws.cell(1, c)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws.row_dimensions[1].height = 28
+
+    widths = {
+        "确认状态": 10,
+        "摘要": 48,
+        "出现次数": 10,
+        "一级科目": 14,
+        "二级科目": 14,
+        "三级科目": 14,
+        "供应商名称": 22,
+        "命中层": 12,
+        "分类ID": 14,
+        "备注": 18,
+        "建议操作": 36,
+    }
+    for name, w in widths.items():
+        if name in headers:
+            ws.column_dimensions[get_column_letter(headers[name])].width = w
+
+    last_data = max(ws.max_row or 2, 2)
+    last = last_data + 200
+
+    # 预留空行便于继续填
+    if "确认状态" in headers:
+        for r in range(last_data + 1, min(last_data + 50, last) + 1):
+            if not ws.cell(r, headers["确认状态"]).value:
+                ws.cell(r, headers["确认状态"], STATUS_PENDING)
+
+    for name in ("确认状态", "摘要", "一级科目", "二级科目", "三级科目", "供应商名称", "备注"):
+        if name not in headers:
+            continue
+        col = headers[name]
+        for r in range(2, last_data + 1):
+            if name == "确认状态":
+                val = str(ws.cell(r, col).value or "")
+                ws.cell(r, col).fill = (
+                    ok_fill if _is_confirmed(val) else pending_fill
+                )
+            else:
+                ws.cell(r, col).fill = core_fill
+
+    # 确认状态下拉
+    if "确认状态" in headers:
+        c_st = headers["确认状态"]
+        # 清掉旧的确认验证
+        keep = []
+        letter = get_column_letter(c_st)
+        for dv in ws.data_validations.dataValidation:
+            sq = str(dv.sqref or "")
+            if letter in sq and (dv.promptTitle == "确认状态" or "确认" in str(dv.formula1 or "")):
+                continue
+            keep.append(dv)
+        ws.data_validations.dataValidation = keep
+        dv_st = DataValidation(
+            type="list",
+            formula1=f'"{STATUS_CONFIRMED},{STATUS_PENDING}"',
+            allow_blank=False,
+            showDropDown=False,
+            showErrorMessage=True,
+            errorTitle="确认状态",
+            error="请选择：确认 或 待分类",
+            showInputMessage=True,
+            promptTitle="确认状态",
+            prompt="改完一/二/三级后选「确认」，再运行 apply-pending-fixes",
+        )
+        dv_st.add(f"{letter}2:{letter}{last}")
+        ws.add_data_validation(dv_st)
+
+    # 一/二/三级联动
+    root = Path(__file__).resolve().parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from payment_hub.category_dropdowns import (
+        apply_category_dropdowns,
+        apply_dropdowns_to_worksheet,
+    )
+
+    n = apply_category_dropdowns(wb, data_dir=data_dir, sheet_names=[sheet_name])
+    apply_dropdowns_to_worksheet(ws, max_row=last)
+    wb.save(report_path)
+    return n
+
+
+def merge_pending_fixes_into_master(
+    pending_path: Path,
+    master_path: Path,
+    data_dir: Path,
+    *,
+    only_confirmed: bool = True,
+    sheet_name: str = PENDING_SHEET,
+) -> Dict[str, Any]:
+    """
+    把「仍待人工_高频」里已改好的行写回付款分类总表，并学习叶子变更。
+    默认仅「确认状态=确认」的行。
+    """
+    pending_path = Path(pending_path)
+    master_path = Path(master_path)
+    data_dir = Path(data_dir)
+    if not pending_path.is_file():
+        raise FileNotFoundError(f"待人工表不存在: {pending_path}")
+    if not master_path.is_file():
+        raise FileNotFoundError(f"分类总表不存在: {master_path}")
+
+    try:
+        pend = pd.read_excel(pending_path, sheet_name=sheet_name)
+    except Exception:
+        pend = pd.read_excel(pending_path, sheet_name=0)
+
+    try:
+        master = pd.read_excel(master_path, sheet_name=MASTER_SHEET)
+    except Exception:
+        master = pd.read_excel(master_path, sheet_name=0)
+
+    def S(v: Any) -> str:
+        return _safe_str(v)
+
+    pcols = {str(c).strip(): c for c in pend.columns}
+    if "摘要" not in pcols:
+        raise ValueError(f"待人工表需含「摘要」列，当前={list(pend.columns)}")
+
+    status_col = pcols.get("确认状态") or pcols.get("确认")
+    updates: Dict[str, Dict[str, str]] = {}
+    for _, row in pend.iterrows():
+        summ = S(row.get(pcols["摘要"]))
+        if not summ:
+            continue
+        st = S(row.get(status_col)) if status_col else STATUS_CONFIRMED
+        if only_confirmed and not _is_confirmed(st):
+            continue
+        l2 = S(row.get(pcols["二级科目"])) if "二级科目" in pcols else ""
+        l3 = S(row.get(pcols["三级科目"])) if "三级科目" in pcols else ""
+        l1 = S(row.get(pcols["一级科目"])) if "一级科目" in pcols else ""
+        if not _is_learnable_l2(l2) and not l3:
+            continue
+        updates[summ] = {
+            "一级科目": l1,
+            "二级科目": l2,
+            "三级科目": l3,
+            "供应商名称": S(row.get(pcols["供应商名称"])) if "供应商名称" in pcols else "",
+            "确认状态": STATUS_CONFIRMED,
+            "备注": S(row.get(pcols["备注"])) if "备注" in pcols else "",
+        }
+
+    if not updates:
+        return {"merged": 0, "message": "没有可合并的确认行（请改分类并把确认状态设为「确认」）"}
+
+    tax = Taxonomy.load(data_dir / "taxonomy.json")
+    mcols = {str(c).strip(): c for c in master.columns}
+    if "摘要" not in mcols:
+        raise ValueError("分类总表缺摘要列")
+
+    merged = 0
+    for i, row in master.iterrows():
+        summ = S(row.get(mcols["摘要"]))
+        if summ not in updates:
+            continue
+        u = updates[summ]
+        # 按叶子解析对齐
+        leaf = resolve_leaf_from_row(tax, u["一级科目"], u["二级科目"], u["三级科目"])
+        if leaf:
+            l1, l2, l3 = tax.display_triple(leaf)
+            u = {
+                **u,
+                "一级科目": l1,
+                "二级科目": l2,
+                "三级科目": l3 or "",
+                "分类ID": leaf,
+            }
+        for k, v in u.items():
+            col = mcols.get(k, k)
+            if col not in master.columns:
+                master[col] = ""
+            master.at[i, col] = v
+        merged += 1
+        del updates[summ]
+
+    # 总表没有的摘要：追加
+    appended = 0
+    for summ, u in updates.items():
+        leaf = resolve_leaf_from_row(tax, u["一级科目"], u["二级科目"], u["三级科目"])
+        if leaf:
+            l1, l2, l3 = tax.display_triple(leaf)
+            u = {**u, "一级科目": l1, "二级科目": l2, "三级科目": l3 or "", "分类ID": leaf}
+        rec = {c: "" for c in master.columns}
+        rec["摘要"] = summ
+        for k, v in u.items():
+            if k in rec:
+                rec[k] = v
+            else:
+                master[k] = ""
+                rec[k] = v
+        if "出现次数" in rec and not rec["出现次数"]:
+            rec["出现次数"] = 1
+        if "命中层" in rec:
+            rec["命中层"] = "pending_fix"
+        master = pd.concat([master, pd.DataFrame([rec])], ignore_index=True)
+        appended += 1
+        merged += 1
+
+    master_path.parent.mkdir(parents=True, exist_ok=True)
+    with pd.ExcelWriter(master_path, engine="openpyxl") as w:
+        master.to_excel(w, sheet_name=MASTER_SHEET, index=False)
+    try:
+        _apply_master_format(master_path, data_dir)
+    except Exception as e:
+        print(f"  ⚠️ 总表格式/下拉刷新失败: {e}")
+
+    return {
+        "merged": merged,
+        "appended": appended,
+        "master": str(master_path),
+    }

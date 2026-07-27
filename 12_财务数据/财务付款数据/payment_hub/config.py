@@ -62,6 +62,13 @@ class Paths:
     learn_log_xlsx_sum: Path = field(
         default_factory=lambda: PAY_ROOT / "C_财务付款_sum" / "学习记录.xlsx"
     )
+    # 分类质量/修正报告（含仍待人工_高频）
+    class_fix_report_xlsx: Path = field(
+        default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "分类修正记录.xlsx"
+    )
+    class_fix_report_xlsx_sum: Path = field(
+        default_factory=lambda: PAY_ROOT / "C_财务付款_sum" / "分类修正记录.xlsx"
+    )
 
     def ensure_output_parents(self) -> None:
         self.std_dir.mkdir(parents=True, exist_ok=True)
