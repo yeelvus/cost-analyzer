@@ -4,17 +4,14 @@
 
 目录结构（代码）：
   9_采购数据/
-    0_run_采购全流程.py   # 入口
+    0_run_采购全流程.py   # 入口（默认 04a→04→06）
     _采购路径.py          # 本文件
-    流水线/               # 1→5 ETL
-    规格标准化/           # 物品规格规则
-    单位转换/             # 单位/数量换算
-    内容标准化/           # 合并时内容标准化
-    分析看板/             # 价格/成本分析
-    工具/                 # 旁路工具
+    流水线/               # 01–06 ETL
+    规格标准化/ / 单位转换/ / 内容标准化/
+    分析看板/ / 工具/
 
 数据目录（磁盘 9_采购台账📦）：
-  A_raw → A_提取 → B_std → D_sum
+  A_raw → A_提取 → B_std → C_raw_sum → D_std_sum → E_split
 """
 from __future__ import annotations
 
@@ -67,7 +64,6 @@ RAW_DIR = find_data_dir("采购部采购台账_raw")
 EXTRACT_DIR = find_data_dir("采购台账提取")
 STD_DIR = find_data_dir("采购部采购台账_std")
 SUM_DIR = find_data_dir("采购部采购台账_sum")
-STD_SPLIT_DIR = find_data_dir("采购部采购台账_std_split")
 SIMPLIFY_DIR = find_data_dir("采购部采购台账_simplify")
 
 
@@ -84,6 +80,10 @@ def _resolve_or_create_data_dir(keyword: str, create_name: str) -> Path:
 # 纯合并（未内容标准化）输出目录：C_采购部采购台账_raw_sum
 RAW_SUM_DIR = _resolve_or_create_data_dir(
     "采购部采购台账_raw_sum", "C_采购部采购台账_raw_sum"
+)
+# 按项目拆分输出：E_采购部采购台账_std_split
+STD_SPLIT_DIR = _resolve_or_create_data_dir(
+    "采购部采购台账_std_split", "E_采购部采购台账_std_split"
 )
 
 # ── 项目主数据 / 分析输出 ─────────────────────────────────

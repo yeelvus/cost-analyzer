@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
 """
-各项目采购分类汇总（独立程序）。
+各项目采购分类汇总（逻辑模块 + 可选手动刷新）。
 
-按项目汇总：
-  - 钢筋：数量(kg) + 金额
-  - 砂浆/水泥：数量(kg) + 金额
-  - 砖/砌块：数量(m³) + 金额
-  - 模板（含木方）：数量(m²，张/根按规格换算) + 金额
-  - 碎石：数量(t) + 金额
-  - 其他：数量 + 金额
+按项目汇总钢筋/砂浆水泥/砖/模板/碎石/其他 数量与金额。
 
-数量列使用整数数字格式（无小数位）；金额保留两位小数。
+日常由「04_std_sum汇总」写入 std_sum 的 sheet：
+  项目汇总 / 分类合计 / 分类明细
+不再单独生成 项目采购分类汇总.xlsx。
 
-数据源优先：std_sum（含原始+标准化对比列）
-输出：SUM/项目采购分类汇总.xlsx
+本脚本仍可单独运行：把分类 sheet 写回 std_sum.xlsx（覆盖同名 sheet）。
 """
 from __future__ import annotations
 
@@ -241,7 +236,7 @@ def find_input_file(sum_dir: Path, explicit: str = "") -> Path:
         if p.exists():
             return p
     raise FileNotFoundError(
-        f"在 {sum_dir} 未找到汇总源文件，请先运行 4_采购部数据汇总.py\n"
+        f"在 {sum_dir} 未找到汇总源文件，请先运行 04_std_sum汇总.py\n"
         f"期望之一: {PREFERRED_INPUTS}"
     )
 
@@ -343,8 +338,19 @@ def build_summary(df: pd.DataFrame, unit_conv) -> tuple[pd.DataFrame, pd.DataFra
     return wide, class_sum, detail
 
 
+_LEFT_TEXT_HEADERS = {
+    "物品名称",
+    "规格",
+    "项目名称",
+    "材料归类",
+    "分类",
+    "汇总数量单位",
+    "单位",
+}
+
+
 def _style_sheet(ws, *, qty_headers: set[str] | None = None, amount_headers: set[str] | None = None) -> None:
-    """数量列整数格式，金额列两位小数。"""
+    """数量列整数格式，金额列两位小数；物品名称/规格等文本左对齐。"""
     qty_headers = qty_headers or set()
     amount_headers = amount_headers or set()
     ws.row_dimensions[1].height = 36
@@ -354,14 +360,18 @@ def _style_sheet(ws, *, qty_headers: set[str] | None = None, amount_headers: set
         cell.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
         cell.font = Font(bold=True)
 
+    left_align = Alignment(horizontal="left", vertical="center")
     for col_idx, h in enumerate(headers, start=1):
         letter = get_column_letter(col_idx)
         ws.column_dimensions[letter].width = min(max(len(str(h or "")) + 2, 10), 18)
         h_str = str(h or "")
         is_qty = h in qty_headers or h_str.endswith("_kg") or h_str.endswith("_m3") or h_str.endswith("_m2") or h_str.endswith("_t") or h_str.endswith("_数量") or h_str in {"汇总数量", "数量", "行数", "明细行数"}
         is_amt = h in amount_headers or ("金额" in h_str)
+        is_left = h in _LEFT_TEXT_HEADERS or "物品名称" in h_str or h_str.endswith("规格")
         for row in range(2, ws.max_row + 1):
             cell = ws.cell(row, col_idx)
+            if is_left and not isinstance(cell.value, (int, float)):
+                cell.alignment = left_align
             if not isinstance(cell.value, (int, float)):
                 continue
             if is_qty and not is_amt:
@@ -503,57 +513,48 @@ def write_output(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="各项目采购分类汇总")
-    parser.add_argument("--input", default="", help="输入明细 Excel")
-    parser.add_argument("--output", default="", help="输出路径")
+    """
+    手动刷新：把分类「项目汇总」等写回 std_sum.xlsx（不另存分类汇总文件）。
+    日常请直接跑步骤4。
+    """
+    from openpyxl import load_workbook
+
+    parser = argparse.ArgumentParser(
+        description="将分类项目汇总写回 std_sum（不再生成独立 项目采购分类汇总.xlsx）"
+    )
+    parser.add_argument("--input", default="", help="输入 std_sum Excel，默认 D_sum/std_sum")
     parser.add_argument("--sum-dir", default="", help="汇总目录")
     args = parser.parse_args()
 
     sum_dir = Path(args.sum_dir).expanduser() if args.sum_dir else SUM_DIR
-    src = find_input_file(sum_dir, args.input)
-    out = (
-        Path(args.output).expanduser().resolve()
-        if args.output
-        else sum_dir / DEFAULT_OUTPUT
-    )
+    if args.input:
+        src = Path(args.input).expanduser().resolve()
+    else:
+        src = sum_dir / STD_SUM_FILE_NAME
+    if not src.is_file():
+        raise FileNotFoundError(
+            f"未找到 {src}，请先运行 04_std_sum汇总.py 生成 std_sum"
+        )
 
-    print(f"输入: {src}")
-    print(f"输出: {out}")
+    print(f"刷新分类 sheet → {src}")
+    # 用合并数据重算并注入（与步骤4一致）
+    import importlib.util
 
-    df = load_detail(src)
-    print(f"明细行数: {len(df)}")
+    step4 = Path(__file__).resolve().parent / "04_std_sum汇总.py"
+    spec = importlib.util.spec_from_file_location("proc_step4_inj", str(step4))
+    mod = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    spec.loader.exec_module(mod)
 
-    unit_conv = _load_unit_conv()
-    print("单位转换:", "已加载" if unit_conv else "未加载")
-
-    wide, class_sum, detail = build_summary(df, unit_conv)
-    if wide.empty:
-        print("无有效数据，结束")
+    wb = load_workbook(src)
+    ok = mod.inject_category_summary_into_workbook(wb)
+    if not ok:
+        print("分类汇总注入失败")
         return
-
-    # 优先从同目录 std_sum 取「采购总金额」按月宽表
-    monthly = None
-    std_sum = sum_dir / STD_SUM_FILE_NAME
-    if src.name == STD_SUM_FILE_NAME or "std_sum" in src.name or "std_merged" in src.name:
-        monthly = _load_monthly_total_from_std(src)
-    if monthly is None and std_sum.is_file():
-        monthly = _load_monthly_total_from_std(std_sum)
-    if monthly is not None:
-        print(f"已附带「采购总金额」按月宽表: {len(monthly)} 行")
-
-    write_output(out, wide, class_sum, detail, src, monthly_total=monthly)
-
-    print("\n—— 分类金额概览 ——")
-    if not class_sum.empty:
-        unit_map = {c[0]: c[3] for c in CLASS_SPECS}
-        for _, r in class_sum.iterrows():
-            u = unit_map.get(r["分类"], "")
-            print(
-                f"  {r['分类']}: 数量={r['汇总数量']:,.0f} {u}  "
-                f"金额={r['含税金额']:,.2f}  行数={int(r['行数'])}"
-            )
-    print(f"\n项目数: {len(wide)}")
-    print(f"已输出: {out}")
+    mod.apply_unified_workbook_format(wb)
+    wb.save(src)
+    print(f"已更新: {src}")
+    print(f"  sheets: {wb.sheetnames}")
 
 
 if __name__ == "__main__":

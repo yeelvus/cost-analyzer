@@ -11,7 +11,7 @@
 并同步「采购总金额」→ D_sum/项目采购分类汇总.xlsx
 
 纯合并请手动运行：
-  流水线/4a_采购台账_raw_sum合并.py → C_raw_sum/*_raw_sum.xlsx
+  流水线/04a_raw_sum纯合并.py → C_raw_sum/*_raw_sum.xlsx
 """
 from __future__ import annotations
 
@@ -37,7 +37,6 @@ for _p in (str(_PKG_ROOT), str(_CODE_ROOT)):
 from common.excel import apply_common_excel_layout
 
 from _采购路径 import (
-    CATEGORY_SUMMARY_NAME,
     CONTENT_STD_UTILS,
     RAW_SUM_DIR,
     RAW_SUM_FILE_NAME,
@@ -55,14 +54,32 @@ FINAL_OUTPUT_COLUMNS = [
     "标准日期", "供货商名称", "备注", "年月", "签订日期",
 ]
 
-# 对比版：原始列 + 转换列 + 标准化后列
+# 对比版：序号 + 原始列 + 转换列 + 标准化后列
 COMPARE_OUTPUT_COLUMNS = [
-    "项目编码", "项目名称",
-    "原始物品名称", "原始规格", "原始单位",
-    "转换单位", "计算数量",
-    "材料归类", "物品名称", "规格", "单位", "数量",
-    "单价", "不含税金额", "7%增值税", "含税金额", "货币种类", "汇率",
-    "标准日期", "供货商名称", "备注", "年月", "签订日期",
+    "序号",
+    "项目编码",
+    "项目名称",
+    "原始物品名称",
+    "原始规格",
+    "原始单位",
+    "转换单位",
+    "计算数量",
+    "材料归类",
+    "物品名称",
+    "规格",
+    "单位",
+    "数量",
+    "单价",
+    "不含税金额",
+    "7%增值税",
+    "含税金额",
+    "货币种类",
+    "汇率",
+    "标准日期",
+    "供货商名称",
+    "备注",
+    "年月",
+    "签订日期",
 ]
 
 OUTPUT_STD_SUM = STD_SUM_FILE_NAME
@@ -177,9 +194,46 @@ def _load_unit_conversion_pipeline():
     return mod
 
 
+# 正文左对齐的文本列（表头仍居中）
+_LEFT_ALIGN_HEADER_KEYS = (
+    "物品名称",
+    "规格",
+    "原始物品名称",
+    "原始规格",
+    "项目名称",
+    "材料归类",
+    "供货商名称",
+    "备注",
+    "供应商",
+)
+
+
+def _apply_left_align_text_columns(ws, header_row: int = 1) -> None:
+    """物品名称、规格等文本列正文左对齐。"""
+    if not ws.max_row or ws.max_row < header_row:
+        return
+    headers = [cell.value for cell in ws[header_row]]
+    left_cols = [
+        idx + 1
+        for idx, h in enumerate(headers)
+        if isinstance(h, str) and any(k in h for k in _LEFT_ALIGN_HEADER_KEYS)
+    ]
+    if not left_cols:
+        return
+    left = Alignment(horizontal="left", vertical="center", wrap_text=False)
+    for col_idx in left_cols:
+        for row_idx in range(header_row + 1, (ws.max_row or header_row) + 1):
+            ws.cell(row=row_idx, column=col_idx).alignment = left
+
+
 def apply_unified_workbook_format(output_wb) -> None:
     amount_keywords = ("金额", "单价", "税")
-    for sheet_name in ("合并数据", "项目汇总", "采购总金额"):
+    for sheet_name in (
+        "合并数据",
+        "项目金额汇总",
+        "项目汇总",
+        "采购总金额",
+    ):
         if sheet_name not in output_wb.sheetnames:
             continue
         ws = output_wb[sheet_name]
@@ -205,6 +259,7 @@ def apply_unified_workbook_format(output_wb) -> None:
                 header_height=40,
                 freeze_panes="A2",
             )
+        _apply_left_align_text_columns(ws, header_row=1)
 
 
 def _period_key(period_text: str) -> tuple[int, int]:
@@ -318,7 +373,8 @@ def _finalize_workbook(
     last_col = get_column_letter(len(columns))
     merged_ws.auto_filter.ref = f"A1:{last_col}{data_last_row}"
 
-    summary_ws = output_wb.create_sheet("项目汇总")
+    # 简单金额合计（与「分类项目汇总」区分；分类宽表 sheet 名仍为「项目汇总」）
+    summary_ws = output_wb.create_sheet("项目金额汇总")
     summary_ws.append(["项目编码", "项目名称", "总采购金额"])
     grand_total = 0.0
     for row_idx, ((code, name), total) in enumerate(sorted(project_totals.items()), start=2):
@@ -326,7 +382,6 @@ def _finalize_workbook(
         summary_ws.append([code, name, amt])
         summary_ws.cell(row_idx, 3).number_format = "#,##0.00"
         grand_total += amt
-    # 合计行（数值，不用公式，避免 #VALUE!）
     last = summary_ws.max_row + 1
     summary_ws.cell(last, 1, "")
     summary_ws.cell(last, 2, "【合计】")
@@ -352,8 +407,8 @@ def _finalize_workbook(
                 cleaned.append("" if _is_excel_error_token(v) else v)
         total_ws.append(cleaned)
 
-    # 只保留业务 sheet，去掉 openpyxl/Excel 可能残留的空 Sheet
-    keep = {"合并数据", "项目汇总", "采购总金额"}
+    # 只保留业务 sheet（分类「项目汇总」由后续注入）
+    keep = {"合并数据", "项目金额汇总", "采购总金额", "项目汇总"}
     for sn in list(output_wb.sheetnames):
         if sn not in keep:
             del output_wb[sn]
@@ -479,7 +534,7 @@ def build_compare_workbook_from_raw_sum(
         print(
             f"⚠️ 对比版跳过：未找到 raw_sum 源文件\n"
             f"   期望: {raw_sum_path}\n"
-            f"   请先运行: 流水线/4a_采购台账_raw_sum合并.py"
+            f"   请先运行: 流水线/04a_raw_sum纯合并.py"
         )
         return None
 
@@ -588,11 +643,14 @@ def build_compare_workbook_from_raw_sum(
     compare_wb, compare_ws = _new_merge_workbook(COMPARE_OUTPUT_COLUMNS)
     compare_row = 2
     compare_totals: dict[tuple[str, str], float] = defaultdict(float)
+    seq = 1
 
     for _, row in compare_df.iterrows():
         compare_data = {
             c: row[c] if c in row.index else "" for c in COMPARE_OUTPUT_COLUMNS
         }
+        compare_data["序号"] = seq
+        seq += 1
         _append_data_row(compare_ws, compare_row, COMPARE_OUTPUT_COLUMNS, compare_data)
         code = "" if pd.isna(row.get("项目编码", "")) else str(row.get("项目编码", "")).strip()
         name = "" if pd.isna(row.get("项目名称", "")) else str(row.get("项目名称", "")).strip()
@@ -601,104 +659,143 @@ def build_compare_workbook_from_raw_sum(
             compare_totals[(code, name)] += float(amt)
         compare_row += 1
 
+    # 序号列居中
+    if "序号" in COMPARE_OUTPUT_COLUMNS:
+        c_idx = COMPARE_OUTPUT_COLUMNS.index("序号") + 1
+        for r in range(2, compare_row):
+            compare_ws.cell(r, c_idx).alignment = Alignment(
+                horizontal="center", vertical="center"
+            )
+
     return _finalize_workbook(
         compare_wb, COMPARE_OUTPUT_COLUMNS, compare_totals, compare_row - 1
     )
 
 
-def sync_monthly_total_to_category_summary(
-    std_merged_path: Path,
-    category_summary_path: Path,
-) -> bool:
+def _load_step5_category_module():
+    """加载 5_项目采购分类汇总（build_summary / 样式）。"""
+    path = Path(__file__).resolve().parent / "05_分类汇总刷新.py"
+    spec = importlib.util.spec_from_file_location("proc_step5_cat", str(path))
+    if spec is None or spec.loader is None:
+        raise ImportError(f"无法加载: {path}")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def inject_category_summary_into_workbook(wb: openpyxl.Workbook) -> bool:
     """
-    把 std_merged 的「采购总金额」sheet（项目×月份宽表）写入
-    项目采购分类汇总.xlsx（存在则替换该 sheet，保留其它 sheet）。
+    把分类「项目汇总」宽表写入 std_sum（不再生成 分类合计/分类明细）。
+    数据取自本簿「合并数据」的标准化列。
     """
-    std_merged_path = Path(std_merged_path)
-    category_summary_path = Path(category_summary_path)
-    if not std_merged_path.is_file():
-        print(f"  ⚠️ 无 std 汇总，跳过同步采购总金额: {std_merged_path}")
+    if "合并数据" not in wb.sheetnames:
+        print("  ⚠️ 无「合并数据」，跳过分类项目汇总")
         return False
 
+    ws_m = wb["合并数据"]
+    rows = list(ws_m.iter_rows(values_only=True))
+    if len(rows) < 2:
+        print("  ⚠️ 合并数据为空，跳过分类项目汇总")
+        return False
+    headers = [str(h).strip() if h is not None else "" for h in rows[0]]
+    detail_src = pd.DataFrame(rows[1:], columns=headers)
+
     try:
-        total_df = pd.read_excel(std_merged_path, sheet_name="采购总金额")
+        cat = _load_step5_category_module()
     except Exception as exc:
-        print(f"  ⚠️ 读取「采购总金额」失败: {exc}")
+        print(f"  ⚠️ 加载分类汇总模块失败: {exc}")
         return False
 
-    if total_df is None or total_df.empty:
-        print("  ⚠️ 「采购总金额」为空，跳过同步")
-        return False
-
-    category_summary_path.parent.mkdir(parents=True, exist_ok=True)
-    sheet_name = "采购总金额"
-
-    if category_summary_path.is_file():
-        try:
-            book = openpyxl.load_workbook(category_summary_path)
-        except Exception as exc:
-            print(f"  ⚠️ 打开分类汇总失败，将新建: {exc}")
-            book = openpyxl.Workbook()
-            # 去掉默认空表，后面统一建
-            if book.active and book.active.max_row == 1 and book.active.max_column == 1:
-                pass
-    else:
-        book = openpyxl.Workbook()
-
-    if sheet_name in book.sheetnames:
-        del book[sheet_name]
-    # 若仅有一个空 Sheet，可先删再建
-    if len(book.sheetnames) == 1:
-        only = book.sheetnames[0]
-        ws0 = book[only]
-        if ws0.max_row <= 1 and (ws0.max_column or 1) <= 1 and not ws0["A1"].value:
-            del book[only]
-
-    ws = book.create_sheet(sheet_name)
-    headers = [str(c) for c in total_df.columns.tolist()]
-    ws.append(headers)
-    for row in total_df.itertuples(index=False, name=None):
-        cleaned = []
-        for v in row:
-            if isinstance(v, (int, float)) and not isinstance(v, bool):
-                try:
-                    if pd.isna(v):
-                        cleaned.append(None)
-                    else:
-                        cleaned.append(float(v))
-                except Exception:
-                    cleaned.append(v)
-            else:
-                cleaned.append("" if _is_excel_error_token(v) else v)
-        ws.append(cleaned)
-
-    # 金额列格式：从第 3 列起多为月份金额
-    for r in range(2, (ws.max_row or 1) + 1):
-        for c in range(3, (ws.max_column or 2) + 1):
-            cell = ws.cell(r, c)
-            if isinstance(cell.value, (int, float)):
-                cell.number_format = "#,##0.00"
-
-    ws.freeze_panes = "C2"
-    if ws.max_row and ws.max_column:
-        ws.auto_filter.ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
-    ws.row_dimensions[1].height = 36
-    for cell in ws[1]:
-        cell.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
+    unit_conv = None
+    try:
+        unit_conv = cat._load_unit_conv()
+    except Exception:
+        unit_conv = None
 
     try:
-        apply_unified_workbook_format(book)
-    except Exception:
-        pass
+        wide, _class_sum, _detail = cat.build_summary(detail_src, unit_conv)
+    except Exception as exc:
+        print(f"  ⚠️ 分类汇总计算失败: {exc}")
+        return False
 
-    book.save(category_summary_path)
-    print(f"已同步「采购总金额」→ {category_summary_path}")
+    if wide is None or wide.empty:
+        print("  ⚠️ 分类项目汇总无有效数据")
+        return False
+
+    for sn in ("项目汇总", "分类合计", "分类明细"):
+        if sn in wb.sheetnames:
+            del wb[sn]
+
+    qty_headers = {c[1] for c in cat.CLASS_SPECS} | {
+        "明细行数",
+        "汇总数量",
+        "数量",
+        "行数",
+    }
+    amt_headers = {c[2] for c in cat.CLASS_SPECS} | {
+        "合计金额",
+        "分类金额合计",
+        "金额差异",
+        "含税金额",
+    }
+
+    # 项目汇总：首列加序号
+    wide = wide.reset_index(drop=True)
+    wide.insert(0, "序号", range(1, len(wide) + 1))
+
+    ws1 = wb.create_sheet("项目汇总")
+    ws1.append(list(wide.columns))
+    for row in wide.itertuples(index=False, name=None):
+        ws1.append(list(row))
+    if len(wide) > 0:
+        total_row = []
+        for col in wide.columns:
+            if col == "序号":
+                total_row.append("")
+            elif col == "项目编码":
+                total_row.append("")
+            elif col == "项目名称":
+                total_row.append("【全部项目合计】")
+            elif col == "明细行数":
+                total_row.append(int(wide[col].sum()))
+            elif col in qty_headers:
+                total_row.append(round(float(wide[col].sum()), 0))
+            else:
+                try:
+                    total_row.append(float(wide[col].sum()))
+                except Exception:
+                    total_row.append("")
+        ws1.append(total_row)
+        from openpyxl.styles import Font as _Font
+
+        for cell in ws1[ws1.max_row]:
+            cell.font = _Font(bold=True)
+    cat._style_sheet(ws1, qty_headers=qty_headers, amount_headers=amt_headers)
+    # 序号居中
+    if "序号" in list(wide.columns):
+        c_idx = list(wide.columns).index("序号") + 1
+        for r in range(2, (ws1.max_row or 1) + 1):
+            cell = ws1.cell(r, c_idx)
+            if cell.value not in ("", None):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    preferred = [
+        "合并数据",
+        "项目汇总",
+        "项目金额汇总",
+        "采购总金额",
+    ]
+    for i, name in enumerate(preferred):
+        if name in wb.sheetnames:
+            wb.move_sheet(name, offset=i - wb.sheetnames.index(name))
+
+    print("  ✓ 已写入分类「项目汇总」（不含分类合计/分类明细）")
     return True
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="C_raw_sum → D_sum/采购部采购台账_std_sum.xlsx（仅保留对比结构一份）"
+        description="C_raw_sum → D_sum/采购部采购台账_std_sum.xlsx（含分类项目汇总，单文件）"
     )
     parser.add_argument(
         "--output-dir",
@@ -725,26 +822,26 @@ def main() -> None:
     )
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    print("标准化汇总 std_sum（仅对比结构，一份文件）")
+    print("标准化汇总 std_sum（对比结构 + 分类项目汇总，单文件）")
     print(f"- 数据源 C_raw_sum: {raw_sum_path}")
     print(f"- 输出 D_sum:       {out_dir / args.output_name}")
     print(f"- 内容标准化:       {CONTENT_STD_UTILS}")
-    print("- 若无 raw_sum，请先: 流水线/4a_采购台账_raw_sum合并.py")
+    print("- 若无 raw_sum，请先: 流水线/04a_raw_sum纯合并.py")
+    print("- 不再输出: 项目采购分类汇总.xlsx（已并入本文件「项目汇总」等 sheet）")
 
-    # 唯一输出：对比结构 → std_sum.xlsx
     wb = build_compare_workbook_from_raw_sum(raw_sum_path)
     if wb is None:
         print(f"未产生有效数据: {args.output_name}")
         return
 
+    # 分类「项目汇总」等并入同一工作簿
+    inject_category_summary_into_workbook(wb)
+
     out_path = out_dir / args.output_name
     apply_unified_workbook_format(wb)
     wb.save(out_path)
     print(f"已输出: {out_path}")
-
-    # 「采购总金额」→ 项目采购分类汇总.xlsx
-    cat_path = out_dir / CATEGORY_SUMMARY_NAME
-    sync_monthly_total_to_category_summary(out_path, cat_path)
+    print(f"  sheets: {wb.sheetnames}")
 
 
 if __name__ == "__main__":

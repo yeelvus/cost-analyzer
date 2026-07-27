@@ -80,6 +80,16 @@ FINAL_COLUMNS = [
 ]
 AMOUNT_COLS = {"单价", "不含税金额", "7%增值税", "含税金额"}
 CENTER_COLS = {"单位", "数量", "货币种类", "汇率"}
+# 正文左对齐（表头仍居中）
+LEFT_COLS = {
+    "物品名称",
+    "规格",
+    "项目名称",
+    "材料归类",
+    "供货商名称",
+    "备注",
+    "签订日期",
+}
 OUTPUT_SUFFIX = "_processed"
 
 
@@ -215,10 +225,82 @@ def is_summary_row(ws, row_idx: int, amount_col: int) -> bool:
     return bool(re.search(rf"\$?{letter}\$?\d+:\$?{letter}\$?\d+", f.replace(" ", "")))
 
 
+def _is_blank_cell(v) -> bool:
+    """判断读取后是否视为空（含 None / 空白串 / NaN）。"""
+    if v is None:
+        return True
+    if isinstance(v, float) and pd.isna(v):
+        return True
+    if isinstance(v, str) and v.strip() == "":
+        return True
+    return False
+
+
+def vertical_merge_slave_rows(ws, col_1based: int, header_row: int) -> set[int]:
+    """
+    某列上「纵向合并」的从属行号集合（非合并区左上角所在行）。
+
+    Excel 合并单元格只在左上角存值，从属格 data_only 读出来是空。
+    对金额列：拆散后从属格应填 0，以便与「真实空缺」区分，方便后续核对。
+    仅处理跨多行的合并；纯横向单行合并不产生从属行。
+    """
+    slaves: set[int] = set()
+    merged = getattr(ws, "merged_cells", None)
+    if merged is None:
+        return slaves
+    for mr in merged.ranges:
+        if not (mr.min_col <= col_1based <= mr.max_col):
+            continue
+        if mr.max_row <= mr.min_row:
+            continue
+        for r in range(mr.min_row + 1, mr.max_row + 1):
+            if r > header_row:
+                slaves.add(r)
+    return slaves
+
+
+def vertical_merge_fill_map(ws, col_1based: int, header_row: int) -> dict[int, object]:
+    """
+    纵向合并：从属行 → 主格（左上角）的值。
+
+    用于文本/枚举列（如货币种类）：拆散后按合并主值填写从属行，
+    而非填 0。主格本身为空时不生成映射（从属行保持空）。
+    """
+    fill: dict[int, object] = {}
+    merged = getattr(ws, "merged_cells", None)
+    if merged is None:
+        return fill
+    for mr in merged.ranges:
+        if not (mr.min_col <= col_1based <= mr.max_col):
+            continue
+        if mr.max_row <= mr.min_row:
+            continue
+        master_val = ws.cell(mr.min_row, col_1based).value
+        if _is_blank_cell(master_val):
+            continue
+        # 文本列规范化为去首尾空白的字符串；数值原样保留
+        if isinstance(master_val, str):
+            master_val = master_val.strip()
+        for r in range(mr.min_row + 1, mr.max_row + 1):
+            if r > header_row:
+                fill[r] = master_val
+    return fill
+
+
+# 金额类：合并从属格空 → 填 0（区分真·空）
+_MERGE_FILL_ZERO_COLS = ("含税金额", "不含税金额", "7%增值税", "单价")
+# 文本/枚举类：合并从属格空 → 填主格原值
+_MERGE_FILL_MASTER_COLS = ("货币种类",)
+
+
 def extract_rows(file_path: Path, project_code: str, project_name: str):
     """
-    两遍读取：先公式模式找汇总行，再 data_only 取数值。
+    两遍读取：先公式模式找汇总行与合并单元格，再 data_only 取数值。
     第二遍使用 read_only 加速大表。
+
+    合并单元格拆散规则：
+    - 金额列（含税金额等）：从属行空 → 填 0（真·空保持空，便于核对）
+    - 货币种类等：从属行空 → 填合并主格原值
     """
     fwb = openpyxl.load_workbook(file_path, data_only=False, read_only=False)
     fws = fwb.active
@@ -246,10 +328,29 @@ def extract_rows(file_path: Path, project_code: str, project_name: str):
     summary = {
         r for r in range(header_row + 1, max_row + 1) if is_summary_row(fws, r, amount_col)
     }
+    # 金额列纵向合并从属行：拆散后空值填 0
+    amount_slave_rows: dict[str, set[int]] = {}
+    for col_name in _MERGE_FILL_ZERO_COLS:
+        if col_name not in hmap:
+            continue
+        slaves = vertical_merge_slave_rows(fws, hmap[col_name] + 1, header_row)
+        if slaves:
+            amount_slave_rows[col_name] = slaves
+    # 文本列纵向合并：从属行 → 主格值（货币种类等）
+    text_merge_fill: dict[str, dict[int, object]] = {}
+    for col_name in _MERGE_FILL_MASTER_COLS:
+        if col_name not in hmap:
+            continue
+        fmap = vertical_merge_fill_map(fws, hmap[col_name] + 1, header_row)
+        if fmap:
+            text_merge_fill[col_name] = fmap
     fwb.close()
 
     # data_only + read_only：显著加快大文件数值读取
     vwb = openpyxl.load_workbook(file_path, data_only=True, read_only=True)
+    rows: list[dict] = []
+    merge_zero_count = 0
+    merge_master_count = 0
     try:
         vws = vwb.active
         if vws is None:
@@ -260,7 +361,6 @@ def extract_rows(file_path: Path, project_code: str, project_name: str):
             for c in ("物品名称", "规格", "单位", "数量", "单价", "不含税金额")
             if c in hmap
         ]
-        rows = []
         for ridx, vals in enumerate(
             vws.iter_rows(min_row=header_row + 1, values_only=True),
             start=header_row + 1,
@@ -287,9 +387,29 @@ def extract_rows(file_path: Path, project_code: str, project_name: str):
                         obj[col] = "" if v is None else v
                 else:
                     obj[col] = ""
+
+            # 金额：合并从属格空 → 0（非合并真·空保持空）
+            for col_name, slaves in amount_slave_rows.items():
+                if ridx in slaves and _is_blank_cell(obj.get(col_name, "")):
+                    obj[col_name] = 0
+                    merge_zero_count += 1
+            # 货币种类等：合并从属格空 → 主格原值
+            for col_name, fmap in text_merge_fill.items():
+                if ridx in fmap and _is_blank_cell(obj.get(col_name, "")):
+                    obj[col_name] = fmap[ridx]
+                    merge_master_count += 1
             rows.append(obj)
     finally:
         vwb.close()
+
+    parts = []
+    if merge_zero_count:
+        parts.append(f"金额填0 {merge_zero_count} 格")
+    if merge_master_count:
+        cols = "、".join(text_merge_fill.keys())
+        parts.append(f"{cols}填主值 {merge_master_count} 格")
+    if parts:
+        print(f"  · 合并单元格拆散: {'；'.join(parts)}")
     return rows, ""
 
 
@@ -369,14 +489,16 @@ def write_output(df: pd.DataFrame, output_path: Path) -> None:
     ws.row_dimensions[1].height = 40
     ws.freeze_panes = "A2"
     for col_idx, header in enumerate(FINAL_COLUMNS, start=1):
-        ws.cell(1, col_idx).alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
+        ws.cell(1, col_idx).alignment = Alignment(
+            wrap_text=True, horizontal="center", vertical="center"
+        )
         for row_idx in range(2, ws.max_row + 1):
             cell = ws.cell(row_idx, col_idx)
             if header in AMOUNT_COLS and isinstance(cell.value, (int, float)):
                 cell.number_format = "0.00"
             if header in CENTER_COLS:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-            elif header == "签订日期":
+            elif header in LEFT_COLS:
                 cell.alignment = Alignment(horizontal="left", vertical="center")
     ws.auto_filter.ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
     wb.save(output_path)
@@ -409,10 +531,22 @@ def process_one(file_path: Path, projects: list[dict], match_db) -> tuple[bool, 
         return False, reason or "无有效数据"
 
     df = pd.DataFrame(rows)
-    amt = df[[c for c in AMOUNT_COLS if c in df.columns]].apply(pd.to_numeric, errors="coerce")
-    df = df[amt.fillna(0).sum(axis=1).ne(0)]
+    # 金额过滤策略（配合合并单元格拆散填 0）：
+    # - 明确 0：合并从属格，保留，便于汇总时不把「无独立金额」当缺失
+    # - 真·空（NaN/空串）：保留有物品名称的行，方便后续人工核对
+    # - 仅丢弃：无物品名称 且 全部金额为空 的无效行
+    amt_cols = [c for c in AMOUNT_COLS if c in df.columns]
+    amt = df[amt_cols].apply(pd.to_numeric, errors="coerce") if amt_cols else pd.DataFrame(index=df.index)
+    name_s = df["物品名称"] if "物品名称" in df.columns else pd.Series("", index=df.index)
+    has_item = name_s.map(
+        lambda x: bool(str(x).strip()) and str(x).strip().lower() not in ("nan", "none")
+        if pd.notna(x)
+        else False
+    )
+    has_amt = amt.notna().any(axis=1) if not amt.empty else pd.Series(False, index=df.index)
+    df = df[has_item | has_amt]
     if df.empty:
-        return False, "金额合计均为0"
+        return False, "无有效明细行"
 
     df = enrich_dates(df)
     file_ym = extract_month_iso(file_path.name) or ""
