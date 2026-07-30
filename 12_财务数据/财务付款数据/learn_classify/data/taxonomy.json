@@ -1,6 +1,6 @@
 {
-  "version": "2.0.0",
-  "description": "三级分类：一级/二级/三级。管理费-办公费下设网络通讯、邮寄快递、办公物品等三级。下拉仅正式名。",
+  "version": "2.3.0",
+  "description": "钢板/工作签证/税金一级/押金保证金一级/备用金与代付不计入成本 | 角钢/预埋钢板→材料采购；空调安装→办公费",
   "default_l2_id": "L2_pending",
   "pending_l2_id": "L2_pending",
   "level1": [
@@ -59,6 +59,20 @@
       "order": 7,
       "active": true,
       "notes": ""
+    },
+    {
+      "id": "L1_tax",
+      "name": "7_税金",
+      "order": 70,
+      "active": true,
+      "notes": "印花税、预扣税、增值税等税款（不进管理费）"
+    },
+    {
+      "id": "L1_deposit",
+      "name": "8_押金保证金",
+      "order": 80,
+      "active": true,
+      "notes": "押金、投标/履约保证金等（独立大类）"
     }
   ],
   "level2": [
@@ -117,7 +131,12 @@
       "parent": "L1_mgmt",
       "order": 0,
       "active": true,
-      "aliases": [],
+      "aliases": [
+        "招待",
+        "宴请",
+        "客户餐",
+        "业务招待"
+      ],
       "notes": ""
     },
     {
@@ -186,7 +205,12 @@
       "parent": "L1_logistics",
       "order": 1,
       "active": true,
-      "aliases": [],
+      "aliases": [
+        "关税",
+        "物流费",
+        "关税物流",
+        "进口税"
+      ],
       "notes": ""
     },
     {
@@ -197,14 +221,10 @@
       "active": true,
       "aliases": [
         "圆钢",
-        "型钢",
-        "工字钢",
-        "槽钢",
         "盘圆",
         "线材",
         "螺纹钢",
-        "角钢",
-        "钢板",
+        "钢筋",
         "钢绞线"
       ],
       "notes": ""
@@ -218,8 +238,9 @@
       "aliases": [
         "体检",
         "医疗",
-        "治安",
-        "药品"
+        "药品",
+        "安全费",
+        "安全文明"
       ],
       "notes": ""
     },
@@ -284,7 +305,17 @@
       "order": 2,
       "active": true,
       "aliases": [
-        "办公费"
+        "中央空调安装",
+        "分体空调",
+        "办公空调",
+        "办公费",
+        "安装空调",
+        "空调",
+        "空调安装",
+        "空调移机",
+        "空调维修",
+        "空调费",
+        "行政办公"
       ],
       "notes": "管理费下二级；其下有三级：网络/邮寄/办公物品/其他办公"
     },
@@ -332,10 +363,14 @@
     {
       "id": "L2_mgmt_petty",
       "name": "备用金",
-      "parent": "L1_mgmt",
+      "parent": "L1_exclude",
       "order": 3,
       "active": true,
-      "aliases": [],
+      "aliases": [
+        "借支",
+        "备用金",
+        "预支"
+      ],
       "notes": ""
     },
     {
@@ -372,12 +407,24 @@
       "order": 4,
       "active": true,
       "aliases": [
+        "C型钢",
+        "H型钢",
+        "型钢",
+        "工字钢",
+        "扁钢",
+        "方钢",
         "施工物资",
         "材料报销",
         "材料费",
         "材料采购付款",
         "材料采购费用",
-        "物资采购"
+        "槽钢",
+        "物资采购",
+        "角钢",
+        "钢结构件",
+        "预埋",
+        "预埋件",
+        "预埋钢板"
       ],
       "notes": ""
     },
@@ -392,7 +439,11 @@
         "危废处理",
         "垃圾处理",
         "建筑垃圾",
-        "清运"
+        "清运",
+        "垃圾清理",
+        "垃圾清理费",
+        "场地清理",
+        "渣土"
       ],
       "notes": ""
     },
@@ -425,9 +476,11 @@
         "皮卡",
         "租车",
         "车辆租赁",
-        "过路费"
+        "过路费",
+        "过路过桥",
+        "车辆使用"
       ],
-      "notes": ""
+      "notes": "车辆租赁/过路等；车辆用油单独"
     },
     {
       "id": "L2_劳务费",
@@ -466,7 +519,14 @@
       "parent": "L1_mgmt",
       "order": 6,
       "active": true,
-      "aliases": [],
+      "aliases": [
+        "伙食",
+        "食堂",
+        "餐费",
+        "误餐",
+        "盒饭",
+        "工作餐"
+      ],
       "notes": ""
     },
     {
@@ -486,10 +546,9 @@
       "active": true,
       "aliases": [
         "取现",
-        "开工仪式",
         "换汇"
       ],
-      "notes": "兜底类，规则低优先级"
+      "notes": "兜底；安保费已独立"
     },
     {
       "id": "L2_eq_flatbed",
@@ -507,14 +566,12 @@
       "order": 8,
       "active": true,
       "aliases": [
-        "95汽油",
+        "燃油",
         "加油",
         "加油费",
-        "柴油",
-        "汽油",
-        "燃油"
+        "柴油"
       ],
-      "notes": ""
+      "notes": "无法区分机具/车辆用油时的兜底"
     },
     {
       "id": "L2_eq_general",
@@ -538,22 +595,22 @@
       "order": 9,
       "active": true,
       "aliases": [
-        "园区水费",
-        "水费",
-        "现场用水",
-        "电费",
-        "饮用水付款"
+        "水电",
+        "水电费合计"
       ],
-      "notes": ""
+      "notes": "无法区分水/电时的兜底；优先用水费/电费/现场饮用水"
     },
     {
       "id": "L2_mgmt_deposit",
       "name": "押金",
       "parent": "L1_mgmt",
       "order": 10,
-      "active": true,
-      "aliases": [],
-      "notes": ""
+      "active": false,
+      "aliases": [
+        "押金",
+        "保证金退还"
+      ],
+      "notes": " | 已迁移到 L1_deposit，见 L2_dep_*"
     },
     {
       "id": "L2_mgmt_park",
@@ -573,14 +630,12 @@
       "aliases": [
         "BOI",
         "DBD",
-        "回头签",
-        "工作签",
-        "工签",
-        "签证",
-        "签证费",
-        "落地签"
+        "证件",
+        "证件许可",
+        "许可证",
+        "劳工证"
       ],
-      "notes": ""
+      "notes": "工作签/施工许可类证件；商务签证归签证费用"
     },
     {
       "id": "L2_mgmt_rent",
@@ -592,7 +647,10 @@
         "宿舍",
         "宿舍租金",
         "房租",
-        "营地"
+        "营地",
+        "物业费",
+        "房租物业",
+        "宿舍费"
       ],
       "notes": ""
     },
@@ -634,20 +692,32 @@
     },
     {
       "id": "L2_mgmt_ceremony",
-      "name": "开工仪式",
+      "name": "奠基仪式费用",
       "parent": "L1_mgmt",
       "order": 18,
-      "active": false,
-      "aliases": [],
-      "notes": " | 并入大类「其他」"
+      "active": true,
+      "aliases": [
+        "仪式花篮",
+        "奠基",
+        "奠基仪式",
+        "奠基仪式费",
+        "奠基石",
+        "开工仪式",
+        "开工仪式费",
+        "开工奠基",
+        "开工奠基仪式"
+      ],
+      "notes": "开工/奠基仪式相关费用（餐费、用车除外）"
     },
     {
       "id": "L2_mgmt_stamp",
       "name": "印花税",
-      "parent": "L1_mgmt",
+      "parent": "L1_tax",
       "order": 19,
       "active": true,
-      "aliases": [],
+      "aliases": [
+        "印花税"
+      ],
       "notes": ""
     },
     {
@@ -721,7 +791,7 @@
       "order": 26,
       "active": false,
       "aliases": [],
-      "notes": " | 并入大类「投标保证金」"
+      "notes": " | 并入大类「投标保证金」 | 已迁移到 L1_deposit，见 L2_dep_*"
     },
     {
       "id": "L2_mgmt_fuel2",
@@ -765,22 +835,25 @@
       "active": true,
       "aliases": [
         "差旅",
-        "机票",
-        "机票款",
+        "差旅费",
         "酒店",
-        "飞签"
+        "住宿",
+        "宾馆"
       ],
-      "notes": "seed extra"
+      "notes": "差旅综合；机票/交通/补助请用细分科目"
     },
     {
       "id": "L2_mgmt_tax",
       "name": "税款",
-      "parent": "L1_mgmt",
+      "parent": "L1_tax",
       "order": 81,
       "active": true,
       "aliases": [
         "WHT",
+        "代扣税",
         "增值税",
+        "税款",
+        "税金",
         "补缴税",
         "预扣税"
       ],
@@ -791,11 +864,11 @@
       "name": "投标保证金",
       "parent": "L1_mgmt",
       "order": 82,
-      "active": true,
+      "active": false,
       "aliases": [
         "履约保证金"
       ],
-      "notes": "seed extra"
+      "notes": "seed extra | 已迁移到 L1_deposit，见 L2_dep_*"
     },
     {
       "id": "L2_mat_brick",
@@ -923,8 +996,11 @@
       "aliases": [
         "保关费",
         "带关费",
+        "带关费用",
         "报关",
-        "清关"
+        "清关",
+        "报关费",
+        "带关"
       ],
       "notes": ""
     },
@@ -1025,6 +1101,316 @@
         "签字费"
       ],
       "notes": ""
+    },
+    {
+      "id": "L2_mgmt_water_fee",
+      "name": "水费",
+      "parent": "L1_mgmt",
+      "order": 30,
+      "active": true,
+      "aliases": [
+        "园区水费",
+        "工业用水",
+        "施工用水",
+        "现场用水",
+        "生活用水",
+        "自来水"
+      ],
+      "notes": "施工/园区/工业用水；不含桶装饮用水"
+    },
+    {
+      "id": "L2_mgmt_elec_fee",
+      "name": "电费",
+      "parent": "L1_mgmt",
+      "order": 31,
+      "active": true,
+      "aliases": [
+        "施工用电",
+        "临时用电",
+        "工业用电",
+        "现场用电",
+        "营地电力",
+        "用电安装"
+      ],
+      "notes": "施工/临时用电；不含燃料发电"
+    },
+    {
+      "id": "L2_mgmt_drink_water",
+      "name": "现场饮用水",
+      "parent": "L1_mgmt",
+      "order": 32,
+      "active": true,
+      "aliases": [
+        "桶装水",
+        "饮用水",
+        "矿泉水",
+        "瓶装水",
+        "饮用水付款",
+        "现场桶装水",
+        "办公室桶装水"
+      ],
+      "notes": "现场/办公室饮用桶装水等"
+    },
+    {
+      "id": "L2_mgmt_fuel_equip",
+      "name": "机具发电用油",
+      "parent": "L1_mgmt",
+      "order": 40,
+      "active": true,
+      "aliases": [
+        "机具用油",
+        "发电用油",
+        "发电机用油",
+        "机械用油",
+        "施工用油",
+        "挖机加油",
+        "吊车加油",
+        "设备加油"
+      ],
+      "notes": "施工机具、发电机用柴油等"
+    },
+    {
+      "id": "L2_mgmt_fuel_vehicle",
+      "name": "车辆用油",
+      "parent": "L1_mgmt",
+      "order": 41,
+      "active": true,
+      "aliases": [
+        "车辆加油",
+        "汽车加油",
+        "皮卡加油",
+        "95汽油",
+        "92汽油",
+        "汽油",
+        "交通用油"
+      ],
+      "notes": "交通车辆用油"
+    },
+    {
+      "id": "L2_mgmt_airfare",
+      "name": "机票费",
+      "parent": "L1_mgmt",
+      "order": 50,
+      "active": true,
+      "aliases": [
+        "机票",
+        "机票款",
+        "航空票",
+        "机票费用"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_transit",
+      "name": "交通费",
+      "parent": "L1_mgmt",
+      "order": 51,
+      "active": true,
+      "aliases": [
+        "打车",
+        "出租车",
+        "网约车",
+        "地铁",
+        "公交",
+        "大巴",
+        "交通费用",
+        "车站"
+      ],
+      "notes": "市内/城际交通，不含车辆租赁与过路"
+    },
+    {
+      "id": "L2_mgmt_travel_allow",
+      "name": "出差补助",
+      "parent": "L1_mgmt",
+      "order": 52,
+      "active": true,
+      "aliases": [
+        "出差补贴",
+        "差旅补助",
+        "出差津贴",
+        "驻外补助",
+        "外勤补助"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "L2_mgmt_visa_fee",
+      "name": "签证费用",
+      "parent": "L1_mgmt",
+      "order": 20,
+      "active": true,
+      "aliases": [
+        "DTV",
+        "商务签",
+        "回头签",
+        "年签",
+        "签证",
+        "签证费",
+        "签证费用",
+        "老挝签",
+        "落地签",
+        "转签",
+        "飞签"
+      ],
+      "notes": "出入境签证；工作签归证件许可"
+    },
+    {
+      "id": "L2_mgmt_security_fee",
+      "name": "安保费",
+      "parent": "L1_mgmt",
+      "order": 60,
+      "active": true,
+      "aliases": [
+        "安保",
+        "安保费用",
+        "保安费",
+        "门岗",
+        "门卫费"
+      ],
+      "notes": "非工资类安保服务费；保安工资在人工费"
+    },
+    {
+      "id": "L2_mat_floor",
+      "name": "地坪硬化",
+      "parent": "L1_mat",
+      "order": 80,
+      "active": true,
+      "aliases": [
+        "硬化地坪",
+        "混凝土地坪",
+        "场地硬化",
+        "地坪"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "L2_mat_gate",
+      "name": "门楼",
+      "parent": "L1_mat",
+      "order": 81,
+      "active": true,
+      "aliases": [
+        "大门",
+        "门楼施工",
+        "门头"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "L2_mat_temp_build",
+      "name": "现场临建用房",
+      "parent": "L1_mat",
+      "order": 82,
+      "active": true,
+      "aliases": [
+        "临建",
+        "临时用房",
+        "活动板房",
+        "板房",
+        "临建设施",
+        "集装箱房"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "L2_mat_temp_fence",
+      "name": "现场临时围墙",
+      "parent": "L1_mat",
+      "order": 83,
+      "active": true,
+      "aliases": [
+        "临时围墙",
+        "围挡",
+        "围墙",
+        "彩钢围挡",
+        "施工围墙"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "L2_mat_plate",
+      "name": "钢板",
+      "parent": "L1_mat",
+      "order": 15,
+      "active": true,
+      "aliases": [
+        "钢板费用",
+        "钢板费",
+        "钢板采购",
+        "钢板款",
+        "钢板材料"
+      ],
+      "notes": "钢板费用，不归钢筋"
+    },
+    {
+      "id": "L2_mgmt_work_visa",
+      "name": "工作签证费用",
+      "parent": "L1_mgmt",
+      "order": 21,
+      "active": true,
+      "aliases": [
+        "工作签",
+        "工签",
+        "工作签证",
+        "工作签费用",
+        "临时工作签",
+        "工作签费",
+        "工签费"
+      ],
+      "notes": "工作签证相关；与商务签证、证件许可区分"
+    },
+    {
+      "id": "L2_dep_deposit",
+      "name": "押金",
+      "parent": "L1_deposit",
+      "order": 10,
+      "active": true,
+      "aliases": [
+        "押金",
+        "保证金退还",
+        "押金退还"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "L2_dep_bid",
+      "name": "投标保证金",
+      "parent": "L1_deposit",
+      "order": 20,
+      "active": true,
+      "aliases": [
+        "投标保证金",
+        "投标保证"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "L2_dep_perf",
+      "name": "履约保证金",
+      "parent": "L1_deposit",
+      "order": 30,
+      "active": true,
+      "aliases": [
+        "履约保证金",
+        "履约保证"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "L2_exclude_agent_pay",
+      "name": "代付款",
+      "parent": "L1_exclude",
+      "order": 40,
+      "active": true,
+      "aliases": [
+        "代付",
+        "代付款",
+        "代支付",
+        "代垫",
+        "代垫款",
+        "代为付款"
+      ],
+      "notes": "代付/代xx付款，不计入管理费与成本"
     }
   ],
   "granularity": {

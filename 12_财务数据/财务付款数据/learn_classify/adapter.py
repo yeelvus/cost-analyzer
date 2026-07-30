@@ -73,19 +73,16 @@ class SubjectMapper:
     def process_excel(self, excel_path: str, output_path: Optional[str] = None):
         import pandas as pd
 
+        from .review import classify_dataframe
+
         df = pd.read_excel(excel_path, sheet_name=0)
-        results = [
-            self.engine.classify(row.get("科目"), row.get("摘要"), row.get("供应商名称"))
-            for _, row in df.iterrows()
-        ]
-        df["新一级科目"] = [r.l1_name for r in results]
-        df["新二级科目"] = [r.l2_name for r in results]
-        df["新三级科目"] = [getattr(r, "l3_name", "") or "" for r in results]
-        df["分类ID"] = [
-            (getattr(r, "l3_id", None) or r.l2_id or "") for r in results
-        ]
-        df["命中层"] = [r.layer for r in results]
-        df["置信度"] = [r.confidence for r in results]
+        classified = classify_dataframe(df, self.engine)
+        df["新一级科目"] = classified["一级科目"]
+        df["新二级科目"] = classified["二级科目"]
+        df["新三级科目"] = classified["三级科目"]
+        df["分类ID"] = classified["分类ID"]
+        df["命中层"] = classified["命中层"]
+        df["置信度"] = classified["置信度"]
         out = Path(output_path) if output_path else Path(excel_path).with_name(
             f"{Path(excel_path).stem}_已分类.xlsx"
         )

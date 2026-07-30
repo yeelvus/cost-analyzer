@@ -180,7 +180,20 @@ def enrich_project_fields(df: pd.DataFrame) -> pd.DataFrame:
     return enriched
 
 
+def _cell_str(value) -> str:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    s = str(value).strip()
+    return "" if s.lower() == "nan" else s
+
+
 def append_subject_levels(df: pd.DataFrame, mapper) -> pd.DataFrame:
+    """为明细附加一/二/三级分类。相同 (科目,摘要,供应商) 只分类一次。"""
     enriched = df.copy()
     if "科目" not in enriched.columns and "摘要" not in enriched.columns:
         enriched["一级科目"] = DEFAULT_CATEGORY
@@ -193,36 +206,74 @@ def append_subject_levels(df: pd.DataFrame, mapper) -> pd.DataFrame:
         else ("供应商" if "供应商" in enriched.columns else None)
     )
 
+    n = len(enriched)
+    subjects = (
+        enriched["科目"].map(_cell_str).tolist()
+        if "科目" in enriched.columns
+        else [""] * n
+    )
+    summaries = (
+        enriched["摘要"].map(_cell_str).tolist()
+        if "摘要" in enriched.columns
+        else [""] * n
+    )
+    if vendor_col:
+        vendors = enriched[vendor_col].map(_cell_str).tolist()
+    else:
+        vendors = [""] * n
+
+    triples = list(zip(subjects, summaries, vendors))
+    unique_triples = list(dict.fromkeys(triples))
+    cache = {}
+
+    engine = getattr(mapper, "engine", None)
+    use_full = hasattr(mapper, "classify_full")
+
+    if engine is not None and hasattr(engine, "classify_unique_map"):
+        cache = engine.classify_unique_map(unique_triples)
+    else:
+        for t in unique_triples:
+            try:
+                if use_full:
+                    cache[t] = mapper.classify_full(t[0], t[1], t[2] or None)
+                else:
+                    l1, l2 = mapper.classify(t[0], t[1])
+                    cache[t] = (l1, l2)
+            except Exception:
+                cache[t] = None
+
     l1s, l2s, l3s, ids, layers, confs = [], [], [], [], [], []
-    for _, row in enriched.iterrows():
-        vendor = row.get(vendor_col) if vendor_col else None
+    for t in triples:
+        r = cache.get(t)
         try:
-            if hasattr(mapper, "classify_full"):
-                r = mapper.classify_full(row.get("科目"), row.get("摘要"), vendor)
+            if r is None:
+                l1, l2, l3 = DEFAULT_CATEGORY, "待复核", ""
+                leaf, layer, conf = "", "error", 0.0
+            elif isinstance(r, tuple):
+                l1, l2 = r[0], r[1]
+                l3, leaf, layer, conf = "", "", "", None
+            else:
                 l1, l2 = r.l1_name, r.l2_name
                 l3 = getattr(r, "l3_name", "") or ""
                 leaf = getattr(r, "l3_id", "") or getattr(r, "l2_id", "") or ""
-                ids.append(leaf)
-                layers.append(r.layer)
-                confs.append(r.confidence)
-            else:
-                l1, l2 = mapper.classify(row.get("科目"), row.get("摘要"))
-                l3 = ""
-                ids.append("")
-                layers.append("")
-                confs.append(None)
+                layer = getattr(r, "layer", "")
+                conf = getattr(r, "confidence", None)
         except Exception:
             l1, l2, l3 = DEFAULT_CATEGORY, "待复核", ""
-            ids.append("")
-            layers.append("error")
-            confs.append(0.0)
+            leaf, layer, conf = "", "error", 0.0
 
-        l1 = str(l1 or "").strip() or DEFAULT_CATEGORY
-        l2 = str(l2 or "").strip() or "待复核"
-        l3 = str(l3 or "").strip()
-        l1s.append(l1)
-        l2s.append(l2)
-        l3s.append(l3)
+        l1s.append(str(l1 or "").strip() or DEFAULT_CATEGORY)
+        l2s.append(str(l2 or "").strip() or "待复核")
+        l3s.append(str(l3 or "").strip())
+        ids.append(leaf)
+        layers.append(layer)
+        confs.append(conf)
+
+    if unique_triples:
+        print(
+            f"  分类缓存: {len(unique_triples)} 种组合 → {n} 行"
+            f"（复用率 {(1 - len(unique_triples) / max(n, 1)) * 100:.0f}%）"
+        )
 
     enriched["一级科目"] = l1s
     enriched["二级科目"] = l2s
@@ -282,6 +333,9 @@ def apply_output_format(output_path: Path, classify_data: Path | None = None) ->
     mismatch_fill = PatternFill(fill_type="solid", fgColor="FFF2CC")
 
     for ws in wb.worksheets:
+        # 分类汇总 sheet 自带样式，跳过明细校验
+        if ws.title in {"分类汇总", "_分类选项"}:
+            continue
         try:
             layout_fn(
                 ws,
@@ -404,6 +458,15 @@ def run_std(paths: Paths, *, cleanup_stale: bool = False) -> List[str]:
             wan_df.to_excel(writer, sheet_name="明细数据_万泰铢", index=False)
             project_df.to_excel(writer, sheet_name="明细数据", index=False)
         apply_output_format(out_path, classify_data=paths.classify_data)
+        # 一级/二级/三级分类汇总（实付+预扣税）
+        try:
+            from .category_summary import add_category_summary_to_workbook
+
+            wb = load_workbook(out_path)
+            add_category_summary_to_workbook(wb, project_df)
+            wb.save(out_path)
+        except Exception as exc:
+            print(f"  ⚠️ 分类汇总 sheet 写入失败: {exc}")
         outputs.append(str(out_path))
         print(f"  ✅ {out_name}  ({len(project_df)} 行)")
 

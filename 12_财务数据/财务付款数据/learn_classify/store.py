@@ -126,6 +126,69 @@ class MemoryStore:
         self._store.rewrite(asdict(e) for e in self.entries.values())
         return changed
 
+    def line_count(self) -> int:
+        if not self.path.exists():
+            return 0
+        n = 0
+        with open(self.path, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    n += 1
+        return n
+
+    def compact(
+        self,
+        *,
+        backup: bool = True,
+        drop_empty_summary: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        压缩 memory.jsonl：只保留每个 key 的最终条目（加载时后写覆盖）。
+
+        - 去掉历史追加造成的重复行（主要体积来源）
+        - 可选丢弃无摘要的空键
+        返回统计；写入前可备份为 memory.jsonl.bak_时间戳
+        """
+        before_lines = self.line_count()
+        before_keys = len(self.entries)
+        before_bytes = self.path.stat().st_size if self.path.exists() else 0
+
+        kept: Dict[str, MemoryEntry] = {}
+        dropped_empty = 0
+        for key, e in self.entries.items():
+            if drop_empty_summary and not str(e.summary or "").strip() and not str(
+                e.key or ""
+            ).replace("|", "").strip():
+                dropped_empty += 1
+                continue
+            if not key or not e.l2_id:
+                dropped_empty += 1
+                continue
+            kept[key] = e
+
+        self.entries = kept
+        bak_path = ""
+        if backup and self.path.exists() and before_lines > 0:
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            bak_path = str(self.path.with_name(f"{self.path.name}.bak_{ts}"))
+            import shutil
+
+            shutil.copy2(self.path, bak_path)
+
+        self._store.rewrite(asdict(e) for e in sorted(self.entries.values(), key=lambda x: x.key))
+        after_bytes = self.path.stat().st_size if self.path.exists() else 0
+        return {
+            "before_lines": before_lines,
+            "after_lines": len(self.entries),
+            "unique_keys_before_load": before_keys,
+            "unique_keys_after": len(self.entries),
+            "dropped_empty": dropped_empty,
+            "before_bytes": before_bytes,
+            "after_bytes": after_bytes,
+            "saved_bytes": max(0, before_bytes - after_bytes),
+            "backup": bak_path,
+        }
+
 
 class CorrectionStore:
     def __init__(self, path: Path):
@@ -168,6 +231,72 @@ class CorrectionStore:
             out.append(row)
         self._store.rewrite(out)
         return changed
+
+    def line_count(self) -> int:
+        if not self._store.path.exists():
+            return 0
+        n = 0
+        with open(self._store.path, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    n += 1
+        return n
+
+    def compact(
+        self,
+        *,
+        backup: bool = True,
+        keep_last: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        压缩纠错日志。
+
+        - 默认：对 (subject, summary, vendor, new_l2_id) 去重，只留最后一条
+        - keep_last: 再截断为最近 N 条（按文件顺序，末尾为新）
+        """
+        path = self._store.path
+        before_lines = self.line_count()
+        before_bytes = path.stat().st_size if path.exists() else 0
+        rows = self._store.read_all()
+
+        # 后写覆盖：按指纹保留最后出现
+        latest: Dict[str, Dict[str, Any]] = {}
+        order: List[str] = []
+        for row in rows:
+            fp = "|".join(
+                [
+                    str(row.get("subject", "")).strip(),
+                    str(row.get("summary", "")).strip(),
+                    str(row.get("vendor", "")).strip(),
+                    str(row.get("new_l2_id", "")).strip(),
+                ]
+            )
+            if fp not in latest:
+                order.append(fp)
+            latest[fp] = row
+        out = [latest[fp] for fp in order]
+
+        if keep_last is not None and keep_last > 0 and len(out) > keep_last:
+            out = out[-keep_last:]
+
+        bak_path = ""
+        if backup and path.exists() and before_lines > 0:
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            bak_path = str(path.with_name(f"{path.name}.bak_{ts}"))
+            import shutil
+
+            shutil.copy2(path, bak_path)
+
+        self._store.rewrite(out)
+        after_bytes = path.stat().st_size if path.exists() else 0
+        return {
+            "before_lines": before_lines,
+            "after_lines": len(out),
+            "before_bytes": before_bytes,
+            "after_bytes": after_bytes,
+            "saved_bytes": max(0, before_bytes - after_bytes),
+            "backup": bak_path,
+        }
 
 
 class VendorStats:
@@ -248,3 +377,64 @@ def save_rules(path: Path, rules: List[Dict[str, Any]], meta: Optional[Dict] = N
     }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
+
+
+def compact_data_dir(
+    data_dir: Path,
+    *,
+    memory: bool = True,
+    corrections: bool = True,
+    backup: bool = True,
+    corrections_keep_last: Optional[int] = None,
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    """压缩 data 目录下的 memory / corrections jsonl。"""
+    data_dir = Path(data_dir)
+    report: Dict[str, Any] = {"data_dir": str(data_dir), "dry_run": dry_run}
+
+    if memory:
+        mem = MemoryStore(data_dir / "memory.jsonl")
+        if dry_run:
+            lines = mem.line_count()
+            report["memory"] = {
+                "before_lines": lines,
+                "unique_keys": len(mem.entries),
+                "would_remove_lines": max(0, lines - len(mem.entries)),
+                "before_bytes": mem.path.stat().st_size if mem.path.exists() else 0,
+            }
+        else:
+            report["memory"] = mem.compact(backup=backup)
+
+    if corrections:
+        corr = CorrectionStore(data_dir / "corrections.jsonl")
+        if dry_run:
+            rows = corr._store.read_all()
+            fps = set()
+            for row in rows:
+                fps.add(
+                    "|".join(
+                        [
+                            str(row.get("subject", "")).strip(),
+                            str(row.get("summary", "")).strip(),
+                            str(row.get("vendor", "")).strip(),
+                            str(row.get("new_l2_id", "")).strip(),
+                        ]
+                    )
+                )
+            after = len(fps)
+            if corrections_keep_last and after > corrections_keep_last:
+                after = corrections_keep_last
+            report["corrections"] = {
+                "before_lines": len(rows),
+                "unique_fingerprints": len(fps),
+                "would_keep": after,
+                "before_bytes": corr._store.path.stat().st_size
+                if corr._store.path.exists()
+                else 0,
+            }
+        else:
+            report["corrections"] = corr.compact(
+                backup=backup, keep_last=corrections_keep_last
+            )
+
+    return report

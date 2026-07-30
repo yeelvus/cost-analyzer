@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -14,6 +15,18 @@ from typing import Any, Dict, List, Optional, Tuple
 from .normalize import memory_key, normalize_text, soft_key
 from .store import MemoryStore, VendorStats, load_rules
 from .taxonomy import Taxonomy
+
+# 摘要正则模式（关键词规则难以表达的中间插词场景）
+# (compiled_regex, leaf_id, conf, reason)
+_SUMMARY_PATTERNS: List[Tuple[re.Pattern, str, float, str]] = [
+    # 代付 / 代xx付款 / 代溧阳付款 / 代张三支付
+    (
+        re.compile(r"代.{0,20}(付款|支付|垫付|垫款)|代付|代垫"),
+        "L2_exclude_agent_pay",
+        0.88,
+        "pattern:代*付款",
+    ),
+]
 
 
 @dataclass
@@ -238,6 +251,19 @@ class ClassifyEngine:
                 candidates=list(dict.fromkeys(cand_ids)),
             )
 
+        # 正则模式（如「代xx付款」中间插词）
+        if summ:
+            for cre, leaf_id, conf, reason in _SUMMARY_PATTERNS:
+                if cre.search(summ) or cre.search(summ_norm):
+                    # 叶子若已停用则跳过
+                    if leaf_id in self.taxonomy.level2 or leaf_id in self.taxonomy.level3:
+                        return self._result_from_leaf(
+                            leaf_id,
+                            layer="pattern",
+                            confidence=conf,
+                            reason=reason,
+                        )
+
         # 科目映射（可为 L2 或 L3 id）
         if subj:
             mapped = self.subject_map.get(subj) or self.subject_map.get(subj_norm)
@@ -285,3 +311,47 @@ class ClassifyEngine:
     ) -> Tuple[str, str, str]:
         r = self.classify(subject, summary, vendor)
         return r.l1_name, r.l2_name, r.l3_name
+
+    @staticmethod
+    def _triple_key(
+        subject: Any = None, summary: Any = None, vendor: Any = None
+    ) -> Tuple[str, str, str]:
+        subj = "" if subject is None else str(subject).strip()
+        summ = "" if summary is None else str(summary).strip()
+        vend = "" if vendor is None else str(vendor).strip()
+        if subj.lower() == "nan":
+            subj = ""
+        if summ.lower() == "nan":
+            summ = ""
+        if vend.lower() == "nan":
+            vend = ""
+        return subj, summ, vend
+
+    def classify_many(
+        self,
+        rows: List[Tuple[Any, Any, Any]],
+    ) -> List[ClassifyResult]:
+        """
+        批量分类：对相同 (科目, 摘要, 供应商) 只算一次。
+        rows: [(subject, summary, vendor), ...]
+        """
+        cache: Dict[Tuple[str, str, str], ClassifyResult] = {}
+        out: List[ClassifyResult] = []
+        for subject, summary, vendor in rows:
+            key = self._triple_key(subject, summary, vendor)
+            if key not in cache:
+                cache[key] = self.classify(key[0], key[1], key[2])
+            out.append(cache[key])
+        return out
+
+    def classify_unique_map(
+        self,
+        triples: List[Tuple[Any, Any, Any]],
+    ) -> Dict[Tuple[str, str, str], ClassifyResult]:
+        """对去重后的三元组建缓存表。"""
+        cache: Dict[Tuple[str, str, str], ClassifyResult] = {}
+        for subject, summary, vendor in triples:
+            key = self._triple_key(subject, summary, vendor)
+            if key not in cache:
+                cache[key] = self.classify(key[0], key[1], key[2])
+        return cache

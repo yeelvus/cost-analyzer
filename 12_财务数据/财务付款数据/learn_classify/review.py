@@ -40,13 +40,19 @@ def classify_dataframe(
     summary_col: str = "摘要",
     vendor_col: str = "供应商名称",
 ) -> pd.DataFrame:
+    """批量分类 DataFrame；相同 (科目,摘要,供应商) 只算一次。"""
     out = df.copy()
-    results: List[ClassifyResult] = []
-    for _, row in out.iterrows():
-        subj = row.get(subject_col) if subject_col in out.columns else None
-        summ = row.get(summary_col) if summary_col in out.columns else None
-        vend = row.get(vendor_col) if vendor_col in out.columns else None
-        results.append(engine.classify(subj, summ, vend))
+    n = len(out)
+
+    def col_vals(name: str) -> List[Any]:
+        if name not in out.columns:
+            return [None] * n
+        return out[name].tolist()
+
+    triples = list(
+        zip(col_vals(subject_col), col_vals(summary_col), col_vals(vendor_col))
+    )
+    results = engine.classify_many(triples)
 
     out["一级科目"] = [r.l1_name for r in results]
     out["二级科目"] = [r.l2_name for r in results]
@@ -185,13 +191,20 @@ def update_excel_classification_columns(
             layer_idx = ensure_col("命中层")
             conf_idx = ensure_col("置信度")
 
+        # 先扫一遍收集待分类行，去重后再写回
+        pending: List[tuple] = []  # (row_idx, subj, summ, vend)
         for r in range(2, ws.max_row + 1):
             subject_value = ws.cell(row=r, column=subj_idx).value if subj_idx else None
             summary_value = ws.cell(row=r, column=summ_idx).value if summ_idx else None
             vendor_value = ws.cell(row=r, column=vend_idx).value if vend_idx else None
             if subject_value is None and summary_value in (None, ""):
                 continue
-            result = engine.classify(subject_value, summary_value, vendor_value)
+            pending.append((r, subject_value, summary_value, vendor_value))
+
+        results = engine.classify_many(
+            [(s, m, v) for _, s, m, v in pending]
+        )
+        for (r, _, _, _), result in zip(pending, results):
             ws.cell(row=r, column=lvl1_idx, value=result.l1_name)
             ws.cell(row=r, column=lvl2_idx, value=result.l2_name)
             ws.cell(row=r, column=lvl3_idx, value=getattr(result, "l3_name", "") or "")
@@ -213,6 +226,22 @@ def update_excel_classification_columns(
 
         data_dir = Path(__file__).resolve().parent / "data"
         apply_category_dropdowns(wb, data_dir=data_dir)
+    except Exception:
+        pass
+
+    # 重写「分类汇总」sheet（一级/二级/三级 · 实付+预扣税）
+    try:
+        hub_root = Path(__file__).resolve().parent.parent
+        if str(hub_root) not in sys.path:
+            sys.path.insert(0, str(hub_root))
+        from payment_hub.category_summary import (
+            _read_detail_df_from_wb,
+            add_category_summary_to_workbook,
+        )
+
+        detail_df = _read_detail_df_from_wb(wb)
+        if detail_df is not None and not detail_df.empty:
+            add_category_summary_to_workbook(wb, detail_df)
     except Exception:
         pass
 

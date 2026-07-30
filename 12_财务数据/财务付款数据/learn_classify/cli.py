@@ -168,6 +168,26 @@ def cmd_seed_vendor(args):
     print(f"✅ 供应商画像观察次数: {n}")
 
 
+def cmd_compact(args):
+    import json
+
+    from .store import compact_data_dir
+
+    only_mem = bool(getattr(args, "memory_only", False))
+    only_corr = bool(getattr(args, "corrections_only", False))
+    do_memory = only_mem or not only_corr
+    do_corr = only_corr or not only_mem
+    report = compact_data_dir(
+        Path(args.data_dir),
+        memory=do_memory,
+        corrections=do_corr,
+        backup=not bool(getattr(args, "no_backup", False)),
+        corrections_keep_last=getattr(args, "corrections_keep_last", None),
+        dry_run=bool(getattr(args, "dry_run", False)),
+    )
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+
+
 def build_parser():
     p = argparse.ArgumentParser(
         prog="learn_classify",
@@ -225,6 +245,14 @@ def build_parser():
     c.add_argument("--std-dir", default=str(DEFAULT_STD))
     c.add_argument("--conf", type=float, default=0.75)
     c.set_defaults(func=cmd_seed_vendor)
+
+    c = sub.add_parser("compact", help="压缩 memory/corrections jsonl")
+    c.add_argument("--dry-run", action="store_true")
+    c.add_argument("--no-backup", action="store_true")
+    c.add_argument("--memory-only", action="store_true")
+    c.add_argument("--corrections-only", action="store_true")
+    c.add_argument("--corrections-keep-last", type=int, default=None)
+    c.set_defaults(func=cmd_compact)
 
     return p
 

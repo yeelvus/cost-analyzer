@@ -67,21 +67,21 @@ def build_parser() -> argparse.ArgumentParser:
         description="财务付款一体化：明细标准化 + 汇总分析 + 现金流 HTML + 分类学习",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-常用示例:
-  python 财务付款一体化.py                   # 默认 = apply-class（总表有效分类全部学习）
-  python 财务付款一体化.py apply-class       # 同上：表内改好的一/二/三级 → 记忆/学习记录 → 重刷
-  python 财务付款一体化.py export-class      # 导出「付款分类总表」(摘要去重)
-  python 财务付款一体化.py all               # 全流程 std → summary → cashflow
-  python 财务付款一体化.py all --skip-std    # 跳过标准化，只汇总+HTML
-  python 财务付款一体化.py std               # 仅原始→标准
-  python 财务付款一体化.py summary           # 仅汇总
-  python 财务付款一体化.py cashflow          # 仅 HTML
-  python 财务付款一体化.py export-taxonomy   # 导出科目体系 Excel
-  python 财务付款一体化.py import-taxonomy   # 导入科目体系
+日常主路径:
+  python 财务付款一体化.py                   # 默认 = apply-class（学分类总表叶子变更）
+  python 财务付款一体化.py export-class      # 导出「付款分类总表」→ 改一/二/三级后 apply
+  python 财务付款一体化.py all               # 月结全流程: std → summary → cashflow
+  python 财务付款一体化.py month             # 同 all（语义别名）
+
+分步 / 维护:
+  python 财务付款一体化.py std | summary | cashflow | reclassify
+  python 财务付款一体化.py all --skip-std    # 已有 B_std，只刷新报表
+  python 财务付款一体化.py compact-memory    # 压缩 memory/corrections jsonl
+  python 财务付款一体化.py compact-memory --dry-run
   python 财务付款一体化.py help-guide
         """,
     )
-    # 无子命令时默认 apply-class；全流程参数仍挂在主 parser（兼容旧习惯）
+    # 无子命令时默认 apply-class（不是 all）；全流程请显式 all/month
     _add_path_args(p)
     p.add_argument(
         "-i",
@@ -121,23 +121,27 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = p.add_subparsers(dest="cmd", required=False)
 
-    # ---- all（兼容旧写法）----
-    c = sub.add_parser("all", help="全流程：std → summary → cashflow（与无子命令相同）")
-    _add_path_args(c)
-    c.add_argument("--skip-std", action="store_true", help="跳过标准化（已有 B_std）")
-    c.add_argument("--skip-summary", action="store_true")
-    c.add_argument("--skip-cashflow", action="store_true")
-    c.add_argument(
-        "--reclassify",
-        action="store_true",
-        help="汇总前用当前分类体系重刷 B_std",
-    )
-    c.add_argument(
-        "--steps",
-        nargs="+",
-        default=None,
-        help="自定义步骤序列: std reclassify summary cashflow review learn health",
-    )
+    # ---- all / month（月结全流程；无参数默认是 apply-class，不是这里）----
+    for all_name, all_help in [
+        ("all", "月结全流程：std → summary → cashflow（不是默认无参数行为）"),
+        ("month", "同 all：月结全流程 std → summary → cashflow"),
+    ]:
+        c = sub.add_parser(all_name, help=all_help)
+        _add_path_args(c)
+        c.add_argument("--skip-std", action="store_true", help="跳过标准化（已有 B_std）")
+        c.add_argument("--skip-summary", action="store_true")
+        c.add_argument("--skip-cashflow", action="store_true")
+        c.add_argument(
+            "--reclassify",
+            action="store_true",
+            help="汇总前用当前分类体系重刷 B_std",
+        )
+        c.add_argument(
+            "--steps",
+            nargs="+",
+            default=None,
+            help="自定义步骤序列: std reclassify summary cashflow review learn health",
+        )
 
     # ---- single steps ----
     for name, help_ in [
@@ -289,6 +293,44 @@ def build_parser() -> argparse.ArgumentParser:
     _add_path_args(c)
     c.add_argument("-i", "--input", default=None, help="默认 data/科目体系.xlsx")
 
+    c = sub.add_parser(
+        "category-summary",
+        help="给 B_std 各项目 Excel 补写/刷新「分类汇总」sheet（一/二/三级·实付+预扣税）",
+    )
+    _add_path_args(c)
+
+    c = sub.add_parser(
+        "compact-memory",
+        help="压缩 memory.jsonl / corrections.jsonl（去重写回，显著减小体积）",
+    )
+    _add_path_args(c)
+    c.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="只统计可压缩量，不写盘",
+    )
+    c.add_argument(
+        "--no-backup",
+        action="store_true",
+        help="写盘前不备份 .bak_时间戳",
+    )
+    c.add_argument(
+        "--memory-only",
+        action="store_true",
+        help="只压 memory.jsonl",
+    )
+    c.add_argument(
+        "--corrections-only",
+        action="store_true",
+        help="只压 corrections.jsonl",
+    )
+    c.add_argument(
+        "--corrections-keep-last",
+        type=int,
+        default=None,
+        help="纠错日志去重后再只保留最近 N 条",
+    )
+
     return p
 
 
@@ -362,7 +404,7 @@ def main(argv=None) -> int:
                 print(f"{k:18} {v}")
             return 0
 
-        if args.cmd == "all":
+        if args.cmd in ("all", "month"):
             return _run_all(paths, args)
 
         if args.cmd == "std":
@@ -564,6 +606,49 @@ def main(argv=None) -> int:
             step_import_taxonomy(
                 paths, Path(args.input) if args.input else None
             )
+            return 0
+
+        if args.cmd == "category-summary":
+            from .category_summary import refresh_category_summary_in_std_dir
+
+            stats = refresh_category_summary_in_std_dir(paths.std_dir)
+            print(f"✅ 分类汇总 sheet 已刷新: {stats}")
+            return 0
+
+        if args.cmd == "compact-memory":
+            import json
+            from learn_classify.store import compact_data_dir
+
+            only_mem = bool(getattr(args, "memory_only", False))
+            only_corr = bool(getattr(args, "corrections_only", False))
+            do_memory = only_mem or not only_corr
+            do_corr = only_corr or not only_mem
+            if only_mem and only_corr:
+                do_memory = do_corr = True
+            report = compact_data_dir(
+                paths.classify_data,
+                memory=do_memory,
+                corrections=do_corr,
+                backup=not bool(getattr(args, "no_backup", False)),
+                corrections_keep_last=getattr(args, "corrections_keep_last", None),
+                dry_run=bool(getattr(args, "dry_run", False)),
+            )
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+            if report.get("dry_run"):
+                print("（dry-run：未写盘。去掉 --dry-run 执行压缩）")
+            else:
+                mem = report.get("memory") or {}
+                corr = report.get("corrections") or {}
+                if mem:
+                    print(
+                        f"✅ memory: {mem.get('before_lines')} → {mem.get('after_lines')} 行"
+                        f"，节省 {mem.get('saved_bytes', 0) / 1024 / 1024:.1f} MB"
+                    )
+                if corr:
+                    print(
+                        f"✅ corrections: {corr.get('before_lines')} → {corr.get('after_lines')} 行"
+                        f"，节省 {corr.get('saved_bytes', 0) / 1024 / 1024:.1f} MB"
+                    )
             return 0
 
         parser.error(f"未知命令: {args.cmd}")

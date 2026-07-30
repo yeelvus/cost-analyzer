@@ -10,12 +10,16 @@
   · learn_classify 可持续学习 / 分类迁移
 
 快速开始：
-  python 财务付款一体化.py              # 默认 = apply-class（总表有效分类全部学习）
+  python 财务付款一体化.py              # 默认 = apply-class（学分类总表叶子变更）
   python 财务付款一体化.py apply-class  # 同上
   python 财务付款一体化.py export-class # 导出付款分类总表
-  python 财务付款一体化.py all          # 全流程 std → summary → cashflow
+  python 财务付款一体化.py all          # 月结全流程 std → summary → cashflow
+  python 财务付款一体化.py month        # 同 all
+  python 财务付款一体化.py compact-memory --dry-run
   python 财务付款一体化.py help-guide
   python 财务付款一体化.py show-paths
+
+注意：无参数不是全流程；出汇总/HTML 请用 all 或 month。
 """
 
 from __future__ import annotations
