@@ -1,36 +1,39 @@
 # -*- coding: utf-8 -*-
 """
-项目明细 Excel · 分类汇总 / 分项跳转 / 明细表联动
+项目明细 Excel · 分类汇总（稳健版，避免 Excel「修复工作簿」）
 
-能力：
-1. 将「明细数据」格式化为 Excel 表「付款明细」（改一/二/三级后汇总公式自动变）
-2. 「分类汇总」：一/二/三级结构 + SUMIFS 公式联动金额 + 超链接跳到明细对应行
-3. 「分项查看」：选择一/二/三级后用 FILTER 列出该分项全部明细（Excel 365/2021+）
-4. 「透视源」：干净数据表，便于插入 Excel 原生数据透视表
+能力（不依赖易损坏的 Table 结构化公式 / FILTER）：
+1. 「分类汇总」：一/二/三级 + 实付/预扣/合计（静态值，可大纲折叠）
+2. 「定位明细」超链接 → 跳到明细首条
+3. 「透视源」：干净数据区，便于插入原生数据透视表
+4. 「分类使用说明」
+
+改明细分类后请重新运行 category-summary / reclassify 刷新汇总数字。
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence
+from zipfile import ZipFile, ZIP_DEFLATED
+import io
+import re
+import shutil
+import tempfile
 
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.workbook.workbook import Workbook
-from openpyxl.worksheet.datavalidation import DataValidation
-from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.worksheet.worksheet import Worksheet
 
 SUMMARY_SHEET = "分类汇总"
-VIEW_SHEET = "分项查看"
 PIVOT_SRC_SHEET = "透视源"
 GUIDE_SHEET = "分类使用说明"
+VIEW_SHEET = "分项查看"  # 保留兼容；改为说明页，去掉 FILTER
 DETAIL_SHEET = "明细数据"
 DETAIL_SHEET_CANDIDATES = ("明细数据", "明细数据_万泰铢")
-TABLE_NAME = "付款明细"
-PIVOT_TABLE_NAME = "透视明细"
 
 _SUMMARY_HEADERS = [
     "一级科目",
@@ -39,7 +42,7 @@ _SUMMARY_HEADERS = [
     "笔数",
     "实付金额",
     "预扣税额",
-    "实付+预扣税",
+    "实付加预扣税",
     "查看明细",
 ]
 
@@ -49,7 +52,7 @@ _PIVOT_COLS = [
     "三级科目",
     "实付金额",
     "预扣税额",
-    "实付+预扣税",
+    "实付加预扣税",
     "摘要",
     "供应商名称",
     "日期",
@@ -75,6 +78,20 @@ def _cell_text(v: Any) -> str:
     return s
 
 
+def _to_float(v: Any) -> float:
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return 0.0
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = str(v).strip().replace(",", "")
+    if not s:
+        return 0.0
+    try:
+        return float(s)
+    except Exception:
+        return 0.0
+
+
 def _num(series: pd.Series) -> pd.Series:
     return pd.to_numeric(series, errors="coerce").fillna(0.0)
 
@@ -89,81 +106,110 @@ def _header_map(ws: Worksheet) -> Dict[str, int]:
     return m
 
 
-def _ensure_col(ws: Worksheet, headers: Dict[str, int], name: str) -> int:
-    if name in headers:
-        return headers[name]
-    idx = (ws.max_column or 0) + 1
-    ws.cell(row=1, column=idx, value=name)
-    headers[name] = idx
-    return idx
-
-
-def _remove_table_if_exists(ws: Worksheet, name: str) -> None:
-    tables = getattr(ws, "tables", None)
-    if not tables:
-        return
-    # openpyxl TableList supports del by name
-    try:
-        if name in tables:
-            del tables[name]
-    except Exception:
-        try:
-            keys = list(tables.keys()) if hasattr(tables, "keys") else []
-            for k in keys:
-                if str(k) == name:
-                    del tables[k]
-        except Exception:
-            pass
-
-
-def ensure_detail_excel_table(ws: Worksheet, table_name: str = TABLE_NAME) -> str:
-    """把明细 sheet 做成 Excel 表，供 SUMIFS / 透视 / FILTER 引用。"""
-    max_row = ws.max_row or 1
-    max_col = ws.max_column or 1
-    if max_row < 1 or max_col < 1:
-        return table_name
-
-    # 规范空分类为空白字符串，便于公式
-    headers = _header_map(ws)
-    for col_name in ("一级科目", "二级科目", "三级科目"):
-        if col_name not in headers:
+def _strip_all_tables(wb: Workbook) -> None:
+    """移除全部 Excel 表，避免绝对路径/中文表名导致修复提示。"""
+    for ws in wb.worksheets:
+        tables = getattr(ws, "tables", None)
+        if not tables:
             continue
-        c = headers[col_name]
-        for r in range(2, max_row + 1):
-            cell = ws.cell(row=r, column=c)
-            val = cell.value
-            if val is None:
-                continue
-            s = str(val).strip()
-            if not s or s.lower() in {"nan", "none"} or s == "(空白)":
-                cell.value = None
+        try:
+            names = list(tables.keys())
+        except Exception:
+            names = []
+        for name in names:
+            try:
+                del tables[name]
+            except Exception:
+                pass
 
-    # 辅助列：实付+预扣税（写值，便于透视）
-    pay_c = headers.get("实付金额")
-    wht_c = headers.get("预扣税额")
-    if pay_c and wht_c:
-        sum_c = _ensure_col(ws, headers, "实付+预扣税")
-        for r in range(2, max_row + 1):
-            # 用公式联动明细自身
-            pc = get_column_letter(pay_c)
-            wc = get_column_letter(wht_c)
-            ws.cell(row=r, column=sum_c).value = f"=IFERROR({pc}{r},0)+IFERROR({wc}{r},0)"
-            ws.cell(row=r, column=sum_c).number_format = "#,##0.00"
-        max_col = max(max_col, sum_c)
 
-    ref = f"A1:{get_column_letter(max_col)}{max_row}"
-    _remove_table_if_exists(ws, table_name)
-    # 表名全局唯一：同一工作簿不能重复
-    tab = Table(displayName=table_name, ref=ref)
-    tab.tableStyleInfo = TableStyleInfo(
-        name="TableStyleMedium2",
-        showFirstColumn=False,
-        showLastColumn=False,
-        showRowStripes=True,
-        showColumnStripes=False,
+def build_category_summary_rows(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    if df is None or df.empty:
+        return []
+
+    d = df.copy()
+    for col in ("一级科目", "二级科目", "三级科目"):
+        if col not in d.columns:
+            d[col] = ""
+        d[col] = d[col].map(_blank_label)
+
+    pay = _num(d["实付金额"]) if "实付金额" in d.columns else pd.Series(0.0, index=d.index)
+    wht = _num(d["预扣税额"]) if "预扣税额" in d.columns else pd.Series(0.0, index=d.index)
+    d = d.assign(_pay=pay, _wht=wht, _sum=pay + wht, _n=1)
+
+    g = (
+        d.groupby(["一级科目", "二级科目", "三级科目"], dropna=False, sort=False)
+        .agg(
+            笔数=("_n", "sum"),
+            实付金额=("_pay", "sum"),
+            预扣税额=("_wht", "sum"),
+            实付加预扣税=("_sum", "sum"),
+        )
+        .reset_index()
     )
-    ws.add_table(tab)
-    return table_name
+    g = g.sort_values(["一级科目", "二级科目", "三级科目"], kind="mergesort").reset_index(
+        drop=True
+    )
+
+    rows: List[Dict[str, Any]] = []
+    for l1, g1 in g.groupby("一级科目", sort=False):
+        for l2, g2 in g1.groupby("二级科目", sort=False):
+            for _, r in g2.iterrows():
+                rows.append(
+                    {
+                        "row_type": "detail",
+                        "outline": 2,
+                        "一级科目": str(l1),
+                        "二级科目": str(l2),
+                        "三级科目": str(r["三级科目"]),
+                        "笔数": int(r["笔数"]),
+                        "实付金额": float(r["实付金额"]),
+                        "预扣税额": float(r["预扣税额"]),
+                        "实付加预扣税": float(r["实付加预扣税"]),
+                    }
+                )
+            rows.append(
+                {
+                    "row_type": "l2_sub",
+                    "outline": 1,
+                    "一级科目": str(l1),
+                    "二级科目": f"{l2} 小计",
+                    "三级科目": "",
+                    "笔数": int(g2["笔数"].sum()),
+                    "实付金额": float(g2["实付金额"].sum()),
+                    "预扣税额": float(g2["预扣税额"].sum()),
+                    "实付加预扣税": float(g2["实付加预扣税"].sum()),
+                }
+            )
+        rows.append(
+            {
+                "row_type": "l1_sub",
+                "outline": 0,
+                "一级科目": f"{l1} 合计",
+                "二级科目": "",
+                "三级科目": "",
+                "笔数": int(g1["笔数"].sum()),
+                "实付金额": float(g1["实付金额"].sum()),
+                "预扣税额": float(g1["预扣税额"].sum()),
+                "实付加预扣税": float(g1["实付加预扣税"].sum()),
+            }
+        )
+
+    if rows:
+        rows.append(
+            {
+                "row_type": "grand",
+                "outline": 0,
+                "一级科目": "总计",
+                "二级科目": "",
+                "三级科目": "",
+                "笔数": int(g["笔数"].sum()),
+                "实付金额": float(g["实付金额"].sum()),
+                "预扣税额": float(g["预扣税额"].sum()),
+                "实付加预扣税": float(g["实付加预扣税"].sum()),
+            }
+        )
+    return rows
 
 
 def _find_first_detail_row(
@@ -172,7 +218,6 @@ def _find_first_detail_row(
     l2: str,
     l3: str,
 ) -> Optional[int]:
-    """在明细中找首条匹配行，供超链接定位。"""
     headers = _header_map(ws)
     c1 = headers.get("一级科目")
     c2 = headers.get("二级科目")
@@ -214,135 +259,16 @@ def _find_first_detail_row(
     return None
 
 
-def build_category_summary_rows(df: pd.DataFrame) -> List[Dict[str, Any]]:
-    if df is None or df.empty:
-        return []
-
-    d = df.copy()
-    for col in ("一级科目", "二级科目", "三级科目"):
-        if col not in d.columns:
-            d[col] = ""
-        d[col] = d[col].map(_blank_label)
-
-    pay = _num(d["实付金额"]) if "实付金额" in d.columns else pd.Series(0.0, index=d.index)
-    wht = _num(d["预扣税额"]) if "预扣税额" in d.columns else pd.Series(0.0, index=d.index)
-    d = d.assign(_pay=pay, _wht=wht, _sum=pay + wht, _n=1)
-
-    g = (
-        d.groupby(["一级科目", "二级科目", "三级科目"], dropna=False, sort=False)
-        .agg(
-            笔数=("_n", "sum"),
-            实付金额=("_pay", "sum"),
-            预扣税额=("_wht", "sum"),
-            **{"实付+预扣税": ("_sum", "sum")},
-        )
-        .reset_index()
-    )
-    g = g.sort_values(["一级科目", "二级科目", "三级科目"], kind="mergesort").reset_index(
-        drop=True
-    )
-
-    rows: List[Dict[str, Any]] = []
-    for l1, g1 in g.groupby("一级科目", sort=False):
-        for l2, g2 in g1.groupby("二级科目", sort=False):
-            for _, r in g2.iterrows():
-                rows.append(
-                    {
-                        "row_type": "detail",
-                        "outline": 2,
-                        "一级科目": str(l1),
-                        "二级科目": str(l2),
-                        "三级科目": str(r["三级科目"]),
-                        "笔数": int(r["笔数"]),
-                        "实付金额": float(r["实付金额"]),
-                        "预扣税额": float(r["预扣税额"]),
-                        "实付+预扣税": float(r["实付+预扣税"]),
-                    }
-                )
-            rows.append(
-                {
-                    "row_type": "l2_sub",
-                    "outline": 1,
-                    "一级科目": str(l1),
-                    "二级科目": f"{l2} 小计",
-                    "三级科目": "",
-                    "笔数": int(g2["笔数"].sum()),
-                    "实付金额": float(g2["实付金额"].sum()),
-                    "预扣税额": float(g2["预扣税额"].sum()),
-                    "实付+预扣税": float(g2["实付+预扣税"].sum()),
-                }
-            )
-        rows.append(
-            {
-                "row_type": "l1_sub",
-                "outline": 0,
-                "一级科目": f"{l1} 合计",
-                "二级科目": "",
-                "三级科目": "",
-                "笔数": int(g1["笔数"].sum()),
-                "实付金额": float(g1["实付金额"].sum()),
-                "预扣税额": float(g1["预扣税额"].sum()),
-                "实付+预扣税": float(g1["实付+预扣税"].sum()),
-            }
-        )
-
-    if rows:
-        rows.append(
-            {
-                "row_type": "grand",
-                "outline": 0,
-                "一级科目": "总计",
-                "二级科目": "",
-                "三级科目": "",
-                "笔数": int(g["笔数"].sum()),
-                "实付金额": float(g["实付金额"].sum()),
-                "预扣税额": float(g["预扣税额"].sum()),
-                "实付+预扣税": float(g["实付+预扣税"].sum()),
-            }
-        )
-    return rows
-
-
-def _sumifs_pay(table: str, l1_cell: str, l2_cell: str, l3_cell: str, amount_col: str) -> str:
-    """生成 SUMIFS；三级 (空白) 匹配空单元格。"""
-    # Excel: 空单元格用 "" 匹配
-    # 三级条件：IF(C2="(空白)","",C2)
-    l3_crit = f'IF({l3_cell}="(空白)","",{l3_cell})'
-    return (
-        f'IFERROR(SUMIFS({table}[{amount_col}],'
-        f'{table}[一级科目],{l1_cell},'
-        f'{table}[二级科目],{l2_cell},'
-        f'{table}[三级科目],{l3_crit}),0)'
-    )
-
-
-def _sumif_l1(table: str, l1_cell: str, amount_col: str) -> str:
-    return f'IFERROR(SUMIF({table}[一级科目],SUBSTITUTE({l1_cell}," 合计",""),{table}[{amount_col}]),0)'
-
-
-def _sumifs_l2(table: str, l1_cell: str, l2_cell: str, amount_col: str) -> str:
-    l2 = f'SUBSTITUTE({l2_cell}," 小计","")'
-    return (
-        f'IFERROR(SUMIFS({table}[{amount_col}],'
-        f'{table}[一级科目],{l1_cell},'
-        f'{table}[二级科目],{l2}),0)'
-    )
-
-
 def write_category_summary_sheet(
     wb: Workbook,
     rows: Sequence[Dict[str, Any]],
     detail_ws: Optional[Worksheet] = None,
     *,
     sheet_name: str = SUMMARY_SHEET,
-    table_name: str = TABLE_NAME,
-    use_formulas: bool = True,
 ) -> Worksheet:
     if sheet_name in wb.sheetnames:
         del wb[sheet_name]
-    pos = None
-    if DETAIL_SHEET in wb.sheetnames:
-        pos = wb.sheetnames.index(DETAIL_SHEET) + 1
+    pos = wb.sheetnames.index(DETAIL_SHEET) + 1 if DETAIL_SHEET in wb.sheetnames else None
     ws = wb.create_sheet(sheet_name, pos)
 
     header_font = Font(bold=True, color="FFFFFF")
@@ -374,96 +300,21 @@ def write_category_summary_sheet(
         l2 = row.get("二级科目", "")
         l3 = row.get("三级科目", "")
 
-        ws.cell(row=i, column=1, value=l1).border = thin
-        ws.cell(row=i, column=2, value=l2).border = thin
-        ws.cell(row=i, column=3, value=l3 if l3 else None).border = thin
-
-        # 金额：优先公式联动「付款明细」表（改明细分类后自动重算）
-        if use_formulas and table_name and rtype == "detail":
-            crit3 = f'IF(OR(C{i}="(空白)",C{i}=""),"",C{i})'
-            n_f = (
-                f'=IFERROR(COUNTIFS({table_name}[一级科目],A{i},'
-                f'{table_name}[二级科目],B{i},'
-                f'{table_name}[三级科目],{crit3}),0)'
-            )
-            pay_f = (
-                f'=IFERROR(SUMIFS({table_name}[实付金额],'
-                f'{table_name}[一级科目],A{i},'
-                f'{table_name}[二级科目],B{i},'
-                f'{table_name}[三级科目],{crit3}),0)'
-            )
-            wht_f = (
-                f'=IFERROR(SUMIFS({table_name}[预扣税额],'
-                f'{table_name}[一级科目],A{i},'
-                f'{table_name}[二级科目],B{i},'
-                f'{table_name}[三级科目],{crit3}),0)'
-            )
-            ws.cell(row=i, column=4, value=n_f)
-            ws.cell(row=i, column=5, value=pay_f)
-            ws.cell(row=i, column=6, value=wht_f)
-            ws.cell(row=i, column=7, value=f"=E{i}+F{i}")
-        elif use_formulas and table_name and rtype == "l2_sub":
-            ws.cell(
-                row=i,
-                column=4,
-                value=(
-                    f'=IFERROR(COUNTIFS({table_name}[一级科目],A{i},'
-                    f'{table_name}[二级科目],SUBSTITUTE(B{i}," 小计","")),0)'
-                ),
-            )
-            ws.cell(
-                row=i,
-                column=5,
-                value=(
-                    f'=IFERROR(SUMIFS({table_name}[实付金额],'
-                    f'{table_name}[一级科目],A{i},'
-                    f'{table_name}[二级科目],SUBSTITUTE(B{i}," 小计","")),0)'
-                ),
-            )
-            ws.cell(
-                row=i,
-                column=6,
-                value=(
-                    f'=IFERROR(SUMIFS({table_name}[预扣税额],'
-                    f'{table_name}[一级科目],A{i},'
-                    f'{table_name}[二级科目],SUBSTITUTE(B{i}," 小计","")),0)'
-                ),
-            )
-            ws.cell(row=i, column=7, value=f"=E{i}+F{i}")
-        elif use_formulas and table_name and rtype == "l1_sub":
-            ws.cell(
-                row=i,
-                column=4,
-                value=f'=IFERROR(COUNTIF({table_name}[一级科目],SUBSTITUTE(A{i}," 合计","")),0)',
-            )
-            ws.cell(
-                row=i,
-                column=5,
-                value=f'=IFERROR(SUMIF({table_name}[一级科目],SUBSTITUTE(A{i}," 合计",""),{table_name}[实付金额]),0)',
-            )
-            ws.cell(
-                row=i,
-                column=6,
-                value=f'=IFERROR(SUMIF({table_name}[一级科目],SUBSTITUTE(A{i}," 合计",""),{table_name}[预扣税额]),0)',
-            )
-            ws.cell(row=i, column=7, value=f"=E{i}+F{i}")
-        elif use_formulas and table_name and rtype == "grand":
-            ws.cell(row=i, column=4, value=f"=IFERROR(COUNTA({table_name}[实付金额]),0)")
-            ws.cell(row=i, column=5, value=f"=IFERROR(SUM({table_name}[实付金额]),0)")
-            ws.cell(row=i, column=6, value=f"=IFERROR(SUM({table_name}[预扣税额]),0)")
-            ws.cell(row=i, column=7, value=f"=E{i}+F{i}")
-        else:
-            ws.cell(row=i, column=4, value=row.get("笔数", 0))
-            ws.cell(row=i, column=5, value=row.get("实付金额", 0))
-            ws.cell(row=i, column=6, value=row.get("预扣税额", 0))
-            ws.cell(row=i, column=7, value=row.get("实付+预扣税", 0))
-
-        for col in range(4, 8):
-            ws.cell(row=i, column=col).border = thin
+        vals = [
+            l1,
+            l2,
+            l3 if l3 else None,
+            row.get("笔数", 0),
+            row.get("实付金额", 0.0),
+            row.get("预扣税额", 0.0),
+            row.get("实付加预扣税", 0.0),
+        ]
+        for col, val in enumerate(vals, start=1):
+            cell = ws.cell(row=i, column=col, value=val)
+            cell.border = thin
             if col >= 5:
-                ws.cell(row=i, column=col).number_format = money_fmt
+                cell.number_format = money_fmt
 
-        # 样式
         fill = None
         bold = False
         if rtype == "l2_sub":
@@ -480,27 +331,27 @@ def write_category_summary_sheet(
                 if fill:
                     cell.fill = fill
 
-        # 超链接：跳到明细首条匹配
         link_cell = ws.cell(row=i, column=8)
         link_cell.border = thin
         if detail_ws is not None and rtype != "grand":
-            target_row = _find_first_detail_row(detail_ws, str(l1), str(l2), str(l3 or "(空白)"))
+            target_row = _find_first_detail_row(
+                detail_ws, str(l1), str(l2), str(l3 or "(空白)")
+            )
             if target_row:
-                # 分项查看：写入参数并跳转；同时超链接到明细行
                 link_cell.value = "定位明细"
-                link_cell.hyperlink = f"#'{DETAIL_SHEET}'!A{target_row}"
+                # 相对工作表定位，兼容性好
+                link_cell.hyperlink = f"#{DETAIL_SHEET}!A{target_row}"
                 link_cell.font = link_font
-            else:
-                link_cell.value = ""
-        else:
-            link_cell.value = ""
 
         ws.row_dimensions[i].outline_level = min(outline, 7)
 
     ws.freeze_panes = "A2"
     last = max(1, len(rows) + 1)
     ws.auto_filter.ref = f"A1:H{last}"
-    ws.sheet_properties.outlinePr.summaryBelow = True
+    try:
+        ws.sheet_properties.outlinePr.summaryBelow = True
+    except Exception:
+        pass
     for i, w in enumerate([16, 20, 16, 8, 14, 14, 14, 12], start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -509,9 +360,9 @@ def write_category_summary_sheet(
         row=note,
         column=1,
         value=(
-            "【联动】金额为公式，引用表「付款明细」。在「明细数据」改一级/二级/三级或金额后，本表自动重算。"
-            "【跳转】点「定位明细」跳到该分类第一条明细，可改科目；改完后汇总自动变。"
-            "【透视】请到「透视源」sheet，选中表 → 插入 → 数据透视表。"
+            "【定位】点「定位明细」跳到该分类在「明细数据」中的第一条，可改一/二/三级。"
+            "【刷新】改完分类后请重新运行 category-summary 或 reclassify 以刷新本表数字。"
+            "【透视】到「透视源」选中数据 → 插入 → 数据透视表（行=一二三级，值=金额求和）。"
         ),
     )
     ws.merge_cells(start_row=note, start_column=1, end_row=note, end_column=8)
@@ -519,24 +370,18 @@ def write_category_summary_sheet(
 
 
 def write_pivot_source_sheet(wb: Workbook, detail_ws: Worksheet) -> Worksheet:
-    """干净数据区 + Excel 表，方便用户一键插数据透视表。"""
     if PIVOT_SRC_SHEET in wb.sheetnames:
         del wb[PIVOT_SRC_SHEET]
     ws = wb.create_sheet(PIVOT_SRC_SHEET)
     headers = _header_map(detail_ws)
-    # 选用列
-    cols: List[Tuple[str, Optional[int]]] = []
-    for name in _PIVOT_COLS:
-        cols.append((name, headers.get(name)))
 
-    # 若无 实付+预扣税 列，后面用公式
-    for c, (name, _) in enumerate(cols, start=1):
-        ws.cell(row=1, column=c, value=name)
+    for c, name in enumerate(_PIVOT_COLS, start=1):
+        cell = ws.cell(row=1, column=c, value=name)
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="D9E2F3")
 
     out_r = 2
-    max_r = detail_ws.max_row or 1
-    for r in range(2, max_r + 1):
-        # 跳过全空行
+    for r in range(2, (detail_ws.max_row or 1) + 1):
         any_val = False
         for src_c in headers.values():
             if detail_ws.cell(row=r, column=src_c).value not in (None, ""):
@@ -544,25 +389,22 @@ def write_pivot_source_sheet(wb: Workbook, detail_ws: Worksheet) -> Worksheet:
                 break
         if not any_val:
             continue
-        for c, (name, src_idx) in enumerate(cols, start=1):
-            if name == "实付+预扣税":
-                # 从源行取实付、预扣
-                pay_i = headers.get("实付金额")
-                wht_i = headers.get("预扣税额")
-                pay = detail_ws.cell(row=r, column=pay_i).value if pay_i else 0
-                wht = detail_ws.cell(row=r, column=wht_i).value if wht_i else 0
-                try:
-                    pv = float(pay or 0)
-                except Exception:
-                    pv = 0.0
-                try:
-                    wv = float(wht or 0)
-                except Exception:
-                    wv = 0.0
-                cell = ws.cell(row=out_r, column=c, value=pv + wv)
+        pay = _to_float(
+            detail_ws.cell(row=r, column=headers["实付金额"]).value
+            if "实付金额" in headers
+            else 0
+        )
+        wht = _to_float(
+            detail_ws.cell(row=r, column=headers["预扣税额"]).value
+            if "预扣税额" in headers
+            else 0
+        )
+        for c, name in enumerate(_PIVOT_COLS, start=1):
+            if name == "实付加预扣税":
+                cell = ws.cell(row=out_r, column=c, value=pay + wht)
                 cell.number_format = "#,##0.00"
-            elif src_idx:
-                val = detail_ws.cell(row=r, column=src_idx).value
+            elif name in headers:
+                val = detail_ws.cell(row=r, column=headers[name]).value
                 if name in ("一级科目", "二级科目", "三级科目"):
                     val = _cell_text(val) or "(空白)"
                 cell = ws.cell(row=out_r, column=c, value=val)
@@ -573,13 +415,7 @@ def write_pivot_source_sheet(wb: Workbook, detail_ws: Worksheet) -> Worksheet:
         out_r += 1
 
     last = max(1, out_r - 1)
-    ref = f"A1:{get_column_letter(len(cols))}{last}"
-    _remove_table_if_exists(ws, PIVOT_TABLE_NAME)
-    if last >= 1:
-        tab = Table(displayName=PIVOT_TABLE_NAME, ref=ref)
-        tab.tableStyleInfo = TableStyleInfo(name="TableStyleMedium9", showRowStripes=True)
-        ws.add_table(tab)
-
+    # 不用 Excel Table，避免修复提示；用户可选中 A1:J{last} 做透视
     for i, w in enumerate([14, 16, 14, 12, 12, 12, 24, 18, 12, 12], start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -587,72 +423,43 @@ def write_pivot_source_sheet(wb: Workbook, detail_ws: Worksheet) -> Worksheet:
         row=last + 2,
         column=1,
         value=(
-            "【做数据透视表】选中上方表格任意单元格 → 插入 → 数据透视表 → "
-            "行：一级科目/二级科目/三级科目 → 值：实付金额、预扣税额、实付+预扣税（求和）。"
-            "改「明细数据」分类后：数据 → 全部刷新，透视表同步更新。"
+            f"【数据透视表】选中 A1:{get_column_letter(len(_PIVOT_COLS))}{last} → "
+            "插入 → 数据透视表 → 行：一级/二级/三级科目 → 值：实付金额、预扣税额、实付加预扣税（求和）。"
+            "改完「明细数据」分类后，请重新运行 category-summary 刷新本页，再对透视表点「刷新」。"
         ),
     )
     return ws
 
 
-def write_item_view_sheet(wb: Workbook, table_name: str = TABLE_NAME) -> Worksheet:
-    """
-    分项查看：在 B2/B3/B4 选一/二/三级，下方 FILTER 列出全部匹配明细。
-    需要 Excel 365 / 2021+ 动态数组。
-    """
+def write_item_view_sheet(wb: Workbook) -> Worksheet:
+    """分项查看：改为操作说明（不再写 FILTER，避免 Excel 修复提示）。"""
     if VIEW_SHEET in wb.sheetnames:
         del wb[VIEW_SHEET]
     ws = wb.create_sheet(VIEW_SHEET)
-
-    ws["A1"] = "分项查看（改科目请回「明细数据」改，本页自动跟着变）"
-    ws["A1"].font = Font(bold=True, size=13)
-    ws.merge_cells("A1:F1")
-
-    ws["A2"] = "一级科目"
-    ws["A3"] = "二级科目"
-    ws["A4"] = "三级科目"
-    ws["B2"] = ""
-    ws["B3"] = ""
-    ws["B4"] = ""
-    for r in (2, 3, 4):
-        ws.cell(row=r, column=2).fill = PatternFill("solid", fgColor="FFF2CC")
-        ws.cell(row=r, column=2).border = Border(
-            left=Side(style="thin"),
-            right=Side(style="thin"),
-            top=Side(style="thin"),
-            bottom=Side(style="thin"),
-        )
-
-    # 下拉：来自明细表唯一值（用公式 UNIQUE，365+）
-    # 兼容：写死从明细数据列提取的 validation 在 refresh 时用数据验证列表
-    ws["D2"] = "提示：可从「分类汇总」复制一/二/三级粘贴到 B2:B4"
-    ws["A6"] = "匹配明细（Excel 365/2021+ 自动列出；旧版请用「透视源」做透视表筛选）"
-    ws["A6"].font = Font(bold=True)
-
-    # FILTER 动态数组：三级空白兼容
-    # =FILTER(付款明细, (一级=B2)*(二级=B3)*((B4="")+((B4="(空白)")*(三级=""))+(三级=B4)))
-    filt = (
-        f'=IFERROR(FILTER({table_name},'
-        f'({table_name}[一级科目]=B2)*'
-        f'({table_name}[二级科目]=B3)*'
-        f'(((B4="")+(B4="(空白)"))*(({table_name}[三级科目]="")+({table_name}[三级科目]="(空白)"))'
-        f'+({table_name}[三级科目]=B4))),'
-        f'"（无匹配行，或请用 Excel 365；可检查 B2/B3/B4）")'
-    )
-    ws["A7"] = filt
-
-    ws["A5"] = "合计实付+预扣税"
-    ws["B5"] = (
-        f'=IFERROR(SUMIFS({table_name}[实付金额],{table_name}[一级科目],B2,{table_name}[二级科目],B3,'
-        f'{table_name}[三级科目],IF(OR(B4="",B4="(空白)"),"",B4)),0)'
-        f'+IFERROR(SUMIFS({table_name}[预扣税额],{table_name}[一级科目],B2,{table_name}[二级科目],B3,'
-        f'{table_name}[三级科目],IF(OR(B4="",B4="(空白)"),"",B4)),0)'
-    )
-    ws["B5"].number_format = "#,##0.00"
-    ws["B5"].font = Font(bold=True, color="C00000")
-
-    for i, w in enumerate([18, 22, 16, 50], start=1):
-        ws.column_dimensions[get_column_letter(i)].width = w
+    lines = [
+        "分项查看（安全版）",
+        "",
+        "因部分 Excel 对 FILTER/结构化表公式会提示「修复工作簿」，本页改为操作指引：",
+        "",
+        "方法 A · 从分类汇总跳转",
+        "  1. 打开「分类汇总」",
+        "  2. 点击对应行的「定位明细」→ 跳到「明细数据」该分类第一条",
+        "  3. 在明细中用筛选：数据 → 筛选 → 按一级/二级/三级筛选查看全部分项",
+        "",
+        "方法 B · 数据透视表切片",
+        "  1. 打开「透视源」",
+        "  2. 选中数据区 → 插入 → 数据透视表",
+        "  3. 用透视表的筛选/切片器查看某一二级分类",
+        "",
+        "改科目：请在「明细数据」改一级/二级/三级，然后运行：",
+        "  python 财务付款一体化.py category-summary",
+        "或 reclassify，以刷新分类汇总与透视源。",
+    ]
+    for i, line in enumerate(lines, start=1):
+        ws.cell(row=i, column=1, value=line)
+        if i == 1:
+            ws.cell(row=i, column=1).font = Font(bold=True, size=13)
+    ws.column_dimensions["A"].width = 88
     return ws
 
 
@@ -663,26 +470,21 @@ def write_guide_sheet(wb: Workbook) -> Worksheet:
     lines = [
         "财务付款 · 分类汇总使用说明",
         "",
-        "一、改科目（会联动汇总）",
-        "  1. 打开 sheet「明细数据」",
-        "  2. 直接改「一级科目 / 二级科目 / 三级科目」列（有下拉可选）",
-        "  3. 回到「分类汇总」：金额是公式，自动按新分类重算（若未变请按 F9 或保存重开）",
+        "一、改科目",
+        "  在「明细数据」修改「一级科目 / 二级科目 / 三级科目」（有下拉）",
+        "  然后运行 category-summary 或 reclassify 刷新「分类汇总」「透视源」",
         "",
         "二、从汇总跳到明细核对",
-        "  1. 在「分类汇总」点「定位明细」→ 跳到该分类在明细中的第一条",
-        "  2. 或：把一/二/三级复制到「分项查看」的 B2/B3/B4 → 下方列出该分项全部行（需 Excel 365/2021）",
+        "  在「分类汇总」点「定位明细」→ 跳到该分类第一条明细",
+        "  再用 Excel 筛选查看该分类全部行",
         "",
         "三、用 Excel 自带数据透视表",
-        "  1. 打开「透视源」sheet",
-        "  2. 点表格内任意格 → 菜单【插入】→【数据透视表】",
-        "  3. 行字段：一级科目、二级科目、三级科目",
-        "  4. 值字段：实付金额、预扣税额、实付+预扣税（求和）",
-        "  5. 改完明细分类后：【数据】→【全部刷新】",
+        "  打开「透视源」→ 选中数据 → 插入 → 数据透视表",
+        "  行：一级/二级/三级；值：实付金额、预扣税额、实付加预扣税",
         "",
-        "四、注意",
-        "  · 请在「明细数据」改分类，不要在汇总表改分类名称（汇总表是统计结果）",
-        "  · 表名「付款明细」供公式引用，勿删",
-        "  · 重新跑 std / reclassify / category-summary 会刷新这些 sheet",
+        "四、若仍提示修复工作簿",
+        "  运行：python 财务付款一体化.py category-summary",
+        "  会重写为兼容性更好的结构（已去掉易损坏的 Table/FILTER 公式）",
     ]
     for i, line in enumerate(lines, start=1):
         ws.cell(row=i, column=1, value=line)
@@ -709,6 +511,7 @@ def _read_detail_df_from_wb(wb: Workbook) -> Optional[pd.DataFrame]:
             empty = True
             for c, h in enumerate(headers, start=1):
                 val = ws.cell(row=r, column=c).value
+                # 跳过公式列污染：若表头是旧的「实付+预扣税」且是公式，读值即可
                 if val is not None and str(val).strip() != "":
                     empty = False
                 row[h] = val
@@ -719,49 +522,77 @@ def _read_detail_df_from_wb(wb: Workbook) -> Optional[pd.DataFrame]:
     return None
 
 
+def _clear_detail_formula_columns(detail_ws: Worksheet) -> None:
+    """去掉明细中易出问题的公式辅助列（实付+预扣税 / 实付加预扣税）。"""
+    headers = _header_map(detail_ws)
+    # 从右往左删列，避免索引偏移
+    drop_cols = sorted(
+        [
+            headers[name]
+            for name in ("实付+预扣税", "实付加预扣税")
+            if name in headers
+        ],
+        reverse=True,
+    )
+    for col in drop_cols:
+        detail_ws.delete_cols(col, 1)
+    # 清理表头为空的尾列
+    max_c = detail_ws.max_column or 1
+    while max_c > 1 and detail_ws.cell(row=1, column=max_c).value in (None, ""):
+        detail_ws.delete_cols(max_c, 1)
+        max_c -= 1
+
+
 def add_category_summary_to_workbook(
     wb: Workbook,
     detail_df: Optional[pd.DataFrame] = None,
     *,
     sheet_name: str = SUMMARY_SHEET,
 ) -> int:
-    """写入：明细表 + 分类汇总(公式+跳转) + 分项查看 + 透视源 + 说明。"""
-    # 明细 sheet
-    if DETAIL_SHEET not in wb.sheetnames:
-        # 尝试用万泰铢
-        if "明细数据_万泰铢" in wb.sheetnames:
-            detail_ws = wb["明细数据_万泰铢"]
-        else:
-            return 0
-    else:
+    _strip_all_tables(wb)
+
+    if DETAIL_SHEET in wb.sheetnames:
         detail_ws = wb[DETAIL_SHEET]
+    elif "明细数据_万泰铢" in wb.sheetnames:
+        detail_ws = wb["明细数据_万泰铢"]
+    else:
+        return 0
 
-    # 唯一表名（多 sheet 时避免冲突）：付款明细
-    # 若工作簿已有同名表在其他 sheet，先清
-    for ws in wb.worksheets:
-        _remove_table_if_exists(ws, TABLE_NAME)
-        _remove_table_if_exists(ws, PIVOT_TABLE_NAME)
-
-    ensure_detail_excel_table(detail_ws, TABLE_NAME)
+    _clear_detail_formula_columns(detail_ws)
 
     if detail_df is None:
         detail_df = _read_detail_df_from_wb(wb)
     if detail_df is None:
         detail_df = pd.DataFrame()
 
+    # 去掉辅助列再汇总
+    drop_cols = [c for c in detail_df.columns if c in ("实付+预扣税", "实付加预扣税")]
+    if drop_cols:
+        detail_df = detail_df.drop(columns=drop_cols, errors="ignore")
+
     rows = build_category_summary_rows(detail_df)
-    write_category_summary_sheet(
-        wb,
-        rows,
-        detail_ws=detail_ws,
-        sheet_name=sheet_name,
-        table_name=TABLE_NAME,
-        use_formulas=True,
-    )
-    write_item_view_sheet(wb, TABLE_NAME)
+    write_category_summary_sheet(wb, rows, detail_ws=detail_ws, sheet_name=sheet_name)
+    write_item_view_sheet(wb)
     write_pivot_source_sheet(wb, detail_ws)
     write_guide_sheet(wb)
     return len(rows)
+
+
+def _fix_xlsx_table_paths(path: Path) -> None:
+    """把 table 关系从绝对路径 /xl/tables/ 改为相对路径 ../tables/。"""
+    path = Path(path)
+    tmp = path.with_suffix(".xlsx.tmpfix")
+    with ZipFile(path, "r") as zin, ZipFile(tmp, "w", ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename.startswith("xl/worksheets/_rels/") and item.filename.endswith(
+                ".rels"
+            ):
+                text = data.decode("utf-8")
+                text2 = text.replace('Target="/xl/tables/', 'Target="../tables/')
+                data = text2.encode("utf-8")
+            zout.writestr(item, data)
+    tmp.replace(path)
 
 
 def refresh_category_summary_in_file(excel_path: Path) -> int:
@@ -769,6 +600,10 @@ def refresh_category_summary_in_file(excel_path: Path) -> int:
     wb = load_workbook(path)
     n = add_category_summary_to_workbook(wb)
     wb.save(path)
+    try:
+        _fix_xlsx_table_paths(path)
+    except Exception:
+        pass
     return n
 
 
@@ -786,3 +621,19 @@ def refresh_category_summary_in_std_dir(std_dir: Path) -> Dict[str, int]:
             stats["errors"] += 1
             print(f"  ⚠️ 分类汇总失败 {f.name}: {exc}")
     return stats
+
+
+def repair_std_workbook(excel_path: Path) -> bool:
+    """
+    修复单个可能损坏的工作簿：
+    - 去掉 Excel Table
+    - 去掉易损坏公式辅助列
+    - 重写分类汇总/透视源/说明
+    """
+    path = Path(excel_path)
+    try:
+        refresh_category_summary_in_file(path)
+        return True
+    except Exception as exc:
+        print(f"  ❌ 修复失败 {path.name}: {exc}")
+        return False
