@@ -1,10 +1,27 @@
-from project_name_matcher import (  # noqa: F401
+# -*- coding: utf-8 -*-
+"""
+兼容入口：从项目基本信息表刷新匹配库。
+
+推荐直接：
+  python project_name_matcher.py refresh
+  或  ProjectMatcher().refresh_from_excel()
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from project_name_matcher import (  # noqa: F401 — 再导出，兼容旧 import
+    DEFAULT_DB_PATH,
+    ProjectMatcher,
     add_mapping,
     build_standard_projects_from_dataframe,
     clear_unmatched_aliases,
+    find_info_excel,
     get_project_lookup,
     get_project_options,
     is_unmatched_alias,
+    load_matcher,
     load_or_init_db,
     mark_unmatched,
     match_project,
@@ -13,22 +30,16 @@ from project_name_matcher import (  # noqa: F401
     update_db_from_excel,
 )
 
-
-# ====================== 主程序 ======================
 if __name__ == "__main__":
-    # 兼容旧入口：仅保留参数与调用，核心逻辑已统一到 project_name_matcher.py。
-    db_path = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
-    excel_path = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
+    db_path = DEFAULT_DB_PATH
+    excel_path = find_info_excel()
+    if not excel_path:
+        excel_path = Path(
+            "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
+        )
 
-    # 如果你的 Excel 列名与下面不同，请在这里修改
-    update_db_from_excel(
-        db_path=db_path,
-        excel_path=excel_path,
-        status_column="项目状态",      # ← 如果状态列不是“项目状态”，请改成实际列名
-        name_column="项目名称",
-        code_column="项目编码"
-    )
-
-    # 更新完后可以继续使用原来的匹配功能
-    print("\n✅ 所有更新已保存到 db.json")
-    print("   你现在可以继续调用 match_project()、prompt_unmatched_project_mappings() 等函数进行匹配。")
+    print(f"DB:    {db_path}")
+    print(f"Excel: {excel_path}")
+    m = ProjectMatcher(db_path=db_path, load_info=False)
+    m.refresh_from_excel(excel_path)
+    print(f"\n✅ 完成。当前标准项目: {m.project_count}")

@@ -2,18 +2,32 @@
 """
 多层分类引擎（可解释）：支持一级/二级/三级。
 
+链路：精确记忆 → core 记忆（去月份/数字同型）→ 关键词规则 → 正则模式
+     → 相似记忆（特征/Jaccard 泛化）→ 科目映射 → 供应商众数 → 待复核。
+
 记忆与规则的 leaf_id 可为 L2 或 L3；有三级时优先落到三级。
+确认/手改写入记忆后，core + similar 会抬升相近未确认摘要的预分类水平。
 """
 
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
 
-from .normalize import memory_key, normalize_text, soft_key
-from .store import MemoryStore, VendorStats, load_rules
+from .normalize import (
+    core_memory_key,
+    core_summary,
+    jaccard,
+    memory_key,
+    normalize_text,
+    soft_key,
+    summary_bigrams,
+    summary_features,
+)
+from .store import MemoryEntry, MemoryStore, VendorStats, load_rules
 from .taxonomy import Taxonomy
 
 # 摘要正则模式（关键词规则难以表达的中间插词场景）
@@ -71,6 +85,11 @@ class ClassifyEngine:
         self.vendor_min_ratio = vendor_min_ratio
         self.conf_review_threshold = conf_review_threshold
         self._compiled = [self._compile_rule(r) for r in self.rules]
+        # 相似记忆索引（懒构建）
+        self._sim_ready = False
+        self._core_to_entries: Dict[str, List[MemoryEntry]] = {}
+        self._feat_to_idxs: Dict[str, List[int]] = {}
+        self._sim_entries: List[Tuple[MemoryEntry, str, Set[str], FrozenSet[str]]] = []
 
     @classmethod
     def from_data_dir(cls, data_dir: Path) -> "ClassifyEngine":
@@ -178,6 +197,256 @@ class ClassifyEngine:
     def _result_from_l2(self, l2_id, layer, confidence, rule_id="", reason="", candidates=None):
         return self._result_from_leaf(l2_id, layer, confidence, rule_id, reason, candidates)
 
+    def invalidate_sim_index(self) -> None:
+        """记忆更新后调用，下次 classify 重建相似索引。"""
+        self._sim_ready = False
+        self._core_to_entries = {}
+        self._feat_to_idxs = {}
+        self._sim_entries = []
+
+    @staticmethod
+    def _entry_rank(e: MemoryEntry) -> Tuple[float, str]:
+        """同摘要多键时择优：人工/学习池 > 高置信 > 较新。"""
+        src = (e.source or "").lower()
+        src_w = 0.0
+        if src in {
+            "learn_pool",
+            "manual",
+            "review",
+            "review_excel",
+            "user",
+            "correction",
+            "class_master_leaf",
+            "class_master",
+        }:
+            src_w = 3.0
+        elif src.startswith("user") or "correct" in src:
+            src_w = 2.5
+        elif src.startswith("ai") or "auto" in src:
+            src_w = 1.0
+        else:
+            src_w = 1.5
+        conf = float(e.confidence or 0.5)
+        return (src_w + conf, e.updated_at or "")
+
+    def _ensure_sim_index(self) -> None:
+        """从 memory 构建 core / feature 倒排索引（一次/引擎生命周期）。"""
+        if self._sim_ready:
+            return
+        self._sim_ready = True
+        self._core_to_entries = {}
+        self._feat_to_idxs = {}
+        self._sim_entries = []
+        if self.memory is None:
+            return
+
+        # 同一摘要文本可能对应多个 key / 不同 leaf → 先按摘要择优
+        by_summ: Dict[str, List[MemoryEntry]] = {}
+        for entry in self.memory.entries.values():
+            summ = (entry.summary or "").strip()
+            if not summ or not entry.l2_id:
+                continue
+            sn = normalize_text(summ)
+            if not sn:
+                continue
+            by_summ.setdefault(sn, []).append(entry)
+
+        for sn, ents in by_summ.items():
+            entry = max(ents, key=self._entry_rank)
+            summ = (entry.summary or "").strip()
+            core = core_summary(summ)
+            feats = summary_features(summ)
+            bigs = summary_bigrams(core or sn)
+            idx = len(self._sim_entries)
+            self._sim_entries.append((entry, core, feats, bigs))
+
+            if core:
+                self._core_to_entries.setdefault(core, []).append(entry)
+            for tok in feats:
+                if len(tok) < 2:
+                    continue
+                bucket = self._feat_to_idxs.setdefault(tok, [])
+                if len(bucket) < 80:
+                    bucket.append(idx)
+
+    def _majority_leaf(
+        self,
+        entries: List[MemoryEntry],
+        *,
+        min_ratio: float = 0.8,
+    ) -> Optional[Tuple[str, float, str]]:
+        """entries → (leaf_id, agreement_ratio, sample_summary)。"""
+        if not entries:
+            return None
+        # 同 leaf 按置信度加权；人工/学习池权重更高
+        weights: Dict[str, float] = {}
+        sample: Dict[str, str] = {}
+        for e in entries:
+            lid = e.l2_id
+            if not lid:
+                continue
+            w = float(e.confidence or 0.8)
+            src = (e.source or "").lower()
+            if src in {
+                "learn_pool",
+                "manual",
+                "review",
+                "review_excel",
+                "user",
+                "correction",
+                "class_master_leaf",
+            }:
+                w *= 1.25
+            weights[lid] = weights.get(lid, 0.0) + w
+            # 优先保留高置信样本摘要
+            prev = sample.get(lid)
+            if prev is None or w >= weights[lid]:
+                sample[lid] = e.summary or e.key
+        if not weights:
+            return None
+        best_leaf, best_w = max(weights.items(), key=lambda x: x[1])
+        total = sum(weights.values())
+        ratio = best_w / total if total else 0.0
+        if len(weights) > 1 and ratio < min_ratio:
+            return None
+        return best_leaf, ratio, sample.get(best_leaf, "")
+
+    def _match_core_memory(self, summ: str) -> Optional[ClassifyResult]:
+        """去数字/月份后的 core 精确命中（跨 01月/02月 等同型摘要）。"""
+        # 显式写入的 |core:xxx 键（learn_one 产出）优先
+        ckey = core_memory_key(summ)
+        if ckey and self.memory is not None:
+            entry = self.memory.get(ckey)
+            if entry and entry.l2_id:
+                conf = min(0.92, float(entry.confidence or 0.92))
+                return self._result_from_leaf(
+                    entry.l2_id,
+                    layer="memory_core",
+                    confidence=conf,
+                    reason=f"memory_core:{entry.summary or ckey}",
+                )
+
+        self._ensure_sim_index()
+        core = core_summary(summ)
+        if not core:
+            return None
+        entries = self._core_to_entries.get(core) or []
+        # 冲突保守：需 ≥80% 加权一致才 core 命中，否则交给 similar
+        maj = self._majority_leaf(entries, min_ratio=0.8)
+        if not maj:
+            return None
+        leaf_id, ratio, sample = maj
+        conf = 0.82 + 0.1 * min(1.0, ratio)
+        return self._result_from_leaf(
+            leaf_id,
+            layer="memory_core",
+            confidence=min(0.92, conf),
+            reason=f"memory_core≈{sample[:40]}",
+        )
+
+    def _match_similar_memory(self, summ: str) -> Optional[ClassifyResult]:
+        """
+        相似记忆：特征重叠 + bigram Jaccard + 子串包含。
+        置信度低于精确/core 记忆与硬规则，避免覆盖明确规则。
+        """
+        self._ensure_sim_index()
+        if not self._sim_entries:
+            return None
+
+        q_core = core_summary(summ)
+        q_norm = normalize_text(summ)
+        q_feats = summary_features(summ)
+        q_bigs = summary_bigrams(q_core or q_norm)
+        if not q_feats and not q_bigs:
+            return None
+
+        # 候选：倒排特征命中
+        cand_idxs: Set[int] = set()
+        ranked_feats = sorted(q_feats, key=lambda t: (-len(t), t))
+        for tok in ranked_feats[:24]:
+            for idx in self._feat_to_idxs.get(tok, []):
+                cand_idxs.add(idx)
+                if len(cand_idxs) >= 350:
+                    break
+            if len(cand_idxs) >= 350:
+                break
+
+        if not cand_idxs:
+            return None
+
+        scored: List[Tuple[float, str, str]] = []  # score, leaf, sample
+        for idx in cand_idxs:
+            entry, m_core, m_feats, m_bigs = self._sim_entries[idx]
+            if not entry.l2_id:
+                continue
+
+            score = 0.0
+            # 1) core 子串 / 相等
+            if q_core and m_core:
+                if q_core == m_core:
+                    score = max(score, 0.95)
+                elif q_core in m_core or m_core in q_core:
+                    shorter = min(len(q_core), len(m_core))
+                    longer = max(len(q_core), len(m_core))
+                    if shorter >= 2 and shorter / longer >= 0.45:
+                        score = max(score, 0.72 + 0.2 * (shorter / longer))
+
+            # 2) 特征 Jaccard
+            fj = jaccard(q_feats, m_feats)
+            if fj > 0:
+                score = max(score, 0.35 + 0.55 * fj)
+
+            # 3) bigram Jaccard
+            bj = jaccard(set(q_bigs), set(m_bigs))
+            if bj > 0:
+                score = max(score, 0.3 + 0.5 * bj)
+
+            # 源加权：人工/学习池略高
+            src = (entry.source or "").lower()
+            if src in {
+                "learn_pool",
+                "manual",
+                "review",
+                "review_excel",
+                "user",
+                "correction",
+            }:
+                score = min(1.0, score + 0.03)
+
+            if score < 0.52:
+                continue
+            scored.append((score, entry.l2_id, entry.summary or entry.key))
+
+        if not scored:
+            return None
+
+        scored.sort(key=lambda x: -x[0])
+        best_score, best_leaf, best_sample = scored[0]
+
+        # 前几名叶子不一致且分数接近 → 放弃（歧义）
+        near = [s for s in scored[:8] if s[0] >= best_score - 0.08]
+        leaves = {s[1] for s in near}
+        if len(leaves) > 1:
+            cnt = Counter(s[1] for s in near)
+            top_leaf, top_n = cnt.most_common(1)[0]
+            if top_n / len(near) < 0.67:
+                return None
+            best_leaf = top_leaf
+            best_sample = next(s[2] for s in near if s[1] == top_leaf)
+            best_score = max(s[0] for s in near if s[1] == top_leaf)
+
+        conf = 0.55 + 0.30 * min(1.0, best_score)
+        conf = min(0.84, conf)
+        if conf < self.conf_review_threshold:
+            return None
+
+        return self._result_from_leaf(
+            best_leaf,
+            layer="similar_memory",
+            confidence=conf,
+            reason=f"similar≈{best_sample[:48]}@{best_score:.2f}",
+        )
+
     def classify(
         self,
         subject: Any = None,
@@ -211,7 +480,13 @@ class ClassifyEngine:
                         reason=f"memory:{entry.source}",
                     )
 
-        # 关键词规则
+            # core 记忆：跨月份/数量变体的同型摘要
+            if summ:
+                core_hit = self._match_core_memory(summ)
+                if core_hit is not None:
+                    return core_hit
+
+        # 关键词规则（硬规则优先于相似记忆）
         hits: List[Tuple[int, Dict[str, Any]]] = []
         for compiled in self._compiled:
             if self._match_compiled(summ_norm, compiled):
@@ -264,6 +539,12 @@ class ClassifyEngine:
                             reason=reason,
                         )
 
+        # 相似记忆：用已确认/已学摘要泛化到相近未确认摘要
+        if summ and self.memory is not None:
+            sim_hit = self._match_similar_memory(summ)
+            if sim_hit is not None:
+                return sim_hit
+
         # 科目映射（可为 L2 或 L3 id）
         if subj:
             mapped = self.subject_map.get(subj) or self.subject_map.get(subj_norm)
@@ -299,6 +580,7 @@ class ClassifyEngine:
             confidence=0.2,
             reason="no_match",
         )
+
 
     def classify_names(
         self, subject: Any = None, summary: Any = None, vendor: Any = None

@@ -1,18 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-财务付款一体化（自包含）
+财务付款一体化（payment_hub）
 
-模块：
-  std_build      原 3_ 标准化
-  summary_build  原 4_ 汇总分析
-  cashflow_build 原 5_ 现金流 HTML
-  pipeline / cli 编排与命令行
+架构：
+  cli / menu     入口与交互菜单
+  pipeline       步骤编排（std / summary / cashflow / 分类）
+  learn_pool     D_ 学习池 export / apply
+  std_build      raw → B_std
+  summary_build  B_std → 汇总 Excel
+  cashflow_build B_std → 现金流 HTML
+  config / utils / deps / pkg
+
+分类引擎在 learn_classify/（memory / rules / taxonomy）。
 """
 
 from .config import Paths
 from .pipeline import run_pipeline, step_cashflow, step_std, step_summary
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __all__ = [
     "Paths",
     "run_pipeline",

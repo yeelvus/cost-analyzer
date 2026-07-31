@@ -16,16 +16,17 @@ import re
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
-from openpyxl import Workbook, load_workbook
+from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from .category_dropdowns import apply_category_dropdowns
 from .config import Paths
+from .pkg import ensure_code_root
 from .utils import safe_filename, safe_text
 
 POOL_SHEET = "学习池"
@@ -341,9 +342,10 @@ def _format_pool_workbook(
         note["A2"] = "① 在「学习池」表改「一级/二级/三级」，或把「确认状态」改为「确认」"
         note["A3"] = "② 保存 Excel 后，必须运行："
         note["A4"] = "   python 财务付款一体化.py apply-learn-pool"
-        note["A5"] = "③ 程序才会写入 03_已确认/已确认分类.xlsx，并从 00/01/02 中剥离；仅改表不运行不会生效"
+        note["A5"] = "③ 写入 03_已确认、剥离已确认摘要，并泛化抬升其余未确认行的预分类（相似/去月份同型）"
         note["A6"] = "④ 推荐在 00_汇总/全部摘要_学习池.xlsx 快速改全量（含非THCC项目）"
-        note["A7"] = "⑤ 不要只运行 export-learn-pool（那是重新导出，可能覆盖未 apply 的修改）"
+        note["A7"] = "⑤ 不要只运行 export-learn-pool（重新导出可能覆盖未 apply 的修改）"
+        note["A8"] = "⑥ 确认越多，未确认摘要的建议科目会越准（memory → core → similar → 规则）"
         note.column_dimensions["A"].width = 90
 
     # 保证活动表是学习池
@@ -603,17 +605,12 @@ def apply_learn_pool(
     """
     检测手改/确认 → 写记忆 → 合并已确认表 → 从 01/02 剥离 → reclassify B_std。
     """
-    import sys
-
-    root = Path(__file__).resolve().parent.parent
-    if str(root) not in sys.path:
-        sys.path.insert(0, str(root))
-
+    ensure_code_root()
+    from learn_classify.engine import ClassifyEngine
     from learn_classify.learn import learn_one
+    from learn_classify.review import reclassify_std_dir
     from learn_classify.store import CorrectionStore, MemoryStore
     from learn_classify.taxonomy import Taxonomy
-    from learn_classify.engine import ClassifyEngine
-    from learn_classify.review import reclassify_std_dir
 
     paths.ensure_output_parents()
     snapshot = load_snapshot(paths.learn_pool_snapshot)
@@ -799,7 +796,16 @@ def apply_learn_pool(
             stripped_files += 1
             print(f"  剥离 {f.name}: -{removed} 行，剩 {len(out_rows)}")
 
-    # 更新按文件快照（剩余行）
+    # 用新记忆 + 相似匹配刷新未确认池的预分类建议
+    pool_refresh = {}
+    eng = None
+    if learned:
+        print("刷新未确认池建议（memory / core / similar）…")
+        eng = ClassifyEngine.from_data_dir(paths.classify_data)
+        pool_refresh = refresh_pool_suggestions(paths, eng)
+        print(f"池建议刷新: {pool_refresh}")
+
+    # 更新按文件快照（剩余行，含刷新后科目）
     remaining = _scan_pool_dirs(paths)
     new_snap: Dict[str, Dict[str, Dict[str, str]]] = defaultdict(dict)
     for r in remaining:
@@ -814,7 +820,8 @@ def apply_learn_pool(
     reclass_stats = {}
     if reclassify and learned:
         print("reclassify B_std …")
-        eng = ClassifyEngine.from_data_dir(paths.classify_data)
+        if eng is None:
+            eng = ClassifyEngine.from_data_dir(paths.classify_data)
         reclass_stats = reclassify_std_dir(paths.std_dir, eng)
         print(f"reclassify: {reclass_stats}")
 
@@ -825,7 +832,146 @@ def apply_learn_pool(
         "conflicts": len(conflicts),
         "confirmed_total": len(conf_rows),
         "stripped_files": stripped_files,
+        "pool_refresh": pool_refresh,
         "reclassify": reclass_stats,
     }
     print(f"✅ apply-learn-pool 完成: locked={learned}")
     return stats
+
+
+# 可接受的引擎层（用于抬升未确认建议）
+_REFRESH_LAYERS = {
+    "memory",
+    "memory_core",
+    "similar_memory",
+    "rule",
+    "rule_hi",
+    "pattern",
+    "subject_map",
+    "vendor",
+}
+
+def refresh_pool_suggestions(
+    paths: Paths,
+    eng: Any,
+    *,
+    min_confidence: float = 0.55,
+) -> Dict[str, Any]:
+    """
+    用当前引擎重算 00/01/02 未确认行的 L1/L2/L3。
+
+    - 只抬升：空科目 / 待复核类 / 或新建议置信更高且层更强
+    - 不改「确认状态」
+    - 写回后与快照对齐，避免下次误判为手改
+    """
+    files_updated = 0
+    rows_scanned = 0
+    rows_changed = 0
+    by_layer: Counter = Counter()
+
+    for d in (
+        paths.learn_pool_all,
+        paths.learn_pool_by_project,
+        paths.learn_pool_by_month,
+    ):
+        if not d.is_dir():
+            continue
+        for f in sorted(d.glob("*.xlsx")):
+            if f.name.startswith("~$"):
+                continue
+            rows = _read_pool_file(f)
+            if not rows:
+                continue
+            changed = False
+            out_rows: List[Dict[str, Any]] = []
+            for r in rows:
+                rows_scanned += 1
+                status = r.get("确认状态") or STATUS_PENDING
+                if _is_confirmed(status):
+                    out_rows.append(
+                        {
+                            "确认状态": status,
+                            "摘要": r["摘要"],
+                            "一级科目": r["一级科目"],
+                            "二级科目": r["二级科目"],
+                            "三级科目": r["三级科目"],
+                            "供应商名称": r.get("供应商名称") or "",
+                            "出现次数": r.get("出现次数") or "",
+                        }
+                    )
+                    continue
+
+                old_t = _triple(r["一级科目"], r["二级科目"], r["三级科目"])
+                try:
+                    res = eng.classify(
+                        "",
+                        r["摘要"],
+                        r.get("供应商名称") or "",
+                    )
+                except Exception:
+                    res = None
+
+                new_row = {
+                    "确认状态": STATUS_PENDING,
+                    "摘要": r["摘要"],
+                    "一级科目": r["一级科目"],
+                    "二级科目": r["二级科目"],
+                    "三级科目": r["三级科目"],
+                    "供应商名称": r.get("供应商名称") or "",
+                    "出现次数": r.get("出现次数") or "",
+                }
+
+                if res is not None and res.layer in _REFRESH_LAYERS:
+                    conf = float(res.confidence or 0)
+                    if conf >= min_confidence:
+                        new_t = (
+                            _norm_cat(res.l1_name),
+                            _norm_cat(res.l2_name),
+                            _norm_cat(res.l3_name),
+                        )
+                        if new_t[1] or new_t[2]:
+                            should = False
+                            # 原无有效二级/三级 → 直接抬升
+                            if not old_t[1] and not old_t[2]:
+                                should = True
+                            elif new_t != old_t:
+                                # 原像待复核 / 空白一级
+                                if not old_t[0] or "待" in old_t[0] or "待" in old_t[1]:
+                                    should = True
+                                # 相似/记忆/规则 且置信足够时覆盖旧建议
+                                elif res.layer in {
+                                    "memory",
+                                    "memory_core",
+                                    "similar_memory",
+                                    "rule",
+                                    "rule_hi",
+                                    "pattern",
+                                } and conf >= 0.65:
+                                    should = True
+                            if should and new_t != old_t:
+                                new_row["一级科目"] = new_t[0]
+                                new_row["二级科目"] = new_t[1]
+                                new_row["三级科目"] = new_t[2]
+                                rows_changed += 1
+                                by_layer[res.layer] += 1
+                                changed = True
+
+                out_rows.append(new_row)
+
+            if changed:
+                out_rows = _sort_by_category(out_rows)
+                _format_pool_workbook(
+                    f,
+                    out_rows,
+                    paths.classify_data,
+                    title="学习池 · 已根据确认结果刷新预分类建议",
+                )
+                files_updated += 1
+                print(f"  ↻ 建议更新 {f.name}")
+
+    return {
+        "files_updated": files_updated,
+        "rows_scanned": rows_scanned,
+        "rows_changed": rows_changed,
+        "by_layer": dict(by_layer),
+    }

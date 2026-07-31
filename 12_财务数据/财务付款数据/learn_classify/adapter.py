@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-与旧 SubjectMapper 兼容的适配器，供 3_财务付款数据汇总台账.py 无插拔。
+SubjectMapper 适配器：供 payment_hub.std_build / deps 使用。
 
 用法：
   from learn_classify.adapter import SubjectMapper
-  mapper = SubjectMapper()  # 使用默认 data 目录
+  mapper = SubjectMapper()  # 默认 learn_classify/data
   mapper.classify(subject, summary)
 """
 

@@ -10,7 +10,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Callable, Optional
 
-CODE_ROOT = Path(__file__).resolve().parent.parent  # 财务付款数据/
+from .pkg import CODE_ROOT
+
 DESKTOP_CODE = Path("/Users/wyattsun/Desktop/code")
 
 
@@ -54,6 +55,7 @@ def get_excel_layout_fn() -> Callable:
 
 @lru_cache(maxsize=1)
 def get_project_matcher_module() -> ModuleType:
+    """加载 project_name_matcher 模块（兼容旧函数式 API）。"""
     info = resolve_project_info_dir()
     if not info:
         raise FileNotFoundError("未找到 0_项目基本信息 目录（需要 project_name_matcher.py）")
@@ -70,6 +72,19 @@ def project_match_db_path() -> str:
     if not info:
         return str(CODE_ROOT / "project_name_match_db.json")
     return str(info / "project_name_match_db.json")
+
+
+def get_project_matcher(load_info: bool = True):
+    """
+    推荐：返回 ProjectMatcher 实例。
+        m = get_project_matcher()
+        name, code = m.resolve("永强")
+    """
+    mod = get_project_matcher_module()
+    cls = getattr(mod, "ProjectMatcher", None)
+    if cls is None:
+        raise AttributeError("project_name_matcher 缺少 ProjectMatcher，请更新 0_项目基本信息")
+    return cls(db_path=project_match_db_path(), load_info=load_info)
 
 
 def get_subject_mapper(data_dir: Optional[Path] = None):

@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 
 from .engine import ClassifyEngine
-from .normalize import memory_key, normalize_text
+from .normalize import core_memory_key, memory_key, normalize_text
 from .store import (
     CorrectionEvent,
     CorrectionStore,
@@ -87,20 +87,26 @@ def learn_one(
     keys = [memory_key(subject, summary, vendor if vendor else None)]
     if also_summary_only and summary:
         keys.append(memory_key("", summary, None))
+        # core 键：去月份/数字后的同型摘要共享（01月保安费用 ≈ 02月保安费用）
+        ckey = core_memory_key(summary)
+        if ckey:
+            keys.append(ckey)
 
     for key in keys:
         if key in ("|", "||", ""):
             continue
+        # core 键置信度略低，避免压过精确摘要
+        is_core = key.startswith("|core:")
         memory.upsert(
             MemoryEntry(
                 key=key,
                 l2_id=leaf_id,
                 subject=subject or "",
                 summary=summary or "",
-                vendor=vendor or "",
+                vendor="" if is_core else (vendor or ""),
                 source=source,
-                confidence=1.0,
-                notes=notes,
+                confidence=0.9 if is_core else 1.0,
+                notes=(notes + ("|core" if is_core else "")).strip("|"),
             )
         )
 

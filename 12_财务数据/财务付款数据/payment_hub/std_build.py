@@ -140,43 +140,66 @@ def process_single_sheet(file_path: Path, sheet_name: str) -> Optional[pd.DataFr
 
 
 def enrich_project_fields(df: pd.DataFrame) -> pd.DataFrame:
-    matcher = get_project_matcher_module()
+    """用 ProjectMatcher 标准化项目名称/编码。"""
+    # 确保 0_项目基本信息 在 path 上
+    mod = get_project_matcher_module()
+    ProjectMatcher = getattr(mod, "ProjectMatcher", None)
     db_path = project_match_db_path()
-    db = matcher.load_or_init_db(db_path, [])
+
+    if ProjectMatcher is not None:
+        m = ProjectMatcher(db_path=db_path, load_info=True)
+        raw_series = df["项目名称"].fillna("").astype(str).str.strip()
+        unique = sorted({n for n in raw_series.tolist() if n and n.lower() != "nan"})
+        mapped = m.match_batch(
+            unique,
+            prompt=True,
+            interactive=True,
+            window_title="财务付款数据项目匹配",
+        )
+        code_map = {k: v.get("project_code", "") for k, v in mapped.items()}
+        name_map = {k: v.get("project_name", k) for k, v in mapped.items()}
+        enriched = df.copy()
+        enriched["项目编码"] = raw_series.map(code_map).fillna("")
+        enriched["项目名称"] = raw_series.map(name_map).fillna(raw_series)
+        enriched = enriched[["项目编码"] + TARGET_COLUMNS]
+        m.save()
+        no_code = [k for k in unique if not code_map.get(k)]
+        if no_code:
+            print(f"  未匹配/无编码: {no_code[:8]}{'…' if len(no_code) > 8 else ''}")
+        return enriched
+
+    # 极旧模块回退
+    db = mod.load_or_init_db(db_path, [])
     raw_series = df["项目名称"].fillna("").astype(str).str.strip()
     unique_names = sorted({n for n in raw_series.tolist() if n and n.lower() != "nan"})
-
     code_map: Dict[str, str] = {}
     name_map: Dict[str, str] = {}
     unmatched: List[str] = []
-
     for raw_name in unique_names:
-        hit = matcher.match_project(raw_name, db)
+        hit = mod.match_project(raw_name, db)
         if hit:
             code_map[raw_name] = hit.get("project_code", "")
             name_map[raw_name] = hit.get("project_name", raw_name)
         else:
-            matcher.mark_unmatched(db, raw_name)
+            mod.mark_unmatched(db, raw_name)
             code_map[raw_name] = ""
             name_map[raw_name] = raw_name
             unmatched.append(raw_name)
-
     if unmatched:
         print(f"  ⚠️ 未匹配项目 {len(unmatched)} 个，弹出手动匹配…")
-        matcher.prompt_unmatched_project_mappings(
-            unmatched, db, window_title="财务付款数据项目匹配"
+        mod.prompt_unmatched_project_mappings(
+            unmatched, db, window_title="财务付款数据项目匹配", db_path=db_path
         )
         for raw_name in unmatched:
-            hit = matcher.match_project(raw_name, db)
+            hit = mod.match_project(raw_name, db)
             if hit:
                 code_map[raw_name] = hit.get("project_code", "")
                 name_map[raw_name] = hit.get("project_name", raw_name)
-
     enriched = df.copy()
     enriched["项目编码"] = raw_series.map(code_map).fillna("")
     enriched["项目名称"] = raw_series.map(name_map).fillna(raw_series)
     enriched = enriched[["项目编码"] + TARGET_COLUMNS]
-    matcher.save_db(db_path, db)
+    mod.save_db(db_path, db)
     return enriched
 
 

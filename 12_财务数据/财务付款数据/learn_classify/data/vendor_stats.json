@@ -3,9 +3,9 @@
     "L2_mat_generic": 32,
     "L2_mgmt_admin": 7,
     "L2_mgmt_food": 133,
-    "L2_mgmt_fuel": 272,
+    "L2_mgmt_fuel": 278,
     "L2_mgmt_vehicle": 181,
-    "L2_labor_local": 88,
+    "L2_labor_local": 90,
     "L2_mgmt_rent": 60,
     "L2_mgmt_travel": 32,
     "L2_mgmt_net": 17,
@@ -13,7 +13,7 @@
     "L2_mat_gravel": 10,
     "L2_mgmt_entertain": 22,
     "L2_mgmt_police": 31,
-    "L2_mgmt_util": 135,
+    "L2_mgmt_util": 136,
     "L2_mgmt_clean": 34,
     "L2_mgmt_office": 77,
     "L2_eq_excavator": 8,
@@ -33,7 +33,7 @@
     "L2_mgmt_permit": 15,
     "L2_eq_crane": 6,
     "L2_eq_tower": 2,
-    "L2_mgmt_permit_sign": 4,
+    "L2_mgmt_permit_sign": 5,
     "L3_office_net": 17,
     "L3_office_supplies": 4,
     "L2_labor_site": 1,
@@ -47,15 +47,15 @@
   },
   "孙谷金": {
     "L2_mgmt_police": 41,
-    "L2_mgmt_fuel": 102,
+    "L2_mgmt_fuel": 107,
     "L2_mgmt_clean": 18,
     "L2_mat_generic": 39,
     "L2_mgmt_food": 17,
-    "L2_mgmt_permit": 28,
+    "L2_mgmt_permit": 29,
     "L2_eq_general": 16,
     "L2_mgmt_util": 24,
     "L2_mgmt_gas": 8,
-    "L2_eq_repair": 12,
+    "L2_eq_repair": 13,
     "L2_mgmt_entertain": 6,
     "L2_mgmt_petty": 4,
     "L2_mgmt_office": 20,
@@ -185,7 +185,7 @@
     "L2_mgmt_police": 2
   },
   "宋朝兴": {
-    "L2_mgmt_fuel": 107,
+    "L2_mgmt_fuel": 109,
     "L2_mgmt_food": 7,
     "L2_mgmt_office": 37,
     "L2_mgmt_gas": 6,
@@ -282,7 +282,7 @@
     "L2_labor_local": 2,
     "L2_mgmt_entertain": 8,
     "L2_mgmt_office": 34,
-    "L2_mgmt_fuel": 55,
+    "L2_mgmt_fuel": 57,
     "L2_mgmt_food": 26,
     "L2_mgmt_vehicle": 91,
     "L2_mgmt_police": 8,
@@ -318,7 +318,7 @@
   "yunancorporationco.ltd": {
     "L2_mat_cement": 69,
     "L2_mat_brick": 70,
-    "L2_mat_steel": 46,
+    "L2_mat_steel": 47,
     "L2_mat_generic": 66,
     "L2_mat_gravel": 54,
     "L2_mat_pile": 5,
@@ -340,14 +340,14 @@
     "L2_labor_local": 31,
     "L2_mgmt_food": 6,
     "L2_mgmt_entertain": 7,
-    "L2_mgmt_police": 5,
-    "L2_mgmt_fuel": 18,
+    "L2_mgmt_police": 6,
+    "L2_mgmt_fuel": 19,
     "L2_mgmt_test": 3,
     "L2_mgmt_petty": 5,
     "L2_mgmt_permit_sign": 7,
     "L2_mat_generic": 8,
     "L2_mgmt_park": 2,
-    "L2_mgmt_vehicle": 55,
+    "L2_mgmt_vehicle": 57,
     "L2_mgmt_util": 18,
     "L2_mgmt_deposit": 4,
     "L2_mgmt_rent": 4,
@@ -360,7 +360,7 @@
     "L2_mgmt_permit": 9,
     "L2_labor_mm": 8,
     "L2_eq_repair": 2,
-    "L2_mat_steel": 4,
+    "L2_mat_steel": 5,
     "L2_eq_truckcrane": 2
   },
   "沙云": {
@@ -411,7 +411,7 @@
   },
   "tn.cementblockco.ltd": {
     "L2_eq_pump": 174,
-    "L2_mat_concrete": 396,
+    "L2_mat_concrete": 399,
     "L2_mat_generic": 38,
     "L2_mat_brick": 22,
     "L2_mat_cement": 26,
@@ -456,8 +456,8 @@
   },
   "seaingco.ltd": {
     "L2_mat_cement": 55,
-    "L2_mat_generic": 15,
-    "L2_mat_brick": 2
+    "L2_mat_generic": 17,
+    "L2_mat_brick": 3
   },
   "tpipolenetowerpubliccompanylimited": {
     "L2_mgmt_fuel": 13,
@@ -561,8 +561,8 @@
     "L2_mgmt_petty": 2,
     "L2_mgmt_net": 3,
     "L2_eq_truckcrane": 2,
-    "L2_eq_general": 8,
-    "L2_mgmt_entertain": 6,
+    "L2_eq_general": 9,
+    "L2_mgmt_entertain": 7,
     "L2_mgmt_rent": 6,
     "L2_mgmt_permit": 9,
     "L2_mat_steel": 2,
@@ -579,7 +579,7 @@
     "L2_mgmt_police": 8
   },
   "张学利": {
-    "L2_mgmt_permit": 24,
+    "L2_mgmt_permit": 25,
     "L2_mgmt_gas": 26,
     "L2_mgmt_vehicle": 63,
     "L2_mgmt_entertain": 2,
@@ -628,7 +628,7 @@
     "L2_mgmt_stamp": 1
   },
   "howmetaltech2019co.ltd": {
-    "L2_mat_steel": 38,
+    "L2_mat_steel": 39,
     "L2_mat_generic": 34
   },
   "securitysiamsafeguard6666co.ltd": {
@@ -650,7 +650,7 @@
     "L2_mat_cement": 2,
     "L2_mgmt_office": 7,
     "L2_mgmt_petty": 2,
-    "L2_mgmt_util": 31,
+    "L2_mgmt_util": 33,
     "L2_mgmt_other": 3,
     "L2_labor_salary": 5,
     "L2_mgmt_net": 1,
@@ -709,7 +709,7 @@
     "L2_mat_steel": 12
   },
   "primaproco.ltd": {
-    "L2_sub_loan": 8,
+    "L2_sub_loan": 12,
     "L2_sub_pay": 28
   },
   "b.i.gintergroupsecurityguardco.ltd": {
@@ -721,7 +721,7 @@
     "L2_eq_general": 2
   },
   "郭嘉钰": {
-    "L2_mgmt_fuel": 3,
+    "L2_mgmt_fuel": 4,
     "L2_mgmt_food": 2,
     "L2_mgmt_vehicle": 3,
     "L2_mgmt_office": 6,
@@ -856,7 +856,7 @@
   },
   "江苏勋业": {
     "L2_sub_pay": 211,
-    "L2_sub_loan": 6,
+    "L2_sub_loan": 9,
     "L2_labor_site": 3,
     "L2_mat_generic": 11,
     "L2_labor_salary": 1
@@ -895,7 +895,7 @@
   "kanfuinternationalco.ltd": {
     "L2_mat_generic": 6,
     "L2_sub_pay": 36,
-    "L2_sub_loan": 2,
+    "L2_sub_loan": 3,
     "L2_eq_general": 2
   },
   "sumphot": {
@@ -985,8 +985,8 @@
   },
   "s.k.intersupplyco.ltd": {
     "L2_labor_mm": 4,
-    "L2_labor_site": 3,
-    "L2_sub_pay": 3
+    "L2_labor_site": 4,
+    "L2_sub_pay": 4
   },
   "kritiphongduphong": {
     "L2_mgmt_rent": 6,
@@ -994,7 +994,7 @@
   },
   "shengtaiinternationalengineeringconstructiontahilandco.ltd": {
     "L2_sub_pay": 42,
-    "L2_sub_loan": 10
+    "L2_sub_loan": 15
   },
   "supapornchoptham": {
     "L2_mat_pile": 6,
@@ -1048,7 +1048,7 @@
     "L3_office_net": 1
   },
   "panichakanyothaco.ltd": {
-    "L2_eq_excavator": 75,
+    "L2_eq_excavator": 77,
     "L2_eq_general": 4,
     "L2_eq_truckcrane": 10,
     "L2_lease_general": 3,
@@ -1097,7 +1097,7 @@
     "L2_mat_generic": 2
   },
   "rojanaindustrialmanagementco.ltd": {
-    "L2_mgmt_util": 91,
+    "L2_mgmt_util": 94,
     "L2_mgmt_rent": 2,
     "L2_mgmt_clean": 3,
     "L2_mgmt_other": 1
@@ -1153,7 +1153,7 @@
   "zplarchitecturaldesignconsultingthailandco.ltd": {
     "L2_sub_pay": 8,
     "L2_mgmt_other": 1,
-    "L2_sub_loan": 6,
+    "L2_sub_loan": 7,
     "L2_mgmt_design": 5,
     "L2_mgmt_tax": 1
   },
@@ -1230,8 +1230,8 @@
   "sinhengengineeringprivateco.ltdheadoffice": {
     "L2_sub_pay": 60,
     "L2_labor_site": 2,
-    "L2_sub_loan": 6,
-    "L2_labor_mm": 2
+    "L2_sub_loan": 9,
+    "L2_labor_mm": 3
   },
   "331ngvco.ltd": {
     "L2_mgmt_fuel": 45,
@@ -1376,7 +1376,7 @@
     "L2_mgmt_office": 3
   },
   "theroomrelax": {
-    "L2_mgmt_rent": 36,
+    "L2_mgmt_rent": 37,
     "L2_mgmt_util": 39
   },
   "谢雨航": {
@@ -1403,7 +1403,7 @@
     "L2_mgmt_safety": 6,
     "L2_mgmt_other": 1,
     "L2_eq_general": 5,
-    "L2_log_transport": 4,
+    "L2_log_transport": 5,
     "L2_mgmt_ppe": 2,
     "L2_mat_cement": 4,
     "L2_mgmt_gas": 4,
@@ -1451,7 +1451,7 @@
   },
   "ztddinternationalco.ltd": {
     "L2_sub_pay": 42,
-    "L2_sub_loan": 4,
+    "L2_sub_loan": 6,
     "L2_labor_site": 2
   },
   "justicemachineryco.ltd": {
@@ -1530,7 +1530,7 @@
   },
   "detaiengineeringelectromechanicalgroupco.ltd": {
     "L2_sub_pay": 19,
-    "L2_sub_loan": 4,
+    "L2_sub_loan": 6,
     "L2_mgmt_other": 1,
     "L2_mat_generic": 3
   },
@@ -1559,7 +1559,7 @@
   },
   "newfarbearing": {
     "L2_mat_steel": 4,
-    "L2_mat_generic": 186,
+    "L2_mat_generic": 188,
     "L2_mat_cement": 6,
     "L2_eq_generator": 2,
     "L2_mat_hardware": 2,
@@ -1581,7 +1581,7 @@
     "L2_mgmt_gas": 4,
     "L2_mgmt_fuel": 5,
     "L2_mgmt_vehicle": 12,
-    "L2_mgmt_rent": 3,
+    "L2_mgmt_rent": 4,
     "L2_mgmt_travel": 2,
     "L2_mgmt_office": 5,
     "L2_mgmt_util": 11,
@@ -1594,7 +1594,7 @@
     "L2_mgmt_clean": 1
   },
   "huichuangco.ltd": {
-    "L2_labor_mm": 3,
+    "L2_labor_mm": 4,
     "L2_labor_site": 6
   },
   "j.o.b.constructionco.ltd": {
@@ -1893,13 +1893,13 @@
     "L2_mgmt_other": 4
   },
   "yuanyangconcreateproductthailandco.ltd": {
-    "L2_mat_concrete": 8,
+    "L2_mat_concrete": 9,
     "L2_mgmt_deposit": 1
   },
   "oneforoneco.ltd": {
     "L2_sub_pay": 62,
     "L2_eq_general": 9,
-    "L2_sub_loan": 2
+    "L2_sub_loan": 3
   },
   "thaihetechnologydevelopmentco.ltd": {
     "L2_sub_pay": 16
@@ -2058,7 +2058,7 @@
   },
   "energixcompanylimited": {
     "L2_mgmt_design": 6,
-    "L2_mgmt_permit": 3,
+    "L2_mgmt_permit": 4,
     "L2_mgmt_other": 2
   },
   "somchaisriket": {
@@ -2138,11 +2138,11 @@
   },
   "hyunequipmentthailandco.ltd": {
     "L2_lease_general": 4,
-    "L2_eq_excavator": 12,
-    "L2_eq_general": 12
+    "L2_eq_excavator": 15,
+    "L2_eq_general": 13
   },
   "srccraneco.ltd": {
-    "L2_eq_crane": 15
+    "L2_eq_crane": 18
   },
   "cwttradingthailandco.ltd": {
     "L2_mat_formwork": 6,
@@ -2227,7 +2227,7 @@
   },
   "phinyo": {
     "L2_mgmt_util": 5,
-    "L2_lease_general": 2,
+    "L2_lease_general": 3,
     "L2_mgmt_other": 1
   },
   "c0loneisornthephomsetthi": {
@@ -2271,7 +2271,7 @@
     "L2_lease_pipe": 12,
     "L2_eq_general": 28,
     "L2_log_transport": 9,
-    "L2_lease_general": 2,
+    "L2_lease_general": 3,
     "L2_mat_generic": 2
   },
   "direkgressgarden": {
@@ -2284,7 +2284,7 @@
     "L2_mgmt_vehicle": 2
   },
   "vcmachineryandservicecoltd": {
-    "L2_eq_general": 2
+    "L2_eq_general": 3
   },
   "mrkittithanachanpanya": {
     "L2_mat_generic": 2
@@ -2365,7 +2365,7 @@
     "L2_mgmt_deposit": 6
   },
   "d.bkanparrunruanglimiledpartenership": {
-    "L2_lease_general": 6,
+    "L2_lease_general": 9,
     "L2_mat_sand": 6,
     "L2_eq_general": 8,
     "L2_mat_gravel": 6
@@ -2413,7 +2413,7 @@
   "newbeingthailandco.ltd": {
     "L2_mgmt_ceremony": 6,
     "L2_mgmt_other": 2,
-    "L2_mgmt_entertain": 14
+    "L2_mgmt_entertain": 15
   },
   "lineyoulinemeco.ltd": {
     "L2_mgmt_vehicle": 4
@@ -2435,7 +2435,7 @@
     "L2_mgmt_vehicle": 3
   },
   "zhongchamaterialhandlingthailandco.ltdheadoffice": {
-    "L2_lease_general": 2
+    "L2_lease_general": 3
   },
   "b.tamsatien2020companylimited": {
     "L2_lease_general": 4
@@ -2568,7 +2568,7 @@
     "L2_eq_general": 2
   },
   "ms.amphajenphanit": {
-    "L2_mgmt_rent": 15
+    "L2_mgmt_rent": 16
   },
   "yuscarnrentalcompany": {
     "L2_mgmt_vehicle": 12
@@ -2864,10 +2864,10 @@
     "L2_eq_general": 8
   },
   "estruckco.ltd": {
-    "L2_eq_crane": 2,
+    "L2_eq_crane": 3,
     "L2_mat_generic": 2,
     "L2_eq_general": 3,
-    "L2_eq_generator": 2,
+    "L2_eq_generator": 3,
     "L2_eq_excavator": 1
   },
   "chayangku": {
@@ -2958,7 +2958,7 @@
     "L2_eq_general": 4
   },
   "mawinmedicalco.ltd": {
-    "L2_labor_site": 6
+    "L2_labor_site": 7
   },
   "provincialelectricityauthority": {
     "L2_mgmt_util": 6
@@ -3019,7 +3019,7 @@
     "L2_mat_steel": 1
   },
   "greenbuildinnowallthailandco..ltd": {
-    "L2_mat_generic": 13,
+    "L2_mat_generic": 14,
     "L2_eq_general": 2,
     "L2_mgmt_rent": 2
   },
@@ -3148,7 +3148,7 @@
     "L2_mat_generic": 4
   },
   "chokudomsabserviceco.ltd": {
-    "L2_eq_truckcrane": 11
+    "L2_eq_truckcrane": 12
   },
   "glamnitycompanylimited": {
     "L2_mat_generic": 18
@@ -3209,7 +3209,7 @@
   },
   "clioshippingandlogisticsthailandco.ltd": {
     "L2_eq_general": 3,
-    "L2_log_customs": 24,
+    "L2_log_customs": 26,
     "L2_log_customs_agent": 11,
     "L2_mgmt_other": 1
   },
@@ -3224,7 +3224,7 @@
     "L2_mat_gravel": 2
   },
   "c.cranetransportco.ltd": {
-    "L2_eq_crane": 6
+    "L2_eq_crane": 8
   },
   "futersigntradingco.ltd": {
     "L2_lease_form": 2
@@ -3245,10 +3245,10 @@
     "L2_mat_generic": 14
   },
   "m.y.buldingmaterialandtechnologyco.ltd": {
-    "L2_mat_formwork": 3
+    "L2_mat_formwork": 4
   },
   "hyunequipmentthailandco.ltd.": {
-    "L2_lease_general": 4
+    "L2_lease_general": 6
   },
   "帕卡瓦赛陈": {
     "L2_mgmt_test": 3
@@ -3330,7 +3330,7 @@
   },
   "yuxiangtechnologybuildingmaterialsthailandco.ltd": {
     "L2_sub_pay": 9,
-    "L2_sub_loan": 2,
+    "L2_sub_loan": 3,
     "L2_mat_generic": 1
   },
   "thairenewableco.ltd": {
@@ -3506,7 +3506,7 @@
     "L2_eq_general": 6
   },
   "rocksolidconstructionengineeringco.ltd": {
-    "L2_mat_cement": 5
+    "L2_mat_cement": 6
   },
   "minmechanicalco.ltd": {
     "L2_mat_pile": 3
@@ -3583,7 +3583,7 @@
   },
   "西瑞荣珏建设有限公司": {
     "L2_sub_pay": 18,
-    "L2_sub_loan": 2
+    "L2_sub_loan": 3
   },
   "南亚雨虹有限公司": {
     "L2_sub_pay": 6
@@ -3605,7 +3605,7 @@
   "thaihuachenco.ltd": {
     "L2_mat_generic": 4,
     "L2_mgmt_admin": 1,
-    "L3_office_supplies": 2
+    "L3_office_supplies": 3
   },
   "chengangconstructionengineeringthailandco.ltd": {
     "L2_mgmt_other": 1
@@ -3884,7 +3884,7 @@
   },
   "hongshengconstructionengineeringthailandco.ltd": {
     "L2_sub_pay": 4,
-    "L2_sub_loan": 2
+    "L2_sub_loan": 3
   },
   "pinnacleprecisionindustrithailandco.ltd": {
     "L2_mgmt_bid_bond": 2
@@ -3960,7 +3960,7 @@
     "L2_mat_generic": 2
   },
   "choksomkidltd.ltd": {
-    "L2_eq_excavator": 4,
+    "L2_eq_excavator": 5,
     "L2_mgmt_entertain": 1
   },
   "张博": {
@@ -4133,7 +4133,7 @@
     "L2_eq_excavator": 2
   },
   "greenbuildinnowallthailandco.ltd": {
-    "L2_mat_generic": 5
+    "L2_mat_generic": 6
   },
   "stcpropertyhomeco.ltd": {
     "L2_labor_site": 3,
@@ -4273,7 +4273,7 @@
     "L2_mgmt_bid_bond": 2
   },
   "yiyundecorationengineeringthailandco.ltd": {
-    "L2_mat_concrete": 3
+    "L2_mat_concrete": 4
   },
   "brachatafindernechannel": {
     "L2_mgmt_other": 1,
@@ -4493,7 +4493,7 @@
     "L2_mgmt_bid_bond": 2
   },
   "kawacorparationco.ltd": {
-    "L2_mat_generic": 2
+    "L2_mat_generic": 3
   },
   "lunthawinengineering": {
     "L2_eq_general": 2
@@ -4562,7 +4562,7 @@
     "L2_mgmt_bid_bond": 4
   },
   "jacservice2025co.ltdheadoffice": {
-    "L2_log_transport": 3
+    "L2_log_transport": 4
   },
   "coldcastletransport": {
     "L2_log_transport": 2
@@ -4653,7 +4653,7 @@
     "L2_mgmt_test": 3
   },
   "nantongconstructionengineering": {
-    "L2_mat_concrete": 4,
+    "L2_mat_concrete": 5,
     "L2_mat_pile": 2,
     "L2_mat_steel": 1
   },
