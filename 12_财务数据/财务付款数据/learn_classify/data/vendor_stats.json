@@ -3,16 +3,16 @@
     "L2_mat_generic": 32,
     "L2_mgmt_admin": 7,
     "L2_mgmt_food": 133,
-    "L2_mgmt_fuel": 270,
+    "L2_mgmt_fuel": 272,
     "L2_mgmt_vehicle": 181,
-    "L2_labor_local": 86,
+    "L2_labor_local": 88,
     "L2_mgmt_rent": 60,
     "L2_mgmt_travel": 32,
     "L2_mgmt_net": 17,
     "L2_mgmt_safety": 21,
     "L2_mat_gravel": 10,
     "L2_mgmt_entertain": 22,
-    "L2_mgmt_police": 22,
+    "L2_mgmt_police": 31,
     "L2_mgmt_util": 135,
     "L2_mgmt_clean": 34,
     "L2_mgmt_office": 77,
@@ -21,7 +21,7 @@
     "L2_eq_repair": 17,
     "L2_mgmt_petty": 7,
     "L2_mgmt_other": 10,
-    "L2_labor_salary": 9,
+    "L2_labor_salary": 11,
     "L2_log_transport": 3,
     "L2_mat_cement": 14,
     "L2_labor_mm": 106,
@@ -30,7 +30,7 @@
     "L2_mat_steel": 9,
     "L2_mgmt_deposit": 2,
     "L2_mgmt_gas": 5,
-    "L2_mgmt_permit": 11,
+    "L2_mgmt_permit": 15,
     "L2_eq_crane": 6,
     "L2_eq_tower": 2,
     "L2_mgmt_permit_sign": 4,
@@ -46,14 +46,14 @@
     "L2_mat_generic": 2
   },
   "孙谷金": {
-    "L2_mgmt_police": 36,
-    "L2_mgmt_fuel": 101,
+    "L2_mgmt_police": 41,
+    "L2_mgmt_fuel": 102,
     "L2_mgmt_clean": 18,
     "L2_mat_generic": 39,
     "L2_mgmt_food": 17,
-    "L2_mgmt_permit": 23,
+    "L2_mgmt_permit": 28,
     "L2_eq_general": 16,
-    "L2_mgmt_util": 22,
+    "L2_mgmt_util": 24,
     "L2_mgmt_gas": 8,
     "L2_eq_repair": 12,
     "L2_mgmt_entertain": 6,
@@ -90,7 +90,7 @@
   "tanthitayasaithong": {
     "L2_mgmt_vehicle": 173,
     "L2_mgmt_post": 4,
-    "L2_mgmt_travel": 25,
+    "L2_mgmt_travel": 26,
     "L2_mgmt_office": 181,
     "L2_mgmt_fuel": 170,
     "L2_mgmt_ppe": 14,
@@ -98,7 +98,7 @@
     "L2_mgmt_bank_fee": 2,
     "L2_mgmt_net": 14,
     "L2_mgmt_stamp": 4,
-    "L2_mgmt_permit": 29,
+    "L2_mgmt_permit": 30,
     "L2_mgmt_other": 11,
     "L2_mgmt_deposit": 10,
     "L2_mgmt_rent": 6,
@@ -107,7 +107,7 @@
     "L2_mgmt_design": 2,
     "L2_eq_repair": 2,
     "L3_office_post": 6,
-    "L3_office_supplies": 33,
+    "L3_office_supplies": 34,
     "L3_office_net": 14,
     "L2_mgmt_entertain": 1,
     "L2_mgmt_insurance": 1,
@@ -115,16 +115,16 @@
   },
   "李铭": {
     "L2_mgmt_fuel": 95,
-    "L2_mgmt_office": 124,
-    "L2_mgmt_gas": 36,
+    "L2_mgmt_office": 125,
+    "L2_mgmt_gas": 37,
     "L2_mgmt_post": 3,
     "L2_mgmt_util": 100,
     "L2_mgmt_vehicle": 124,
     "L2_labor_local": 4,
     "L2_mgmt_other": 8,
-    "L2_eq_general": 13,
-    "L2_mgmt_permit": 27,
-    "L2_mgmt_travel": 46,
+    "L2_eq_general": 14,
+    "L2_mgmt_permit": 31,
+    "L2_mgmt_travel": 47,
     "L2_mgmt_safety": 27,
     "L2_mgmt_water": 3,
     "L2_mgmt_net": 15,
@@ -144,7 +144,8 @@
     "L3_office_supplies": 9,
     "L3_office_post": 6,
     "L3_office_net": 15,
-    "L2_mgmt_design": 1
+    "L2_mgmt_design": 1,
+    "L2_mgmt_police": 12
   },
   "panuwatpetroleumpartnership": {
     "L2_mgmt_fuel": 42,
@@ -153,13 +154,13 @@
   "张军": {
     "L2_mgmt_water": 2,
     "L2_labor_mm": 9,
-    "L2_mgmt_util": 23,
+    "L2_mgmt_util": 25,
     "L2_eq_pump": 4,
     "L2_mgmt_vehicle": 25,
     "L2_eq_repair": 30,
-    "L2_mgmt_gas": 24,
+    "L2_mgmt_gas": 25,
     "L2_mgmt_clean": 20,
-    "L2_mgmt_office": 155,
+    "L2_mgmt_office": 156,
     "L2_mgmt_food": 9,
     "L2_eq_general": 27,
     "L2_mgmt_other": 9,
@@ -180,18 +181,19 @@
     "L2_eq_loader": 6,
     "L2_mat_steel": 2,
     "L3_office_net": 4,
-    "L3_office_supplies": 6
+    "L3_office_supplies": 7,
+    "L2_mgmt_police": 2
   },
   "宋朝兴": {
-    "L2_mgmt_fuel": 106,
+    "L2_mgmt_fuel": 107,
     "L2_mgmt_food": 7,
-    "L2_mgmt_office": 35,
+    "L2_mgmt_office": 37,
     "L2_mgmt_gas": 6,
     "L2_mgmt_util": 33,
     "L2_eq_truckcrane": 4,
     "L2_eq_repair": 16,
     "L2_mgmt_water": 3,
-    "L2_mgmt_permit": 28,
+    "L2_mgmt_permit": 31,
     "L2_mgmt_safety": 9,
     "L2_eq_general": 26,
     "L2_labor_mm": 16,
@@ -221,7 +223,8 @@
     "L2_mat_steel": 4,
     "L3_office_net": 6,
     "L2_mgmt_insurance": 1,
-    "L3_office_supplies": 1
+    "L3_office_supplies": 1,
+    "L2_mgmt_police": 4
   },
   "王修文": {
     "L2_labor_local": 16,
@@ -230,7 +233,7 @@
     "L2_mgmt_entertain": 6,
     "L2_mgmt_vehicle": 10,
     "L2_mgmt_food": 2,
-    "L2_mgmt_permit": 5,
+    "L2_mgmt_permit": 7,
     "L2_mgmt_office": 2,
     "L2_eq_repair": 2,
     "L2_mgmt_deposit": 2,
@@ -258,7 +261,7 @@
   },
   "李晓同": {
     "L2_log_customs_agent": 30,
-    "L2_mgmt_permit": 116,
+    "L2_mgmt_permit": 135,
     "L2_mgmt_permit_sign": 4,
     "L2_labor_salary": 92,
     "L2_mgmt_insurance": 15,
@@ -269,19 +272,20 @@
     "L2_mgmt_safety": 4,
     "L2_mgmt_travel": 7,
     "L2_mgmt_petty": 2,
-    "L2_log_customs": 3
+    "L2_log_customs": 3,
+    "L2_mgmt_police": 2
   },
   "郝阳": {
-    "L2_mgmt_util": 27,
+    "L2_mgmt_util": 29,
     "L2_mat_generic": 40,
     "L2_mgmt_admin": 2,
     "L2_labor_local": 2,
     "L2_mgmt_entertain": 8,
-    "L2_mgmt_office": 33,
+    "L2_mgmt_office": 34,
     "L2_mgmt_fuel": 55,
     "L2_mgmt_food": 26,
     "L2_mgmt_vehicle": 91,
-    "L2_mgmt_police": 3,
+    "L2_mgmt_police": 8,
     "L2_mgmt_water": 8,
     "L2_eq_pump": 4,
     "L2_mgmt_petty": 2,
@@ -291,7 +295,7 @@
     "L2_eq_general": 23,
     "L2_eq_repair": 14,
     "L2_mgmt_safety": 10,
-    "L2_mgmt_permit": 17,
+    "L2_mgmt_permit": 20,
     "L2_log_customs": 2,
     "L2_mgmt_rent": 18,
     "L2_mgmt_other": 8,
@@ -336,7 +340,7 @@
     "L2_labor_local": 31,
     "L2_mgmt_food": 6,
     "L2_mgmt_entertain": 7,
-    "L2_mgmt_police": 4,
+    "L2_mgmt_police": 5,
     "L2_mgmt_fuel": 18,
     "L2_mgmt_test": 3,
     "L2_mgmt_petty": 5,
@@ -353,8 +357,8 @@
     "L2_mgmt_ceremony": 2,
     "L2_mgmt_clean": 4,
     "L2_eq_excavator": 2,
-    "L2_mgmt_permit": 7,
-    "L2_labor_mm": 7,
+    "L2_mgmt_permit": 9,
+    "L2_labor_mm": 8,
     "L2_eq_repair": 2,
     "L2_mat_steel": 4,
     "L2_eq_truckcrane": 2
@@ -363,7 +367,7 @@
     "L2_mgmt_food": 10,
     "L2_mgmt_util": 4,
     "L2_mgmt_fuel": 12,
-    "L2_mgmt_vehicle": 14,
+    "L2_mgmt_vehicle": 15,
     "L2_mgmt_rent": 2,
     "L2_labor_local": 2,
     "L2_labor_mm": 6,
@@ -378,7 +382,7 @@
     "L2_mgmt_permit_sign": 4,
     "L2_eq_generator": 2,
     "L2_mgmt_ppe": 2,
-    "L2_mgmt_clean": 4,
+    "L2_mgmt_clean": 5,
     "L2_mgmt_petty": 8,
     "L2_mat_pile": 4,
     "L2_mgmt_gas": 11,
@@ -502,10 +506,11 @@
     "L2_mgmt_other": 3,
     "L2_mgmt_ppe": 3,
     "L2_mgmt_net": 1,
-    "L2_mgmt_permit": 3,
+    "L2_mgmt_permit": 4,
     "L3_office_net": 1,
     "L2_mgmt_safety": 2,
-    "L3_office_supplies": 1
+    "L3_office_supplies": 1,
+    "L2_mgmt_police": 2
   },
   "ms.thanthront": {
     "L2_mat_formwork": 2
@@ -514,19 +519,19 @@
     "L2_mat_generic": 36,
     "L2_eq_generator": 4,
     "L2_mgmt_petty": 6,
-    "L2_labor_local": 16,
+    "L2_labor_local": 17,
     "L2_mgmt_office": 45,
     "L2_mgmt_water": 3,
     "L2_mgmt_fuel": 32,
     "L2_mgmt_vehicle": 24,
     "L2_mgmt_other": 8,
     "L2_mgmt_food": 10,
-    "L2_mgmt_police": 6,
+    "L2_mgmt_police": 9,
     "L2_eq_crane": 6,
     "L2_mgmt_rent": 4,
     "L2_mgmt_clean": 3,
     "L2_eq_repair": 2,
-    "L2_mgmt_permit": 33,
+    "L2_mgmt_permit": 38,
     "L2_eq_excavator": 4,
     "L2_eq_general": 9,
     "L2_log_customs_agent": 4,
@@ -542,7 +547,7 @@
     "L2_mgmt_insurance": 2,
     "L2_mgmt_admin": 1,
     "L3_office_post": 2,
-    "L3_office_supplies": 2,
+    "L3_office_supplies": 3,
     "L2_mgmt_design": 1
   },
   "陈仁武": {
@@ -559,7 +564,7 @@
     "L2_eq_general": 8,
     "L2_mgmt_entertain": 6,
     "L2_mgmt_rent": 6,
-    "L2_mgmt_permit": 7,
+    "L2_mgmt_permit": 9,
     "L2_mat_steel": 2,
     "L2_mgmt_workvisa": 2,
     "L2_mat_generic": 4,
@@ -574,7 +579,7 @@
     "L2_mgmt_police": 8
   },
   "张学利": {
-    "L2_mgmt_permit": 21,
+    "L2_mgmt_permit": 24,
     "L2_mgmt_gas": 26,
     "L2_mgmt_vehicle": 63,
     "L2_mgmt_entertain": 2,
@@ -583,7 +588,7 @@
     "L2_mgmt_food": 18,
     "L2_mgmt_fuel": 17,
     "L2_mgmt_workvisa": 1,
-    "L2_mgmt_util": 4,
+    "L2_mgmt_util": 5,
     "L2_mgmt_office": 65,
     "L2_mat_generic": 40,
     "L2_log_transport": 13,
@@ -608,7 +613,8 @@
     "L2_eq_truckcrane": 3,
     "L3_office_supplies": 4,
     "L2_mgmt_test": 1,
-    "L2_mat_concrete": 1
+    "L2_mat_concrete": 1,
+    "L2_mgmt_police": 3
   },
   "xintaihuangyuanonternationalproductsgroupco.ltd": {
     "L2_mat_concrete": 21,
@@ -635,7 +641,7 @@
     "L2_mat_generic": 4
   },
   "陈晓吴": {
-    "L2_mgmt_fuel": 14,
+    "L2_mgmt_fuel": 15,
     "L2_mgmt_police": 2,
     "L2_labor_local": 16,
     "L2_mgmt_food": 6,
@@ -707,10 +713,10 @@
     "L2_sub_pay": 28
   },
   "b.i.gintergroupsecurityguardco.ltd": {
-    "L2_labor_security": 19
+    "L2_labor_security": 22
   },
   "provincalelecticityauthority": {
-    "L2_mgmt_util": 60,
+    "L2_mgmt_util": 61,
     "L2_mgmt_deposit": 2,
     "L2_eq_general": 2
   },
@@ -807,7 +813,7 @@
     "L2_mgmt_travel": 16,
     "L2_mgmt_office": 13,
     "L2_mgmt_design": 2,
-    "L2_mgmt_permit": 3,
+    "L2_mgmt_permit": 4,
     "L2_mgmt_food": 3
   },
   "nattarikakampaen": {
@@ -815,7 +821,7 @@
     "L2_mgmt_deposit": 2
   },
   "bohuiyang": {
-    "L2_mgmt_office": 23,
+    "L2_mgmt_office": 24,
     "L2_mgmt_permit": 2,
     "L2_mgmt_food": 28,
     "L2_mgmt_rent": 2,
@@ -844,7 +850,7 @@
     "L2_mgmt_workvisa": 1,
     "L2_mgmt_other": 1,
     "L3_office_supplies": 1,
-    "L2_mgmt_safety": 3,
+    "L2_mgmt_safety": 4,
     "L2_mgmt_vehicle": 1,
     "L2_mgmt_design": 1
   },
@@ -879,7 +885,8 @@
     "L2_mgmt_other": 2,
     "L3_office_net": 1,
     "L3_office_post": 1,
-    "L2_mgmt_design": 1
+    "L2_mgmt_design": 1,
+    "L2_mgmt_police": 2
   },
   "shuntaithailandco.ltd": {
     "L2_mat_generic": 16,
@@ -903,7 +910,7 @@
     "L2_mgmt_permit": 3,
     "L2_mgmt_other": 4,
     "L2_labor_local": 6,
-    "L2_mgmt_police": 2,
+    "L2_mgmt_police": 4,
     "L2_mgmt_office": 43,
     "L2_mgmt_food": 4,
     "L2_mgmt_safety": 3,
@@ -938,7 +945,8 @@
     "L2_mgmt_other": 1,
     "L2_mgmt_fuel": 3,
     "L2_labor_salary": 4,
-    "L3_office_net": 1
+    "L3_office_net": 1,
+    "L2_mgmt_police": 2
   },
   "张晓朋": {
     "L2_mgmt_vehicle": 7,
@@ -961,7 +969,7 @@
     "L2_labor_security": 2
   },
   "securitypnserviceco.ltd": {
-    "L2_labor_security": 20
+    "L2_labor_security": 22
   },
   "mrsaranyoochangchoedchusakun": {
     "L2_labor_local": 6
@@ -970,7 +978,7 @@
     "L2_mgmt_rent": 4
   },
   "provincialelecticityauthority": {
-    "L2_mgmt_util": 57,
+    "L2_mgmt_util": 58,
     "L2_mgmt_deposit": 3,
     "L2_mgmt_net": 1,
     "L3_office_net": 2
@@ -1013,7 +1021,8 @@
     "L2_mgmt_office": 2,
     "L2_mgmt_visa": 1,
     "L2_mgmt_safety": 3,
-    "L2_labor_site": 1
+    "L2_labor_site": 1,
+    "L2_mgmt_police": 2
   },
   "sunhakkathailandco.ltd": {
     "L2_mat_admix": 4,
@@ -1021,7 +1030,7 @@
   },
   "charinboonswang": {
     "L2_mgmt_deposit": 2,
-    "L2_mgmt_util": 21,
+    "L2_mgmt_util": 22,
     "L2_mgmt_rent": 9,
     "L2_mgmt_clean": 9
   },
@@ -1069,7 +1078,7 @@
     "L2_lease_general": 4
   },
   "colonelsornthephomsetthi": {
-    "L2_mgmt_util": 46,
+    "L2_mgmt_util": 47,
     "L2_mgmt_rent": 51,
     "L2_mgmt_office": 4,
     "L2_mgmt_deposit": 2
@@ -1084,17 +1093,17 @@
     "L2_mgmt_test": 7,
     "L2_mgmt_other": 5,
     "L2_mat_concrete": 4,
-    "L2_eq_general": 20,
+    "L2_eq_general": 21,
     "L2_mat_generic": 2
   },
   "rojanaindustrialmanagementco.ltd": {
-    "L2_mgmt_util": 90,
+    "L2_mgmt_util": 91,
     "L2_mgmt_rent": 2,
     "L2_mgmt_clean": 3,
     "L2_mgmt_other": 1
   },
   "provincialelectricityauthoritynongyaibranch": {
-    "L2_mgmt_util": 92,
+    "L2_mgmt_util": 95,
     "L2_eq_general": 6,
     "L2_mgmt_deposit": 6,
     "L2_mgmt_other": 1
@@ -1117,7 +1126,7 @@
     "L2_mgmt_rent": 6
   },
   "securitys.v.cservice2004co.ltd.": {
-    "L2_labor_security": 17
+    "L2_labor_security": 20
   },
   "dathpaisanservicelimitedpartnership": {
     "L2_eq_general": 34,
@@ -1166,7 +1175,8 @@
     "L2_labor_salary": 4,
     "L2_mgmt_util": 6,
     "L2_mgmt_safety": 2,
-    "L2_mgmt_petty": 2
+    "L2_mgmt_petty": 2,
+    "L2_mgmt_police": 1
   },
   "jongrak": {
     "L2_labor_local": 4
@@ -1317,7 +1327,7 @@
     "L2_mgmt_police": 6
   },
   "securitysuperguardco.ltd": {
-    "L2_labor_security": 24
+    "L2_labor_security": 26
   },
   "misswantaneenimsuwan": {
     "L2_mgmt_rent": 12,
@@ -1366,7 +1376,7 @@
     "L2_mgmt_office": 3
   },
   "theroomrelax": {
-    "L2_mgmt_rent": 35,
+    "L2_mgmt_rent": 36,
     "L2_mgmt_util": 39
   },
   "谢雨航": {
@@ -1380,7 +1390,7 @@
   },
   "徐臻": {
     "L2_mgmt_vehicle": 8,
-    "L2_mgmt_permit": 3,
+    "L2_mgmt_permit": 4,
     "L2_mgmt_petty": 3,
     "L2_mgmt_net": 1,
     "L2_mgmt_fuel": 7,
@@ -1402,7 +1412,8 @@
     "L3_office_supplies": 1,
     "L2_mgmt_util": 2,
     "L2_mgmt_clean": 2,
-    "L2_mgmt_entertain": 1
+    "L2_mgmt_entertain": 1,
+    "L2_mgmt_police": 3
   },
   "chinawestconstructiongroupthailandco.ltd": {
     "L2_mat_concrete": 12,
@@ -1507,14 +1518,15 @@
     "L2_mgmt_safety": 4,
     "L2_mgmt_office": 13,
     "L2_mat_cement": 2,
-    "L2_mgmt_permit": 2,
+    "L2_mgmt_permit": 3,
     "L2_mgmt_fuel": 3,
     "L2_eq_excavator": 2,
     "L2_mgmt_travel": 6,
     "L3_office_net": 2,
     "L3_office_supplies": 1,
     "L2_labor_mm": 8,
-    "L2_log_transport": 1
+    "L2_log_transport": 1,
+    "L2_mgmt_police": 2
   },
   "detaiengineeringelectromechanicalgroupco.ltd": {
     "L2_sub_pay": 19,
@@ -1895,12 +1907,12 @@
   "丁海杰": {
     "L2_mgmt_safety": 4,
     "L2_mgmt_permit": 2,
-    "L2_mgmt_police": 2,
+    "L2_mgmt_police": 4,
     "L2_labor_local": 5,
     "L2_mgmt_entertain": 4,
     "L2_mgmt_travel": 12,
     "L2_mat_generic": 3,
-    "L2_mgmt_office": 4,
+    "L2_mgmt_office": 5,
     "L2_mgmt_other": 1,
     "L2_log_customs_agent": 2,
     "L2_labor_mm": 1
@@ -1969,7 +1981,7 @@
   "勾晓杰": {
     "L2_mgmt_petty": 6,
     "L2_mgmt_travel": 12,
-    "L2_mgmt_office": 20,
+    "L2_mgmt_office": 21,
     "L2_mgmt_other": 2,
     "L2_mgmt_entertain": 2,
     "L2_mgmt_permit": 2,
@@ -1977,7 +1989,8 @@
     "L2_mgmt_bid_bond": 3,
     "L3_office_post": 1,
     "L2_mgmt_safety": 1,
-    "L2_mgmt_design": 1
+    "L2_mgmt_design": 1,
+    "L2_mgmt_police": 1
   },
   "2pnequipmentkosangpartnership": {
     "L2_mat_generic": 16
@@ -2014,7 +2027,7 @@
     "L2_mgmt_vehicle": 4,
     "L2_mgmt_office": 4,
     "L2_eq_crane": 2,
-    "L2_mgmt_permit": 3,
+    "L2_mgmt_permit": 4,
     "L2_eq_general": 2
   },
   "huyipeng": {
@@ -2028,7 +2041,8 @@
     "L2_mgmt_travel": 4,
     "L2_mgmt_admin": 1,
     "L3_office_post": 3,
-    "L3_office_supplies": 4
+    "L3_office_supplies": 4,
+    "L2_mgmt_police": 2
   },
   "pinthongindustrialparkpubliccompanylimited": {
     "L2_mgmt_deposit": 2,
@@ -2195,7 +2209,8 @@
     "L2_mgmt_office": 2,
     "L2_mat_formwork": 3,
     "L2_mgmt_vehicle": 1,
-    "L2_log_transport": 1
+    "L2_log_transport": 1,
+    "L2_mgmt_police": 1
   },
   "italynoblematerialco.ltd": {
     "L2_mat_generic": 15,
@@ -2339,7 +2354,7 @@
     "L2_mgmt_vehicle": 18
   },
   "jjforcegroupsecurityco.ltd": {
-    "L2_labor_security": 15
+    "L2_labor_security": 18
   },
   "whawaterco.ltd": {
     "L2_mgmt_util": 21,
@@ -2377,7 +2392,7 @@
     "L2_mgmt_rent": 6
   },
   "securitykdco.ltd": {
-    "L2_labor_security": 13
+    "L2_labor_security": 14
   },
   "sermsubmysupplyco.ltd": {
     "L2_labor_site": 6
@@ -2507,7 +2522,7 @@
     "L2_mgmt_food": 8
   },
   "p.mankongsecuritycompanylimited": {
-    "L2_labor_security": 6,
+    "L2_labor_security": 8,
     "L2_eq_excavator": 4
   },
   "okaydeegroupsco.ltd": {
@@ -2823,7 +2838,7 @@
     "L2_eq_crane": 2,
     "L2_mat_generic": 4,
     "L2_mat_concrete": 2,
-    "L2_mgmt_permit": 6,
+    "L2_mgmt_permit": 7,
     "L2_mgmt_safety": 1,
     "L2_mgmt_design": 1
   },
@@ -3029,7 +3044,7 @@
     "L2_mat_sand": 8
   },
   "deeperminterguardsecurityco.ltd.": {
-    "L2_labor_security": 6
+    "L2_labor_security": 8
   },
   "bl.g.intersafetygroupseoupsecurityguard": {
     "L2_labor_security": 2
@@ -3268,7 +3283,8 @@
     "L2_sub_pay": 8
   },
   "rialaborator": {
-    "L2_mgmt_safety": 2
+    "L2_mgmt_safety": 2,
+    "L2_mgmt_police": 1
   },
   "孟飞": {
     "L2_mgmt_travel": 10,
@@ -3284,7 +3300,8 @@
     "L3_office_supplies": 1,
     "L2_mgmt_safety": 1,
     "L2_mgmt_vehicle": 2,
-    "L2_mgmt_food": 1
+    "L2_mgmt_food": 1,
+    "L2_mgmt_police": 1
   },
   "sunshinedecorationco.ltd": {
     "L2_mgmt_other": 1,
@@ -3293,7 +3310,7 @@
     "L2_mat_generic": 2
   },
   "dpharmacycompanylimited": {
-    "L2_mat_generic": 2
+    "L2_mat_generic": 3
   },
   "sathaporn": {
     "L2_mgmt_office": 4
@@ -3905,7 +3922,7 @@
     "L2_mgmt_ppe": 2
   },
   "lixiaotong": {
-    "L2_mgmt_permit": 12,
+    "L2_mgmt_permit": 15,
     "L2_labor_salary": 2,
     "L2_log_customs_agent": 2,
     "L2_mgmt_other": 1,
@@ -4298,7 +4315,7 @@
     "L2_log_transport": 2
   },
   "王浩宇": {
-    "L2_mgmt_permit": 3,
+    "L2_mgmt_permit": 4,
     "L2_mgmt_vehicle": 2,
     "L2_mgmt_office": 1,
     "L3_office_supplies": 1

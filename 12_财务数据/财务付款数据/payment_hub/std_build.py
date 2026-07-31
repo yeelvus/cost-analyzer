@@ -333,8 +333,7 @@ def apply_output_format(output_path: Path, classify_data: Path | None = None) ->
     mismatch_fill = PatternFill(fill_type="solid", fgColor="FFF2CC")
 
     for ws in wb.worksheets:
-        # 分类汇总 sheet 自带样式，跳过明细校验
-        if ws.title in {"分类汇总", "_分类选项"}:
+        if ws.title in {"_分类选项"}:
             continue
         try:
             layout_fn(
@@ -458,15 +457,6 @@ def run_std(paths: Paths, *, cleanup_stale: bool = False) -> List[str]:
             wan_df.to_excel(writer, sheet_name="明细数据_万泰铢", index=False)
             project_df.to_excel(writer, sheet_name="明细数据", index=False)
         apply_output_format(out_path, classify_data=paths.classify_data)
-        # 一级/二级/三级分类汇总（实付+预扣税）
-        try:
-            from .category_summary import add_category_summary_to_workbook
-
-            wb = load_workbook(out_path)
-            add_category_summary_to_workbook(wb, project_df)
-            wb.save(out_path)
-        except Exception as exc:
-            print(f"  ⚠️ 分类汇总 sheet 写入失败: {exc}")
         outputs.append(str(out_path))
         print(f"  ✅ {out_name}  ({len(project_df)} 行)")
 

@@ -69,15 +69,17 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="""
 日常主路径:
   python 财务付款一体化.py                   # 默认 = apply-class（学分类总表叶子变更）
-  python 财务付款一体化.py export-class      # 导出「付款分类总表」→ 改一/二/三级后 apply
   python 财务付款一体化.py all               # 月结全流程: std → summary → cashflow
   python 财务付款一体化.py month             # 同 all（语义别名）
 
+学习池 D_财务付款_学习池:
+  python 财务付款一体化.py export-learn-pool # 导出 00_汇总 + 01_按项目 + 02_按月份
+  python 财务付款一体化.py apply-learn-pool  # 确认/手改 → 记忆 → 已确认 → 剥离 → 刷 B_std
+  # 推荐在 00_汇总/全部摘要_学习池.xlsx 快速改全量（含非THCC），改完后必须 apply
+
 分步 / 维护:
   python 财务付款一体化.py std | summary | cashflow | reclassify
-  python 财务付款一体化.py all --skip-std    # 已有 B_std，只刷新报表
-  python 财务付款一体化.py compact-memory    # 压缩 memory/corrections jsonl
-  python 财务付款一体化.py compact-memory --dry-run
+  python 财务付款一体化.py compact-memory
   python 财务付款一体化.py help-guide
         """,
     )
@@ -294,10 +296,27 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("-i", "--input", default=None, help="默认 data/科目体系.xlsx")
 
     c = sub.add_parser(
-        "category-summary",
-        help="给 B_std 各项目 Excel 补写/刷新「分类汇总」sheet（一/二/三级·实付+预扣税）",
+        "cleanup-sheets",
+        help="删除 B_std 中已废弃 sheet：分类使用说明/分类汇总/分项查看/透视源",
     )
     _add_path_args(c)
+
+    c = sub.add_parser(
+        "export-learn-pool",
+        help="从 B_std 导出 D_财务付款_学习池（按项目/按月份·摘要去重）",
+    )
+    _add_path_args(c)
+
+    c = sub.add_parser(
+        "apply-learn-pool",
+        help="学习池：确认/手改 → 记忆 → 已确认表 → 从项目/月份表剥离 → reclassify B_std",
+    )
+    _add_path_args(c)
+    c.add_argument(
+        "--no-reclassify",
+        action="store_true",
+        help="只学习与剥离，不重刷 B_std",
+    )
 
     c = sub.add_parser(
         "compact-memory",
@@ -608,11 +627,28 @@ def main(argv=None) -> int:
             )
             return 0
 
-        if args.cmd == "category-summary":
-            from .category_summary import refresh_category_summary_in_std_dir
+        if args.cmd == "cleanup-sheets":
+            from .category_summary import remove_deprecated_sheets_in_std_dir
 
-            stats = refresh_category_summary_in_std_dir(paths.std_dir)
-            print(f"✅ 分类汇总 sheet 已刷新: {stats}")
+            stats = remove_deprecated_sheets_in_std_dir(paths.std_dir)
+            print(f"✅ 已清理废弃 sheet: {stats}")
+            return 0
+
+        if args.cmd == "export-learn-pool":
+            from .learn_pool import export_learn_pool
+
+            stats = export_learn_pool(paths)
+            print(f"✅ export-learn-pool: {stats}")
+            return 0
+
+        if args.cmd == "apply-learn-pool":
+            from .learn_pool import apply_learn_pool
+
+            stats = apply_learn_pool(
+                paths,
+                reclassify=not bool(getattr(args, "no_reclassify", False)),
+            )
+            print(f"✅ apply-learn-pool: {stats}")
             return 0
 
         if args.cmd == "compact-memory":

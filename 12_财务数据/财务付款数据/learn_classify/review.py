@@ -229,19 +229,14 @@ def update_excel_classification_columns(
     except Exception:
         pass
 
-    # 重写「分类汇总」sheet（一级/二级/三级 · 实付+预扣税）
+    # 清理已废弃的分类汇总相关 sheet（若仍存在）
     try:
         hub_root = Path(__file__).resolve().parent.parent
         if str(hub_root) not in sys.path:
             sys.path.insert(0, str(hub_root))
-        from payment_hub.category_summary import (
-            _read_detail_df_from_wb,
-            add_category_summary_to_workbook,
-        )
+        from payment_hub.category_summary import remove_deprecated_sheets_from_workbook
 
-        detail_df = _read_detail_df_from_wb(wb)
-        if detail_df is not None and not detail_df.empty:
-            add_category_summary_to_workbook(wb, detail_df)
+        remove_deprecated_sheets_from_workbook(wb)
     except Exception:
         pass
 

@@ -70,6 +70,41 @@ class Paths:
         default_factory=lambda: PAY_ROOT / "C_财务付款_sum" / "分类修正记录.xlsx"
     )
 
+    # 学习池：汇总 / 按项目 / 按月份 + 已确认总表
+    learn_pool_root: Path = field(
+        default_factory=lambda: PAY_ROOT / "D_财务付款_学习池"
+    )
+    learn_pool_all: Path = field(
+        default_factory=lambda: PAY_ROOT / "D_财务付款_学习池" / "00_汇总"
+    )
+    learn_pool_all_xlsx: Path = field(
+        default_factory=lambda: PAY_ROOT
+        / "D_财务付款_学习池"
+        / "00_汇总"
+        / "全部摘要_学习池.xlsx"
+    )
+    learn_pool_by_project: Path = field(
+        default_factory=lambda: PAY_ROOT / "D_财务付款_学习池" / "01_按项目"
+    )
+    learn_pool_by_month: Path = field(
+        default_factory=lambda: PAY_ROOT / "D_财务付款_学习池" / "02_按月份"
+    )
+    learn_pool_confirmed: Path = field(
+        default_factory=lambda: PAY_ROOT
+        / "D_财务付款_学习池"
+        / "03_已确认"
+        / "已确认分类.xlsx"
+    )
+    learn_pool_snapshot: Path = field(
+        default_factory=lambda: PAY_ROOT / "D_财务付款_学习池" / "_export_snapshot.json"
+    )
+    learn_pool_conflicts: Path = field(
+        default_factory=lambda: PAY_ROOT
+        / "D_财务付款_学习池"
+        / "03_已确认"
+        / "冲突记录.xlsx"
+    )
+
     def ensure_output_parents(self) -> None:
         self.std_dir.mkdir(parents=True, exist_ok=True)
         self.sum_xlsx.parent.mkdir(parents=True, exist_ok=True)
@@ -80,3 +115,7 @@ class Paths:
         self.class_master_xlsx_sum.parent.mkdir(parents=True, exist_ok=True)
         self.learn_log_xlsx.parent.mkdir(parents=True, exist_ok=True)
         self.learn_log_xlsx_sum.parent.mkdir(parents=True, exist_ok=True)
+        self.learn_pool_all.mkdir(parents=True, exist_ok=True)
+        self.learn_pool_by_project.mkdir(parents=True, exist_ok=True)
+        self.learn_pool_by_month.mkdir(parents=True, exist_ok=True)
+        self.learn_pool_confirmed.parent.mkdir(parents=True, exist_ok=True)
