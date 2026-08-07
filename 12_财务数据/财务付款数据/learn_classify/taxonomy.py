@@ -381,6 +381,18 @@ def apply_migration_to_taxonomy_file(
         if lid in by_l3:
             by_l3[lid]["parent"] = new_parent
 
+    # 可选：按 id 覆盖 level2 字段（order / notes / aliases 等）
+    for lid, fields in (migration.get("patch_level2") or {}).items():
+        if lid not in by_l2 or not isinstance(fields, dict):
+            continue
+        for key, val in fields.items():
+            if key == "id":
+                continue
+            by_l2[lid][key] = val
+
+    if migration.get("taxonomy_description") is not None:
+        data["description"] = str(migration["taxonomy_description"])
+
     for lid in migration.get("deactivate") or []:
         if lid in by_l2:
             by_l2[lid]["active"] = False

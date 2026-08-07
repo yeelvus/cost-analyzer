@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 合同金额汇总（原 03.1-总包分包合同额统计）
-按项目汇总总包/分包合同额（万泰铢），并按币种拆分 Sheet。
+按项目汇总总包/分包合同额（泰铢，不四舍五入），并按币种拆分 Sheet。
 """
 
 from __future__ import annotations
@@ -19,12 +19,18 @@ from openpyxl.workbook.workbook import Workbook
 
 from summary_config import (
     GENERAL_CONTRACT_DIR,
-    SUBPACKAGE_COMPARE_TOLERANCE_WAN,
+    SUBPACKAGE_COMPARE_TOLERANCE_THB,
     SUBPACKAGE_CONTRACT_DIR,
     get_contract_root,
     get_project_db,
     get_subpackage_std_dir,
 )
+
+# 金额列名（单位：泰铢，原始精度，不四舍五入）
+COL_GENERAL = "总包合同额(泰铢)"
+COL_SUBPACKAGE = "分包合同额(泰铢)"
+COL_LEDGER_SUB = "台账分包合同额(泰铢)"
+COL_DIFF = "差额(泰铢)"
 
 
 def load_project_name_by_code(match_db_file: str) -> dict[str, str]:
@@ -51,6 +57,10 @@ def load_project_name_by_code(match_db_file: str) -> dict[str, str]:
 
 
 def extract_contract_amount_from_json(json_file: str) -> tuple[float, str, float, float]:
+    """
+    返回 (原币金额, 币种, 汇率, 折合泰铢金额)。
+    折合泰铢 = 原币金额 × 汇率，不做四舍五入、不除以 10000。
+    """
     try:
         with open(json_file, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -80,10 +90,9 @@ def extract_contract_amount_from_json(json_file: str) -> tuple[float, str, float
                     f"  ⚠️  汇率格式错误，已默认设为1.0 → {os.path.basename(os.path.dirname(json_file))}"
                 )
 
-        # 与明细汇总保持一致：CNY 且汇率无效时使用默认 5（仅当 JSON 无有效汇率）
-        # 此处保留原 03.1 逻辑：默认 1.0；金额换算统一用 exchange_rate
-        amount_in_wan_thb = (amount * exchange_rate) / 10000
-        return amount, currency, exchange_rate, amount_in_wan_thb
+        # 折合泰铢：原币 × 汇率（保留浮点全精度，不 round）
+        amount_in_thb = amount * exchange_rate
+        return amount, currency, exchange_rate, amount_in_thb
     except Exception as e:
         print(f"  ❌ 读取JSON失败: {json_file} | 错误: {e}")
         return 0.0, "THB", 1.0, 0.0
@@ -104,16 +113,16 @@ def calculate_contract_total(contract_folder: str) -> tuple[float, int, set, dic
             continue
         json_file = os.path.join(item_path, "合同信息.json")
         if os.path.exists(json_file):
-            amount, currency, exchange_rate, amount_in_wan_thb = extract_contract_amount_from_json(
+            amount, currency, exchange_rate, amount_in_thb = extract_contract_amount_from_json(
                 json_file
             )
-            total_thb += amount_in_wan_thb
+            total_thb += amount_in_thb
             contract_count += 1
             currencies_used.add(currency)
             if currency == "CNY":
-                currency_details["CNY"] += amount_in_wan_thb
+                currency_details["CNY"] += amount_in_thb
             else:
-                currency_details["THB"] += amount_in_wan_thb
+                currency_details["THB"] += amount_in_thb
 
     return total_thb, contract_count, currencies_used, currency_details
 
@@ -236,8 +245,8 @@ def scan_all_projects(
                     "项目状态": project_status,
                     "项目编码": project_code,
                     "项目名称": standard_name,
-                    "总包合同额(万泰铢)": round(general_total, 2),
-                    "分包合同额(万泰铢)": round(subpackage_total, 2),
+                    COL_GENERAL: general_total,
+                    COL_SUBPACKAGE: subpackage_total,
                     "_currency_type": currency_type,
                 }
             )
@@ -247,8 +256,8 @@ def scan_all_projects(
                 "MIXED": "[混合币种]",
             }.get(currency_type, "")
             print(
-                f" {project_code} {currency_label}: 总包 {general_count}个({general_total:,.2f}万) "
-                f"+ 分包 {subpackage_count}个({subpackage_total:,.2f}万) [名称匹配:{name_source}]"
+                f" {project_code} {currency_label}: 总包 {general_count}个({general_total:,.4f} 泰铢) "
+                f"+ 分包 {subpackage_count}个({subpackage_total:,.4f} 泰铢) [名称匹配:{name_source}]"
             )
 
     print(f"\n共找到 {len(projects_data)} 个项目")
@@ -291,8 +300,8 @@ def find_latest_subpackage_std_file(std_dir: str | None = None) -> str | None:
 
 def load_ledger_subpackage_by_code(std_file: str | None = None) -> tuple[dict[str, float], str | None]:
     """
-    从最新标准化分包台账按项目编码汇总合同额（万泰铢）。
-    返回 (code -> 万泰铢, 源文件名)
+    从最新标准化分包台账按项目编码汇总合同额（泰铢，不四舍五入）。
+    返回 (code -> 泰铢, 源文件名)
     """
     path = std_file or find_latest_subpackage_std_file()
     if not path or not os.path.isfile(path):
@@ -322,10 +331,10 @@ def load_ledger_subpackage_by_code(std_file: str | None = None) -> tuple[dict[st
     tmp[code_col] = tmp[code_col].fillna("").astype(str).str.strip()
     tmp = tmp[(tmp[code_col] != "") & (tmp[code_col].str.lower() != "nan")]
     tmp[amount_col] = pd.to_numeric(tmp[amount_col], errors="coerce").fillna(0)
-    # 泰铢 → 万泰铢
-    grouped = tmp.groupby(code_col, as_index=True)[amount_col].sum() / 10000.0
-    mapping = {str(k).strip(): round(float(v), 2) for k, v in grouped.items()}
-    print(f"  台账按项目编码汇总: {len(mapping)} 个项目, 合计 {sum(mapping.values()):,.2f} 万泰铢")
+    # 台账本身已是泰铢，按项目编码求和，不 round、不除以 10000
+    grouped = tmp.groupby(code_col, as_index=True)[amount_col].sum()
+    mapping = {str(k).strip(): float(v) for k, v in grouped.items()}
+    print(f"  台账按项目编码汇总: {len(mapping)} 个项目, 合计 {sum(mapping.values()):,.4f} 泰铢")
     return mapping, os.path.basename(path)
 
 
@@ -336,13 +345,13 @@ def enrich_with_ledger_subpackage(
 ) -> pd.DataFrame:
     """
     在「1_总包分包汇总(全部)」上增加台账对比列。
-    - 台账分包合同额(万泰铢): 来自最新 分包签订合同汇总
-    - 差额(万泰铢): 文件夹汇总分包额 - 台账分包额
+    - 台账分包合同额(泰铢): 来自最新 分包签订合同汇总
+    - 差额(泰铢): 文件夹汇总分包额 - 台账分包额
     - 对比结果: 一致 / 有差异 / 台账无此项目 / 文件夹无台账金额
     """
     if df is None or df.empty:
         return df
-    tolerance = SUBPACKAGE_COMPARE_TOLERANCE_WAN if tolerance is None else tolerance
+    tolerance = SUBPACKAGE_COMPARE_TOLERANCE_THB if tolerance is None else tolerance
     out = df.copy()
 
     def _lookup(code) -> float | None:
@@ -364,26 +373,23 @@ def enrich_with_ledger_subpackage(
             statuses.append("")
             continue
         code = row.get("项目编码", "")
-        folder_amt = float(pd.to_numeric(row.get("分包合同额(万泰铢)"), errors="coerce") or 0)
+        folder_amt = float(pd.to_numeric(row.get(COL_SUBPACKAGE), errors="coerce") or 0)
         ledger_amt = _lookup(code)
         if ledger_amt is None:
             ledger_vals.append(None)
             diffs.append(None)
-            if folder_amt > tolerance:
-                statuses.append("台账无此项目")
-            else:
-                statuses.append("台账无此项目")
+            statuses.append("台账无此项目")
         else:
-            ledger_vals.append(round(ledger_amt, 2))
-            diff = round(folder_amt - ledger_amt, 2)
+            ledger_vals.append(float(ledger_amt))
+            diff = float(folder_amt) - float(ledger_amt)
             diffs.append(diff)
             if abs(diff) <= tolerance:
                 statuses.append("一致")
             else:
                 statuses.append("有差异")
 
-    out["台账分包合同额(万泰铢)"] = ledger_vals
-    out["差额(万泰铢)"] = diffs
+    out[COL_LEDGER_SUB] = ledger_vals
+    out[COL_DIFF] = diffs
     out["对比结果"] = statuses
 
     # 总计行：台账合计、差额合计
@@ -391,26 +397,28 @@ def enrich_with_ledger_subpackage(
     if total_mask.any():
         # 仅对非总计行求和
         data_part = out.loc[~total_mask]
-        ledger_sum = pd.to_numeric(data_part["台账分包合同额(万泰铢)"], errors="coerce").fillna(0).sum()
-        folder_sum = pd.to_numeric(data_part["分包合同额(万泰铢)"], errors="coerce").fillna(0).sum()
-        out.loc[total_mask, "台账分包合同额(万泰铢)"] = round(float(ledger_sum), 2)
-        out.loc[total_mask, "差额(万泰铢)"] = round(float(folder_sum - ledger_sum), 2)
+        ledger_sum = float(
+            pd.to_numeric(data_part[COL_LEDGER_SUB], errors="coerce").fillna(0).sum()
+        )
+        folder_sum = float(
+            pd.to_numeric(data_part[COL_SUBPACKAGE], errors="coerce").fillna(0).sum()
+        )
+        out.loc[total_mask, COL_LEDGER_SUB] = ledger_sum
+        out.loc[total_mask, COL_DIFF] = folder_sum - ledger_sum
         out.loc[total_mask, "对比结果"] = (
-            "有差异"
-            if abs(folder_sum - ledger_sum) > tolerance
-            else "一致"
+            "有差异" if abs(folder_sum - ledger_sum) > tolerance else "一致"
         )
 
     return out
 
 
 def build_amount_dataframes(projects_data: list[dict]) -> dict[str, pd.DataFrame]:
-    """构建金额汇总各 Sheet 的 DataFrame。"""
+    """构建金额汇总各 Sheet 的 DataFrame（单位：泰铢）。"""
     if not projects_data:
         return {"说明": pd.DataFrame([{"提示": "未找到任何合同金额数据"}])}
 
     df_all = pd.DataFrame(projects_data)
-    display_columns = ["项目状态", "项目编码", "项目名称", "总包合同额(万泰铢)", "分包合同额(万泰铢)"]
+    display_columns = ["项目状态", "项目编码", "项目名称", COL_GENERAL, COL_SUBPACKAGE]
     sheets: dict[str, pd.DataFrame] = {}
 
     def with_total(df: pd.DataFrame) -> pd.DataFrame:
@@ -420,8 +428,8 @@ def build_amount_dataframes(projects_data: list[dict]) -> dict[str, pd.DataFrame
             "项目状态": "",
             "项目编码": "",
             "项目名称": "总计",
-            "总包合同额(万泰铢)": df["总包合同额(万泰铢)"].sum(),
-            "分包合同额(万泰铢)": df["分包合同额(万泰铢)"].sum(),
+            COL_GENERAL: df[COL_GENERAL].sum(),
+            COL_SUBPACKAGE: df[COL_SUBPACKAGE].sum(),
         }
         # 保留可能已有的对比列占位
         for col in df.columns:
@@ -558,7 +566,7 @@ def format_amount_sheets(workbook: Workbook, sheet_names: list[str] | None = Non
                     horizontal="center" if col_idx <= 3 else "right", vertical="center"
                 )
 
-        # 金额列数字格式（从第4列起，排除「对比结果」文本列）
+        # 金额列：千分位 + 最多 4 位小数展示（单元格存原始浮点，不四舍五入写入）
         for col_idx in range(4, ws.max_column + 1):
             header = headers[col_idx - 1] if col_idx - 1 < len(headers) else None
             if header == "对比结果":
@@ -566,17 +574,17 @@ def format_amount_sheets(workbook: Workbook, sheet_names: list[str] | None = Non
             col_letter = get_column_letter(col_idx)
             for cell in ws[col_letter][1:]:
                 if cell.value is not None and isinstance(cell.value, (int, float)):
-                    cell.number_format = "#,##0.00"
+                    cell.number_format = "#,##0.####"
 
         # 列宽
         default_widths = {
             "项目状态": 16,
             "项目编码": 16,
             "项目名称": 28,
-            "总包合同额(万泰铢)": 16,
-            "分包合同额(万泰铢)": 16,
-            "台账分包合同额(万泰铢)": 18,
-            "差额(万泰铢)": 12,
+            COL_GENERAL: 18,
+            COL_SUBPACKAGE: 18,
+            COL_LEDGER_SUB: 20,
+            COL_DIFF: 14,
             "对比结果": 14,
         }
         for col_idx, header in enumerate(headers, start=1):
@@ -608,8 +616,8 @@ def export_amount_only(output_path: str, base_dir: str | None = None) -> tuple[s
         "cny": int((df_all["_currency_type"] == "CNY").sum()),
         "thb": int((df_all["_currency_type"] == "THB").sum()),
         "mixed": int((df_all["_currency_type"] == "MIXED").sum()),
-        "total_general": float(df_all["总包合同额(万泰铢)"].sum()),
-        "total_subpackage": float(df_all["分包合同额(万泰铢)"].sum()),
+        "total_general": float(df_all[COL_GENERAL].sum()),
+        "total_subpackage": float(df_all[COL_SUBPACKAGE].sum()),
     }
     print(f"金额汇总已保存：{output_path}")
     return output_path, stats
@@ -617,7 +625,7 @@ def export_amount_only(output_path: str, base_dir: str | None = None) -> tuple[s
 
 def main() -> None:
     print("=" * 80)
-    print("合同管理 - 总包分包合同额汇总工具")
+    print("合同管理 - 总包分包合同额汇总工具（单位：泰铢）")
     print("=" * 80)
     root = get_contract_root()
     print(f"\n合同目录: {root}")
@@ -635,8 +643,8 @@ def main() -> None:
         print(f" - 人民币项目: {stats['cny']}")
         print(f" - 泰铢项目: {stats['thb']}")
         print(f" - 混合币种项目: {stats['mixed']}")
-        print(f"\n 总包合同额: {stats['total_general']:,.2f} 万泰铢")
-        print(f" 分包合同额: {stats['total_subpackage']:,.2f} 万泰铢")
+        print(f"\n 总包合同额: {stats['total_general']:,.4f} 泰铢")
+        print(f" 分包合同额: {stats['total_subpackage']:,.4f} 泰铢")
 
 
 if __name__ == "__main__":

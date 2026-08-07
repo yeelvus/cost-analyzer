@@ -3,7 +3,6 @@ import numpy as np
 import os
 import sys
 import importlib.util
-from datetime import datetime
 
 # ===== 项目配置与客户映射 =====
 CODE_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -705,11 +704,10 @@ def process_concrete_data():
                 '年月', '日期', '强度（塌落度）', '价格', '金额', '金额（万泰铢）',
             ]
             merged_df = merged_df.reindex(columns=[c for c in keep_cols if c in merged_df.columns])
-            ym_suffix = datetime.now().strftime('%Y%m')
             if total_groups > 1:
-                output_base = f"搅拌站混凝土汇总报表_{ym_suffix}_{idx_item:02d}"
+                output_base = f"搅拌站混凝土汇总报表_{idx_item:02d}"
             else:
-                output_base = f"搅拌站混凝土汇总报表_{ym_suffix}"
+                output_base = "搅拌站混凝土汇总报表"
 
             z_report_dir = '/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report'
             os.makedirs(z_report_dir, exist_ok=True)

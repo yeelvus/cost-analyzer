@@ -166,11 +166,13 @@ def export_merged(
     for i, name in enumerate(detail_names + amount_names, 1):
         print(f"  {i}. {name}")
     if projects_data:
+        from amount_summary import COL_GENERAL, COL_SUBPACKAGE
+
         df = pd.DataFrame(projects_data)
         print(
             f"\n金额侧概览: 项目 {len(df)} 个 | "
-            f"总包 {df['总包合同额(万泰铢)'].sum():,.2f} 万泰铢 | "
-            f"分包 {df['分包合同额(万泰铢)'].sum():,.2f} 万泰铢"
+            f"总包 {df[COL_GENERAL].sum():,.4f} 泰铢 | "
+            f"分包 {df[COL_SUBPACKAGE].sum():,.4f} 泰铢"
         )
     return output_path
 

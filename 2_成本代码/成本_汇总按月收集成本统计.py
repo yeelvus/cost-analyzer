@@ -475,6 +475,83 @@ def write_ws_cell(ws, row, col, value=None, number_format=None):
         cell.number_format = number_format
     return cell
 
+
+def write_dataframe_to_sheet(ws, df):
+    if df is None or df.empty:
+        ws.cell(row=1, column=1, value="提示")
+        ws.cell(row=2, column=1, value="无可用数据")
+        return
+
+    for col_idx, column_name in enumerate(df.columns, start=1):
+        ws.cell(row=1, column=col_idx, value=column_name)
+
+    for row_idx, (_, row) in enumerate(df.iterrows(), start=2):
+        for col_idx, column_name in enumerate(df.columns, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=row[column_name])
+
+
+def apply_sheet_default_style(ws, df):
+    if df is None or df.empty:
+        return
+
+    ws.auto_filter.ref = ws.dimensions
+    ws.row_dimensions[1].height = 50
+    for cell in ws[1]:
+        cell.alignment = Alignment(wrap_text=True, vertical='center', horizontal='center')
+
+    num_format = numbers.FORMAT_NUMBER_00
+    pct_format = numbers.FORMAT_PERCENTAGE_00
+    numeric_cols = set(CONFIG["items"].keys()) | {
+        "财务分包已付款",
+        "总包合同额",
+        "业主签证",
+        "分包合同额",
+        "分包签证",
+        "工程部记录分包已付款",
+        "采购数据汇总",
+        "商混站混凝土汇总",
+        "机具费汇总",
+        "人工费汇总",
+        "分包结算比例",
+        "毛利率",
+        "实际已发生金额",
+        "计算总成本",
+        "部门记录汇总金额",
+        "后续预估汇总",
+    }
+    percent_cols = {"毛利率", "分包结算比例"}
+    monthly_excel_cols = set(CONFIG["items"].keys()) | {"计算总成本", "部门记录汇总金额", "后续预估汇总"}
+    pink_summary_cols = {"计算总成本", "部门记录汇总金额", "后续预估汇总"}
+    no_fill_cols = {"项目名称", "标准项目名称"}
+
+    headers = [cell.value for cell in ws[1]]
+    for col_idx, header in enumerate(headers, start=1):
+        if not header:
+            continue
+        fmt = pct_format if header in percent_cols else (num_format if header in numeric_cols else None)
+        if fmt is not None:
+            for row in range(2, ws.max_row + 1):
+                ws.cell(row=row, column=col_idx).number_format = fmt
+
+    yellow_fill = PatternFill(fill_type="solid", fgColor="FFF2CC")
+    blue_fill = PatternFill(fill_type="solid", fgColor="DDEBF7")
+    pink_fill = PatternFill(fill_type="solid", fgColor="F4CCCC")
+    for col_idx, header in enumerate(headers, start=1):
+        if not header or header in no_fill_cols:
+            continue
+        fill = pink_fill if header in pink_summary_cols else (yellow_fill if header in monthly_excel_cols else blue_fill)
+        for row in range(2, ws.max_row + 1):
+            ws.cell(row=row, column=col_idx).fill = fill
+
+    for col_idx in range(1, len(df.columns) + 1):
+        column_letter = get_column_letter(col_idx)
+        max_length = 0
+        for cell in ws[column_letter]:
+            if cell.value is not None:
+                max_length = max(max_length, len(str(cell.value)))
+        ws.column_dimensions[column_letter].width = min(max_length + 2, 35)
+
+
 def generate_profit_rate_chart(summary_df, output_html):
     required_cols = ["月份", "项目名称", "毛利率"]
     missing_cols = [col for col in required_cols if col not in summary_df.columns]
@@ -658,16 +735,26 @@ def process_all_projects():
         contract_df = pd.read_excel(contract_file, sheet_name=CONFIG["contract_management_sheet"])
         print(f"已加载 {len(contract_df)} 条合同管理记录")
         code_col_candidates = ["项目编码", "标准项目编码"]
-        amount_col_candidates = ["总包合同额(万泰铢)", "总包合同额（万泰铢）", "总包合同额"]
+        amount_col_candidates = [
+            "总包合同额(泰铢)",
+            "总包合同额（泰铢）",
+            "总包合同额(万泰铢)",
+            "总包合同额（万泰铢）",
+            "总包合同额",
+        ]
         code_col = next((c for c in code_col_candidates if c in contract_df.columns), None)
         amount_col = next((c for c in amount_col_candidates if c in contract_df.columns), None)
         if not code_col or not amount_col:
             raise KeyError(f"合同管理sheet缺少必要列，找到列: {list(contract_df.columns)}")
+        # 成本汇总口径为万泰铢：列名含「泰铢」且不含「万」时 ÷10000
+        amount_is_thb = ("泰铢" in str(amount_col)) and ("万" not in str(amount_col))
         for _, row in contract_df.iterrows():
             code = normalize_project_code(row.get(code_col))
             if not code:
                 continue
             contract_amount = safe_to_float(row.get(amount_col, 0))
+            if amount_is_thb:
+                contract_amount = contract_amount / 10000.0
             contract_dict_by_code[code] = contract_dict_by_code.get(code, 0.0) + contract_amount
         print(f"已构建 {len(contract_dict_by_code)} 个项目编码的总包合同额索引\n")
     except Exception as e:
@@ -843,8 +930,12 @@ def process_all_projects():
     if summary_list:
         df = pd.DataFrame(summary_list)
         df["_month_sort"] = df["月份"].apply(parse_month_sort_key)
-        df = df.sort_values(by="_month_sort", ascending=False).drop(columns=["_month_sort"])
+        df = df.sort_values(by=["项目名称", "_month_sort"], ascending=[True, False])
 
+        latest_month_df = df.drop_duplicates(subset=["项目名称"], keep="first").sort_values(by="_month_sort", ascending=False)
+        latest_month_df = latest_month_df.drop(columns=["_month_sort"])
+
+        df = df.sort_values(by="_month_sort", ascending=False).drop(columns=["_month_sort"])
         chart_source_df = df.copy()
 
         contract_col_name = CONTRACT_COL_NAME
@@ -1161,6 +1252,13 @@ def process_all_projects():
 
         margin_change_wide_df = build_margin_change_wide_df(chart_source_df)
         write_margin_change_sheet(wb, margin_change_wide_df)
+
+        latest_month_sheet_name = "最新月份项目"
+        if latest_month_sheet_name in wb.sheetnames:
+            del wb[latest_month_sheet_name]
+        latest_ws = wb.create_sheet(title=latest_month_sheet_name)
+        write_dataframe_to_sheet(latest_ws, latest_month_df)
+        apply_sheet_default_style(latest_ws, latest_month_df)
 
         wb.save(CONFIG["output_file"])
         print(f"\n✓ 成功！所有项目数据已汇总至: {CONFIG['output_file']}")

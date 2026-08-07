@@ -24,8 +24,8 @@ MERGED_OUTPUT_NAME = "合同管理_总包分包全量汇总.xlsx"
 
 # 分包台账标准化目录（用于与文件夹汇总的分包额交叉核对）
 SUBPACKAGE_STD_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_分包合同台账_std"
-# 分包额对比容差（万泰铢）；超过则着色标注
-SUBPACKAGE_COMPARE_TOLERANCE_WAN = 0.01
+# 分包额对比容差（泰铢）；超过则着色标注（约等于原 0.01 万泰铢）
+SUBPACKAGE_COMPARE_TOLERANCE_THB = 100.0
 
 COLUMN_ORDER_FILE = str(Path(__file__).resolve().parent / "column_order.txt")
 

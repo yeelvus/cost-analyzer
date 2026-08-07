@@ -1,0 +1,885 @@
+{
+  "version": "2.4.0",
+  "description": "关键词规则，target 为 level2 稳定 ID",
+  "rules": [
+    {
+      "id": "r_work_visa",
+      "l2_id": "L2_mgmt_work_visa",
+      "priority": 340,
+      "含有": "工作证;工作证费用;工作证费;临时工作证;办理工作证;工作签证;工作签;工签;临时工作签;落地签;落地签费用;落地签证;落地签证费;落地签证费用",
+      "不包含": ""
+    },
+    {
+      "id": "r_medical",
+      "l2_id": "L2_mgmt_medical",
+      "priority": 330,
+      "含有": "医务;医务费;医务费用;体检;体检费;医疗;医疗费;药品;药费;就医;门诊;住院;健康体检;医务体检",
+      "不包含": "治安;安保"
+    },
+    {
+      "id": "r_mat_angle_embed",
+      "l2_id": "L2_mat_generic",
+      "priority": 320,
+      "含有": "预埋钢板;预埋件;预埋;角钢;型钢;工字钢;槽钢;扁钢;方钢;H型钢;C型钢",
+      "不包含": "螺纹钢;盘圆;钢绞线;钢筋"
+    },
+    {
+      "id": "r_office_ac",
+      "l2_id": "L2_mgmt_office",
+      "priority": 320,
+      "含有": "空调安装;安装空调;空调移机;空调维修;办公空调;分体空调;中央空调;空调费;空调",
+      "不包含": "挖机;吊车;塔吊;泵车;发电机;铲车"
+    },
+    {
+      "id": "r_police",
+      "l2_id": "L2_mgmt_police",
+      "priority": 320,
+      "含有": "治安管理费;治安管理;治安费;治安;安保公司;安保费;安保费用;安保;保安费;门岗费;门卫费;安全费用;安全费;安全文明",
+      "不包含": "体检;医疗;药品;医务;劳保;安全帽;安全带;手套;工作服"
+    },
+    {
+      "id": "r_safety",
+      "l2_id": "L2_mgmt_police",
+      "priority": 300,
+      "含有": "安全费用;安全费;安全文明;劳保以外安全",
+      "不包含": ""
+    },
+    {
+      "id": "r_security_fee",
+      "l2_id": "L2_mgmt_police",
+      "priority": 300,
+      "含有": "安保费;安保费用;保安费;门岗费",
+      "不包含": "保安工资"
+    },
+    {
+      "id": "r_steel_plate",
+      "l2_id": "L2_mat_plate",
+      "priority": 300,
+      "含有": "钢板费用;钢板费;钢板采购;钢板款",
+      "不包含": "预埋;租赁;租;角钢"
+    },
+    {
+      "id": "r_dep_bid",
+      "l2_id": "L2_dep_bid",
+      "priority": 290,
+      "含有": "投标保证金;投标保证",
+      "不包含": ""
+    },
+    {
+      "id": "r_dep_perf",
+      "l2_id": "L2_dep_perf",
+      "priority": 290,
+      "含有": "履约保证金;履约保证",
+      "不包含": ""
+    },
+    {
+      "id": "r_agent_pay",
+      "l2_id": "L2_exclude_agent_pay",
+      "priority": 285,
+      "含有": "代付;代付款;代支付;代垫;代垫款;代为付款",
+      "不包含": ""
+    },
+    {
+      "id": "r_agent_pay2",
+      "l2_id": "L2_exclude_agent_pay",
+      "priority": 280,
+      "含有": "代付",
+      "不包含": ""
+    },
+    {
+      "id": "r_airfare",
+      "l2_id": "L2_mgmt_airfare",
+      "priority": 280,
+      "含有": "机票;机票款;机票费;航空票",
+      "不包含": ""
+    },
+    {
+      "id": "r_customs_agent",
+      "l2_id": "L2_log_customs_agent",
+      "priority": 280,
+      "含有": "带关;带关费;带关费用;报关;清关;保关",
+      "不包含": ""
+    },
+    {
+      "id": "r_drink_water",
+      "l2_id": "L2_mgmt_drink_water",
+      "priority": 280,
+      "含有": "桶装水;饮用水;矿泉水;瓶装水;现场饮用水;办公室桶装水",
+      "不包含": ""
+    },
+    {
+      "id": "r_petty",
+      "l2_id": "L2_mgmt_petty",
+      "priority": 280,
+      "含有": "备用金;借支;预支",
+      "不包含": ""
+    },
+    {
+      "id": "r_stamp",
+      "l2_id": "L2_mgmt_stamp",
+      "priority": 280,
+      "含有": "印花税",
+      "不包含": ""
+    },
+    {
+      "id": "r_steel_plate2",
+      "l2_id": "L2_mat_plate",
+      "priority": 280,
+      "含有": "钢板",
+      "不包含": "预埋;租赁;租;角钢;钢筋;螺纹"
+    },
+    {
+      "id": "r_fuel_vehicle",
+      "l2_id": "L2_mgmt_fuel_vehicle",
+      "priority": 270,
+      "含有": "车辆加油;汽车加油;皮卡加油;95汽油;92汽油;汽油;车辆用油;交通用油",
+      "不包含": "发电机;挖机;吊车;机具"
+    },
+    {
+      "id": "r_tax",
+      "l2_id": "L2_mgmt_tax",
+      "priority": 270,
+      "含有": "预扣税;增值税;补缴税;WHT;税款;税金;代扣税",
+      "不包含": "印花税;关税"
+    },
+    {
+      "id": "r_travel_allow",
+      "l2_id": "L2_mgmt_travel_allow",
+      "priority": 270,
+      "含有": "出差补助;出差补贴;差旅补助;出差津贴;驻外补助;外勤补助",
+      "不包含": ""
+    },
+    {
+      "id": "r_fuel_equip",
+      "l2_id": "L2_mgmt_fuel_equip",
+      "priority": 265,
+      "含有": "发电用油;发电机用油;机具用油;机械用油;施工用油;挖机加油;吊车加油;设备加油;柴油机",
+      "不包含": ""
+    },
+    {
+      "id": "r_dep_deposit",
+      "l2_id": "L2_dep_deposit",
+      "priority": 260,
+      "含有": "押金",
+      "不包含": "投标;履约"
+    },
+    {
+      "id": "r_elec",
+      "l2_id": "L2_mgmt_elec_fee",
+      "priority": 260,
+      "含有": "电费;施工用电;临时用电;工业用电;现场用电;电力维修;用电安装;营地电力",
+      "不包含": "发电机;发电用油"
+    },
+    {
+      "id": "r_floor",
+      "l2_id": "L2_mat_floor",
+      "priority": 260,
+      "含有": "地坪硬化;硬化地坪;场地硬化;地坪",
+      "不包含": ""
+    },
+    {
+      "id": "r_transfer",
+      "l2_id": "L2_exclude_transfer",
+      "priority": 260,
+      "含有": "资金调拨;内部调拨",
+      "不包含": ""
+    },
+    {
+      "id": "r_visa_biz",
+      "l2_id": "L2_mgmt_visa_fee",
+      "priority": 260,
+      "含有": "商务签;回头签;DTV;签证费;签证费用;签证",
+      "不包含": "工作签;工签;工作证;落地签;落地签证;办理工作证;临时工作"
+    },
+    {
+      "id": "r_visa_fee",
+      "l2_id": "L2_mgmt_visa_fee",
+      "priority": 260,
+      "含有": "签证;签证费;商务签;落地签;回头签;DTV;飞签;转签;年签;老挝签",
+      "不包含": "工作签;工签"
+    },
+    {
+      "id": "r_L2_sub_loan",
+      "l2_id": "L2_sub_loan",
+      "priority": 250,
+      "含有": "分包&借款",
+      "不包含": ""
+    },
+    {
+      "id": "r_clean",
+      "l2_id": "L2_mgmt_clean",
+      "priority": 250,
+      "含有": "场地清理;垃圾清理;垃圾处理;建筑垃圾;清运;危废;渣土",
+      "不包含": ""
+    },
+    {
+      "id": "r_entertain",
+      "l2_id": "L2_mgmt_entertain",
+      "priority": 250,
+      "含有": "招待费;宴请;业务招待;客户餐",
+      "不包含": ""
+    },
+    {
+      "id": "r_gate",
+      "l2_id": "L2_mat_gate",
+      "priority": 250,
+      "含有": "门楼;门头",
+      "不包含": ""
+    },
+    {
+      "id": "r_rebar",
+      "l2_id": "L2_mat_steel",
+      "priority": 250,
+      "含有": "钢筋;螺纹钢;盘圆;钢绞线;圆钢",
+      "不包含": "角钢;型钢;工字钢;槽钢;钢板;预埋;扁钢;方钢"
+    },
+    {
+      "id": "r_temp_build",
+      "l2_id": "L2_mat_temp_build",
+      "priority": 250,
+      "含有": "临建;临时用房;活动板房;板房;临建设施;集装箱房",
+      "不包含": "集装箱租赁"
+    },
+    {
+      "id": "r_temp_fence",
+      "l2_id": "L2_mat_temp_fence",
+      "priority": 250,
+      "含有": "临时围墙;围挡;施工围墙;彩钢围挡",
+      "不包含": ""
+    },
+    {
+      "id": "r_vehicle",
+      "l2_id": "L2_mgmt_vehicle",
+      "priority": 250,
+      "含有": "过路费;过路过桥;ETC;车辆租赁;租车;皮卡租赁;车辆使用",
+      "不包含": "加油;用油;汽油;柴油"
+    },
+    {
+      "id": "r_water_fee",
+      "l2_id": "L2_mgmt_water_fee",
+      "priority": 250,
+      "含有": "水费;工业用水;施工用水;园区水费;现场用水;自来水",
+      "不包含": "桶装;饮用;矿物;瓶装"
+    },
+    {
+      "id": "r_bid",
+      "l2_id": "L2_mgmt_bid_bond",
+      "priority": 240,
+      "含有": "投标保证金",
+      "不包含": ""
+    },
+    {
+      "id": "r_deposit",
+      "l2_id": "L2_mgmt_deposit",
+      "priority": 240,
+      "含有": "押金",
+      "不包含": "投标;履约"
+    },
+    {
+      "id": "r_food",
+      "l2_id": "L2_mgmt_food",
+      "priority": 240,
+      "含有": "伙食;食堂;工作餐;盒饭;误餐",
+      "不包含": "招待;宴请;客户"
+    },
+    {
+      "id": "r_permit_only",
+      "l2_id": "L2_mgmt_permit",
+      "priority": 240,
+      "含有": "证件许可;许可证;BOI;DBD;劳工证",
+      "不包含": "工作证;工作签;工签;落地签;落地签证;办理工作证"
+    },
+    {
+      "id": "r_rent",
+      "l2_id": "L2_mgmt_rent",
+      "priority": 240,
+      "含有": "房租;物业费;宿舍租金;宿舍;营地租金",
+      "不包含": ""
+    },
+    {
+      "id": "r_transit",
+      "l2_id": "L2_mgmt_transit",
+      "priority": 240,
+      "含有": "交通费;打车;出租车;网约车;地铁;公交",
+      "不包含": "车辆租赁;租车;过路;加油"
+    },
+    {
+      "id": "r_bank_fee",
+      "l2_id": "L2_mgmt_bank_fee",
+      "priority": 230,
+      "含有": "手续费;银行转账手续费;转账手续费;电汇费",
+      "不包含": "中介费;律师"
+    },
+    {
+      "id": "r_travel_hotel",
+      "l2_id": "L2_mgmt_travel",
+      "priority": 230,
+      "含有": "差旅;酒店;住宿;宾馆",
+      "不包含": "机票;补助;补贴"
+    },
+    {
+      "id": "r_customs",
+      "l2_id": "L2_log_customs",
+      "priority": 220,
+      "含有": "关税物流;关税;物流费",
+      "不包含": "带关;报关;清关"
+    },
+    {
+      "id": "r_test_fee",
+      "l2_id": "L2_mgmt_test",
+      "priority": 210,
+      "含有": "大小应变;低应变;高应变;检测费;试验费;桩基检测;检验试验;三线检测;一线检测",
+      "不包含": "塔吊"
+    },
+    {
+      "id": "r_L2_sub_pay",
+      "l2_id": "L2_sub_pay",
+      "priority": 200,
+      "含有": "分包",
+      "不包含": ""
+    },
+    {
+      "id": "r_fence",
+      "l2_id": "L2_mat_temp_fence",
+      "priority": 200,
+      "含有": "围墙",
+      "不包含": "租赁"
+    },
+    {
+      "id": "r_fuel_diesel",
+      "l2_id": "L2_mgmt_fuel_equip",
+      "priority": 200,
+      "含有": "柴油",
+      "不包含": "皮卡;汽车;车辆;95;92;汽油"
+    },
+    {
+      "id": "r_ins",
+      "l2_id": "L2_mgmt_insurance",
+      "priority": 200,
+      "含有": "保险费;保费;车辆保险;工程保险",
+      "不包含": "安全带"
+    },
+    {
+      "id": "r_office",
+      "l2_id": "L2_mgmt_office",
+      "priority": 200,
+      "含有": "办公费;行政用品;办公用品;文具",
+      "不包含": ""
+    },
+    {
+      "id": "r_office_net",
+      "l2_id": "L2_mgmt_office",
+      "l3_id": "L3_office_net",
+      "priority": 200,
+      "含有": "网费;网络费;宽带费;网络;宽带;通讯费;电话费",
+      "不包含": ""
+    },
+    {
+      "id": "r_office_post",
+      "l2_id": "L2_mgmt_office",
+      "l3_id": "L3_office_post",
+      "priority": 200,
+      "含有": "邮寄费;邮寄费用;快递费;快递",
+      "不包含": ""
+    },
+    {
+      "id": "r_permit_fee",
+      "l2_id": "L2_mgmt_permit_sign",
+      "priority": 195,
+      "含有": "施工许可;劳工部检查费;施工许可证",
+      "不包含": ""
+    },
+    {
+      "id": "r_design",
+      "l2_id": "L2_mgmt_design",
+      "priority": 190,
+      "含有": "图纸签字;工程师签字;设计费;转图费;图纸费",
+      "不包含": "打印;复印"
+    },
+    {
+      "id": "r_admix",
+      "l2_id": "L2_mat_admix",
+      "priority": 185,
+      "含有": "苏博特;减水剂;外加剂",
+      "不包含": ""
+    },
+    {
+      "id": "r_gas",
+      "l2_id": "L2_mgmt_gas",
+      "priority": 185,
+      "含有": "厨房煤气;食堂煤气;煤气费用;煤气;燃气费;液化气",
+      "不包含": ""
+    },
+    {
+      "id": "r_ppe",
+      "l2_id": "L2_mgmt_ppe",
+      "priority": 185,
+      "含有": "劳保用品;劳保;安全帽;反光背心;安全带;工作服",
+      "不包含": ""
+    },
+    {
+      "id": "r_brick",
+      "l2_id": "L2_mat_brick",
+      "priority": 180,
+      "含有": "实心砖;空心砖;加气块;砌块;水泥砖",
+      "不包含": ""
+    },
+    {
+      "id": "r_cement",
+      "l2_id": "L2_mat_cement",
+      "priority": 180,
+      "含有": "水泥采购;吨水泥;抹灰砂浆;砌筑砂浆;预拌砂浆",
+      "不包含": "混凝土"
+    },
+    {
+      "id": "r_office_supplies",
+      "l2_id": "L2_mgmt_office",
+      "l3_id": "L3_office_supplies",
+      "priority": 180,
+      "含有": "办公用品;行政采购;行政用品;文具;硒鼓;打印纸;办公物品",
+      "不包含": "宿舍用品"
+    },
+    {
+      "id": "r_travel",
+      "l2_id": "L2_mgmt_travel",
+      "priority": 180,
+      "含有": "差旅;机票;酒店;住宿报销",
+      "不包含": ""
+    },
+    {
+      "id": "r_form",
+      "l2_id": "L2_mat_formwork",
+      "priority": 175,
+      "含有": "木模板;木方;建筑模板",
+      "不包含": "钢膜"
+    },
+    {
+      "id": "r_sand",
+      "l2_id": "L2_mat_sand",
+      "priority": 175,
+      "含有": "河沙;机制砂;黄沙;中砂;粗砂;沙子;砂子",
+      "不包含": "砂浆;砂石"
+    },
+    {
+      "id": "r_slag",
+      "l2_id": "L2_mat_slag",
+      "priority": 175,
+      "含有": "炉渣款;炉渣;粉煤灰",
+      "不包含": ""
+    },
+    {
+      "id": "r_cement2",
+      "l2_id": "L2_mat_cement",
+      "priority": 170,
+      "含有": "水泥;砂浆",
+      "不包含": "混凝土;水泥砖"
+    },
+    {
+      "id": "r_eq_repair",
+      "l2_id": "L2_eq_repair",
+      "priority": 170,
+      "含有": "机具维修;机械维修;车辆维修费;车辆维修;设备维修;补胎;电镐维修;机具维修费",
+      "不包含": ""
+    },
+    {
+      "id": "r_loader",
+      "l2_id": "L2_eq_loader",
+      "priority": 165,
+      "含有": "装载机;铲车租赁;铲车",
+      "不包含": "维修;补胎"
+    },
+    {
+      "id": "r_form2",
+      "l2_id": "L2_mat_formwork",
+      "priority": 160,
+      "含有": "模板",
+      "不包含": "钢膜"
+    },
+    {
+      "id": "r_steel_shape",
+      "l2_id": "L2_mat_steel",
+      "priority": 160,
+      "含有": "角钢;工字钢;槽钢;钢板;螺纹钢;线材;盘圆",
+      "不包含": "钢板租赁;租赁"
+    },
+    {
+      "id": "r_steel_plate_buy",
+      "l2_id": "L2_mat_steel",
+      "priority": 155,
+      "含有": "钢板;工字钢;角钢;槽钢;型钢",
+      "不包含": "租赁;钢板租赁"
+    },
+    {
+      "id": "r_L2_labor_security",
+      "l2_id": "L2_labor_security",
+      "priority": 150,
+      "含有": "保安工资;保安",
+      "不包含": ""
+    },
+    {
+      "id": "r_hw",
+      "l2_id": "L2_mat_hardware",
+      "priority": 120,
+      "含有": "hardware;DOHOME;HARDWAREHOUSE;五金采购;五金;零星材料",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_eq_boom",
+      "l2_id": "L2_eq_boom",
+      "priority": 100,
+      "含有": "曲臂车",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_eq_crane",
+      "l2_id": "L2_eq_crane",
+      "priority": 100,
+      "含有": "吊车;汽车吊;50吨吊车;25吨吊车;100吨吊车",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_eq_excavator",
+      "l2_id": "L2_eq_excavator",
+      "priority": 100,
+      "含有": "挖机;轮式挖机;小挖机",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_eq_flatbed",
+      "l2_id": "L2_eq_flatbed",
+      "priority": 100,
+      "含有": "平板车",
+      "不包含": "皮卡"
+    },
+    {
+      "id": "r_L2_eq_generator",
+      "l2_id": "L2_eq_generator",
+      "priority": 100,
+      "含有": "发电机",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_eq_loader",
+      "l2_id": "L2_eq_loader",
+      "priority": 100,
+      "含有": "铲车",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_eq_pump",
+      "l2_id": "L2_eq_pump",
+      "priority": 100,
+      "含有": "泵车;TN泵车;SCG混凝土泵车;地泵;天泵",
+      "不包含": "脚手架;钢板;钢管"
+    },
+    {
+      "id": "r_L2_eq_tower",
+      "l2_id": "L2_eq_tower",
+      "priority": 100,
+      "含有": "塔吊",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_eq_truckcrane",
+      "l2_id": "L2_eq_truckcrane",
+      "priority": 100,
+      "含有": "随车吊;10吨随车吊",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_labor_local",
+      "l2_id": "L2_labor_local",
+      "priority": 100,
+      "含有": "属地",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_labor_mm",
+      "l2_id": "L2_labor_mm",
+      "priority": 100,
+      "含有": "缅工",
+      "不包含": "医疗;体检"
+    },
+    {
+      "id": "r_L2_labor_salary",
+      "l2_id": "L2_labor_salary",
+      "priority": 100,
+      "含有": "工资薪金",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_labor_site",
+      "l2_id": "L2_labor_site",
+      "priority": 100,
+      "含有": "工程劳工;劳务费",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_lease_container",
+      "l2_id": "L2_lease_container",
+      "priority": 100,
+      "含有": "集装箱&租赁",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_lease_form",
+      "l2_id": "L2_lease_form",
+      "priority": 100,
+      "含有": "钢膜&租赁",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_lease_pipe",
+      "l2_id": "L2_lease_pipe",
+      "priority": 100,
+      "含有": "钢管&租赁",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_lease_plate",
+      "l2_id": "L2_lease_plate",
+      "priority": 100,
+      "含有": "钢板&租赁;TCB钢板",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_lease_scaffold",
+      "l2_id": "L2_lease_scaffold",
+      "priority": 100,
+      "含有": "脚手架&租赁;盘扣脚手架",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_log_customs",
+      "l2_id": "L2_log_customs",
+      "priority": 100,
+      "含有": "关税物流费",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_log_transport",
+      "l2_id": "L2_log_transport",
+      "priority": 100,
+      "含有": "运输费;运费;调转",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mat_concrete",
+      "l2_id": "L2_mat_concrete",
+      "priority": 100,
+      "含有": "混凝土",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mat_gravel",
+      "l2_id": "L2_mat_gravel",
+      "priority": 100,
+      "含有": "碎石",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mat_pile",
+      "l2_id": "L2_mat_pile",
+      "priority": 100,
+      "含有": "桩",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mat_steel",
+      "l2_id": "L2_mat_steel",
+      "priority": 100,
+      "含有": "钢筋",
+      "不包含": "角钢;钢板;预埋;型钢;工字钢;槽钢"
+    },
+    {
+      "id": "r_L2_mgmt_admin",
+      "l2_id": "L2_mgmt_admin",
+      "priority": 100,
+      "含有": "行政用品",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_agency",
+      "l2_id": "L2_mgmt_agency",
+      "priority": 100,
+      "含有": "中介费;律师咨询费",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_ceremony",
+      "l2_id": "L2_mgmt_ceremony",
+      "priority": 100,
+      "含有": "开工仪式;奠基仪式;奠基",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_clean",
+      "l2_id": "L2_mgmt_clean",
+      "priority": 100,
+      "含有": "场地清理费;垃圾处理;建筑垃圾;危废处理;清运",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_deposit",
+      "l2_id": "L2_mgmt_deposit",
+      "priority": 100,
+      "含有": "押金",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_entertain",
+      "l2_id": "L2_mgmt_entertain",
+      "priority": 100,
+      "含有": "招待费;接待费;宴请",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_flyvisa",
+      "l2_id": "L2_mgmt_flyvisa",
+      "priority": 100,
+      "含有": "飞签",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_food",
+      "l2_id": "L2_mgmt_food",
+      "priority": 100,
+      "含有": "伙食",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_fuel",
+      "l2_id": "L2_mgmt_fuel",
+      "priority": 100,
+      "含有": "燃料及动力;加油费;油卡;柴油;汽油;B7柴油;95汽油;燃油",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_office",
+      "l2_id": "L2_mgmt_office",
+      "priority": 100,
+      "含有": "办公费;行政用品;行政采购;打印机;标识;条幅;广告",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_park",
+      "l2_id": "L2_mgmt_park",
+      "priority": 100,
+      "含有": "园区&管理费",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_permit",
+      "l2_id": "L2_mgmt_permit",
+      "priority": 100,
+      "含有": "证件许可;签证;工作证;工签;回头签;落地签;DBD;移民局;BOI;施工许可证",
+      "不包含": "医疗（非签证）"
+    },
+    {
+      "id": "r_L2_mgmt_petty",
+      "l2_id": "L2_mgmt_petty",
+      "priority": 100,
+      "含有": "备用金",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_rent",
+      "l2_id": "L2_mgmt_rent",
+      "priority": 100,
+      "含有": "房租;宿舍租赁;营地租赁;办公室租赁;缅工营地租金",
+      "不包含": "机具;塔吊;泵车;挖机;脚手架;钢板"
+    },
+    {
+      "id": "r_L2_mgmt_stamp",
+      "l2_id": "L2_mgmt_stamp",
+      "priority": 100,
+      "含有": "印花税",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_util",
+      "l2_id": "L2_mgmt_util",
+      "priority": 100,
+      "含有": "水电费;电费;水费;园区水费;现场用水",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_vehicle",
+      "l2_id": "L2_mgmt_vehicle",
+      "priority": 100,
+      "含有": "皮卡;租车费;车辆租赁",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_water",
+      "l2_id": "L2_mgmt_water",
+      "priority": 100,
+      "含有": "饮用水;桶装水;矿泉水",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_workvisa",
+      "l2_id": "L2_mgmt_workvisa",
+      "priority": 100,
+      "含有": "工作签",
+      "不包含": ""
+    },
+    {
+      "id": "r_eq_general",
+      "l2_id": "L2_eq_general",
+      "priority": 100,
+      "含有": "临租;机具款;机械租赁;机械租赁费;设备租赁;机具使用",
+      "不包含": "空调"
+    },
+    {
+      "id": "r_L2_mgmt_safety",
+      "l2_id": "L2_mgmt_safety",
+      "priority": 90,
+      "含有": "安全费用;治安管理费;安全文明;安全网;反光背心;安全带",
+      "不包含": "保安工资;保安费"
+    },
+    {
+      "id": "r_office_gen",
+      "l2_id": "L2_mgmt_office",
+      "l3_id": "L3_office_other",
+      "priority": 90,
+      "含有": "办公费",
+      "不包含": "网费;邮寄;快递;用品"
+    },
+    {
+      "id": "r_aux",
+      "l2_id": "L2_mat_generic",
+      "priority": 80,
+      "含有": "螺栓;焊条;铁丝;钉子;自钻;膨胀螺栓;切割片;五金",
+      "不包含": ""
+    },
+    {
+      "id": "r_reimb",
+      "l2_id": "L2_mgmt_reimburse",
+      "priority": 80,
+      "含有": "报销费用;日常费用报销;郝阳报销;费用报销",
+      "不包含": "材料报销"
+    },
+    {
+      "id": "r_L2_eq_general",
+      "l2_id": "L2_eq_general",
+      "priority": 60,
+      "含有": "机具;OBD机械;自卸吊;临租;设备租赁;机械租赁",
+      "不包含": "脚手架;钢板;钢管;集装箱;泵车;塔吊;挖机;皮卡"
+    },
+    {
+      "id": "r_L2_mat_generic",
+      "l2_id": "L2_mat_generic",
+      "priority": 50,
+      "含有": "材料采购;物资采购;材料&采购;物资&采购",
+      "不包含": ""
+    },
+    {
+      "id": "r_L2_mgmt_other",
+      "l2_id": "L2_mgmt_other",
+      "priority": 25,
+      "含有": "杂费;无法归类;零星杂费",
+      "不包含": ""
+    }
+  ]
+}

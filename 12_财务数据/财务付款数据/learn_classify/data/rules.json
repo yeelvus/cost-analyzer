@@ -1,5 +1,5 @@
 {
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "关键词规则，target 为 level2 稳定 ID",
   "rules": [
     {
