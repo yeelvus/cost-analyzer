@@ -18,14 +18,17 @@ from .config import Paths
 from .menu import interactive_menu, print_maint_help, print_quick_help
 from .pipeline import (
     run_pipeline,
+    step_amount_mismatch,
     step_apply_class_master,
     step_cashflow,
+    step_classify,
     step_export_class_master,
     step_export_review,
     step_export_taxonomy,
     step_health,
     step_import_taxonomy,
     step_learn,
+    step_raw_std,
     step_reclassify,
     step_std,
     step_summary,
@@ -72,6 +75,21 @@ def _add_path_args(sp: argparse.ArgumentParser) -> None:
     sp.add_argument("--data-dir", help="learn_classify/data")
 
 
+def _add_project_match_args(sp: argparse.ArgumentParser) -> None:
+    """项目名称：默认仅精确别名、不弹窗；需要时显式打开弹窗。"""
+    g = sp.add_mutually_exclusive_group()
+    g.add_argument(
+        "--prompt-project",
+        action="store_true",
+        help="std 时弹窗补录未匹配项目名称（默认不弹）",
+    )
+    g.add_argument(
+        "--no-prompt-project",
+        action="store_true",
+        help="不弹窗（默认行为，可显式写出）",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="财务付款一体化",
@@ -80,6 +98,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="无参数且在终端中 → 交互菜单",
     )
     _add_path_args(p)
+    _add_project_match_args(p)
     p.add_argument("--menu", action="store_true", help="强制交互菜单")
     p.add_argument("--no-menu", action="store_true", help="无子命令只打印帮助")
     p.add_argument("--skip-std", action="store_true")
@@ -105,12 +124,25 @@ def build_parser() -> argparse.ArgumentParser:
         _add_path_args(c)
         if name == "apply":
             c.add_argument("--no-reclassify", action="store_true")
+            c.add_argument(
+                "--no-auto-taxonomy",
+                action="store_true",
+                help="禁止自动把学习池中的新科目登记进 taxonomy",
+            )
+            c.add_argument(
+                "--only-confirmed",
+                action="store_true",
+                help="仅学习状态为「确认」的行（默认：待确认但已手改科目也会学）",
+            )
         if name == "run":
+            c.add_argument("--skip-raw-std", action="store_true", help="跳过 raw 合并标准化")
+            c.add_argument("--skip-classify", action="store_true", help="跳过摘要科目分类")
             c.add_argument("--skip-std", action="store_true")
             c.add_argument("--skip-summary", action="store_true")
             c.add_argument("--skip-cashflow", action="store_true")
             c.add_argument("--reclassify", action="store_true")
             c.add_argument("--steps", nargs="+", default=None)
+            _add_project_match_args(c)
 
     sub.add_parser("help", aliases=["help-guide"], help="用法说明")
     sub.add_parser("maint", help="维护子菜单 / 列表")
@@ -118,9 +150,12 @@ def build_parser() -> argparse.ArgumentParser:
     _add_path_args(c)
 
     for name, help_ in [
-        ("std", "仅标准化"),
-        ("summary", "仅汇总"),
+        ("raw-std", "raw 标准化合并（按文件夹合并为一个 Excel）"),
+        ("classify", "A1_raw_std 摘要→一级/二级/三级科目（学习分类）"),
+        ("std", "按项目拆分到 B_std（优先读 A2_classified）"),
+        ("summary", "汇总（优先读 A2_classified）"),
         ("cashflow", "仅现金流"),
+        ("amount-mismatch", "汇总应付≠预扣+实付的明细"),
         ("reclassify", "重刷 B_std 分类"),
         ("health", "分类健康度"),
         ("dropdowns", "B_std 加下拉"),
@@ -131,7 +166,9 @@ def build_parser() -> argparse.ArgumentParser:
     ]:
         c = sub.add_parser(name, help=help_)
         _add_path_args(c)
-        if name in {"export-class", "export-taxonomy"}:
+        if name in {"std", "raw-std"}:
+            _add_project_match_args(c)
+        if name in {"export-class", "export-taxonomy", "amount-mismatch"}:
             c.add_argument("-o", "--output", default=None)
         if name == "import-taxonomy":
             c.add_argument("-i", "--input", default=None)
@@ -168,7 +205,11 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--no-backup", action="store_true")
     c.add_argument("--with-reclassify", action="store_true")
 
-    c = sub.add_parser("classify", help="单条摘要调试")
+    c = sub.add_parser(
+        "classify-one",
+        aliases=["debug-classify"],
+        help="单条摘要分类调试（--summary 必填）",
+    )
     _add_path_args(c)
     c.add_argument("--subject", default="")
     c.add_argument("--summary", required=True)
@@ -200,6 +241,13 @@ def _cmd_help_guide() -> int:
     return 0
 
 
+def _prompt_project_from_args(args: Any) -> bool:
+    """默认不弹窗；仅 --prompt-project 时开启。"""
+    if bool(getattr(args, "prompt_project", False)):
+        return True
+    return False
+
+
 def _dispatch(cmd: str, paths: Paths, args: Any) -> int:
     ensure_code_root()
 
@@ -212,21 +260,38 @@ def _dispatch(cmd: str, paths: Paths, args: Any) -> int:
         run_pipeline(
             paths,
             steps=getattr(args, "steps", None),
+            skip_raw_std=bool(getattr(args, "skip_raw_std", False)),
+            skip_classify=bool(getattr(args, "skip_classify", False)),
             skip_std=bool(getattr(args, "skip_std", False)),
             skip_summary=bool(getattr(args, "skip_summary", False)),
             skip_cashflow=bool(getattr(args, "skip_cashflow", False)),
             reclassify_before_summary=bool(getattr(args, "reclassify", False)),
+            prompt_project=_prompt_project_from_args(args),
         )
         return 0
 
+    if cmd in {"raw-std", "raw_std"}:
+        step_raw_std(paths, prompt_project=_prompt_project_from_args(args))
+        return 0
+
+    if cmd == "classify":
+        step_classify(paths)
+        return 0
+
     if cmd == "std":
-        step_std(paths)
+        step_std(paths, prompt_project=_prompt_project_from_args(args))
         return 0
     if cmd == "summary":
         step_summary(paths)
         return 0
     if cmd == "cashflow":
         step_cashflow(paths)
+        return 0
+    if cmd == "amount-mismatch":
+        step_amount_mismatch(
+            paths,
+            Path(args.output) if getattr(args, "output", None) else None,
+        )
         return 0
     if cmd == "reclassify":
         step_reclassify(paths)
@@ -240,7 +305,8 @@ def _dispatch(cmd: str, paths: Paths, args: Any) -> int:
 
         stats = export_learn_pool(paths)
         print(f"✅ pool: {stats}")
-        print(f"   打开: {paths.learn_pool_all_xlsx}")
+        print(f"   打开: {paths.learn_pool_priority_xlsx}")
+        print(f"   00_汇总: {paths.learn_pool_all}")
         print("   改完后: apply")
         return 0
 
@@ -250,6 +316,8 @@ def _dispatch(cmd: str, paths: Paths, args: Any) -> int:
         stats = apply_learn_pool(
             paths,
             reclassify=not bool(getattr(args, "no_reclassify", False)),
+            auto_taxonomy=not bool(getattr(args, "no_auto_taxonomy", False)),
+            learn_unconfirmed_edits=not bool(getattr(args, "only_confirmed", False)),
         )
         print(f"✅ apply: {stats}")
         return 0
@@ -337,7 +405,7 @@ def _dispatch(cmd: str, paths: Paths, args: Any) -> int:
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
 
-    if cmd == "classify":
+    if cmd in {"classify-one", "debug-classify"}:
         from learn_classify.engine import ClassifyEngine
 
         r = ClassifyEngine.from_data_dir(paths.classify_data).classify(

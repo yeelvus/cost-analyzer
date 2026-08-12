@@ -9,9 +9,12 @@ import time
 from pathlib import Path
 from typing import Iterable, List, Optional
 
+from .amount_mismatch import run_amount_mismatch
 from .cashflow_build import run_cashflow
+from .classify_raw_std import run_classify_raw_std
 from .config import Paths
 from .pkg import ensure_code_root
+from .raw_std_build import run_raw_std
 from .std_build import run_std
 from .summary_build import run_summary
 
@@ -22,26 +25,62 @@ def _banner(title: str) -> None:
     print("=" * 64)
 
 
-def step_std(paths: Paths) -> List[str]:
-    _banner("步骤 · 原始付款 → 标准明细 (std)")
+def step_raw_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
+    _banner("步骤 · raw 标准化合并 (raw_std)")
+    print(f"输入: {paths.raw_dir}/{{组名}}/*.xlsx")
+    print(f"输出: {paths.raw_std_dir}/{{组名}}/{{组名}}_财务付款_raw_std.xlsx")
+    print(
+        f"项目匹配: 精确别名"
+        f"{' + 弹窗' if prompt_project else '（弹窗关，--prompt-project 可开）'}"
+    )
     t0 = time.time()
-    outs = run_std(paths)
+    outs = run_raw_std(paths, prompt_project=prompt_project)
+    print(f"耗时 {time.time() - t0:.1f}s")
+    return outs
+
+
+def step_classify(paths: Paths) -> List[str]:
+    _banner("步骤 · 摘要科目分类 (classify)")
+    print(f"输入: {paths.raw_std_dir}/{{组名}}/*_raw_std.xlsx")
+    print(f"输出: {paths.classified_dir}/{{组名}}/*_classified.xlsx")
+    print("分类: 学习记忆 + 规则 → 一级/二级/三级科目")
+    t0 = time.time()
+    outs = run_classify_raw_std(paths)
+    print(f"耗时 {time.time() - t0:.1f}s")
+    return outs
+
+
+def step_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
+    _banner("步骤 · 按项目拆分标准明细 (std)")
+    print("优先: A2_classified → B_std/{组}/有支出|未支出/")
+    print("回退: A_raw 全量重处理")
+    t0 = time.time()
+    outs = run_std(paths, prompt_project=prompt_project)
     print(f"耗时 {time.time() - t0:.1f}s")
     return outs
 
 
 def step_summary(paths: Paths) -> List[str]:
     _banner("步骤 · 汇总分析 Excel (summary)")
+    print("优先: A2_classified 直接汇总；回退扫 B_std")
     t0 = time.time()
     outs = run_summary(paths)
     print(f"耗时 {time.time() - t0:.1f}s")
     return outs
 
 
-def step_cashflow(paths: Paths) -> str:
-    _banner("步骤 · 项目现金流量 HTML (cashflow)")
+def step_cashflow(paths: Paths):
+    _banner("步骤 · 项目现金流量 HTML (cashflow，按组)")
     t0 = time.time()
     out = run_cashflow(paths)
+    print(f"耗时 {time.time() - t0:.1f}s")
+    return out
+
+
+def step_amount_mismatch(paths: Paths, output: Optional[Path] = None):
+    _banner("步骤 · 应付≠预扣+实付 不平明细汇总（按组）")
+    t0 = time.time()
+    out = run_amount_mismatch(paths, output_path=output)
     print(f"耗时 {time.time() - t0:.1f}s")
     return out
 
@@ -111,7 +150,7 @@ def step_health(paths: Paths) -> None:
     l1_c: Counter = Counter()
     l2_c: Counter = Counter()
     review_n = total = 0
-    for f in paths.std_dir.glob("*.xlsx"):
+    for f in paths.std_dir.rglob("*.xlsx"):
         if f.name.startswith("~$"):
             continue
         try:
@@ -253,15 +292,27 @@ def run_pipeline(
     paths: Paths,
     *,
     steps: Optional[Iterable[str]] = None,
+    skip_raw_std: bool = False,
+    skip_classify: bool = False,
     skip_std: bool = False,
     skip_summary: bool = False,
     skip_cashflow: bool = False,
     reclassify_before_summary: bool = False,
+    prompt_project: bool = False,
 ) -> dict:
     paths.ensure_output_parents()
     result: dict = {"paths": {}, "ok": True}
 
-    order = list(steps) if steps else ["std", "summary", "cashflow"]
+    # 快路径：raw_std → classify → summary → std → cashflow
+    order = (
+        list(steps)
+        if steps
+        else ["raw_std", "classify", "summary", "std", "cashflow"]
+    )
+    if skip_raw_std:
+        order = [s for s in order if s != "raw_std"]
+    if skip_classify:
+        order = [s for s in order if s != "classify"]
     if skip_std:
         order = [s for s in order if s != "std"]
     if skip_summary:
@@ -274,16 +325,26 @@ def run_pipeline(
         else:
             order.append("reclassify")
 
-    _banner("财务付款一体化流水线")
-    print(f"原始: {paths.raw_dir}")
-    print(f"标准: {paths.std_dir}")
-    print(f"汇总: {paths.sum_xlsx}")
-    print(f"HTML: {paths.cashflow_html}")
+    _banner("财务付款快路径流水线（按文件夹分组）")
+    print(f"A_raw:        {paths.raw_dir}/{{组名}}/")
+    print(f"A1_raw_std:   {paths.raw_std_dir}/{{组名}}/*_raw_std.xlsx")
+    print(f"A2_classified:{paths.classified_dir}/{{组名}}/*_classified.xlsx")
+    print(f"C_sum:        {paths.sum_dir}/{{组名}}/财务付款数据汇总.xlsx")
+    print(f"B_std:        {paths.std_dir}/{{组名}}/有支出|未支出/")
+    print(f"项目弹窗: {'开' if prompt_project else '关'}（--prompt-project）")
     print(f"步骤: {' → '.join(order)}")
 
     t_all = time.time()
     handlers = {
-        "std": lambda: result["paths"].__setitem__("std", step_std(paths)),
+        "raw_std": lambda: result["paths"].__setitem__(
+            "raw_std", step_raw_std(paths, prompt_project=prompt_project)
+        ),
+        "classify": lambda: result["paths"].__setitem__(
+            "classify", step_classify(paths)
+        ),
+        "std": lambda: result["paths"].__setitem__(
+            "std", step_std(paths, prompt_project=prompt_project)
+        ),
         "summary": lambda: result["paths"].__setitem__("summary", step_summary(paths)),
         "cashflow": lambda: result["paths"].__setitem__(
             "cashflow", step_cashflow(paths)

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -237,6 +238,174 @@ class Taxonomy:
             return False
         l1 = self.level1.get(l2.parent)
         return bool(l1 and l1.active)
+
+    def _unique_node_id(self, prefix: str, name: str) -> str:
+        """生成稳定可读 ID：L2_auto_名称；冲突则加序号。"""
+        raw = re.sub(r"\s+", "", str(name or "").strip())
+        raw = re.sub(r'[\\/:*?"<>|]', "", raw)
+        raw = raw[:28] if raw else "new"
+        base = f"{prefix}_{raw}"
+        # ID 中尽量 ASCII；保留中文亦可
+        existing = set(self.level1) | set(self.level2) | set(self.level3)
+        if base not in existing:
+            return base
+        n = 2
+        while f"{base}_{n}" in existing:
+            n += 1
+        return f"{base}_{n}"
+
+    def ensure_l1(
+        self,
+        name: str,
+        *,
+        notes: str = "auto from learn_pool",
+    ) -> Tuple[str, bool]:
+        """确保一级存在。返回 (l1_id, created)。"""
+        text = str(name or "").strip()
+        if not text:
+            raise ValueError("一级科目名称为空")
+        hit = self.resolve_l1_id(text)
+        if hit:
+            return hit, False
+        lid = self._unique_node_id("L1_auto", text)
+        order = max((x.order for x in self.level1.values()), default=0) + 1
+        node = Level1(id=lid, name=text, order=order, active=True, notes=notes)
+        self.level1[lid] = node
+        self._name_to_l1[text] = lid
+        self._name_to_l1[text.lower()] = lid
+        return lid, True
+
+    def ensure_l2(
+        self,
+        name: str,
+        parent_l1_id: str,
+        *,
+        notes: str = "auto from learn_pool",
+    ) -> Tuple[str, bool]:
+        """确保二级存在于指定一级下。返回 (l2_id, created)。"""
+        text = str(name or "").strip()
+        if not text:
+            raise ValueError("二级科目名称为空")
+        if parent_l1_id not in self.level1:
+            raise ValueError(f"一级不存在: {parent_l1_id}")
+        hit = self.resolve_l2_id(text)
+        if hit:
+            # 已存在但挂在别的一级：不挪动，直接复用（避免破坏历史）
+            return hit, False
+        lid = self._unique_node_id("L2_auto", text)
+        siblings = [x for x in self.level2.values() if x.parent == parent_l1_id]
+        order = max((x.order for x in siblings), default=0) + 1
+        node = Level2(
+            id=lid,
+            name=text,
+            parent=parent_l1_id,
+            order=order,
+            active=True,
+            aliases=[],
+            notes=notes,
+        )
+        self.level2[lid] = node
+        self._register_names(self._name_to_l2, text, [], lid)
+        return lid, True
+
+    def ensure_l3(
+        self,
+        name: str,
+        parent_l2_id: str,
+        *,
+        notes: str = "auto from learn_pool",
+    ) -> Tuple[str, bool]:
+        """确保三级存在。返回 (l3_id, created)。"""
+        text = str(name or "").strip()
+        if not text:
+            raise ValueError("三级科目名称为空")
+        if parent_l2_id not in self.level2:
+            raise ValueError(f"二级不存在: {parent_l2_id}")
+        hit = self.resolve_l3_id(text)
+        if hit:
+            return hit, False
+        lid = self._unique_node_id("L3_auto", text)
+        siblings = [x for x in self.level3.values() if x.parent == parent_l2_id]
+        order = max((x.order for x in siblings), default=0) + 1
+        node = Level3(
+            id=lid,
+            name=text,
+            parent=parent_l2_id,
+            order=order,
+            active=True,
+            aliases=[],
+            notes=notes,
+        )
+        self.level3[lid] = node
+        self._register_names(self._name_to_l3, text, [], lid)
+        return lid, True
+
+    def ensure_triple(
+        self,
+        level1: Any = None,
+        level2: Any = None,
+        level3: Any = None,
+        *,
+        default_l1_id: str = "L1_mgmt",
+        notes: str = "auto from learn_pool",
+    ) -> Tuple[str, str, Optional[str], List[str]]:
+        """
+        解析三元组；缺失则自动登记。
+        返回 (l1_id, l2_id, l3_id|None, created_log)。
+        created_log 如 ["L1:新类", "L2:xxx"]。
+        """
+        created: List[str] = []
+        l1_name = str(level1 or "").strip()
+        l2_name = str(level2 or "").strip()
+        l3_name = str(level3 or "").strip()
+
+        # 已能完整解析则直接返回
+        l1_id, l2_id, l3_id = self.resolve_triple(
+            l1_name or None, l2_name or None, l3_name or None
+        )
+        if l3_id or l2_id:
+            if l3_id and not l2_id:
+                l2_id = self.level3[l3_id].parent
+            if l2_id and not l1_id:
+                l1_id = self.level2[l2_id].parent
+            return l1_id or "", l2_id or "", l3_id, created
+
+        # 仅给了三级名：当作二级登记（常见误填）
+        if not l2_name and l3_name:
+            l2_name = l3_name
+            l3_name = ""
+
+        if not l2_name:
+            raise ValueError(
+                f"无法自动登记：缺少二级科目名 l1={l1_name!r} l2={l2_name!r} l3={l3_name!r}"
+            )
+
+        # 一级
+        if l1_name:
+            l1_id, c1 = self.ensure_l1(l1_name, notes=notes)
+            if c1:
+                created.append(f"L1:{l1_name}")
+        else:
+            l1_id = default_l1_id if default_l1_id in self.level1 else None
+            if not l1_id:
+                # 回退任意一级
+                l1_id = next(iter(self.level1), "")
+            if not l1_id:
+                l1_id, c1 = self.ensure_l1("6_管理费", notes=notes)
+                if c1:
+                    created.append("L1:6_管理费")
+
+        l2_id, c2 = self.ensure_l2(l2_name, l1_id, notes=notes)
+        if c2:
+            created.append(f"L2:{l2_name}->{self.level1[l1_id].name}")
+
+        l3_out: Optional[str] = None
+        if l3_name:
+            l3_out, c3 = self.ensure_l3(l3_name, l2_id, notes=notes)
+            if c3:
+                created.append(f"L3:{l3_name}")
+
+        return l1_id, l2_id, l3_out, created
 
     def is_active_leaf(self, leaf_id: str) -> bool:
         if leaf_id in self.level3:

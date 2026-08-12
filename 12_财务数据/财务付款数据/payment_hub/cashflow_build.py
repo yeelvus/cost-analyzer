@@ -13,7 +13,7 @@ from typing import Dict, List
 import pandas as pd
 
 from .config import Paths
-from .utils import iter_excel_files
+from .utils import iter_excel_files, resolve_business_groups
 
 REQUIRED_COLUMNS = ["项目编码", "项目名称", "日期", "实付金额", "增值税额"]
 SHEET_CANDIDATES = ["明细数据", "明细数据_万泰铢"]
@@ -307,14 +307,47 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
     output_html.write_text(html, encoding="utf-8")
 
 
-def run_cashflow(paths: Paths) -> str:
-    std_dir = Path(paths.std_dir)
-    out_html = Path(paths.cashflow_html)
-    project_info = Path(paths.project_info_xlsx)
-
-    cashflow_df = build_cashflow_df(std_dir)
-    status_map = load_project_status(project_info)
+def run_cashflow_for_group(
+    group_std_dir: Path,
+    out_html: Path,
+    project_info: Path,
+    *,
+    group_label: str = "",
+) -> str:
+    label = group_label or Path(group_std_dir).name
+    cashflow_df = build_cashflow_df(Path(group_std_dir))
+    status_map = load_project_status(Path(project_info))
     payload = build_project_payload(cashflow_df, status_map)
+    out_html = Path(out_html)
     render_html(payload, out_html)
-    print(f"✅ 现金流 HTML：{len(payload)} 个项目 → {out_html}")
+    print(f"  ✅ [{label}] 现金流 HTML：{len(payload)} 个项目 → {out_html}")
     return str(out_html)
+
+
+def run_cashflow(paths: Paths) -> list[str]:
+    """
+    按 A_raw 一级文件夹对应 B_std/{组名} 分别生成现金流 HTML：
+      C_sum/{组名}/财务付款项目现金流量分析.html
+    """
+    groups = resolve_business_groups(paths.raw_dir, paths.std_dir)
+    if not groups:
+        print("未发现业务分组，跳过 cashflow")
+        return []
+
+    print(f"现金流按文件夹分组: {', '.join(g for g, _ in groups)}")
+    written: list[str] = []
+    project_info = Path(paths.project_info_xlsx)
+    for group_name, group_std in groups:
+        print(f"\n{'=' * 64}")
+        print(f"  分组 cashflow · {group_name}  ← {group_std}")
+        print(f"{'=' * 64}")
+        out = run_cashflow_for_group(
+            group_std,
+            paths.group_cashflow_html(group_name),
+            project_info,
+            group_label=group_name,
+        )
+        written.append(out)
+
+    print(f"\n✅ cashflow 全部完成：{len(written)} 个 HTML")
+    return written

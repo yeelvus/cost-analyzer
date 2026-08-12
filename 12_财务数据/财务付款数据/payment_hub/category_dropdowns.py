@@ -374,14 +374,14 @@ def apply_category_dropdowns_to_std_dir(
 ) -> Dict[str, int]:
     std_dir = Path(std_dir)
     stats = {"files": 0, "sheets": 0, "errors": 0}
-    for f in sorted(std_dir.glob("*.xlsx")):
+    for f in sorted(std_dir.rglob("*.xlsx")):
         if f.name.startswith("~$"):
             continue
         try:
             n = apply_category_dropdowns_to_file(f, data_dir=data_dir)
             stats["files"] += 1
             stats["sheets"] += n
-            print(f"  ✅ 下拉 {f.name} ({n} sheets)")
+            print(f"  ✅ 下拉 {f.relative_to(std_dir)} ({n} sheets)")
         except Exception as e:
             stats["errors"] += 1
             print(f"  ⚠️ 失败 {f.name}: {e}")

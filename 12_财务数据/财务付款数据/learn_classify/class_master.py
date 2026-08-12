@@ -81,7 +81,7 @@ def _collect_raw_lines(std_dir: Path) -> List[Dict[str, Any]]:
     std_dir = Path(std_dir)
     lines: List[Dict[str, Any]] = []
 
-    for f in sorted(std_dir.glob("*.xlsx")):
+    for f in sorted(std_dir.rglob("*.xlsx")):
         if f.name.startswith("~$"):
             continue
         sheet = _pick_sheet(f)
@@ -114,10 +114,23 @@ def _collect_raw_lines(std_dir: Path) -> List[Dict[str, Any]]:
             summ = _safe_str(row.get(c_summ)) if c_summ else ""
             if not summ:
                 continue
+            # 仅学习「有实付金额」的摘要；空实付不进入分类总表/学习
+            amt_raw = row.get(c_amt) if c_amt is not None else None
+            try:
+                from payment_hub.utils import has_actual_payment
+
+                if not has_actual_payment(amt_raw):
+                    continue
+            except Exception:
+                # 回退：空单元格跳过
+                if amt_raw is None or (isinstance(amt_raw, float) and pd.isna(amt_raw)):
+                    continue
+                if str(amt_raw).strip() == "":
+                    continue
             amt = 0.0
             if c_amt is not None:
                 try:
-                    amt = float(row.get(c_amt) or 0)
+                    amt = float(amt_raw if amt_raw is not None else 0)
                 except Exception:
                     amt = 0.0
             lines.append(

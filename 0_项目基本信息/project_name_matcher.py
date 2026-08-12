@@ -454,6 +454,11 @@ def match_project(
     匹配项目名 → dict 或 None。
 
     返回字段: raw_name, project_name, project_code, target_status, source
+
+    匹配顺序：
+    1. 精确 / 规范化别名（已确认映射始终优先）
+    2. 若已在 unmatched_aliases 中标记过 → 直接保留原名，**不再模糊匹配、不再弹窗**
+    3. 模糊匹配（仅对从未标记过的新名称）
     """
     if raw_name is None:
         return None
@@ -475,12 +480,7 @@ def match_project(
             add_mapping(db, raw_name, std)
             return _result(raw_name, std, meta, "normalized_alias")
 
-    if fuzzy:
-        hit = _fuzzy_match_project(raw_name, db)
-        if hit:
-            add_mapping(db, raw_name, hit["project_name"])
-            return hit
-
+    # 二次及以后运行：曾标记为未匹配的名称，跳过模糊匹配与再次弹窗
     if skip_marked_unmatched and is_unmatched_alias(db, raw_name):
         return {
             "raw_name": raw_name,
@@ -489,6 +489,12 @@ def match_project(
             "target_status": "未匹配保留",
             "source": "unmatched_keep",
         }
+
+    if fuzzy:
+        hit = _fuzzy_match_project(raw_name, db)
+        if hit:
+            add_mapping(db, raw_name, hit["project_name"])
+            return hit
 
     return None
 
@@ -802,30 +808,55 @@ class ProjectMatcher:
     ) -> Dict[str, dict]:
         """
         批量匹配。prompt=True 时对未命中弹窗补录后再匹配一次。
-        返回 {原始名: hit_dict}（保留原名的也会有 hit）。
+        返回 {原始名: hit_dict}。
+
+        注意：去空白/大小写后相同的名称（如「KB项目」「kb项目」「KB 项目」）
+        只匹配一次，结果会回填到所有写法，避免只命中其中一种写法。
         """
-        names = []
-        seen = set()
+        # 规范化键 → 该键下出现过的全部原始写法
+        groups: Dict[str, List[str]] = {}
         for n in raw_names:
             s = str(n or "").strip()
             if not s or s.lower() == "nan":
                 continue
             k = _normalize_key(s)
-            if k in seen:
+            if not k:
                 continue
-            seen.add(k)
-            names.append(s)
+            bucket = groups.setdefault(k, [])
+            if s not in bucket:
+                bucket.append(s)
+
+        # 每个规范化键取一个代表名做匹配
+        representatives = [variants[0] for variants in groups.values()]
+
+        def _broadcast(rep: str, hit: dict) -> None:
+            """把命中结果写到同一规范化键下的全部原始写法。"""
+            k = _normalize_key(rep)
+            for original in groups.get(k, [rep]):
+                h = dict(hit)
+                h["raw_name"] = original
+                out[original] = h
 
         out: Dict[str, dict] = {}
         pending: List[str] = []
-        for n in names:
+        skipped_keep = 0
+        for n in representatives:
             hit = self.match(n, fuzzy=fuzzy)
             if hit:
-                out[n] = hit
+                _broadcast(n, hit)
+                if hit.get("source") == "unmatched_keep":
+                    skipped_keep += 1
             else:
+                # 仅「从未匹配成功、也从未标记未匹配」的新名称才进入弹窗
                 pending.append(n)
 
+        if skipped_keep:
+            print(
+                f"  跳过已标记未匹配（不再弹窗/模糊匹配）: {skipped_keep} 个"
+            )
+
         if pending and prompt:
+            print(f"  新未匹配项目需确认: {len(pending)} 个")
             prompt_unmatched_project_mappings(
                 pending,
                 self.db,
@@ -834,28 +865,40 @@ class ProjectMatcher:
                 interactive=interactive,
             )
             for n in pending:
-                hit = self.match(n, fuzzy=fuzzy)
-                if hit:
-                    out[n] = hit
+                # 弹窗后：有别名则用别名；已点跳过/关闭的标记未匹配
+                hit = self.match(n, fuzzy=False)
+                if hit and hit.get("source") not in {"unmatched_keep", "unmatched"}:
+                    _broadcast(n, hit)
                 else:
                     mark_unmatched(self.db, n)
-                    out[n] = {
+                    _broadcast(
+                        n,
+                        {
+                            "raw_name": n,
+                            "project_name": n,
+                            "project_code": "",
+                            "target_status": "未匹配",
+                            "source": "unmatched",
+                        },
+                    )
+                    # 同键其它写法也记入未匹配，避免下次再弹
+                    for original in groups.get(_normalize_key(n), []):
+                        if original != n:
+                            mark_unmatched(self.db, original)
+        elif pending:
+            # 不弹窗：保留原名，不写入 unmatched_aliases，便于下次主动 --prompt-project
+            print(f"  未匹配保留原名（未弹窗、未标记）: {len(pending)} 个")
+            for n in pending:
+                _broadcast(
+                    n,
+                    {
                         "raw_name": n,
                         "project_name": n,
                         "project_code": "",
                         "target_status": "未匹配",
                         "source": "unmatched",
-                    }
-        else:
-            for n in pending:
-                mark_unmatched(self.db, n)
-                out[n] = {
-                    "raw_name": n,
-                    "project_name": n,
-                    "project_code": "",
-                    "target_status": "未匹配",
-                    "source": "unmatched",
-                }
+                    },
+                )
         return out
 
     def enrich_dataframe(

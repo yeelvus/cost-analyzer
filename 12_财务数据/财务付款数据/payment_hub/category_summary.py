@@ -50,7 +50,7 @@ def remove_deprecated_sheets_in_std_dir(std_dir: Path) -> Dict[str, int]:
     """批量清理 B_std 下项目 Excel。"""
     std_dir = Path(std_dir)
     stats = {"files": 0, "changed": 0, "removed_sheets": 0, "errors": 0}
-    for f in sorted(std_dir.glob("*.xlsx")):
+    for f in sorted(std_dir.rglob("*.xlsx")):
         if f.name.startswith("~$"):
             continue
         stats["files"] += 1

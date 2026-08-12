@@ -42,11 +42,15 @@ def learn_one(
     source: str = "review",
     notes: str = "",
     also_summary_only: bool = True,
-) -> Tuple[str, str, str]:
+    auto_register: bool = False,
+) -> Tuple[str, str, str, List[str]]:
     """
-    学习一条纠正。返回 (l1_name, l2_name, l3_name)。
+    学习一条纠正。返回 (l1_name, l2_name, l3_name, taxonomy_created_log)。
     名称/ID 均可；有三级时记忆存 leaf=l3_id，否则 l2_id。
+
+    auto_register=True 时：体系中不存在的一/二/三级会自动登记（调用方负责 backup/save）。
     """
+    created_log: List[str] = []
     l1_id, l2_id, l3_id = taxonomy.resolve_triple(
         new_l1 or None, new_l2 or None, new_l3 or None
     )
@@ -59,9 +63,19 @@ def learn_one(
             l1_id = taxonomy.level2[l2_id].parent
 
     if not l2_id and not l3_id:
-        raise ValueError(f"无法解析分类: l1={new_l1!r} l2={new_l2!r} l3={new_l3!r}")
+        if not auto_register:
+            raise ValueError(f"无法解析分类: l1={new_l1!r} l2={new_l2!r} l3={new_l3!r}")
+        l1_id, l2_id, l3_id, created_log = taxonomy.ensure_triple(
+            new_l1 or None,
+            new_l2 or None,
+            new_l3 or None,
+            notes=f"auto from {source}",
+        )
 
     leaf_id = l3_id or l2_id
+    if not leaf_id:
+        raise ValueError(f"无法解析分类: l1={new_l1!r} l2={new_l2!r} l3={new_l3!r}")
+
     l1_name, l2_name, l3_name = taxonomy.display_triple(leaf_id)
     old_l1_name, old_l2_name = ("", "")
     if old_l2_id:
@@ -114,7 +128,7 @@ def learn_one(
         vendor_stats.observe(normalize_text(vendor), leaf_id, 1)
         vendor_stats.save()
 
-    return l1_name, l2_name, l3_name
+    return l1_name, l2_name, l3_name, created_log
 
 
 def import_corrections_excel(
@@ -320,7 +334,7 @@ def rebuild_vendor_stats_from_std(
     """用现有 std 高置信结果热身供应商画像（可选）。"""
     std_dir = Path(std_dir)
     n = 0
-    for f in std_dir.glob("*.xlsx"):
+    for f in std_dir.rglob("*.xlsx"):
         if f.name.startswith("~$"):
             continue
         try:

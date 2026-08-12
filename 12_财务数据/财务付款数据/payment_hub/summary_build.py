@@ -19,18 +19,36 @@ from .config import Paths
 from .deps import get_excel_layout_fn
 from .utils import (
     infer_time_tag_from_path,
-    iter_excel_files,
+    iter_group_std_files,
     level1_sort_key,
+    parse_std_project_filename,
+    resolve_business_groups,
     safe_text,
     ymd_sort_key,
     ymd_to_month,
 )
 
 AMOUNT_COLUMNS = ["应付金额", "预扣税额", "实付金额", "增值税额", "不含税额"]
+# 不计入成本：一级科目名（taxonomy L1_exclude）
+EXCLUDE_COST_L1_NAMES = {"不计入成本"}
+# 总体汇总中追加的不计入/计入成本金额列
+EXCLUDE_COST_AMOUNT_COLUMNS = [f"不计入成本_{c}" for c in AMOUNT_COLUMNS]
+INCLUDE_COST_AMOUNT_COLUMNS = [f"计入成本_{c}" for c in AMOUNT_COLUMNS]
 SUBJECT_WIDE_SHEET = "一级二级科目宽表"
 SUBJECT_SUMMARY_ROW = "一级科目汇总"
 PROJECT_LEVEL1_SHEET = "项目一级科目汇总"
 EXCLUDED_SCAN_DIRS = {"C_财务付款_sum"}
+
+
+def is_exclude_cost_l1(level1) -> bool:
+    """是否一级科目「不计入成本」。"""
+    name = safe_text(level1)
+    if not name:
+        return False
+    if name in EXCLUDE_COST_L1_NAMES:
+        return True
+    # 兼容带编号前缀，如「9_不计入成本」
+    return name.endswith("不计入成本") or "不计入成本" in name
 
 
 def _l2_detail_header(level1: str, level2: str, used_headers: set) -> str:
@@ -125,15 +143,8 @@ def extract_month_from_row(row: pd.Series, fallback_ymd: str) -> str:
 
 
 def parse_project_from_filename(file_path: Path) -> tuple[str, str]:
-    stem = safe_text(file_path.stem)
-    if not stem:
-        return "", ""
-    # 去掉尾部 _(日期)
-    stem = re.sub(r"_\(\d{4}-\d{2}-\d{2}\)$", "", stem)
-    match = re.match(r"^([A-Za-z0-9\-]+)[_\-\s]+(.+)$", stem)
-    if not match:
-        return "", stem
-    return safe_text(match.group(1)), safe_text(match.group(2))
+    """兼容 编码_名称_财务付款数据 / 旧 编码_名称_(日期)。"""
+    return parse_std_project_filename(file_path)
 
 
 def pick_first_valid_text(series: pd.Series) -> str:
@@ -248,8 +259,8 @@ def extract_project_monthly_rows(file_path: Path, ymd: str) -> List[Dict]:
 
 def build_subject_wide_payload(std_dir: Path) -> Dict[str, object]:
     rows: List[Dict[str, object]] = []
-    files = iter_excel_files(std_dir, exclude_dir_names=EXCLUDED_SCAN_DIRS)
-    print(f"\n检测到 std 文件数: {len(files)}")
+    files = iter_group_std_files(std_dir)
+    print(f"\n检测到本组 std 文件数: {len(files)}  （目录: {std_dir}）")
     for fp in files:
         rows.extend(extract_subject_rows(fp))
     if not rows:
@@ -281,6 +292,8 @@ def build_subject_wide_payload(std_dir: Path) -> Dict[str, object]:
 
 def build_project_level1_summary_dataframe(
     std_dir: Path,
+    *,
+    group_label: str = "",
 ) -> Tuple[pd.DataFrame, List[List[str]]]:
     """
     项目 × 一级科目宽表，每个一级科目合计后展开其二级类目。
@@ -288,11 +301,12 @@ def build_project_level1_summary_dataframe(
     返回值第二项为各组二级明细列名（每组对应一个一级，列连续），
     供写入 Excel 时做列组合（大纲折叠）。
     """
+    label = group_label or Path(std_dir).name
     rows = []
-    for fp in iter_excel_files(std_dir, exclude_dir_names=EXCLUDED_SCAN_DIRS):
+    for fp in iter_group_std_files(std_dir):
         rows.extend(extract_subject_rows(fp))
     if not rows:
-        return pd.DataFrame(columns=["项目编码", "项目名称"]), []
+        return pd.DataFrame(columns=["业务分组", "项目编码", "项目名称"]), []
 
     df = pd.DataFrame(rows)
     df["一级科目"] = df["一级科目"].map(safe_text).replace("", "未分类一级科目")
@@ -316,7 +330,7 @@ def build_project_level1_summary_dataframe(
             wide[col] = 0
 
     # 各一级下的二级明细
-    used_headers: set = set(level1_order) | {"项目编码", "项目名称"}
+    used_headers: set = set(level1_order) | {"业务分组", "项目编码", "项目名称"}
     # l1 -> [(l2_raw, header), ...]
     l1_l2_headers: Dict[str, List[Tuple[str, str]]] = {}
     detail_groups: List[List[str]] = []
@@ -351,7 +365,7 @@ def build_project_level1_summary_dataframe(
         amount_lookup[key] = float(row["金额汇总"] or 0)
 
     # 列序：一级合计 + 紧跟其二级明细
-    col_order = ["项目编码", "项目名称"]
+    col_order = ["业务分组", "项目编码", "项目名称"]
     all_detail_headers: List[str] = []
     for l1 in level1_order:
         col_order.append(l1)
@@ -382,9 +396,10 @@ def build_project_level1_summary_dataframe(
         for header in all_detail_headers:
             wide[header] = detail_values[header]
 
+    wide.insert(0, "业务分组", label)
     wide = wide[col_order]
     return (
-        wide.sort_values(["项目编码", "项目名称"]).reset_index(drop=True),
+        wide.sort_values(["业务分组", "项目编码", "项目名称"]).reset_index(drop=True),
         detail_groups,
     )
 
@@ -418,28 +433,377 @@ def apply_level2_column_groups(ws, detail_groups: List[List[str]]) -> None:
             cell.font = detail_font
 
 
-def build_summary_dataframe(std_dir: Path) -> pd.DataFrame:
+def build_summary_from_detail_df(
+    detail_df: pd.DataFrame, *, group_label: str = ""
+) -> pd.DataFrame:
+    """
+    从已分类明细 DataFrame 直接汇总（快路径）。
+
+    金额列：
+    - 应付/预扣/实付/…：全部合计
+    - 不计入成本_*：一级科目=不计入成本 的合计
+    - 计入成本_*：全部 − 不计入成本
+    """
+    label = group_label or ""
+    base_cols = (
+        ["业务分组", "项目编码", "项目名称"]
+        + AMOUNT_COLUMNS
+        + EXCLUDE_COST_AMOUNT_COLUMNS
+        + INCLUDE_COST_AMOUNT_COLUMNS
+    )
+    if detail_df is None or detail_df.empty:
+        return pd.DataFrame(columns=base_cols)
+
+    df = detail_df.copy()
+    for col in AMOUNT_COLUMNS:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+    # 去掉金额全 0
+    df = df[df[AMOUNT_COLUMNS].sum(axis=1) != 0]
+    if df.empty:
+        return pd.DataFrame(columns=base_cols)
+
+    if "项目编码" not in df.columns:
+        df["项目编码"] = ""
+    if "项目名称" not in df.columns:
+        df["项目名称"] = ""
+    df["项目编码"] = df["项目编码"].map(safe_text)
+    df["项目名称"] = df["项目名称"].map(safe_text)
+
+    l1_col = "一级科目" if "一级科目" in df.columns else None
+    if l1_col:
+        excl_mask = df[l1_col].map(is_exclude_cost_l1)
+    else:
+        excl_mask = pd.Series(False, index=df.index)
+
+    for col in AMOUNT_COLUMNS:
+        df[f"_excl_{col}"] = df[col].where(excl_mask, 0.0)
+        df[f"_incl_{col}"] = df[col].where(~excl_mask, 0.0)
+
+    agg_cols = (
+        AMOUNT_COLUMNS
+        + [f"_excl_{c}" for c in AMOUNT_COLUMNS]
+        + [f"_incl_{c}" for c in AMOUNT_COLUMNS]
+    )
+    overall = df.groupby(["项目编码", "项目名称"], dropna=False, as_index=False)[
+        agg_cols
+    ].sum()
+
+    rename = {}
+    for c in AMOUNT_COLUMNS:
+        rename[f"_excl_{c}"] = f"不计入成本_{c}"
+        rename[f"_incl_{c}"] = f"计入成本_{c}"
+    overall = overall.rename(columns=rename)
+    overall.insert(0, "业务分组", label)
+
+    # 不计入成本金额合计 / 计入成本金额合计（预扣+实付口径）
+    overall["不计入成本_金额合计"] = (
+        overall.get("不计入成本_预扣税额", 0) + overall.get("不计入成本_实付金额", 0)
+    )
+    overall["计入成本_金额合计"] = (
+        overall.get("计入成本_预扣税额", 0) + overall.get("计入成本_实付金额", 0)
+    )
+
+    out_cols = (
+        ["业务分组", "项目编码", "项目名称"]
+        + AMOUNT_COLUMNS
+        + EXCLUDE_COST_AMOUNT_COLUMNS
+        + ["不计入成本_金额合计"]
+        + INCLUDE_COST_AMOUNT_COLUMNS
+        + ["计入成本_金额合计"]
+    )
+    for c in out_cols:
+        if c not in overall.columns:
+            overall[c] = 0.0
+    return overall[out_cols]
+
+
+def build_monthly_wide_from_detail_df(
+    detail_df: pd.DataFrame, *, group_label: str = ""
+) -> pd.DataFrame:
+    label = group_label or ""
+    if detail_df is None or detail_df.empty:
+        return pd.DataFrame(columns=["业务分组", "项目编码", "项目名称"])
+
+    df = detail_df.copy()
+    for col in AMOUNT_COLUMNS:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+
+    if "项目编码" not in df.columns:
+        df["项目编码"] = ""
+    if "项目名称" not in df.columns:
+        df["项目名称"] = ""
+    df["项目编码"] = df["项目编码"].map(safe_text)
+    df["项目名称"] = df["项目名称"].map(safe_text)
+
+    # 月份键
+    months = []
+    for _, row in df.iterrows():
+        ym = ""
+        if "年" in df.columns and "月" in df.columns:
+            y = pd.to_numeric(row.get("年"), errors="coerce")
+            m = pd.to_numeric(row.get("月"), errors="coerce")
+            if pd.notna(y) and pd.notna(m) and 1 <= int(m) <= 12:
+                ym = f"{int(y)}-{int(m):02d}"
+        if not ym and "日期" in df.columns:
+            parsed = pd.to_datetime(row.get("日期"), errors="coerce")
+            if pd.notna(parsed):
+                ym = parsed.strftime("%Y-%m")
+        months.append(ym or "未识别")
+    df["_月份"] = months
+    w = (
+        pd.to_numeric(df["预扣税额"], errors="coerce").fillna(0.0)
+        if "预扣税额" in df.columns
+        else 0.0
+    )
+    a = (
+        pd.to_numeric(df["实付金额"], errors="coerce").fillna(0.0)
+        if "实付金额" in df.columns
+        else 0.0
+    )
+    df["_月度金额"] = w + a
+
+    monthly = (
+        df.groupby(["项目编码", "项目名称", "_月份"], dropna=False, as_index=False)["_月度金额"]
+        .sum()
+        .rename(columns={"_月份": "月份", "_月度金额": "月度金额汇总"})
+    )
+    monthly.insert(0, "业务分组", label)
+    if monthly.empty:
+        return pd.DataFrame(columns=["业务分组", "项目编码", "项目名称"])
+
+    month_order = sorted(monthly["月份"].dropna().unique(), key=ymd_sort_key)
+    wide = monthly.pivot_table(
+        index=["业务分组", "项目编码", "项目名称"],
+        columns="月份",
+        values="月度金额汇总",
+        aggfunc="sum",
+        fill_value=0,
+    )
+    wide = wide.reindex(columns=month_order, fill_value=0)
+    wide.columns = [f"金额汇总_{m}" for m in wide.columns]
+    return wide.reset_index()
+
+
+def build_subject_wide_from_detail_df(detail_df: pd.DataFrame) -> Dict[str, object]:
+    if detail_df is None or detail_df.empty:
+        return {"project_order": [], "layout": OrderedDict(), "project_map": {}, "grand_map": {}}
+
+    df = detail_df.copy()
+    withhold = (
+        pd.to_numeric(df["预扣税额"], errors="coerce").fillna(0.0)
+        if "预扣税额" in df.columns
+        else 0.0
+    )
+    actual = (
+        pd.to_numeric(df["实付金额"], errors="coerce").fillna(0.0)
+        if "实付金额" in df.columns
+        else 0.0
+    )
+    df["金额汇总"] = withhold + actual
+    df = df[df["金额汇总"] != 0]
+    if df.empty:
+        return {"project_order": [], "layout": OrderedDict(), "project_map": {}, "grand_map": {}}
+
+    df["项目名称"] = df["项目名称"].map(safe_text) if "项目名称" in df.columns else ""
+    df["一级科目"] = (
+        df["一级科目"].map(safe_text).replace("", "未分类一级科目")
+        if "一级科目" in df.columns
+        else "未分类一级科目"
+    )
+    df["二级科目"] = (
+        df["二级科目"].map(safe_text).replace("", "未分类二级科目")
+        if "二级科目" in df.columns
+        else "未分类二级科目"
+    )
+
+    grouped = df.groupby(
+        ["项目名称", "一级科目", "二级科目"], dropna=False, as_index=False
+    )["金额汇总"].sum()
+    level1_order = sorted(grouped["一级科目"].dropna().unique().tolist(), key=level1_sort_key)
+    layout: OrderedDict[str, List[str]] = OrderedDict()
+    for level1 in level1_order:
+        l2s = grouped.loc[grouped["一级科目"] == level1, "二级科目"].dropna().unique().tolist()
+        layout[level1] = sorted(l2s, key=level1_sort_key)
+
+    project_order = sorted(grouped["项目名称"].dropna().unique().tolist(), key=level1_sort_key)
+    project_map: Dict[str, Dict[str, Dict[str, float]]] = defaultdict(lambda: defaultdict(dict))
+    grand_map: Dict[str, Dict[str, float]] = defaultdict(dict)
+    for _, row in grouped.iterrows():
+        pn, l1, l2 = safe_text(row["项目名称"]), safe_text(row["一级科目"]), safe_text(row["二级科目"])
+        amount = float(row["金额汇总"] or 0)
+        project_map[pn][l1][l2] = amount
+        grand_map[l1][l2] = grand_map[l1].get(l2, 0.0) + amount
+    return {
+        "project_order": project_order,
+        "layout": layout,
+        "project_map": project_map,
+        "grand_map": grand_map,
+    }
+
+
+def build_project_level1_from_detail_df(
+    detail_df: pd.DataFrame, *, group_label: str = ""
+) -> Tuple[pd.DataFrame, List[List[str]]]:
+    """基于已分类明细构建项目×一级科目宽表（复用文件路径版逻辑）。"""
+    # 临时写 subject rows 结构再走原逻辑的简化版
+    if detail_df is None or detail_df.empty:
+        return pd.DataFrame(columns=["业务分组", "项目编码", "项目名称"]), []
+
+    df = detail_df.copy()
+    withhold = (
+        pd.to_numeric(df["预扣税额"], errors="coerce").fillna(0.0)
+        if "预扣税额" in df.columns
+        else 0.0
+    )
+    actual = (
+        pd.to_numeric(df["实付金额"], errors="coerce").fillna(0.0)
+        if "实付金额" in df.columns
+        else 0.0
+    )
+    df["金额汇总"] = withhold + actual
     rows = []
-    files = iter_excel_files(std_dir, exclude_dir_names=EXCLUDED_SCAN_DIRS)
-    print(f"\n检测到 std 文件数: {len(files)}")
+    for _, row in df.iterrows():
+        if float(row.get("金额汇总") or 0) == 0:
+            continue
+        rows.append(
+            {
+                "项目编码": safe_text(row.get("项目编码")),
+                "项目名称": safe_text(row.get("项目名称")),
+                "一级科目": safe_text(row.get("一级科目")) or safe_text(row.get("科目")) or "未分类一级科目",
+                "二级科目": safe_text(row.get("二级科目")) or safe_text(row.get("科目")) or "未分类二级科目",
+                "金额汇总": float(row.get("金额汇总") or 0),
+            }
+        )
+    if not rows:
+        return pd.DataFrame(columns=["业务分组", "项目编码", "项目名称"]), []
+
+    # 复用 build_project_level1_summary_dataframe 的核心：构造伪 std 不可行，内联调用现有 group 逻辑
+    # 用临时 DataFrame 走原函数需要文件；这里复制关键代码路径
+    tmp = pd.DataFrame(rows)
+    # 借用 build_project_level1 的文件版：写入内存结构 — 直接调用简化实现
+    label = group_label or ""
+    # 调用现有函数需要 Path；改为：拼一个 minimal frame 用 groupby 逻辑
+    # 最简：一级科目透视 + 二级明细（与文件版一致）
+    from copy import deepcopy  # noqa: F401
+
+    # 直接用文件版内部逻辑：把 rows 当作 extract_subject_rows 结果
+    # 构造 virtual by writing to build_project_level1_summary_dataframe via monkey — 太重
+    # 这里调用已有 build_project_level1_summary_dataframe 的核心代码块：
+    # 为减少重复，用 tempfile 写 subject-only 不合适
+    # 采用：groupby 一级透视（不含二级展开的精简版）若 detail_groups 为空也能用
+    grouped_l1 = tmp.groupby(
+        ["项目编码", "项目名称", "一级科目"], dropna=False, as_index=False
+    )["金额汇总"].sum()
+    level1_order = sorted(
+        grouped_l1["一级科目"].dropna().unique().tolist(), key=level1_sort_key
+    )
+    wide = grouped_l1.pivot_table(
+        index=["项目编码", "项目名称"],
+        columns="一级科目",
+        values="金额汇总",
+        aggfunc="sum",
+        fill_value=0,
+    ).reset_index()
+    for col in level1_order:
+        if col not in wide.columns:
+            wide[col] = 0
+
+    used_headers: set = set(level1_order) | {"业务分组", "项目编码", "项目名称"}
+    l1_l2_headers: Dict[str, List[Tuple[str, str]]] = {}
+    detail_groups: List[List[str]] = []
+    for l1 in level1_order:
+        sub = tmp.loc[tmp["一级科目"] == l1]
+        l2_order = sorted(sub["二级科目"].dropna().unique().tolist(), key=level1_sort_key)
+        pairs: List[Tuple[str, str]] = []
+        for l2 in l2_order:
+            header = _l2_detail_header(l1, l2, used_headers)
+            used_headers.add(header)
+            pairs.append((l2, header))
+        l1_l2_headers[l1] = pairs
+        if pairs:
+            detail_groups.append([h for _, h in pairs])
+
+    grouped_l2 = tmp.groupby(
+        ["项目编码", "项目名称", "一级科目", "二级科目"], dropna=False, as_index=False
+    )["金额汇总"].sum()
+    amount_lookup: Dict[Tuple[str, str, str, str], float] = {}
+    for _, row in grouped_l2.iterrows():
+        key = (
+            safe_text(row["项目编码"]),
+            safe_text(row["项目名称"]),
+            safe_text(row["一级科目"]),
+            safe_text(row["二级科目"]),
+        )
+        amount_lookup[key] = float(row["金额汇总"] or 0)
+
+    col_order = ["业务分组", "项目编码", "项目名称"]
+    all_detail_headers: List[str] = []
+    for l1 in level1_order:
+        col_order.append(l1)
+        for _l2, header in l1_l2_headers.get(l1, []):
+            col_order.append(header)
+            all_detail_headers.append(header)
+
+    for header in all_detail_headers:
+        wide[header] = 0.0
+    header_to_l1_l2 = {
+        h: (l1, l2) for l1, pairs in l1_l2_headers.items() for l2, h in pairs
+    }
+    if all_detail_headers and not wide.empty:
+        detail_values = {h: [] for h in all_detail_headers}
+        for _, prow in wide.iterrows():
+            pcode = safe_text(prow["项目编码"])
+            pname = safe_text(prow["项目名称"])
+            for header in all_detail_headers:
+                l1, l2 = header_to_l1_l2[header]
+                detail_values[header].append(
+                    amount_lookup.get((pcode, pname, l1, l2), 0.0)
+                )
+        for header in all_detail_headers:
+            wide[header] = detail_values[header]
+
+    wide.insert(0, "业务分组", label)
+    wide = wide[col_order]
+    return (
+        wide.sort_values(["业务分组", "项目编码", "项目名称"]).reset_index(drop=True),
+        detail_groups,
+    )
+
+
+def build_summary_dataframe(std_dir: Path, *, group_label: str = "") -> pd.DataFrame:
+    rows = []
+    files = iter_group_std_files(std_dir)
+    print(f"\n[{group_label or std_dir.name}] 本组 std 文件数: {len(files)}")
+    print(f"  扫描目录: {std_dir}")
     for fp in files:
         ymd = infer_time_tag_from_path(fp, std_dir)
         rows.extend(extract_project_monthly_rows(fp, ymd))
     if not rows:
-        return pd.DataFrame(columns=["项目编码", "项目名称"] + AMOUNT_COLUMNS)
+        cols = ["业务分组", "项目编码", "项目名称"] + AMOUNT_COLUMNS
+        return pd.DataFrame(columns=cols)
     df = pd.DataFrame(rows)
-    overall = df.groupby(["项目编码", "项目名称"], dropna=False, as_index=False)[AMOUNT_COLUMNS].sum()
-    return overall[["项目编码", "项目名称"] + AMOUNT_COLUMNS]
+    overall = df.groupby(["项目编码", "项目名称"], dropna=False, as_index=False)[
+        AMOUNT_COLUMNS
+    ].sum()
+    label = group_label or Path(std_dir).name
+    overall.insert(0, "业务分组", label)
+    return overall[["业务分组", "项目编码", "项目名称"] + AMOUNT_COLUMNS]
 
 
-def build_monthly_wide_dataframe(std_dir: Path) -> pd.DataFrame:
+def build_monthly_wide_dataframe(std_dir: Path, *, group_label: str = "") -> pd.DataFrame:
     rows = []
-    for fp in iter_excel_files(std_dir, exclude_dir_names=EXCLUDED_SCAN_DIRS):
+    label = group_label or Path(std_dir).name
+    for fp in iter_group_std_files(std_dir):
         ymd = infer_time_tag_from_path(fp, std_dir)
         for row in extract_project_monthly_rows(fp, ymd):
             month_key = ymd_to_month(safe_text(row.get("年月日")))
             rows.append(
                 {
+                    "业务分组": label,
                     "项目编码": safe_text(row.get("项目编码")),
                     "项目名称": safe_text(row.get("项目名称")),
                     "月份": month_key,
@@ -449,14 +813,14 @@ def build_monthly_wide_dataframe(std_dir: Path) -> pd.DataFrame:
                 }
             )
     if not rows:
-        return pd.DataFrame(columns=["项目编码", "项目名称"])
+        return pd.DataFrame(columns=["业务分组", "项目编码", "项目名称"])
     monthly = pd.DataFrame(rows)
-    grouped = monthly.groupby(["项目编码", "项目名称", "月份"], dropna=False, as_index=False)[
-        ["月度金额汇总"]
-    ].sum()
+    grouped = monthly.groupby(
+        ["业务分组", "项目编码", "项目名称", "月份"], dropna=False, as_index=False
+    )[["月度金额汇总"]].sum()
     month_order = sorted(grouped["月份"].dropna().unique(), key=ymd_sort_key)
     wide = grouped.pivot_table(
-        index=["项目编码", "项目名称"],
+        index=["业务分组", "项目编码", "项目名称"],
         columns="月份",
         values="月度金额汇总",
         aggfunc="sum",
@@ -621,7 +985,16 @@ def apply_formatting(
                     h for h in headers if isinstance(h, str) and h not in {"项目编码", "项目名称"}
                 ]
             else:
-                amount_headers = [h for h in headers if h in AMOUNT_COLUMNS]
+                amount_headers = [
+                    h
+                    for h in headers
+                    if isinstance(h, str)
+                    and (
+                        h in AMOUNT_COLUMNS
+                        or h.startswith("不计入成本_")
+                        or h.startswith("计入成本_")
+                    )
+                ]
             layout_fn(
                 ws,
                 numeric_start_col=ws.max_column + 1,
@@ -638,30 +1011,281 @@ def apply_formatting(
         print(f"⚠️ 样式应用失败: {e}")
 
 
-def run_summary(paths: Paths) -> List[str]:
-    std_dir = Path(paths.std_dir)
-    if not std_dir.is_dir():
-        raise FileNotFoundError(f"std 目录不存在: {std_dir}")
+def _write_summary_workbook(
+    path: Path,
+    *,
+    summary_df: pd.DataFrame,
+    monthly_wide_df: pd.DataFrame,
+    subject_payload: Dict[str, object],
+    project_level1_df: pd.DataFrame,
+    detail_groups,
+) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        summary_df.to_excel(writer, sheet_name="总体汇总", index=False)
+        monthly_wide_df.to_excel(writer, sheet_name="项目按月宽表", index=False)
+        project_level1_df.to_excel(writer, sheet_name=PROJECT_LEVEL1_SHEET, index=False)
+        write_subject_wide_sheet(writer.book, subject_payload)
+    apply_formatting(path, detail_groups=detail_groups)
 
-    summary_df = build_summary_dataframe(std_dir)
-    monthly_wide_df = build_monthly_wide_dataframe(std_dir)
-    subject_payload = build_subject_wide_payload(std_dir)
-    project_level1_df, detail_groups = build_project_level1_summary_dataframe(std_dir)
 
-    written = []
-    for path in (Path(paths.sum_xlsx_z), Path(paths.sum_xlsx)):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with pd.ExcelWriter(path, engine="openpyxl") as writer:
-            summary_df.to_excel(writer, sheet_name="总体汇总", index=False)
-            monthly_wide_df.to_excel(writer, sheet_name="项目按月宽表", index=False)
-            project_level1_df.to_excel(writer, sheet_name=PROJECT_LEVEL1_SHEET, index=False)
-            write_subject_wide_sheet(writer.book, subject_payload)
-        apply_formatting(path, detail_groups=detail_groups)
+def run_summary_for_detail_df(
+    detail_df: pd.DataFrame,
+    *,
+    sum_xlsx: Path,
+    sum_xlsx_z: Path | None = None,
+    group_label: str = "",
+) -> List[str]:
+    """从已分类明细 DataFrame 写汇总（快路径）。"""
+    label = group_label or ""
+    print(f"  [{label}] 快路径汇总：明细 {len(detail_df)} 行（已含科目分类）")
+
+    summary_df = build_summary_from_detail_df(detail_df, group_label=label)
+    monthly_wide_df = build_monthly_wide_from_detail_df(detail_df, group_label=label)
+    subject_payload = build_subject_wide_from_detail_df(detail_df)
+    project_level1_df, detail_groups = build_project_level1_from_detail_df(
+        detail_df, group_label=label
+    )
+
+    written: List[str] = []
+    targets = [Path(sum_xlsx)]
+    if sum_xlsx_z is not None:
+        targets.append(Path(sum_xlsx_z))
+    for path in targets:
+        # 清理旧文件名 财务付款数据汇总.xlsx（无组名前缀）
+        legacy = path.parent / "财务付款数据汇总.xlsx"
+        if legacy.is_file() and legacy.resolve() != Path(path).resolve():
+            try:
+                legacy.unlink()
+                print(f"   🗑️ 移除旧汇总文件名: {legacy.name}")
+            except OSError:
+                pass
+        _write_summary_workbook(
+            path,
+            summary_df=summary_df,
+            monthly_wide_df=monthly_wide_df,
+            subject_payload=subject_payload,
+            project_level1_df=project_level1_df,
+            detail_groups=detail_groups,
+        )
         written.append(str(path))
         print(f"   → {path}")
 
     if detail_groups:
         n_detail = sum(len(g) for g in detail_groups)
-        print(f"   一级科目展开二级明细: {len(detail_groups)} 组 / 共 {n_detail} 列")
-    print(f"✅ 汇总完成：项目 {len(summary_df)} 个")
+        print(
+            f"   [{label}] 一级科目展开二级明细: {len(detail_groups)} 组 / 共 {n_detail} 列"
+        )
+    pay = (
+        float(pd.to_numeric(summary_df["实付金额"], errors="coerce").sum())
+        if "实付金额" in summary_df.columns and not summary_df.empty
+        else 0.0
+    )
+    excl = (
+        float(pd.to_numeric(summary_df["不计入成本_金额合计"], errors="coerce").sum())
+        if "不计入成本_金额合计" in summary_df.columns and not summary_df.empty
+        else 0.0
+    )
+    incl = (
+        float(pd.to_numeric(summary_df["计入成本_金额合计"], errors="coerce").sum())
+        if "计入成本_金额合计" in summary_df.columns and not summary_df.empty
+        else 0.0
+    )
+    print(
+        f"  ✅ [{label}] 汇总完成：项目 {len(summary_df)} 个 · 实付 {pay:,.2f}"
+        f" · 计入成本 {incl:,.2f} · 不计入成本 {excl:,.2f}"
+    )
+    return written
+
+
+def run_summary_for_group(
+    group_std_dir: Path,
+    *,
+    sum_xlsx: Path,
+    sum_xlsx_z: Path | None = None,
+    group_label: str = "",
+) -> List[str]:
+    """对单个业务分组目录内的 std 生成汇总（绝不扫其他分组）。"""
+    group_std_dir = Path(group_std_dir).resolve()
+    label = group_label or group_std_dir.name
+    if not group_std_dir.is_dir():
+        print(f"  [{label}] std 目录不存在，跳过汇总")
+        return []
+
+    n_files = len(iter_group_std_files(group_std_dir))
+    print(f"  [{label}] 仅汇总目录: {group_std_dir}  （{n_files} 个项目文件）")
+
+    summary_df = build_summary_dataframe(group_std_dir, group_label=label)
+    monthly_wide_df = build_monthly_wide_dataframe(group_std_dir, group_label=label)
+    subject_payload = build_subject_wide_payload(group_std_dir)
+    project_level1_df, detail_groups = build_project_level1_summary_dataframe(
+        group_std_dir, group_label=label
+    )
+
+    written: List[str] = []
+    targets = [Path(sum_xlsx)]
+    if sum_xlsx_z is not None:
+        targets.append(Path(sum_xlsx_z))
+    for path in targets:
+        _write_summary_workbook(
+            path,
+            summary_df=summary_df,
+            monthly_wide_df=monthly_wide_df,
+            subject_payload=subject_payload,
+            project_level1_df=project_level1_df,
+            detail_groups=detail_groups,
+        )
+        written.append(str(path))
+        print(f"   → {path}")
+
+    if detail_groups:
+        n_detail = sum(len(g) for g in detail_groups)
+        print(
+            f"   [{label}] 一级科目展开二级明细: {len(detail_groups)} 组 / 共 {n_detail} 列"
+        )
+    pay = (
+        float(pd.to_numeric(summary_df["实付金额"], errors="coerce").sum())
+        if "实付金额" in summary_df.columns and not summary_df.empty
+        else 0.0
+    )
+    print(f"  ✅ [{label}] 汇总完成：项目 {len(summary_df)} 个 · 实付合计 {pay:,.2f}")
+    return written
+
+
+def _archive_ungrouped_root_outputs(paths: Paths, active_groups: List[str]) -> None:
+    """
+    把 C_sum / Z_report 根目录下旧的「未分组」总表挪到 _历史未分组，
+    避免与 C_sum/流水、C_sum/银行账 混淆。
+    """
+    import shutil
+    from datetime import datetime
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    root_names = {
+        paths.sum_xlsx.name,
+        paths.cashflow_html.name,
+        paths.amount_mismatch_xlsx.name,
+    }
+    for root in (paths.sum_dir, paths.sum_dir_z):
+        root = Path(root)
+        if not root.is_dir():
+            continue
+        archive = root / "_历史未分组" / stamp
+        for name in root_names:
+            fp = root / name
+            if not fp.is_file():
+                continue
+            archive.mkdir(parents=True, exist_ok=True)
+            dest = archive / name
+            try:
+                shutil.move(str(fp), str(dest))
+                print(f"  📦 已归档旧根目录文件: {fp.name} → {dest}")
+            except OSError as exc:
+                print(f"  ⚠️ 归档失败 {fp}: {exc}")
+
+
+def _write_group_index(paths: Paths, group_stats: List[dict]) -> Path:
+    """C_sum/分组汇总索引.xlsx：每组一行，标明路径与合计。"""
+    index_path = paths.sum_dir / "分组汇总索引.xlsx"
+    df = pd.DataFrame(group_stats)
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_excel(index_path, index=False)
+    print(f"  📑 分组索引: {index_path}")
+    return index_path
+
+
+def run_summary(paths: Paths) -> List[str]:
+    """
+    优先快路径：读 A2_classified 已分类明细 → 直接汇总
+    回退：扫 B_std/{组名}/ 多项目文件
+
+    写出 C_sum/{组名}/财务付款数据汇总.xlsx
+         Z_report/{组名}/财务付款数据汇总.xlsx
+    """
+    from .classify_raw_std import list_classified_groups, load_classified_detail
+
+    written: List[str] = []
+    group_stats: List[dict] = []
+
+    classified_groups = list_classified_groups(paths)
+    if classified_groups:
+        print(f"汇总快路径（A2_classified）: {', '.join(g for g, _ in classified_groups)}")
+        print(f"  源: {paths.classified_dir}/{{组名}}/*_classified.xlsx")
+        print(f"  出: {paths.sum_dir}/{{组名}}/财务付款数据汇总.xlsx")
+
+        for group_name, class_xlsx in classified_groups:
+            print(f"\n{'=' * 64}")
+            print(f"  分组 summary · {group_name}（classified）")
+            print(f"{'=' * 64}")
+            detail = load_classified_detail(class_xlsx)
+            sum_path = paths.group_sum_xlsx(group_name)
+            outs = run_summary_for_detail_df(
+                detail,
+                sum_xlsx=sum_path,
+                sum_xlsx_z=paths.group_sum_xlsx_z(group_name),
+                group_label=group_name,
+            )
+            written.extend(outs)
+            try:
+                sdf = pd.read_excel(sum_path, sheet_name="总体汇总")
+                n_proj = len(sdf)
+                pay = float(pd.to_numeric(sdf.get("实付金额"), errors="coerce").sum())
+            except Exception:
+                n_proj, pay = 0, 0.0
+            group_stats.append(
+                {
+                    "业务分组": group_name,
+                    "数据源": str(class_xlsx),
+                    "汇总文件": str(sum_path),
+                    "项目数": n_proj,
+                    "实付金额合计": pay,
+                }
+            )
+    else:
+        # 回退旧路径
+        std_dir = Path(paths.std_dir)
+        if not std_dir.is_dir():
+            raise FileNotFoundError(
+                f"无 A2_classified 且 std 目录不存在: {std_dir}；请先 classify 或 std"
+            )
+        groups = resolve_business_groups(paths.raw_dir, paths.std_dir)
+        if not groups:
+            print("未发现业务分组，跳过 summary")
+            return []
+        print(f"汇总回退路径（B_std）: {', '.join(g for g, _ in groups)}")
+        for group_name, group_std in groups:
+            print(f"\n{'=' * 64}")
+            print(f"  分组 summary · {group_name}")
+            print(f"{'=' * 64}")
+            sum_path = paths.group_sum_xlsx(group_name)
+            outs = run_summary_for_group(
+                group_std,
+                sum_xlsx=sum_path,
+                sum_xlsx_z=paths.group_sum_xlsx_z(group_name),
+                group_label=group_name,
+            )
+            written.extend(outs)
+            try:
+                sdf = pd.read_excel(sum_path, sheet_name="总体汇总")
+                n_proj = len(sdf)
+                pay = float(pd.to_numeric(sdf.get("实付金额"), errors="coerce").sum())
+            except Exception:
+                n_proj, pay = 0, 0.0
+            group_stats.append(
+                {
+                    "业务分组": group_name,
+                    "数据源": str(group_std),
+                    "汇总文件": str(sum_path),
+                    "项目数": n_proj,
+                    "实付金额合计": pay,
+                }
+            )
+
+    _archive_ungrouped_root_outputs(paths, [g["业务分组"] for g in group_stats])
+    _write_group_index(paths, group_stats)
+
+    print(f"\n✅ summary 全部完成：{len(group_stats)} 个分组，{len(written)} 个文件")
+    for st in group_stats:
+        print(f"   · [{st['业务分组']}] 项目 {st['项目数']} → {st['汇总文件']}")
     return written

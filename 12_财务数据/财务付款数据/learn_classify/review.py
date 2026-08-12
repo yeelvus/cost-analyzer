@@ -80,7 +80,7 @@ def export_review_pool(
     std_dir = Path(std_dir)
     rows: List[Dict[str, Any]] = []
 
-    for f in sorted(std_dir.glob("*.xlsx")):
+    for f in sorted(std_dir.rglob("*.xlsx")):
         if f.name.startswith("~$"):
             continue
         try:
@@ -98,17 +98,33 @@ def export_review_pool(
             subj = "" if not c_subj or pd.isna(row.get(c_subj)) else str(row.get(c_subj)).strip()
             summ = "" if not c_summ or pd.isna(row.get(c_summ)) else str(row.get(c_summ)).strip()
             vend = "" if not c_vend or pd.isna(row.get(c_vend)) else str(row.get(c_vend)).strip()
+            amt = None
+            if c_amt is not None:
+                try:
+                    from payment_hub.utils import has_actual_payment
+
+                    raw_amt = row.get(c_amt)
+                    if not has_actual_payment(raw_amt):
+                        continue  # 空实付不进待复核/学习
+                    amt = float(raw_amt)
+                except Exception:
+                    raw_amt = row.get(c_amt) if c_amt is not None else None
+                    if raw_amt is None or (isinstance(raw_amt, float) and pd.isna(raw_amt)):
+                        continue
+                    if str(raw_amt).strip() == "":
+                        continue
+                    try:
+                        amt = float(raw_amt or 0)
+                    except Exception:
+                        amt = raw_amt
+            elif c_amt is None:
+                # 无实付列则不导出（口径：只处理有实付金额）
+                continue
             r = engine.classify(subj, summ, vend)
             if only_review and not (r.needs_review or r.confidence < conf_threshold or r.layer == "pending"):
                 # 也导出「其他」类便于清洗
                 if r.l2_name not in {"其他", "待复核", "(空白)"}:
                     continue
-            amt = None
-            if c_amt is not None:
-                try:
-                    amt = float(row.get(c_amt) or 0)
-                except Exception:
-                    amt = row.get(c_amt)
             proj = "" if not c_proj or pd.isna(row.get(c_proj)) else str(row.get(c_proj)).strip()
             rows.append(
                 {
@@ -140,6 +156,22 @@ def export_review_pool(
     return out_path
 
 
+def _is_valid_xlsx(path: Path) -> bool:
+    """xlsx 本质是 zip；损坏/非 xlsx 会触发 File is not a zip file。"""
+    path = Path(path)
+    if not path.is_file() or path.stat().st_size < 64:
+        return False
+    try:
+        import zipfile
+
+        with zipfile.ZipFile(path, "r") as zf:
+            # 至少能列出中央目录
+            _ = zf.namelist()
+        return True
+    except Exception:
+        return False
+
+
 def update_excel_classification_columns(
     excel_path: Path,
     engine: ClassifyEngine,
@@ -153,6 +185,10 @@ def update_excel_classification_columns(
     extra_cols: bool = True,
 ) -> int:
     """更新已有 Excel 的分类列（保留其它内容）。"""
+    excel_path = Path(excel_path)
+    if not _is_valid_xlsx(excel_path):
+        raise ValueError(f"不是有效 xlsx（可能损坏）: {excel_path}")
+
     wb = load_workbook(excel_path)
     target_sheets = sheet_names or wb.sheetnames
     updated = 0
@@ -191,7 +227,8 @@ def update_excel_classification_columns(
             layer_idx = ensure_col("命中层")
             conf_idx = ensure_col("置信度")
 
-        # 先扫一遍收集待分类行，去重后再写回
+        # 先扫一遍收集待分类行（仅有实付金额），去重后再写回
+        amt_idx = header_to_col.get("实付金额")
         pending: List[tuple] = []  # (row_idx, subj, summ, vend)
         for r in range(2, ws.max_row + 1):
             subject_value = ws.cell(row=r, column=subj_idx).value if subj_idx else None
@@ -199,6 +236,30 @@ def update_excel_classification_columns(
             vendor_value = ws.cell(row=r, column=vend_idx).value if vend_idx else None
             if subject_value is None and summary_value in (None, ""):
                 continue
+            # 空实付：不分类，清空科目列标记
+            if amt_idx is not None:
+                amt_val = ws.cell(row=r, column=amt_idx).value
+                try:
+                    from payment_hub.utils import has_actual_payment
+
+                    has_pay = has_actual_payment(amt_val)
+                except Exception:
+                    has_pay = amt_val is not None and str(amt_val).strip() not in {
+                        "",
+                        "nan",
+                        "None",
+                    }
+                if not has_pay:
+                    ws.cell(row=r, column=lvl1_idx, value="")
+                    ws.cell(row=r, column=lvl2_idx, value="")
+                    ws.cell(row=r, column=lvl3_idx, value="")
+                    if id_idx:
+                        ws.cell(row=r, column=id_idx, value="")
+                    if layer_idx:
+                        ws.cell(row=r, column=layer_idx, value="skip_no_payment")
+                    if conf_idx:
+                        ws.cell(row=r, column=conf_idx, value=None)
+                    continue
             pending.append((r, subject_value, summary_value, vendor_value))
 
         results = engine.classify_many(
@@ -251,17 +312,46 @@ def reclassify_std_dir(
     sheet_names=None,
     extra_cols: bool = True,
 ) -> Dict[str, int]:
+    """
+    重刷 B_std 下所有项目 xlsx 的分类列。
+    遇到损坏/非 zip 的 xlsx 会跳过并记入 skipped，不中断整批。
+    """
     std_dir = Path(std_dir)
-    stats = {"files": 0, "rows": 0}
-    for f in sorted(std_dir.glob("*.xlsx")):
+    stats: Dict[str, Any] = {
+        "files": 0,
+        "rows": 0,
+        "skipped": 0,
+        "skipped_files": [],
+    }
+    for f in sorted(std_dir.rglob("*.xlsx")):
         if f.name.startswith("~$"):
             continue
-        n = update_excel_classification_columns(
-            f,
-            engine,
-            sheet_names=sheet_names or ["明细数据_万泰铢", "明细数据"],
-            extra_cols=extra_cols,
-        )
+        try:
+            rel = str(f.relative_to(std_dir))
+        except ValueError:
+            rel = str(f)
+        if not _is_valid_xlsx(f):
+            print(f"  ⚠️ 跳过损坏/非 xlsx: {rel}")
+            stats["skipped"] += 1
+            stats["skipped_files"].append(rel)
+            continue
+        try:
+            n = update_excel_classification_columns(
+                f,
+                engine,
+                sheet_names=sheet_names or ["明细数据_万泰铢", "明细数据"],
+                extra_cols=extra_cols,
+            )
+        except Exception as e:
+            print(f"  ⚠️ reclassify 失败 {rel}: {e}")
+            stats["skipped"] += 1
+            stats["skipped_files"].append(f"{rel} ({e})")
+            continue
         stats["files"] += 1
         stats["rows"] += n
+    if stats["skipped"]:
+        print(
+            f"  reclassify 完成：成功 {stats['files']} 文件 / {stats['rows']} 行，"
+            f"跳过 {stats['skipped']} 个坏文件"
+        )
     return stats

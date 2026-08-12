@@ -15,12 +15,21 @@
 """
 
 from .config import Paths
-from .pipeline import run_pipeline, step_cashflow, step_std, step_summary
+from .pipeline import (
+    run_pipeline,
+    step_cashflow,
+    step_classify,
+    step_raw_std,
+    step_std,
+    step_summary,
+)
 
-__version__ = "2.1.0"
+__version__ = "2.4.0"
 __all__ = [
     "Paths",
     "run_pipeline",
+    "step_raw_std",
+    "step_classify",
     "step_std",
     "step_summary",
     "step_cashflow",

@@ -1,6 +1,6 @@
 {
-  "version": "2.5.0",
-  "description": "代付款→0_分包计入成本；现场临建用房/现场临时围墙/集装箱租赁→6_管理费；备用金与资金调拨仍不计入成本 | 角钢/预埋钢板→材料采购；空调安装→办公费 | 治安安保安全→治安管理费；新增医务费用",
+  "version": "2.5.0+auto",
+  "description": "代付款→0_分包计入成本；现场临建用房/现场临时围墙/集装箱租赁→6_管理费；备用金与资金调拨仍不计入成本 | 角钢/预埋钢板→材料采购；空调安装→办公费 | 治安安保安全→治安管理费；新增医务费用 | auto_register 2026-08-10 11:56:20: 1 nodes",
   "granularity": {
     "level": "business_category_l3",
     "note": "三级仍为大类拆分，非型号规格"
@@ -1401,6 +1401,15 @@
         "预扣税"
       ],
       "notes": "seed extra"
+    },
+    {
+      "id": "L2_auto_混凝土及泵车",
+      "name": "混凝土及泵车",
+      "parent": "L1_mat",
+      "order": 82,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from learn_pool"
     },
     {
       "id": "L2_mgmt_bid_bond",

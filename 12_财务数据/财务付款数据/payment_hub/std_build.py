@@ -26,8 +26,10 @@ from .deps import (
     project_match_db_path,
 )
 from .utils import (
+    has_actual_payment,
     infer_time_tag_from_path,
     iter_excel_files,
+    list_raw_groups,
     normalize_text,
     safe_filename,
     to_numeric_series,
@@ -50,6 +52,11 @@ TARGET_COLUMNS = [
 MIN_REQUIRED_COLUMNS = ["项目名称", "摘要", "实付金额"]
 AMOUNT_COLUMNS = ["应付金额", "预扣税额", "实付金额", "增值税额", "不含税额"]
 DEFAULT_CATEGORY = "6_管理费"
+
+# B_std 子目录：按「全量数据最新月份」是否有支出归类
+STD_DIR_HAS_SPEND = "最新月份有支出"
+STD_DIR_NO_SPEND = "最新月份未支出"
+STD_FILE_TAG = "财务付款数据"
 
 COLUMN_ALIASES = {
     "项目名称": ["项目名称", "项目", "项目名", "工程名称", "工程项目"],
@@ -139,12 +146,27 @@ def process_single_sheet(file_path: Path, sheet_name: str) -> Optional[pd.DataFr
     return None if out.empty else out
 
 
-def enrich_project_fields(df: pd.DataFrame) -> pd.DataFrame:
-    """用 ProjectMatcher 标准化项目名称/编码。"""
-    # 确保 0_项目基本信息 在 path 上
+def enrich_project_fields(
+    df: pd.DataFrame,
+    *,
+    prompt: bool = False,
+    interactive: bool = True,
+) -> pd.DataFrame:
+    """
+    用 ProjectMatcher 标准化项目名称/编码。
+
+    - **不做模糊匹配**，仅精确/规范化别名 + 标准项目名
+    - prompt=False（默认）：未命中的保留原名，不弹窗
+    - prompt=True：仅对未命中名称弹窗，由用户决定映射；跳过后记入 unmatched_aliases
+    """
     mod = get_project_matcher_module()
     ProjectMatcher = getattr(mod, "ProjectMatcher", None)
     db_path = project_match_db_path()
+
+    print(
+        f"  项目匹配: 精确别名 only（无模糊）"
+        f"{'；弹窗补录=开' if prompt else '；弹窗补录=关（可用 --prompt-project 打开）'}"
+    )
 
     if ProjectMatcher is not None:
         m = ProjectMatcher(db_path=db_path, load_info=True)
@@ -152,9 +174,10 @@ def enrich_project_fields(df: pd.DataFrame) -> pd.DataFrame:
         unique = sorted({n for n in raw_series.tolist() if n and n.lower() != "nan"})
         mapped = m.match_batch(
             unique,
-            prompt=True,
-            interactive=True,
+            prompt=prompt,
+            interactive=interactive,
             window_title="财务付款数据项目匹配",
+            fuzzy=False,
         )
         code_map = {k: v.get("project_code", "") for k, v in mapped.items()}
         name_map = {k: v.get("project_name", k) for k, v in mapped.items()}
@@ -165,36 +188,47 @@ def enrich_project_fields(df: pd.DataFrame) -> pd.DataFrame:
         m.save()
         no_code = [k for k in unique if not code_map.get(k)]
         if no_code:
-            print(f"  未匹配/无编码: {no_code[:8]}{'…' if len(no_code) > 8 else ''}")
+            print(f"  未匹配/无编码: {len(no_code)} 个"
+                  f"  例: {no_code[:8]}{'…' if len(no_code) > 8 else ''}")
         return enriched
 
-    # 极旧模块回退
+    # 极旧模块回退：同样仅精确匹配，不模糊
     db = mod.load_or_init_db(db_path, [])
     raw_series = df["项目名称"].fillna("").astype(str).str.strip()
     unique_names = sorted({n for n in raw_series.tolist() if n and n.lower() != "nan"})
     code_map: Dict[str, str] = {}
     name_map: Dict[str, str] = {}
-    unmatched: List[str] = []
+    pending: List[str] = []
     for raw_name in unique_names:
-        hit = mod.match_project(raw_name, db)
-        if hit:
-            code_map[raw_name] = hit.get("project_code", "")
+        hit = mod.match_project(raw_name, db, fuzzy=False)
+        if hit and hit.get("source") not in {"unmatched_keep", "unmatched"}:
+            code_map[raw_name] = hit.get("project_code", "") or ""
             name_map[raw_name] = hit.get("project_name", raw_name)
         else:
-            mod.mark_unmatched(db, raw_name)
+            pending.append(raw_name)
             code_map[raw_name] = ""
             name_map[raw_name] = raw_name
-            unmatched.append(raw_name)
-    if unmatched:
-        print(f"  ⚠️ 未匹配项目 {len(unmatched)} 个，弹出手动匹配…")
+    if pending and prompt:
+        print(f"  ⚠️ 未匹配项目 {len(pending)} 个，弹出手动匹配…")
         mod.prompt_unmatched_project_mappings(
-            unmatched, db, window_title="财务付款数据项目匹配", db_path=db_path
+            pending,
+            db,
+            window_title="财务付款数据项目匹配",
+            db_path=db_path,
+            interactive=interactive,
         )
-        for raw_name in unmatched:
-            hit = mod.match_project(raw_name, db)
-            if hit:
-                code_map[raw_name] = hit.get("project_code", "")
+        for raw_name in pending:
+            hit = mod.match_project(raw_name, db, fuzzy=False)
+            if hit and hit.get("source") not in {"unmatched_keep", "unmatched"}:
+                code_map[raw_name] = hit.get("project_code", "") or ""
                 name_map[raw_name] = hit.get("project_name", raw_name)
+            else:
+                mod.mark_unmatched(db, raw_name)
+                code_map[raw_name] = ""
+                name_map[raw_name] = raw_name
+    elif pending:
+        # 不弹窗：不强制写入 unmatched_aliases，便于下次 --prompt-project 再确认
+        print(f"  未匹配保留原名（未弹窗）: {len(pending)} 个")
     enriched = df.copy()
     enriched["项目编码"] = raw_series.map(code_map).fillna("")
     enriched["项目名称"] = raw_series.map(name_map).fillna(raw_series)
@@ -245,15 +279,22 @@ def append_subject_levels(df: pd.DataFrame, mapper) -> pd.DataFrame:
     else:
         vendors = [""] * n
 
-    triples = list(zip(subjects, summaries, vendors))
-    unique_triples = list(dict.fromkeys(triples))
+    # 仅有实付金额的行参与分类
+    pay_ok = (
+        enriched["实付金额"].map(has_actual_payment).tolist()
+        if "实付金额" in enriched.columns
+        else [False] * n
+    )
+    triples_all = list(zip(subjects, summaries, vendors))
+    triples_pay = [t for t, ok in zip(triples_all, pay_ok) if ok]
+    unique_triples = list(dict.fromkeys(triples_pay))
     cache = {}
 
     engine = getattr(mapper, "engine", None)
     use_full = hasattr(mapper, "classify_full")
 
     if engine is not None and hasattr(engine, "classify_unique_map"):
-        cache = engine.classify_unique_map(unique_triples)
+        cache = engine.classify_unique_map(unique_triples) if unique_triples else {}
     else:
         for t in unique_triples:
             try:
@@ -266,7 +307,17 @@ def append_subject_levels(df: pd.DataFrame, mapper) -> pd.DataFrame:
                 cache[t] = None
 
     l1s, l2s, l3s, ids, layers, confs = [], [], [], [], [], []
-    for t in triples:
+    n_skip = 0
+    for t, ok in zip(triples_all, pay_ok):
+        if not ok:
+            l1s.append("")
+            l2s.append("")
+            l3s.append("")
+            ids.append("")
+            layers.append("skip_no_payment")
+            confs.append(None)
+            n_skip += 1
+            continue
         r = cache.get(t)
         try:
             if r is None:
@@ -292,10 +343,11 @@ def append_subject_levels(df: pd.DataFrame, mapper) -> pd.DataFrame:
         layers.append(layer)
         confs.append(conf)
 
-    if unique_triples:
+    if unique_triples or n_skip:
         print(
-            f"  分类缓存: {len(unique_triples)} 种组合 → {n} 行"
-            f"（复用率 {(1 - len(unique_triples) / max(n, 1)) * 100:.0f}%）"
+            f"  分类缓存: {len(unique_triples)} 种组合 → 有实付 {n - n_skip} 行"
+            f"（跳过空实付 {n_skip}）"
+            f"（复用率 {(1 - len(unique_triples) / max(n - n_skip, 1)) * 100:.0f}%）"
         )
 
     enriched["一级科目"] = l1s
@@ -330,6 +382,77 @@ def format_last_payment_date(df: pd.DataFrame) -> str:
     if parsed.notna().any():
         return parsed.max().strftime("%Y-%m-%d")
     return "未识别日期"
+
+
+def year_month_series(df: pd.DataFrame) -> pd.Series:
+    """从 日期 / 年+月 推导 YYYY-MM 序列。"""
+    if df is None or df.empty:
+        return pd.Series(dtype=object)
+
+    result = pd.Series(pd.NA, index=df.index, dtype=object)
+
+    if "日期" in df.columns:
+        parsed = pd.to_datetime(df["日期"], errors="coerce")
+        result = parsed.dt.strftime("%Y-%m")
+
+    if "年" in df.columns and "月" in df.columns:
+        years = pd.to_numeric(df["年"], errors="coerce")
+        months = pd.to_numeric(df["月"], errors="coerce")
+        valid = years.notna() & months.notna() & (months >= 1) & (months <= 12)
+        parts = pd.Series(pd.NA, index=df.index, dtype=object)
+        if valid.any():
+            parts.loc[valid] = (
+                years.loc[valid].astype(int).astype(str)
+                + "-"
+                + months.loc[valid].astype(int).map(lambda m: f"{int(m):02d}")
+            )
+        result = result.where(result.notna(), parts)
+
+    return result.fillna("").astype(str)
+
+
+def row_spend_amount(df: pd.DataFrame) -> pd.Series:
+    """行支出口径：预扣税额 + 实付金额（缺列按 0）。"""
+    withhold = (
+        pd.to_numeric(df["预扣税额"], errors="coerce").fillna(0.0)
+        if "预扣税额" in df.columns
+        else 0.0
+    )
+    actual = (
+        pd.to_numeric(df["实付金额"], errors="coerce").fillna(0.0)
+        if "实付金额" in df.columns
+        else 0.0
+    )
+    return withhold + actual
+
+
+def detect_global_latest_spend_month(df: pd.DataFrame) -> str:
+    """全量数据中有支出的最新 YYYY-MM；无则返回空。"""
+    if df is None or df.empty:
+        return ""
+    ym = year_month_series(df)
+    spend = row_spend_amount(df)
+    mask = (ym != "") & (spend != 0)
+    if not mask.any():
+        # 退而求其次：任意有月份的最大月
+        valid = ym[ym != ""]
+        return str(valid.max()) if not valid.empty else ""
+    return str(ym[mask].max())
+
+
+def project_has_spend_in_month(project_df: pd.DataFrame, latest_ym: str) -> bool:
+    if not latest_ym or project_df is None or project_df.empty:
+        return False
+    ym = year_month_series(project_df)
+    spend = row_spend_amount(project_df)
+    return bool(((ym == latest_ym) & (spend != 0)).any())
+
+
+def build_std_project_filename(code: str, name: str) -> str:
+    """项目编码_项目名称_财务付款数据.xlsx"""
+    code_part = safe_filename(code) if code else "未识别编码"
+    name_part = safe_filename(name) if name else "未命名项目"
+    return f"{code_part}_{name_part}_{STD_FILE_TAG}.xlsx"
 
 
 def apply_output_format(output_path: Path, classify_data: Path | None = None) -> None:
@@ -400,43 +523,76 @@ def apply_output_format(output_path: Path, classify_data: Path | None = None) ->
     wb.save(output_path)
 
 
-def _cleanup_stale_project_files(std_dir: Path, keep: set[str]) -> None:
-    """删除本次未产出的旧项目文件（避免改名后残留）。"""
-    for f in std_dir.glob("*.xlsx"):
+def _cleanup_stale_project_files(std_dir: Path, keep_relpaths: set[str]) -> None:
+    """
+    删除本次未产出的项目文件（含子目录）。
+    keep_relpaths: 相对 std_dir 的路径，如「最新月份有支出/编码_名称_财务付款数据.xlsx」
+    """
+    std_dir = Path(std_dir)
+    for f in std_dir.rglob("*.xlsx"):
         if f.name.startswith("~$"):
             continue
-        if f.name not in keep:
-            # 仅清理典型命名；保留需手动核对等特殊文件若本次未覆盖
-            if re.match(r"^(THCC|LSBM|未识别编码|需手动核对)", f.name):
-                try:
-                    f.unlink()
-                    print(f"  🗑️ 移除过期文件: {f.name}")
-                except OSError:
-                    pass
+        try:
+            rel = f.relative_to(std_dir).as_posix()
+        except ValueError:
+            continue
+        if rel in keep_relpaths:
+            continue
+        # 典型项目文件 / 新旧命名 / 两个归类子目录下的文件
+        parent_name = f.parent.name
+        in_bucket = parent_name in {STD_DIR_HAS_SPEND, STD_DIR_NO_SPEND}
+        looks_project = bool(
+            re.match(
+                r"^(THCC|LSBM|XCY|未识别编码|需手动核对).*\.xlsx$",
+                f.name,
+                re.I,
+            )
+        ) or f.name.endswith(f"_{STD_FILE_TAG}.xlsx")
+        if in_bucket or looks_project or f.parent == std_dir:
+            try:
+                f.unlink()
+                print(f"  🗑️ 移除过期文件: {rel}")
+            except OSError:
+                pass
 
 
-def run_std(paths: Paths, *, cleanup_stale: bool = False) -> List[str]:
-    raw_dir = Path(paths.raw_dir)
-    std_dir = Path(paths.std_dir)
-    if not raw_dir.is_dir():
-        raise FileNotFoundError(f"原始目录不存在: {raw_dir}")
-    std_dir.mkdir(parents=True, exist_ok=True)
+def _process_group_std(
+    *,
+    group_name: str,
+    group_raw_dir: Path,
+    group_std_dir: Path,
+    mapper,
+    classify_data: Path,
+    cleanup_stale: bool = True,
+    prompt_project: bool = False,
+) -> List[str]:
+    """
+    处理单个业务分组：组内全部 Excel 合并 → 按项目写出 std。
+    输出：group_std_dir/{最新月份有支出|未支出}/编码_名称_财务付款数据.xlsx
+    """
+    group_std_dir = Path(group_std_dir)
+    group_raw_dir = Path(group_raw_dir)
+    group_std_dir.mkdir(parents=True, exist_ok=True)
+    has_spend_dir = group_std_dir / STD_DIR_HAS_SPEND
+    no_spend_dir = group_std_dir / STD_DIR_NO_SPEND
+    has_spend_dir.mkdir(parents=True, exist_ok=True)
+    no_spend_dir.mkdir(parents=True, exist_ok=True)
 
-    mapper = get_subject_mapper(paths.classify_data)
-    all_files = iter_excel_files(raw_dir)
+    all_files = iter_excel_files(group_raw_dir)
     if not all_files:
-        print("未发现 Excel，跳过 std")
+        print(f"  [{group_name}] 未发现 Excel，跳过")
         return []
 
-    grouped: Dict[str, List[Path]] = {}
+    # 组内仅扫本组目录；若 raw 即组目录本身，时间标签相对组根
+    time_grouped: Dict[str, List[Path]] = {}
     for fp in all_files:
-        tag = infer_time_tag_from_path(fp, raw_dir)
-        grouped.setdefault(tag, []).append(fp)
+        tag = infer_time_tag_from_path(fp, group_raw_dir)
+        time_grouped.setdefault(tag, []).append(fp)
 
     parts: List[pd.DataFrame] = []
-    for tag in sorted(grouped.keys()):
-        print(f"\n{'=' * 60}\n处理时间批次: {tag}")
-        for file_path in grouped[tag]:
+    for tag in sorted(time_grouped.keys()):
+        print(f"\n  --- 时间批次: {tag} ---")
+        for file_path in time_grouped[tag]:
             print(f"  处理: {file_path.name}")
             try:
                 sheets = pd.ExcelFile(file_path).sheet_names
@@ -449,15 +605,19 @@ def run_std(paths: Paths, *, cleanup_stale: bool = False) -> List[str]:
                     parts.append(part)
 
     if not parts:
-        print("未提取到有效数据")
+        print(f"  [{group_name}] 未提取到有效数据")
         return []
 
     final_df = pd.concat(parts, ignore_index=True)
-    final_df = enrich_project_fields(final_df)
+    final_df = enrich_project_fields(final_df, prompt=prompt_project, interactive=True)
     final_df = append_subject_levels(final_df, mapper)
 
+    latest_ym = detect_global_latest_spend_month(final_df)
+    print(f"\n  📅 [{group_name}] 组内最新有支出月份: {latest_ym or '（未识别）'}")
+
     outputs: List[str] = []
-    keep_names: set[str] = set()
+    keep_relpaths: set[str] = set()
+    n_has = n_no = 0
 
     for project_name, project_df in final_df.groupby("项目名称", dropna=False, sort=True):
         name = project_name if not isinstance(project_name, tuple) else project_name[0]
@@ -468,23 +628,256 @@ def run_std(paths: Paths, *, cleanup_stale: bool = False) -> List[str]:
             codes = codes[codes != ""]
             if not codes.empty:
                 code = codes.iloc[0]
-        code_part = safe_filename(code) if code else "未识别编码"
-        name_part = safe_filename(name)
-        last_date = format_last_payment_date(project_df)
-        out_name = f"{code_part}_{name_part}_({last_date}).xlsx"
-        out_path = std_dir / out_name
-        keep_names.add(out_name)
+
+        out_name = build_std_project_filename(code, name)
+        has_spend = project_has_spend_in_month(project_df, latest_ym)
+        bucket = STD_DIR_HAS_SPEND if has_spend else STD_DIR_NO_SPEND
+        bucket_dir = has_spend_dir if has_spend else no_spend_dir
+        out_path = bucket_dir / out_name
+        rel = f"{bucket}/{out_name}"
+        keep_relpaths.add(rel)
 
         wan_df = build_detail_wan_sheet(project_df)
         with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
             wan_df.to_excel(writer, sheet_name="明细数据_万泰铢", index=False)
             project_df.to_excel(writer, sheet_name="明细数据", index=False)
-        apply_output_format(out_path, classify_data=paths.classify_data)
+        apply_output_format(out_path, classify_data=classify_data)
         outputs.append(str(out_path))
-        print(f"  ✅ {out_name}  ({len(project_df)} 行)")
+        if has_spend:
+            n_has += 1
+            tag = "有支出"
+        else:
+            n_no += 1
+            tag = "未支出"
+        print(f"  ✅ [{tag}] {group_name}/{bucket}/{out_name}  ({len(project_df)} 行)")
 
     if cleanup_stale:
-        _cleanup_stale_project_files(std_dir, keep_names)
+        _cleanup_stale_project_files(group_std_dir, keep_relpaths)
 
-    print(f"\n✅ std 完成：{len(outputs)} 个项目，{len(final_df)} 行 → {std_dir}")
+    print(
+        f"\n  ✅ 分组 [{group_name}] 完成：{len(outputs)} 个项目"
+        f"（{STD_DIR_HAS_SPEND} {n_has} / {STD_DIR_NO_SPEND} {n_no}），"
+        f"{len(final_df)} 行 → {group_std_dir}"
+    )
+    if latest_ym:
+        print(f"     归类口径：最新月份 = {latest_ym}（预扣税额+实付金额 ≠ 0）")
     return outputs
+
+
+def _cleanup_legacy_flat_std(std_dir: Path, active_groups: set[str]) -> None:
+    """
+    迁移后清理旧版「B_std 根下直接有支出/未支出」结构，
+    以及已不在 raw 中的分组目录。
+    """
+    std_dir = Path(std_dir)
+    if not std_dir.is_dir():
+        return
+    for child in list(std_dir.iterdir()):
+        if not child.is_dir():
+            continue
+        if child.name in {STD_DIR_HAS_SPEND, STD_DIR_NO_SPEND}:
+            # 旧扁平结构
+            try:
+                import shutil
+
+                shutil.rmtree(child)
+                print(f"  🗑️ 移除旧版扁平目录: {child.name}")
+            except OSError as exc:
+                print(f"  ⚠️ 无法移除 {child}: {exc}")
+            continue
+        if child.name.startswith("."):
+            continue
+        if active_groups and child.name not in active_groups:
+            # 仅删除看起来是过期业务组（内含 std 项目文件）
+            try:
+                has_std = any(child.rglob(f"*_{STD_FILE_TAG}.xlsx"))
+            except OSError:
+                has_std = False
+            if has_std:
+                try:
+                    import shutil
+
+                    shutil.rmtree(child)
+                    print(f"  🗑️ 移除过期分组目录: {child.name}")
+                except OSError as exc:
+                    print(f"  ⚠️ 无法移除 {child}: {exc}")
+
+
+def _split_detail_df_to_std(
+    final_df: pd.DataFrame,
+    *,
+    group_name: str,
+    group_std_dir: Path,
+    classify_data: Path,
+    cleanup_stale: bool = True,
+    light_format: bool = True,
+) -> List[str]:
+    """已分类明细 → 按项目拆分到 B_std/{组}/有支出|未支出/。"""
+    group_std_dir = Path(group_std_dir)
+    group_std_dir.mkdir(parents=True, exist_ok=True)
+    has_spend_dir = group_std_dir / STD_DIR_HAS_SPEND
+    no_spend_dir = group_std_dir / STD_DIR_NO_SPEND
+    has_spend_dir.mkdir(parents=True, exist_ok=True)
+    no_spend_dir.mkdir(parents=True, exist_ok=True)
+
+    if final_df is None or final_df.empty:
+        print(f"  [{group_name}] 明细为空，跳过拆分")
+        return []
+
+    latest_ym = detect_global_latest_spend_month(final_df)
+    print(f"  📅 [{group_name}] 组内最新有支出月份: {latest_ym or '（未识别）'}")
+
+    outputs: List[str] = []
+    keep_relpaths: set[str] = set()
+    n_has = n_no = 0
+
+    for project_name, project_df in final_df.groupby("项目名称", dropna=False, sort=True):
+        name = project_name if not isinstance(project_name, tuple) else project_name[0]
+        name = "" if name is None else str(name)
+        code = ""
+        if "项目编码" in project_df.columns:
+            codes = project_df["项目编码"].dropna().astype(str).str.strip()
+            codes = codes[(codes != "") & (codes.str.lower() != "nan")]
+            if not codes.empty:
+                code = codes.iloc[0]
+
+        out_name = build_std_project_filename(code, name)
+        has_spend = project_has_spend_in_month(project_df, latest_ym)
+        bucket = STD_DIR_HAS_SPEND if has_spend else STD_DIR_NO_SPEND
+        bucket_dir = has_spend_dir if has_spend else no_spend_dir
+        out_path = bucket_dir / out_name
+        rel = f"{bucket}/{out_name}"
+        keep_relpaths.add(rel)
+
+        wan_df = build_detail_wan_sheet(project_df)
+        with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
+            wan_df.to_excel(writer, sheet_name="明细数据_万泰铢", index=False)
+            project_df.to_excel(writer, sheet_name="明细数据", index=False)
+        if light_format:
+            # 轻量：仅金额格式，避免每个项目文件全量下拉/样式（提速）
+            try:
+                apply_output_format(out_path, classify_data=None)
+            except Exception:
+                pass
+        else:
+            apply_output_format(out_path, classify_data=classify_data)
+        outputs.append(str(out_path))
+        if has_spend:
+            n_has += 1
+            tag = "有支出"
+        else:
+            n_no += 1
+            tag = "未支出"
+        print(f"  ✅ [{tag}] {group_name}/{bucket}/{out_name}  ({len(project_df)} 行)")
+
+    if cleanup_stale:
+        _cleanup_stale_project_files(group_std_dir, keep_relpaths)
+
+    print(
+        f"\n  ✅ 分组 [{group_name}] 拆分完成：{len(outputs)} 个项目"
+        f"（{STD_DIR_HAS_SPEND} {n_has} / {STD_DIR_NO_SPEND} {n_no}），"
+        f"{len(final_df)} 行 → {group_std_dir}"
+    )
+    return outputs
+
+
+def run_std_from_classified(
+    paths: Paths, *, cleanup_stale: bool = True
+) -> List[str]:
+    """
+    快路径：A2_classified 已分类明细 → B_std 按项目拆分。
+    不再重复读 A_raw / 不再重复分类。
+    """
+    from .classify_raw_std import list_classified_groups, load_classified_detail
+
+    std_dir = Path(paths.std_dir)
+    std_dir.mkdir(parents=True, exist_ok=True)
+    groups = list_classified_groups(paths)
+    if not groups:
+        print("未找到 A2_classified，无法快路径拆分 std")
+        return []
+
+    print(f"std 快路径（classified → 按项目拆分）: {', '.join(g for g, _ in groups)}")
+    all_outputs: List[str] = []
+    for group_name, class_xlsx in groups:
+        print(f"\n{'=' * 64}")
+        print(f"  分组 std · {group_name} ← {class_xlsx.name}")
+        print(f"{'=' * 64}")
+        detail = load_classified_detail(class_xlsx)
+        outs = _split_detail_df_to_std(
+            detail,
+            group_name=group_name,
+            group_std_dir=paths.group_std_dir(group_name),
+            classify_data=paths.classify_data,
+            cleanup_stale=cleanup_stale,
+            light_format=True,
+        )
+        all_outputs.extend(outs)
+
+    if cleanup_stale:
+        _cleanup_legacy_flat_std(std_dir, {g for g, _ in groups})
+
+    print(
+        f"\n✅ std 快路径完成：{len(groups)} 个分组，共 {len(all_outputs)} 个项目文件 → {std_dir}"
+    )
+    return all_outputs
+
+
+def run_std(
+    paths: Paths,
+    *,
+    cleanup_stale: bool = True,
+    prompt_project: bool = False,
+) -> List[str]:
+    """
+    优先：A2_classified → 按项目拆 B_std（快）
+    回退：A_raw 组内读 Excel → 匹配项目 → 分类 → 拆分（旧路径）
+    """
+    from .classify_raw_std import list_classified_groups
+
+    # 快路径
+    if list_classified_groups(paths):
+        return run_std_from_classified(paths, cleanup_stale=cleanup_stale)
+
+    raw_dir = Path(paths.raw_dir)
+    std_dir = Path(paths.std_dir)
+    if not raw_dir.is_dir():
+        raise FileNotFoundError(f"原始目录不存在: {raw_dir}")
+    std_dir.mkdir(parents=True, exist_ok=True)
+
+    groups = list_raw_groups(raw_dir)
+    if not groups:
+        print("未发现业务分组（A_raw 一级子目录中无 Excel），跳过 std")
+        return []
+
+    print(f"业务分组（回退路径 A_raw）: {', '.join(g for g, _ in groups)}")
+    print(
+        f"项目匹配弹窗: {'开启' if prompt_project else '关闭'}"
+        f"（CLI: --prompt-project / --no-prompt-project）"
+    )
+    mapper = get_subject_mapper(paths.classify_data)
+
+    all_outputs: List[str] = []
+    for group_name, group_raw in groups:
+        print(f"\n{'=' * 64}")
+        print(f"  分组 std · {group_name}")
+        print(f"{'=' * 64}")
+        group_std = paths.group_std_dir(group_name)
+        outs = _process_group_std(
+            group_name=group_name,
+            group_raw_dir=group_raw,
+            group_std_dir=group_std,
+            mapper=mapper,
+            classify_data=paths.classify_data,
+            cleanup_stale=cleanup_stale,
+            prompt_project=prompt_project,
+        )
+        all_outputs.extend(outs)
+
+    if cleanup_stale:
+        _cleanup_legacy_flat_std(std_dir, {g for g, _ in groups})
+
+    print(
+        f"\n✅ std 全部完成：{len(groups)} 个分组，共 {len(all_outputs)} 个项目文件 → {std_dir}"
+    )
+    return all_outputs
