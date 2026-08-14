@@ -1,6 +1,6 @@
 {
   "version": "2.5.0+auto",
-  "description": "代付款→0_分包计入成本；现场临建用房/现场临时围墙/集装箱租赁→6_管理费；备用金与资金调拨仍不计入成本 | 角钢/预埋钢板→材料采购；空调安装→办公费 | 治安安保安全→治安管理费；新增医务费用 | auto_register 2026-08-10 11:56:20: 1 nodes",
+  "description": "代付款→0_分包计入成本；现场临建用房/现场临时围墙/集装箱租赁→6_管理费；备用金与资金调拨仍不计入成本 | 角钢/预埋钢板→材料采购；空调安装→办公费 | 治安安保安全→治安管理费；新增医务费用 | auto_register 2026-08-10 11:56:20: 1 nodes | auto_register 2026-08-14 17:33:17: 1 nodes",
   "granularity": {
     "level": "business_category_l3",
     "note": "三级仍为大类拆分，非型号规格"
@@ -520,6 +520,15 @@
       "active": false,
       "aliases": [],
       "notes": " | 并入大类「材料采购」"
+    },
+    {
+      "id": "L2_auto_缅工营地",
+      "name": "缅工营地",
+      "parent": "L1_labor",
+      "order": 6,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from learn_pool"
     },
     {
       "id": "L2_eq_loader",
