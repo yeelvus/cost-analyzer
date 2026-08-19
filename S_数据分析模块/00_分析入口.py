@@ -43,6 +43,7 @@ COMMANDS: dict[str, dict[str, str]] = {
     },
     "reports": {
         "generate-config": "reports/generate_report_config.py",
+        "contract": "reports/contract_report_generator.py",
         "pipeline": "reports/contract_report_pipeline.py",
     },
 }

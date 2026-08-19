@@ -27,8 +27,8 @@ from excel_formatting_utils import apply_common_excel_layout
 excel_path = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_材料欠款/A_材料欠款_raw/泰国子公司各项目采购欠款汇总7.31.xlsx"
 db_path = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
 
-# 输出目录
-output_dir = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report"
+# 输出目录（模块自己的 std，不写 Z_report）
+output_dir = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_材料欠款/B_材料欠款_std"
 os.makedirs(output_dir, exist_ok=True)
 
 sheet_name = "汇总表"

@@ -54,8 +54,6 @@ def _paths_from_args(args: Any) -> Paths:
         p.std_dir = Path(args.std_dir)
     if getattr(args, "sum_xlsx", None):
         p.sum_xlsx = Path(args.sum_xlsx)
-    if getattr(args, "sum_xlsx_z", None):
-        p.sum_xlsx_z = Path(args.sum_xlsx_z)
     if getattr(args, "cashflow_html", None):
         p.cashflow_html = Path(args.cashflow_html)
     if getattr(args, "data_dir", None):
@@ -70,7 +68,6 @@ def _add_path_args(sp: argparse.ArgumentParser) -> None:
     sp.add_argument("--raw-dir", help="A_财务付款_raw")
     sp.add_argument("--std-dir", help="B_财务付款_std")
     sp.add_argument("--sum-xlsx", help="汇总 Excel")
-    sp.add_argument("--sum-xlsx-z", help="汇总副本 Z_report")
     sp.add_argument("--cashflow-html", help="现金流 HTML")
     sp.add_argument("--data-dir", help="learn_classify/data")
 

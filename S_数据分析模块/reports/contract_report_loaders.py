@@ -269,7 +269,102 @@ def detect_attachment_files(folder_path: Path) -> Dict[str, str]:
     return {"有PDF": "✓" if has_pdf else "", "有Word": "✓" if has_word else "", "有Excel": "✓" if has_excel else ""}
 
 
+def _is_summary_contract_row(name: str) -> bool:
+    text = str(name or "").strip()
+    if not text:
+        return True
+    return any(key in text for key in ("分类汇总", "不分类汇总", "合计", "小计"))
+
+
+def load_contracts_from_summary_excel(summary_path: Path) -> Optional[Dict[str, pd.DataFrame]]:
+    if not summary_path or not Path(summary_path).exists():
+        return None
+
+    try:
+        xl = pd.ExcelFile(summary_path)
+    except Exception as exc:
+        print(f"警告：读取合同汇总失败 {summary_path}: {exc}")
+        return None
+
+    base_columns = [
+        "项目状态", "项目名称", "项目编码", "项目简称", "合同子文件夹", "合同金额", "币种", "汇率",
+        "金额_THB", "金额_含税优先", "是否采购类合同",
+    ]
+    result: Dict[str, pd.DataFrame] = {}
+    for kw in ("总包合同", "分包合同"):
+        if kw not in xl.sheet_names:
+            result[kw] = pd.DataFrame(columns=base_columns)
+            continue
+
+        df = xl.parse(kw)
+        df.columns = [str(c).strip() for c in df.columns]
+        rows = []
+        for _, row in df.iterrows():
+            contract_name = str(row.get("合同名称", "") or "").strip()
+            if _is_summary_contract_row(contract_name):
+                continue
+            code = normalize_project_code(row.get("项目编码", ""))
+            if not code:
+                continue
+            wan = coerce_float(row.get("金额（万泰铢）", 0))
+            amount_thb = wan * 10000 if wan else convert_amount_to_thb(
+                row.get("合同金额", 0), row.get("币种", ""), row.get("汇率", "")
+            )
+            short_name = normalize_project_name(row.get("项目名称", ""))
+            rec = {
+                "项目状态": normalize_project_name(row.get("项目状态", "")),
+                "项目名称": f"{code}_{short_name}" if short_name else code,
+                "项目编码": code,
+                "项目简称": short_name,
+                "合同子文件夹": contract_name,
+                "合同名称": contract_name,
+                "合同编号": row.get("合同编号", ""),
+                "合同签订日期": row.get("合同签订日期", ""),
+                "合同类型": row.get("合同类型", "") or row.get("工程范围", ""),
+                "工程范围": row.get("工程范围", ""),
+                "对方公司名称": row.get("对方公司名称", "") or row.get("对方单位公司名称", ""),
+                "币种": row.get("币种", ""),
+                "合同金额": coerce_float(row.get("合同金额", 0)),
+                "汇率": row.get("汇率", ""),
+                "金额_含税优先": coerce_float(row.get("含税金额", row.get("合同金额", 0))),
+                "金额_THB": amount_thb,
+                "有PDF": row.get("有PDF", ""),
+                "有Word": row.get("有Word", ""),
+                "有Excel": row.get("有Excel", ""),
+            }
+            rec["是否采购类合同"] = detect_procurement(pd.Series(rec)) or ("材料" in str(rec.get("工程范围", "")))
+            rows.append(rec)
+        out = pd.DataFrame(rows) if rows else pd.DataFrame(columns=base_columns)
+        result[kw] = ensure_columns(out, base_columns)
+
+    if all(df.empty for df in result.values()):
+        return None
+    print(f"✓ 合同汇总：从 {summary_path.name} 读取 总包 {len(result['总包合同'])} 条、分包 {len(result['分包合同'])} 条")
+    return result
+
+
 def load_contracts_from_folder(root_dir: Path) -> Dict[str, pd.DataFrame]:
+    if root_dir and Path(root_dir).is_file() and Path(root_dir).suffix.lower() in {".xlsx", ".xls"}:
+        loaded = load_contracts_from_summary_excel(Path(root_dir))
+        if loaded:
+            return loaded
+        root_dir = Path(root_dir).parent
+
+    if root_dir and Path(root_dir).is_dir():
+        candidates = [
+            p for p in Path(root_dir).glob("合同管理_总包分包*.xlsx")
+            if p.is_file() and not p.name.startswith("~$")
+        ]
+        candidates.extend(
+            p for p in Path(root_dir).glob("总包合同+分包合同汇总_*.xlsx")
+            if p.is_file() and not p.name.startswith("~$")
+        )
+        if candidates:
+            summary = max(candidates, key=lambda p: p.stat().st_mtime)
+            loaded = load_contracts_from_summary_excel(summary)
+            if loaded:
+                return loaded
+
     target_keywords = ["总包合同", "分包合同"]
     mapping_path = root_dir / "project_mapping.json"
     project_mapping: Dict[str, str] = {}
@@ -430,6 +525,8 @@ def load_contracts_from_folder(root_dir: Path) -> Dict[str, pd.DataFrame]:
 
 
 def load_procurement(procurement_path: Path) -> pd.DataFrame:
+    if not procurement_path or not Path(procurement_path).exists():
+        return pd.DataFrame()
     xl = pd.ExcelFile(procurement_path)
     preferred_sheets = ["合并数据", "采购明细", "明细", "项目汇总"]
     sheet = next((s for s in preferred_sheets if s in xl.sheet_names), xl.sheet_names[0])
@@ -482,7 +579,7 @@ def load_procurement(procurement_path: Path) -> pd.DataFrame:
 
 
 def load_material_arrears(material_arrears_path: Path) -> pd.DataFrame:
-    if not material_arrears_path.exists():
+    if not material_arrears_path or not Path(material_arrears_path).exists():
         return pd.DataFrame(columns=["项目编码", "标准项目名称", "欠款金额_THB"])
 
     try:
@@ -527,7 +624,7 @@ def load_material_arrears(material_arrears_path: Path) -> pd.DataFrame:
 
 def load_concrete(concrete_paths: List[Path]) -> pd.DataFrame:
     frames: List[pd.DataFrame] = []
-    for path in concrete_paths:
+    for path in concrete_paths or []:
         if not path.exists():
             print(f"警告：商混文件不存在，已跳过: {path}")
             continue
@@ -576,8 +673,11 @@ def load_concrete(concrete_paths: List[Path]) -> pd.DataFrame:
 
 
 def load_equipment(equipment_path: Path) -> pd.DataFrame:
+    if not equipment_path or not Path(equipment_path).exists():
+        return pd.DataFrame()
     xl = pd.ExcelFile(equipment_path)
-    sheet = "汇总" if "汇总" in xl.sheet_names else xl.sheet_names[0]
+    preferred_sheets = ["汇总", "项目汇总机具费", "按项目", "明细数据"]
+    sheet = next((s for s in preferred_sheets if s in xl.sheet_names), xl.sheet_names[0])
     df = xl.parse(sheet)
     df["sheet名称"] = sheet
     df.columns = [str(c).strip() for c in df.columns]
@@ -599,12 +699,21 @@ def load_equipment(equipment_path: Path) -> pd.DataFrame:
         if col in df.columns:
             amount_col = col
             break
+    if amount_col is None:
+        for col in df.columns:
+            if "费用合计" in str(col) or "金额" in str(col):
+                amount_col = col
+                break
 
     if amount_col is None:
         df["金额_THB"] = 0.0
         return df
 
     temp = df.copy()
+    if "项目编码" not in temp.columns:
+        temp["项目编码"] = ""
+    if "项目名称" not in temp.columns:
+        temp["项目名称"] = ""
     temp["项目编码"] = temp["项目编码"].apply(normalize_project_code)
     temp["项目名称"] = temp["项目名称"].apply(normalize_project_name)
     temp = temp[(temp["项目编码"] != "") | (temp["项目名称"] != "")]
@@ -614,6 +723,8 @@ def load_equipment(equipment_path: Path) -> pd.DataFrame:
 
 
 def load_labor(labor_path: Path) -> pd.DataFrame:
+    if not labor_path or not Path(labor_path).exists():
+        return pd.DataFrame()
     xl = pd.ExcelFile(labor_path)
     labor_sheet = "按项目汇总" if "按项目汇总" in xl.sheet_names else ("项目求和" if "项目求和" in xl.sheet_names else xl.sheet_names[0])
     df = xl.parse(labor_sheet)
@@ -666,15 +777,21 @@ def load_labor(labor_path: Path) -> pd.DataFrame:
 
 
 def load_labor_monthly(labor_path: Path) -> pd.DataFrame:
+    if not labor_path or not Path(labor_path).exists():
+        return pd.DataFrame(columns=["项目编码", "项目名称", "年", "月"])
     xl = pd.ExcelFile(labor_path)
     if "按年月项目汇总" in xl.sheet_names:
         df = xl.parse("按年月项目汇总")
+    elif "原始数据" in xl.sheet_names:
+        df = xl.parse("原始数据")
     elif "按项目汇总" in xl.sheet_names:
         df = xl.parse("按项目汇总")
     else:
         return pd.DataFrame(columns=["项目编码", "项目名称", "年", "月"])
 
     df = df.rename(columns={"project_code": "项目编码"})
+    if "项目编码" in df.columns:
+        df["项目编码"] = df["项目编码"].apply(normalize_project_code)
     df = scale_wan_amount_columns(
         df,
         amount_keywords=["万元"],
@@ -684,7 +801,7 @@ def load_labor_monthly(labor_path: Path) -> pd.DataFrame:
 
 
 def load_subcontract_ledger(subcontract_path: Path) -> pd.DataFrame:
-    if not subcontract_path.exists():
+    if not subcontract_path or not Path(subcontract_path).exists():
         return pd.DataFrame()
 
     xl = pd.ExcelFile(subcontract_path)
@@ -731,7 +848,7 @@ def load_subcontract_ledger(subcontract_path: Path) -> pd.DataFrame:
 
 
 def load_budget_summary(budget_excel_path: Path) -> pd.DataFrame:
-    if not budget_excel_path.exists():
+    if not budget_excel_path or not Path(budget_excel_path).exists():
         return pd.DataFrame()
 
     try:
@@ -766,11 +883,25 @@ def load_budget_summary(budget_excel_path: Path) -> pd.DataFrame:
 
 
 def load_cost_statistics(cost_stats_path: Path) -> pd.DataFrame:
-    if not cost_stats_path.exists():
+    if not cost_stats_path or not Path(cost_stats_path).exists():
         return pd.DataFrame()
 
     try:
         df = pd.read_excel(cost_stats_path)
+        column_aliases = {
+            "总包合同额": "总包合同额(万泰铢)",
+            "分包合同额": "分包合同额(万泰铢)",
+            "业主签证": "签证情况",
+            "分包签证": "分包签证情况",
+            "财务分包已付款": "分包已付款",
+        }
+        rename_map = {
+            src: dst for src, dst in column_aliases.items()
+            if src in df.columns and dst not in df.columns
+        }
+        if rename_map:
+            df = df.rename(columns=rename_map)
+
         if "标准项目编码" not in df.columns and "项目编码" not in df.columns:
             return pd.DataFrame()
 
@@ -828,12 +959,55 @@ def load_cost_statistics(cost_stats_path: Path) -> pd.DataFrame:
 
 
 def load_finance_summary(finance_path: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    if not finance_path.exists():
+    if not finance_path or not Path(finance_path).exists():
         return pd.DataFrame(), pd.DataFrame()
 
     try:
-        df_summary = pd.read_excel(finance_path, sheet_name="项目汇总（万泰铢）")
-        df_category = pd.read_excel(finance_path, sheet_name="分类汇总")
+        xl = pd.ExcelFile(finance_path)
+        sheet_names = xl.sheet_names
+
+        if "项目汇总（万泰铢）" in sheet_names:
+            df_summary = pd.read_excel(finance_path, sheet_name="项目汇总（万泰铢）")
+            df_category = (
+                pd.read_excel(finance_path, sheet_name="分类汇总")
+                if "分类汇总" in sheet_names
+                else pd.DataFrame()
+            )
+            return df_summary, df_category
+
+        if "总体汇总" not in sheet_names:
+            print(f"警告：财务文件缺少可识别 sheet: {finance_path.name} / {sheet_names}")
+            return pd.DataFrame(), pd.DataFrame()
+
+        df_summary = pd.read_excel(finance_path, sheet_name="总体汇总")
+        df_summary.columns = [str(c).strip() for c in df_summary.columns]
+        if "项目编码" in df_summary.columns:
+            df_summary["项目编码"] = df_summary["项目编码"].apply(normalize_project_code)
+
+        paid_thb = None
+        for col in ["实付金额", "计入成本_实付金额", "含税实付金额"]:
+            if col in df_summary.columns:
+                paid_thb = df_summary[col].apply(coerce_float)
+                break
+        if paid_thb is None:
+            paid_thb = pd.Series([0.0] * len(df_summary), index=df_summary.index)
+
+        # 下游按「万泰铢」读取后再 *10000 还原为泰铢
+        df_summary["含税实付金额（万泰铢）"] = paid_thb / 10000.0
+        df_summary["付款汇总（万泰铢）"] = paid_thb / 10000.0
+
+        if "项目一级科目汇总" in sheet_names:
+            df_category = pd.read_excel(finance_path, sheet_name="项目一级科目汇总")
+            df_category.columns = [str(c).strip() for c in df_category.columns]
+            if "项目编码" in df_category.columns:
+                df_category["项目编码"] = df_category["项目编码"].apply(normalize_project_code)
+            if "0_分包" in df_category.columns:
+                df_category["付款汇总（泰铢）"] = df_category["0_分包"].apply(coerce_float)
+            elif "分包款" in df_category.columns:
+                df_category["付款汇总（泰铢）"] = df_category["分包款"].apply(coerce_float)
+        else:
+            df_category = pd.DataFrame()
+
         return df_summary, df_category
     except Exception as e:
         print(f"警告：读取财务部数据失败 {finance_path}: {e}")

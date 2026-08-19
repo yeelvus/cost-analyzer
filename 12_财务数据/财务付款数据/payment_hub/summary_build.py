@@ -1034,7 +1034,6 @@ def run_summary_for_detail_df(
     detail_df: pd.DataFrame,
     *,
     sum_xlsx: Path,
-    sum_xlsx_z: Path | None = None,
     group_label: str = "",
 ) -> List[str]:
     """从已分类明细 DataFrame 写汇总（快路径）。"""
@@ -1048,29 +1047,25 @@ def run_summary_for_detail_df(
         detail_df, group_label=label
     )
 
-    written: List[str] = []
-    targets = [Path(sum_xlsx)]
-    if sum_xlsx_z is not None:
-        targets.append(Path(sum_xlsx_z))
-    for path in targets:
-        # 清理旧文件名 财务付款数据汇总.xlsx（无组名前缀）
-        legacy = path.parent / "财务付款数据汇总.xlsx"
-        if legacy.is_file() and legacy.resolve() != Path(path).resolve():
-            try:
-                legacy.unlink()
-                print(f"   🗑️ 移除旧汇总文件名: {legacy.name}")
-            except OSError:
-                pass
-        _write_summary_workbook(
-            path,
-            summary_df=summary_df,
-            monthly_wide_df=monthly_wide_df,
-            subject_payload=subject_payload,
-            project_level1_df=project_level1_df,
-            detail_groups=detail_groups,
-        )
-        written.append(str(path))
-        print(f"   → {path}")
+    path = Path(sum_xlsx)
+    # 清理旧文件名 财务付款数据汇总.xlsx（无组名前缀）
+    legacy = path.parent / "财务付款数据汇总.xlsx"
+    if legacy.is_file() and legacy.resolve() != path.resolve():
+        try:
+            legacy.unlink()
+            print(f"   🗑️ 移除旧汇总文件名: {legacy.name}")
+        except OSError:
+            pass
+    _write_summary_workbook(
+        path,
+        summary_df=summary_df,
+        monthly_wide_df=monthly_wide_df,
+        subject_payload=subject_payload,
+        project_level1_df=project_level1_df,
+        detail_groups=detail_groups,
+    )
+    written = [str(path)]
+    print(f"   → {path}")
 
     if detail_groups:
         n_detail = sum(len(g) for g in detail_groups)
@@ -1103,7 +1098,6 @@ def run_summary_for_group(
     group_std_dir: Path,
     *,
     sum_xlsx: Path,
-    sum_xlsx_z: Path | None = None,
     group_label: str = "",
 ) -> List[str]:
     """对单个业务分组目录内的 std 生成汇总（绝不扫其他分组）。"""
@@ -1123,21 +1117,17 @@ def run_summary_for_group(
         group_std_dir, group_label=label
     )
 
-    written: List[str] = []
-    targets = [Path(sum_xlsx)]
-    if sum_xlsx_z is not None:
-        targets.append(Path(sum_xlsx_z))
-    for path in targets:
-        _write_summary_workbook(
-            path,
-            summary_df=summary_df,
-            monthly_wide_df=monthly_wide_df,
-            subject_payload=subject_payload,
-            project_level1_df=project_level1_df,
-            detail_groups=detail_groups,
-        )
-        written.append(str(path))
-        print(f"   → {path}")
+    path = Path(sum_xlsx)
+    _write_summary_workbook(
+        path,
+        summary_df=summary_df,
+        monthly_wide_df=monthly_wide_df,
+        subject_payload=subject_payload,
+        project_level1_df=project_level1_df,
+        detail_groups=detail_groups,
+    )
+    written = [str(path)]
+    print(f"   → {path}")
 
     if detail_groups:
         n_detail = sum(len(g) for g in detail_groups)
@@ -1155,7 +1145,7 @@ def run_summary_for_group(
 
 def _archive_ungrouped_root_outputs(paths: Paths, active_groups: List[str]) -> None:
     """
-    把 C_sum / Z_report 根目录下旧的「未分组」总表挪到 _历史未分组，
+    把 C_sum 根目录下旧的「未分组」总表挪到 _历史未分组，
     避免与 C_sum/流水、C_sum/银行账 混淆。
     """
     import shutil
@@ -1167,22 +1157,21 @@ def _archive_ungrouped_root_outputs(paths: Paths, active_groups: List[str]) -> N
         paths.cashflow_html.name,
         paths.amount_mismatch_xlsx.name,
     }
-    for root in (paths.sum_dir, paths.sum_dir_z):
-        root = Path(root)
-        if not root.is_dir():
+    root = Path(paths.sum_dir)
+    if not root.is_dir():
+        return
+    archive = root / "_历史未分组" / stamp
+    for name in root_names:
+        fp = root / name
+        if not fp.is_file():
             continue
-        archive = root / "_历史未分组" / stamp
-        for name in root_names:
-            fp = root / name
-            if not fp.is_file():
-                continue
-            archive.mkdir(parents=True, exist_ok=True)
-            dest = archive / name
-            try:
-                shutil.move(str(fp), str(dest))
-                print(f"  📦 已归档旧根目录文件: {fp.name} → {dest}")
-            except OSError as exc:
-                print(f"  ⚠️ 归档失败 {fp}: {exc}")
+        archive.mkdir(parents=True, exist_ok=True)
+        dest = archive / name
+        try:
+            shutil.move(str(fp), str(dest))
+            print(f"  📦 已归档旧根目录文件: {fp.name} → {dest}")
+        except OSError as exc:
+            print(f"  ⚠️ 归档失败 {fp}: {exc}")
 
 
 def _write_group_index(paths: Paths, group_stats: List[dict]) -> Path:
@@ -1200,8 +1189,7 @@ def run_summary(paths: Paths) -> List[str]:
     优先快路径：读 A2_classified 已分类明细 → 直接汇总
     回退：扫 B_std/{组名}/ 多项目文件
 
-    写出 C_sum/{组名}/财务付款数据汇总.xlsx
-         Z_report/{组名}/财务付款数据汇总.xlsx
+    写出 C_sum/{组名}/{组名}_财务付款数据汇总.xlsx
     """
     from .classify_raw_std import list_classified_groups, load_classified_detail
 
@@ -1223,7 +1211,6 @@ def run_summary(paths: Paths) -> List[str]:
             outs = run_summary_for_detail_df(
                 detail,
                 sum_xlsx=sum_path,
-                sum_xlsx_z=paths.group_sum_xlsx_z(group_name),
                 group_label=group_name,
             )
             written.extend(outs)
@@ -1262,7 +1249,6 @@ def run_summary(paths: Paths) -> List[str]:
             outs = run_summary_for_group(
                 group_std,
                 sum_xlsx=sum_path,
-                sum_xlsx_z=paths.group_sum_xlsx_z(group_name),
                 group_label=group_name,
             )
             written.extend(outs)

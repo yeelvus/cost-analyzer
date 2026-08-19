@@ -70,7 +70,7 @@ def sanitize_filename(name: str) -> str:
 
 def load_responsibility_cost_mapping(responsibility_dir: Path) -> Dict[str, Path]:
     mapping = {}
-    if not responsibility_dir.is_dir():
+    if not responsibility_dir or not Path(responsibility_dir).is_dir():
         return mapping
 
     pattern = re.compile(r"^(THCC-\d{4}-\d{3})_.*_责任成本\.xlsx$")
@@ -149,7 +149,7 @@ def build_provenance_rows(
         input_rows.append({
             "类别": category,
             "项目": item,
-            "来源文件": str(source),
+            "来源文件": str(source) if source else "",
             "Sheet": sheet,
             "列": columns,
             "备注": note,
@@ -170,7 +170,7 @@ def build_provenance_rows(
 
     add_input("合同", "合同管理根目录", contract_dir, note="总包/分包合同文件夹")
     add_input("采购", "采购明细合并表", procurement_path, sheet="项目汇总(优先)/合并数据", columns="项目编码, 项目名称, 总采购金额")
-    for c_path in concrete_paths:
+    for c_path in concrete_paths or []:
         add_input("商混", "商混明细汇总", c_path, sheet="客户总额汇总", columns="项目编码, 项目名称, 总方量, 总车次, 金额, 金额（万泰铢）")
     add_input("机具", "机具使用费汇总", equipment_path, sheet="项目汇总机具费", columns="项目编码, 项目名称, 费用合计(泰铢)")
     add_input("人工", "人工费汇总", labor_path, sheet="按项目汇总", columns="项目编码, 项目名称, 中方正式工铢, 中方劳务工铢, 子公司属地工铢, 劳务公司铢, 签证费, 总人工费")

@@ -29,9 +29,6 @@ class Paths:
     sum_xlsx: Path = field(
         default_factory=lambda: PAY_ROOT / "C_财务付款_sum" / "财务付款数据汇总.xlsx"
     )
-    sum_xlsx_z: Path = field(
-        default_factory=lambda: DESKTOP_COST / "Z_report" / "财务付款数据汇总.xlsx"
-    )
     amount_mismatch_xlsx: Path = field(
         default_factory=lambda: PAY_ROOT
         / "C_财务付款_sum"
@@ -142,11 +139,6 @@ class Paths:
         """C_财务付款_sum 根目录（分组输出写在其下一级子目录）。"""
         return self.sum_xlsx.parent
 
-    @property
-    def sum_dir_z(self) -> Path:
-        """Z_report 下付款汇总根（按组分子目录）。"""
-        return self.sum_xlsx_z.parent
-
     def group_raw_std_dir(self, group: str) -> Path:
         """A1_raw_std/{组名}/"""
         name = (group or "").strip() or "未分组"
@@ -177,20 +169,10 @@ class Paths:
         name = (group or "").strip() or "未分组"
         return self.sum_dir / name
 
-    def group_sum_dir_z(self, group: str) -> Path:
-        """Z_report/{组名}/"""
-        name = (group or "").strip() or "未分组"
-        return self.sum_dir_z / name
-
     def group_sum_xlsx(self, group: str) -> Path:
         """C_sum/{组名}/{组名}_财务付款数据汇总.xlsx"""
         name = (group or "").strip() or "未分组"
         return self.group_sum_dir(name) / f"{name}_财务付款数据汇总.xlsx"
-
-    def group_sum_xlsx_z(self, group: str) -> Path:
-        """Z_report/{组名}/{组名}_财务付款数据汇总.xlsx"""
-        name = (group or "").strip() or "未分组"
-        return self.group_sum_dir_z(name) / f"{name}_财务付款数据汇总.xlsx"
 
     def group_cashflow_html(self, group: str) -> Path:
         name = (group or "").strip() or "未分组"
@@ -210,7 +192,6 @@ class Paths:
         self.classified_dir.mkdir(parents=True, exist_ok=True)
         self.std_dir.mkdir(parents=True, exist_ok=True)
         self.sum_dir.mkdir(parents=True, exist_ok=True)
-        self.sum_dir_z.mkdir(parents=True, exist_ok=True)
         self.classify_data.mkdir(parents=True, exist_ok=True)
         self.class_master_xlsx.parent.mkdir(parents=True, exist_ok=True)
         self.class_master_xlsx_sum.parent.mkdir(parents=True, exist_ok=True)
