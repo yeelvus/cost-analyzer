@@ -254,6 +254,7 @@ def resolve_input_paths() -> Dict:
             [
                 (BASE_DIR / "10_机具费🚜/D_机具费_std_sum", "机具费汇总_*汇总.xlsx", False),
                 (BASE_DIR / "10_机具费🚜/D_机具费_std_sum", "*.xlsx", False),
+                (BASE_DIR / "Z_report/机具费分析", "机具租赁统计汇总_*.xlsx", False),
                 (BASE_DIR / "10_机具费🚜/F_机具费_report", "机具租赁统计汇总_*.xlsx", False),
                 (BASE_DIR / "10_机具费🚜/B_机具费_sum", "*租赁机具台账_汇总.xlsx", False),
                 (BASE_DIR / "10_机具费🚜/B_机具费_sum", "*机具台账*_汇总.xlsx", False),

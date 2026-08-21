@@ -33,7 +33,7 @@ DEFAULT_MATCHER_DIR = CODE_ROOT_DIR / "0_项目基本信息"
 CONFIG = {
 "base_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/A_成本统计_raw",
 "output_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_sum/项目统计数据汇总_全月份.xlsx",
-"profit_rate_chart_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_sum/项目毛利率变化图.html",
+"profit_rate_chart_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report/项目毛利率变化图.html",
 "project_matcher_dir": str(DEFAULT_MATCHER_DIR),
 "project_match_db_file": "",
 "project_info_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx",
@@ -1265,8 +1265,7 @@ def process_all_projects():
 
         chart_output = CONFIG.get("profit_rate_chart_file")
         if not chart_output:
-            output_file = Path(CONFIG["output_file"])
-            chart_output = str(output_file.with_name(f"{output_file.stem}_毛利率变化图.html"))
+            chart_output = str(Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report") / "项目毛利率变化图.html")
         generate_profit_rate_chart(chart_source_df, chart_output)
         save_db_fn(matcher['db_path'], match_db)
         print(f"✓ 匹配库已保存: {matcher['db_path']}")

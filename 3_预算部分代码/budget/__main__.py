@@ -37,7 +37,7 @@ def cmd_glodon(args):
 
 
 def cmd_dashboard(args):
-    from budget.config import DASHBOARD_HTML_NAME, GLODON_STD_DIR
+    from budget.config import DASHBOARD_HTML_PATH, GLODON_STD_DIR
     from budget.dashboard import (
         build_html,
         build_payload,
@@ -59,7 +59,7 @@ def cmd_dashboard(args):
     print(f"使用总汇总: {summary_file}")
     payload = build_payload(summary_file)
     html = build_html(payload)
-    out_html = Path(getattr(args, "output", None) or (output_dir / DASHBOARD_HTML_NAME))
+    out_html = Path(args.output) if getattr(args, "output", None) else DASHBOARD_HTML_PATH
     out_html.parent.mkdir(parents=True, exist_ok=True)
     out_html.write_text(html, encoding="utf-8")
     print(f"看板已生成: {out_html}")

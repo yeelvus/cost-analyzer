@@ -52,7 +52,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-html",
-        default="/Users/wyattsun/Desktop/邯郸中材/01成本统计/1_成本报公司/项目月度进度汇总.html",
+        default="/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report/项目月度进度汇总.html",
         help="输出HTML路径",
     )
     return parser.parse_args()

@@ -24,7 +24,7 @@ from common.project import (
     save_db,
 )
 from common.excel import apply_common_excel_layout
-from settings import MATCH_DB_PATH as _SETTINGS_MATCH_DB_PATH
+from settings import MATCH_DB_PATH as _SETTINGS_MATCH_DB_PATH, REPORT_ROOT
 
 
 # ====================== 配置区 ======================
@@ -34,6 +34,7 @@ class Config:
 
     MAPPING_EXCEL_PATH = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
     MATCH_DB_PATH = str(_SETTINGS_MATCH_DB_PATH)
+    OUTPUT_Z_REPORT = str(REPORT_ROOT)
 
     OUTPUT_STD = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_2_飞签机票/B_飞签机票_std"
 
@@ -756,7 +757,7 @@ def main():
     print("\n🎉 机票台账处理完成！")
 
     # ========== 输出 HTML 分析报告 ==========
-    html_path = out_dir / "机票分析报告.html"
+    html_path = Path(Config.OUTPUT_Z_REPORT) / "机票分析报告.html"
     build_html_report(df, out_path=html_path)
     print(f"✅ HTML 报告已输出：{html_path}")
 

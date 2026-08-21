@@ -21,7 +21,7 @@ if str(CODE_ROOT) not in sys.path:
     sys.path.insert(0, str(CODE_ROOT))
 
 try:
-    from settings import DATA_ROOT, MATCH_DB_PATH  # type: ignore
+    from settings import DATA_ROOT, MATCH_DB_PATH, REPORT_ROOT  # type: ignore
 except Exception:
     DATA_ROOT = Path(
         os.environ.get(
@@ -30,6 +30,7 @@ except Exception:
         )
     )
     MATCH_DB_PATH = CODE_ROOT / "0_项目基本信息" / "project_name_match_db.json"
+    REPORT_ROOT = DATA_ROOT / "Z_report"
 
 # ---------- 广联达人材机路径 ----------
 BUDGET_ROOT = DATA_ROOT / "3_预算部分"
@@ -64,6 +65,7 @@ TOTAL_SUMMARY_PREFIX = "【总汇总】所有标段_"
 MATERIAL_SHEET_NAME = "材料汇总"
 UNIT_ANOMALY_SHEET = "单位异常明细"
 DASHBOARD_HTML_NAME = "总汇总项目看板.html"
+DASHBOARD_HTML_PATH = REPORT_ROOT / DASHBOARD_HTML_NAME
 
 # include_kw, exclude_kw, unit_codes（标准码；空=不限制单位）
 # 砂浆/碎石允许 m³ 与 t/kg（重量按容重折 m³，见 budget.units）

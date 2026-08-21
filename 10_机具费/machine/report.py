@@ -455,7 +455,7 @@ footer { margin-top:18px; font-size:12px; color:var(--muted); line-height:1.55; 
 
     parts.append(
         f"<footer>源文件：{excel_path}<br/>"
-        f"流水线：B_raw_sum → C_raw_split → D_std_sum → F_report · "
+        f"流水线：B_raw_sum → C_raw_split → D_std_sum → Z_report/机具费分析 · "
         f"Excel 统计见同目录 {xlsx_path.name}</footer>"
     )
     parts.append("</div></body></html>")

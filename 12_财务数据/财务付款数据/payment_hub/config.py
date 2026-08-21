@@ -9,6 +9,7 @@ from pathlib import Path
 CODE_DIR = Path(__file__).resolve().parent.parent  # 财务付款数据/
 DESKTOP_COST = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
 PAY_ROOT = DESKTOP_COST / "12-财务数据💰" / "A_财务付款数据"
+REPORT_ROOT = DESKTOP_COST / "Z_report"
 
 
 @dataclass
@@ -36,8 +37,8 @@ class Paths:
     )
 
     cashflow_html: Path = field(
-        default_factory=lambda: PAY_ROOT
-        / "C_财务付款_sum"
+        default_factory=lambda: REPORT_ROOT
+        / "财务付款"
         / "财务付款项目现金流量分析.html"
     )
     project_info_xlsx: Path = field(
@@ -179,7 +180,7 @@ class Paths:
         # 与汇总命名一致：文件夹名_原文件名
         stem = Path(self.cashflow_html).stem
         suffix = Path(self.cashflow_html).suffix
-        return self.group_sum_dir(name) / f"{name}_{stem}{suffix}"
+        return Path(self.cashflow_html).parent / f"{name}_{stem}{suffix}"
 
     def group_amount_mismatch_xlsx(self, group: str) -> Path:
         name = (group or "").strip() or "未分组"
@@ -192,6 +193,7 @@ class Paths:
         self.classified_dir.mkdir(parents=True, exist_ok=True)
         self.std_dir.mkdir(parents=True, exist_ok=True)
         self.sum_dir.mkdir(parents=True, exist_ok=True)
+        self.cashflow_html.parent.mkdir(parents=True, exist_ok=True)
         self.classify_data.mkdir(parents=True, exist_ok=True)
         self.class_master_xlsx.parent.mkdir(parents=True, exist_ok=True)
         self.class_master_xlsx_sum.parent.mkdir(parents=True, exist_ok=True)

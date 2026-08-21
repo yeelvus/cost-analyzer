@@ -327,7 +327,7 @@ def run_cashflow_for_group(
 def run_cashflow(paths: Paths) -> list[str]:
     """
     按 A_raw 一级文件夹对应 B_std/{组名} 分别生成现金流 HTML：
-      C_sum/{组名}/财务付款项目现金流量分析.html
+      Z_report/财务付款/{组名}_财务付款项目现金流量分析.html
     """
     groups = resolve_business_groups(paths.raw_dir, paths.std_dir)
     if not groups:

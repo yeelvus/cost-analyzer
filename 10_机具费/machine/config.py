@@ -7,7 +7,7 @@
   C_机具费_raw_split/        原始拆分：{编码}_{项目}_机具费.xlsx
   D_机具费_std_sum/          标准汇总：机具费汇总_全量标准化_汇总.xlsx
   E_机具费_std_split/        标准拆分：标准汇总按项目拆分
-  F_机具费_report/           分析报告 HTML / Excel
+分析报告 HTML / Excel 输出到 Z_report/机具费分析/
 """
 from __future__ import annotations
 
@@ -25,10 +25,11 @@ for p in (str(MACHINE_CODE_DIR), str(CODE_ROOT)):
         sys.path.insert(0, p)
 
 try:
-    from settings import DATA_ROOT, MATCH_DB_PATH  # type: ignore
+    from settings import DATA_ROOT, MATCH_DB_PATH, REPORT_ROOT  # type: ignore
 except Exception:
     DATA_ROOT = Path(os.environ.get("COST_DATA_ROOT", str(Path.home() / "Desktop/邯郸中材/01成本统计")))
     MATCH_DB_PATH = CODE_ROOT / "0_项目基本信息" / "project_name_match_db.json"
+    REPORT_ROOT = DATA_ROOT / "Z_report"
 
 
 def first_existing(*candidates: Path) -> Path:
@@ -46,7 +47,8 @@ RAW_SUM_DIR = MACHINE_ROOT / "B_机具费_raw_sum"         # B 过程合并
 RAW_SPLIT_DIR = MACHINE_ROOT / "C_机具费_raw_split"     # C 原始拆分
 STD_SUM_DIR = MACHINE_ROOT / "D_机具费_std_sum"         # D 标准汇总
 STD_SPLIT_DIR = MACHINE_ROOT / "E_机具费_std_split"     # E 标准拆分
-REPORT_DIR = MACHINE_ROOT / "F_机具费_report"           # F 分析报告
+REPORT_DIR = REPORT_ROOT / "机具费分析"                 # 分析报告 HTML / Excel（Z_report）
+LEGACY_REPORT_DIR = MACHINE_ROOT / "F_机具费_report"    # 旧分析报告目录
 
 # 兼容旧路径（回退查找 / 迁移源）
 LEGACY_PATHS = {
@@ -66,6 +68,7 @@ LEGACY_PATHS = {
         MACHINE_ROOT / "标准拆分",
     ],
     "REPORT": [
+        MACHINE_ROOT / "F_机具费_report",
         MACHINE_ROOT / "C_机具租赁分析报告",
     ],
 }
@@ -79,7 +82,7 @@ SUM_DIR = STD_SUM_DIR
 
 
 def ensure_data_dirs() -> None:
-    """创建 A→F 流水线目录。"""
+    """创建 A→E 流水线目录，以及 Z_report 分析报告目录。"""
     for d in (RAW_DIR, RAW_SUM_DIR, RAW_SPLIT_DIR, STD_SUM_DIR, STD_SPLIT_DIR, REPORT_DIR):
         d.mkdir(parents=True, exist_ok=True)
 

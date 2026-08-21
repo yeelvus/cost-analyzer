@@ -6,7 +6,7 @@ python -m machine [command]
   summarize      C_raw_split → D_std_sum + E_std_split
   split-ledger   仅：B_raw_sum 合并 → C_raw_split
   split-sum      仅：D_std_sum → E_std_split
-  report         D_std_sum → F_report
+  report         D_std_sum → Z_report/机具费分析
   all            全流程
   paths          打印路径
 """
@@ -91,7 +91,8 @@ def cmd_paths(args):
         ("C RAW_SPLIT_DIR", c.RAW_SPLIT_DIR),
         ("D STD_SUM_DIR", c.STD_SUM_DIR),
         ("E STD_SPLIT_DIR", c.STD_SPLIT_DIR),
-        ("F REPORT_DIR", c.REPORT_DIR),
+        ("REPORT_DIR (Z_report/机具费分析)", c.REPORT_DIR),
+        ("LEGACY F_机具费_report", c.LEGACY_REPORT_DIR),
         ("RAW_MERGE_NAME", c.RAW_MERGE_NAME),
         ("FULL_SUMMARY_FILENAME", c.FULL_SUMMARY_FILENAME),
         ("RUN_MODE", c.RUN_MODE),
@@ -126,7 +127,7 @@ def build_parser():
     s.add_argument("--output-dir", default=None)
     s.set_defaults(func=cmd_split_ledger)
 
-    s = sub.add_parser("report", help="D_std_sum → F_report")
+    s = sub.add_parser("report", help="D_std_sum → Z_report/机具费分析")
     s.add_argument("--file", default=None)
     s.add_argument("--output-dir", default=None)
     s.set_defaults(func=cmd_report)
