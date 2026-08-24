@@ -4,17 +4,20 @@
 
 目录结构：合同类型 / 项目状态 / 项目文件夹
 
-默认仅预览，不移动任何文件。执行移动必须明确加 --apply，并再次确认。
-目标目录已经存在时始终跳过，绝不覆盖、合并或删除文件。
+默认仅预览，不移动任何文件。执行必须明确加 --apply，并再次确认。
+
+移动是 os.rename / shutil.move，成功后若源目录仍在（iCloud 复制残留），会删除源目录。
+目标已存在时不再整夹跳过：
+  - 源为空 → 删除旧文件夹
+  - 目标为空 → 删空目标后再移动
+  - 两边都有文件 → 把源里目标没有的文件拷入目标（不覆盖），再删除旧文件夹
 """
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import shutil
-from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -27,6 +30,7 @@ CODE_COLUMN = "项目编码"
 STATUS_COLUMN = "项目状态"
 CONTRACT_TYPE_KEYWORDS = ("总包合同", "分包合同", "总包签证", "分包签证")
 LOG_FOLDER = "日志"
+IGNORE_NAMES = {".DS_Store", "Thumbs.db", ".localized"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -90,6 +94,67 @@ def project_code(folder_name: str) -> str:
     return folder_name.split("_", 1)[0].strip()
 
 
+def iter_real_files(folder: Path):
+    for path in folder.rglob("*"):
+        if path.is_file() and path.name not in IGNORE_NAMES:
+            yield path
+
+
+def is_effectively_empty(folder: Path) -> bool:
+    if not folder.is_dir():
+        return True
+    return next(iter_real_files(folder), None) is None
+
+
+def remove_tree(path: Path) -> None:
+    if path.is_dir():
+        shutil.rmtree(path)
+    elif path.exists():
+        path.unlink()
+
+
+def robust_move(source: Path, target: Path) -> None:
+    """移动目录；若底层变成复制（iCloud / 跨卷），结束后删掉源目录。"""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        raise FileExistsError("目标项目文件夹已存在")
+    shutil.move(str(source), str(target))
+    if source.exists():
+        remove_tree(source)
+
+
+def merge_missing_files(source: Path, target: Path) -> dict:
+    """把源中目标没有的文件拷入目标，不覆盖已有文件。"""
+    copied = 0
+    skipped_existing = 0
+    conflicts = []
+    for src_file in iter_real_files(source):
+        rel = src_file.relative_to(source)
+        dest_file = target / rel
+        if dest_file.exists():
+            skipped_existing += 1
+            if dest_file.stat().st_size != src_file.stat().st_size:
+                conflicts.append({"rel": str(rel), "source": str(src_file), "target": str(dest_file)})
+            continue
+        dest_file.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src_file, dest_file)
+        copied += 1
+    return {"copied": copied, "skipped_existing": skipped_existing, "conflicts": conflicts}
+
+
+def classify_action(source: Path, target: Path) -> str:
+    source_empty = is_effectively_empty(source)
+    target_exists = target.exists()
+    target_empty = is_effectively_empty(target) if target_exists else True
+    if not target_exists:
+        return "move"
+    if source_empty:
+        return "delete_empty_source"
+    if target_empty:
+        return "replace_empty_target"
+    return "merge_then_delete_source"
+
+
 def build_plan(root: Path, status_map: dict[str, str]) -> tuple[list[dict], list[dict]]:
     moves: list[dict] = []
     skipped: list[dict] = []
@@ -112,12 +177,7 @@ def build_plan(root: Path, status_map: dict[str, str]) -> tuple[list[dict], list
                 if current_status_dir.name == desired_status:
                     continue
                 target = contract_dir / desired_status / project_dir.name
-                if target.exists():
-                    skipped.append({
-                        "reason": "目标项目文件夹已存在（不合并）",
-                        "source": str(project_dir), "target": str(target), "code": code,
-                    })
-                    continue
+                action = classify_action(project_dir, target)
                 moves.append({
                     "code": code,
                     "contract_type_dir": contract_dir.name,
@@ -125,16 +185,30 @@ def build_plan(root: Path, status_map: dict[str, str]) -> tuple[list[dict], list
                     "to_status": desired_status,
                     "source": str(project_dir),
                     "target": str(target),
+                    "action": action,
                 })
     return moves, skipped
 
 
+ACTION_LABELS = {
+    "move": "移动（完成后删除源文件夹）",
+    "delete_empty_source": "旧文件夹为空，删除",
+    "replace_empty_target": "目标为空：先删空目标再移动，并删除源",
+    "merge_then_delete_source": "合并到已有目标（不覆盖同名文件），再删除旧文件夹",
+}
+
+
 def print_preview(moves: list[dict], skipped: list[dict]) -> None:
     print("\n" + "=" * 88)
-    print(f"待移动项目文件夹：{len(moves)} 个；跳过/待处理：{len(skipped)} 个")
+    print(f"待处理项目文件夹：{len(moves)} 个；跳过/待处理：{len(skipped)} 个")
+    counts: dict[str, int] = {}
+    for item in moves:
+        counts[item["action"]] = counts.get(item["action"], 0) + 1
+    if counts:
+        print("其中：" + "；".join(f"{ACTION_LABELS[key]} {counts[key]} 个" for key in ACTION_LABELS if key in counts))
     print("=" * 88)
     for index, item in enumerate(moves, start=1):
-        print(f"{index:>3}. [{item['contract_type_dir']}] {item['code']}")
+        print(f"{index:>3}. [{item['contract_type_dir']}] {item['code']}  ·  {ACTION_LABELS[item['action']]}")
         print(f"     {item['from_status']}  →  {item['to_status']}")
         print(f"     {item['source']}")
         print(f"     → {item['target']}")
@@ -150,18 +224,43 @@ def execute_plan(moves: list[dict]) -> tuple[list[dict], list[dict]]:
     for item in moves:
         source = Path(item["source"])
         target = Path(item["target"])
+        action = item["action"]
         try:
             if not source.is_dir():
                 raise FileNotFoundError("源项目文件夹已不存在")
-            if target.exists():
-                raise FileExistsError("目标项目文件夹已存在")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(source), str(target))
-            moved.append(item)
-            print(f"✅ 已移动：{item['code']} · {item['from_status']} → {item['to_status']}")
+            extra = {}
+            if action == "move":
+                robust_move(source, target)
+            elif action == "delete_empty_source":
+                if not is_effectively_empty(source):
+                    raise RuntimeError("源文件夹已不再为空，已中止删除")
+                remove_tree(source)
+            elif action == "replace_empty_target":
+                if target.exists() and not is_effectively_empty(target):
+                    raise RuntimeError("目标已有文件，已中止覆盖")
+                if target.exists():
+                    remove_tree(target)
+                robust_move(source, target)
+            elif action == "merge_then_delete_source":
+                if not target.exists():
+                    robust_move(source, target)
+                else:
+                    extra = merge_missing_files(source, target)
+                    remove_tree(source)
+            else:
+                raise RuntimeError(f"未知动作：{action}")
+            if source.exists():
+                raise RuntimeError(f"源文件夹仍在，未完成去重：{source}")
+            record = {**item, **extra}
+            moved.append(record)
+            print(f"✅ {ACTION_LABELS[action]}：{item['code']} · {item['from_status']} → {item['to_status']}")
+            if extra.get("copied"):
+                print(f"     补入目标 {extra['copied']} 个文件；已有同名 {extra.get('skipped_existing', 0)} 个")
+            if extra.get("conflicts"):
+                print(f"     ⚠️ {len(extra['conflicts'])} 个同名文件大小不同，已保留目标中的版本")
         except Exception as exc:
             failed.append({**item, "error": str(exc)})
-            print(f"❌ 移动失败：{item['source']}（{exc}）")
+            print(f"❌ 失败：{item['source']}（{exc}）")
     return moved, failed
 
 
@@ -204,17 +303,17 @@ def main() -> None:
 
     if not args.apply:
         log = None if args.no_log else save_log(root, excel_path=excel_path, moves=moves, skipped=skipped, moved=[], failed=[], dry_run=True, duplicates=duplicates)
-        print(f"\n🧪 当前为预览模式，未移动任何文件夹。" + (f"日志：{log}" if log else ""))
+        print(f"\n🧪 当前为预览模式，未移动或删除任何文件夹。" + (f"日志：{log}" if log else ""))
         print("如确认无误，请执行：python 本脚本.py --apply")
         return
     if not args.yes:
-        answer = input("\n确认执行以上移动？目标存在的项目将跳过，不会合并。(y/n): ").strip().lower()
+        answer = input("\n确认执行以上操作？旧状态目录在移动/合并后会被删除。(y/n): ").strip().lower()
         if answer not in {"y", "yes", "是"}:
             print("已取消，未移动任何文件夹。")
             return
     moved, failed = execute_plan(moves)
     log = None if args.no_log else save_log(root, excel_path=excel_path, moves=moves, skipped=skipped, moved=moved, failed=failed, dry_run=False, duplicates=duplicates)
-    print(f"\n完成：成功移动 {len(moved)} 个，失败 {len(failed)} 个，跳过 {len(skipped)} 个。")
+    print(f"\n完成：成功 {len(moved)} 个，失败 {len(failed)} 个，跳过 {len(skipped)} 个。")
     if log:
         print(f"日志：{log}")
 
