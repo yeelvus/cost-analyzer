@@ -195,7 +195,7 @@
     },
     "泰跃项目": {
       "project_code": "THCC-2025-008",
-      "target_status": "D_已完工",
+      "target_status": "F_业主结算完成",
       "aliases": [
         "旭创项目",
         "泰跃旭创",
@@ -206,14 +206,14 @@
     },
     "华谊项目": {
       "project_code": "THCC-2023-001",
-      "target_status": "D_已完工",
+      "target_status": "F_业主结算完成",
       "aliases": [
         "华谊"
       ]
     },
     "建滔板材": {
       "project_code": "THCC-2022-002",
-      "target_status": "D_已完工",
+      "target_status": "F_业主结算完成",
       "aliases": [
         "泰国建滔板材（安装）",
         "建滔板材项目",
@@ -227,7 +227,7 @@
     },
     "阳光城项目": {
       "project_code": "THCC-2023-006",
-      "target_status": "D_已完工",
+      "target_status": "F_业主结算完成",
       "aliases": [
         "阳光项目",
         "阳光物流",
@@ -297,7 +297,7 @@
     },
     "北新建材大城府": {
       "project_code": "THCC-2024-002",
-      "target_status": "D_2_正在结算",
+      "target_status": "F_业主结算完成",
       "aliases": [
         "泰国北新项目（土建+安装）",
         "北新",
@@ -404,7 +404,7 @@
     },
     "海螺型材": {
       "project_code": "THCC-2019-001",
-      "target_status": "D_已完工",
+      "target_status": "F_业主结算完成",
       "aliases": [
         "海螺",
         "型材"
@@ -423,16 +423,18 @@
       ]
     },
     "中石科技": {
-      "project_code": "THCC-2021-002",
-      "target_status": "D_已完工",
+      "project_code": "THCC-2023-007",
+      "target_status": "需手动核对",
       "aliases": [
         "中石伟业科技改造项目",
-        "泰国中石伟业科技改造项目（土建+安装）",
         "泰国中石伟业科技改造项目（土建+安装）",
         "中石伟业",
         "中石项目",
         "中石",
-        "中石二期项目"
+        "中石二期项目",
+        "中石科技(泰国)无尘车间工程",
+        "中石科技泰国工厂厂房工程",
+        "THCC-2023-007"
       ]
     },
     "振威特（装修）": {
@@ -494,11 +496,6 @@
         "东威",
         "东威项目"
       ]
-    },
-    "中石泰国工厂": {
-      "project_code": "THCC-2025-004",
-      "target_status": "需手动核对",
-      "aliases": []
     },
     "天顿科技": {
       "project_code": "THCC-2026-004",
@@ -565,6 +562,11 @@
         "广合",
         "广合项目"
       ]
+    },
+    "中石泰国工厂": {
+      "project_code": "THCC-2025-004",
+      "target_status": "需手动核对",
+      "aliases": []
     }
   },
   "unmatched_aliases": [

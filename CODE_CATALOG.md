@@ -32,6 +32,7 @@ common / settings  公共路径与修正工具
 | `10_机具费/` | 领域 ETL | 机具台账合并、使用汇总、按项目拆分、HTML |
 | `11_人工费/` | 领域 ETL | 人工费/机票汇总 |
 | `12_财务数据/` | 领域 ETL | 财务付款、分包付款台账 |
+| `13_结算整理/` | 领域 ETL | 业主结算额空 JSON + 汇总 Excel（汇率折泰铢） |
 | `S_数据分析模块/` | **分析** | 全过程/综合看板、成本分析、配置驱动报告 |
 | `common/` | 公共库 | paths、corrections、excel、project |
 | `templates/` | 资源 | 看板 HTML 模板与 chart.js |
