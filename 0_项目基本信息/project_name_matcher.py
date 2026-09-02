@@ -10,6 +10,11 @@
     name, code = m.resolve("永强")          # → ("永强车业项目", "THCC-2025-005")
     m.save()
 
+【图形界面】
+    python project_name_matcher.py
+    python project_name_matcher.py gui
+    python project_name_matcher.py excel 台账.xlsx --process-summary
+
 【批量 + 弹窗补录】
     mapped = m.match_batch(names, prompt=True)
 
@@ -117,6 +122,25 @@ def _clean_field(value, default: str = "") -> str:
     if not s or s.lower() in {"nan", "none", "nat"}:
         return default
     return s
+
+
+# 摘要前缀清理：去掉与项目名称相同的开头，以及随后的连接符
+_SUMMARY_DASH_PREFIX_RE = re.compile(r"^[\s\-－—–﹣−]+")
+
+
+def strip_project_prefix_from_summary(project_name, summary):
+    """
+    若摘要以项目名称开头，则删去该前缀；删完后若以「-」等连接符开头，一并去掉。
+
+    摘要本身不含此前缀时原样返回。summary 为 None 时返回 None。
+    """
+    if summary is None:
+        return None
+    text = str(summary)
+    name = "" if project_name is None else str(project_name).strip()
+    if name and len(text) >= len(name) and text[: len(name)].casefold() == name.casefold():
+        text = _SUMMARY_DASH_PREFIX_RE.sub("", text[len(name) :])
+    return text
 
 
 def _invalidate_db_caches(db=None) -> None:
@@ -457,7 +481,8 @@ def match_project(
 
     匹配顺序：
     1. 精确 / 规范化别名（已确认映射始终优先）
-    2. 若已在 unmatched_aliases 中标记过 → 直接保留原名，**不再模糊匹配、不再弹窗**
+    2. 若已在 unmatched_aliases 中标记过 → 直接保留原名，不再模糊匹配
+       （自动批处理不再弹窗；手动运行 prompt=True 时仍会弹出补录对话框）
     3. 模糊匹配（仅对从未标记过的新名称）
     """
     if raw_name is None:
@@ -500,7 +525,11 @@ def match_project(
 
 
 def collect_names_needing_prompt(
-    raw_names, db, *, fuzzy: bool = True
+    raw_names,
+    db,
+    *,
+    fuzzy: bool = True,
+    include_marked_unmatched: bool = False,
 ) -> list[str]:
     need = []
     seen = set()
@@ -512,7 +541,14 @@ def collect_names_needing_prompt(
         if key in seen:
             continue
         seen.add(key)
-        if match_project(name, db, fuzzy=fuzzy, skip_marked_unmatched=True):
+        hit = match_project(name, db, fuzzy=fuzzy, skip_marked_unmatched=True)
+        if hit and hit.get("source") not in {"unmatched_keep", "unmatched"}:
+            continue
+        if (
+            hit
+            and hit.get("source") == "unmatched_keep"
+            and not include_marked_unmatched
+        ):
             continue
         need.append(name)
     return sorted(need)
@@ -525,10 +561,16 @@ def prompt_unmatched_project_mappings(
     db_path=None,
     *,
     interactive: bool = True,
+    parent=None,
 ):
-    """弹窗补录未匹配项目。interactive=False 时全部 mark_unmatched。"""
+    """弹窗补录未匹配项目。interactive=False 时全部 mark_unmatched。
+
+    parent 传入已有 Tk 根窗口时复用，避免图形界面里再创建一个 Tk。
+    """
     unmatched_names = [str(n).strip() for n in unmatched_names if str(n).strip()]
-    unmatched_names = collect_names_needing_prompt(unmatched_names, db, fuzzy=True)
+    unmatched_names = collect_names_needing_prompt(
+        unmatched_names, db, fuzzy=True, include_marked_unmatched=True
+    )
     if not unmatched_names:
         return {}
 
@@ -553,18 +595,29 @@ def prompt_unmatched_project_mappings(
         if hit:
             suggestions[raw] = hit["project_name"]
 
-    root = tk.Tk()
-    root.withdraw()
+    created_root = False
+    root = parent if parent is not None else getattr(tk, "_default_root", None)
+    if root is None:
+        root = tk.Tk()
+        root.withdraw()
+        created_root = True
+
     win = tk.Toplevel(root)
     win.title(f"{window_title}（{len(unmatched_names)}项）")
     win.geometry("980x660")
+    if not created_root:
+        win.transient(root)
     win.lift()
     win.attributes("-topmost", True)
     win.after_idle(win.attributes, "-topmost", False)
+    try:
+        win.grab_set()
+    except tk.TclError:
+        pass
 
     tip = (
-        "以下为新出现的未匹配项目。下拉可改；建议已预填。"
-        "选「保持原名称」后下次不再弹窗。"
+        "以下为未匹配项目（含此前保留原名称的项）。下拉可改；建议已预填。"
+        "选「保持原名称」后，自动批处理会跳过；手动运行仍会弹出。"
     )
     tk.Label(
         win, text=tip, font=("Arial", 11, "bold"), pady=8, wraplength=900, justify="left"
@@ -624,7 +677,8 @@ def prompt_unmatched_project_mappings(
     )
     win.protocol("WM_DELETE_WINDOW", on_skip_all)
     root.wait_window(win)
-    root.destroy()
+    if created_root:
+        root.destroy()
 
     selected_map = {}
     for raw_name, var in var_map.items():
@@ -805,9 +859,11 @@ class ProjectMatcher:
         interactive: bool = True,
         window_title: str = "手动项目匹配",
         fuzzy: bool = True,
+        parent=None,
     ) -> Dict[str, dict]:
         """
-        批量匹配。prompt=True 时对未命中弹窗补录后再匹配一次。
+        批量匹配。prompt=True 时对未命中弹窗补录后再匹配一次
+        （含此前「保持原名称」记入 unmatched_aliases 的项）。
         返回 {原始名: hit_dict}。
 
         注意：去空白/大小写后相同的名称（如「KB项目」「kb项目」「KB 项目」）
@@ -842,27 +898,32 @@ class ProjectMatcher:
         skipped_keep = 0
         for n in representatives:
             hit = self.match(n, fuzzy=fuzzy)
-            if hit:
+            if hit and hit.get("source") != "unmatched_keep":
                 _broadcast(n, hit)
-                if hit.get("source") == "unmatched_keep":
+            elif hit and hit.get("source") == "unmatched_keep":
+                # 手动弹窗：已保留原名的项也要再确认；自动批处理才跳过
+                if prompt:
+                    pending.append(n)
+                else:
+                    _broadcast(n, hit)
                     skipped_keep += 1
             else:
-                # 仅「从未匹配成功、也从未标记未匹配」的新名称才进入弹窗
                 pending.append(n)
 
         if skipped_keep:
             print(
-                f"  跳过已标记未匹配（不再弹窗/模糊匹配）: {skipped_keep} 个"
+                f"  跳过已标记未匹配（未弹窗）: {skipped_keep} 个"
             )
 
         if pending and prompt:
-            print(f"  新未匹配项目需确认: {len(pending)} 个")
+            print(f"  未匹配项目需确认: {len(pending)} 个")
             prompt_unmatched_project_mappings(
                 pending,
                 self.db,
                 window_title=window_title,
                 db_path=str(self.db_path),
                 interactive=interactive,
+                parent=parent,
             )
             for n in pending:
                 # 弹窗后：有别名则用别名；已点跳过/关闭的标记未匹配
@@ -911,6 +972,7 @@ class ProjectMatcher:
         prompt: bool = False,
         interactive: bool = True,
         window_title: str = "项目匹配",
+        parent=None,
     ) -> pd.DataFrame:
         """
         给 DataFrame 写入标准化项目名称与编码。
@@ -925,6 +987,7 @@ class ProjectMatcher:
             prompt=prompt,
             interactive=interactive,
             window_title=window_title,
+            parent=parent,
         )
         codes = series.map(lambda x: mapped.get(x, {}).get("project_code", "") if x else "")
         names = series.map(
@@ -934,6 +997,11 @@ class ProjectMatcher:
         target_name = name_col if name_col is not None else col
         out[target_name] = names
         return out
+
+    def fill_excel(self, excel_path: PathLike, **kwargs) -> dict:
+        """按列填写 Excel 标准名称/编码（只改指定单元格，保留原格式）。"""
+        kwargs.setdefault("matcher", self)
+        return fill_excel_project_columns(excel_path, **kwargs)
 
     # --- 维护 ---
     def add_alias(self, raw_name: str, standard_name: str) -> None:
@@ -1007,6 +1075,298 @@ def clear_matcher_cache() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Excel 填写（保留原格式）
+# ---------------------------------------------------------------------------
+def peek_excel_sheets_and_headers(
+    excel_path: PathLike, header_row: int = 1
+) -> Tuple[List[str], Dict[str, List[str]]]:
+    """只读扫描工作表名与表头，供图形界面下拉框使用。"""
+    from openpyxl import load_workbook
+
+    path = Path(excel_path)
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        sheets = list(wb.sheetnames)
+        headers: Dict[str, List[str]] = {}
+        for name in sheets:
+            ws = wb[name]
+            row_vals: List[str] = []
+            for i, row in enumerate(
+                ws.iter_rows(min_row=1, max_row=header_row, values_only=True), 1
+            ):
+                if i != header_row:
+                    continue
+                row_vals = [str(c).strip() if c is not None else "" for c in row]
+            while row_vals and not row_vals[-1]:
+                row_vals.pop()
+            headers[name] = row_vals
+        return sheets, headers
+    finally:
+        wb.close()
+
+
+def _read_header_map(ws, header_row: int = 1) -> Dict[str, int]:
+    mapping: Dict[str, int] = {}
+    last = ws.max_column or 1
+    for col in range(1, last + 1):
+        value = ws.cell(header_row, col).value
+        if value is None:
+            continue
+        key = str(value).strip()
+        if key and key not in mapping:
+            mapping[key] = col
+    return mapping
+
+
+def _resolve_header_col(header_map: Dict[str, int], name: str, *fallbacks: str) -> Optional[int]:
+    if not name:
+        return None
+    candidates = (name,) + fallbacks
+    for cand in candidates:
+        if cand in header_map:
+            return header_map[cand]
+        want = _normalize_key(cand)
+        for key, idx in header_map.items():
+            if _normalize_key(key) == want:
+                return idx
+    return None
+
+
+def _last_header_col(ws, header_row: int = 1) -> int:
+    last = 1
+    for col in range(1, (ws.max_column or 1) + 1):
+        value = ws.cell(header_row, col).value
+        if value is not None and str(value).strip():
+            last = col
+    return last
+
+
+def _ensure_header_column(ws, header_row: int, col_name: str, header_map: Dict[str, int]) -> int:
+    existing = _resolve_header_col(header_map, col_name)
+    if existing:
+        return existing
+    new_idx = _last_header_col(ws, header_row) + 1
+    cell = ws.cell(header_row, new_idx, col_name)
+    src = ws.cell(header_row, new_idx - 1)
+    try:
+        if src.has_style:
+            cell.font = src.font.copy()
+            cell.fill = src.fill.copy()
+            cell.alignment = src.alignment.copy()
+            cell.border = src.border.copy()
+    except Exception:
+        pass
+    header_map[col_name] = new_idx
+    return new_idx
+
+
+def _cell_is_empty(value) -> bool:
+    if value is None:
+        return True
+    s = str(value).strip()
+    return (not s) or s.lower() in {"nan", "none", "nat"}
+
+
+def _is_unmatched_hit(hit: Optional[dict]) -> bool:
+    if not hit:
+        return True
+    if hit.get("source") in {"unmatched", "unmatched_keep"}:
+        return True
+    return False
+
+
+def fill_excel_project_columns(
+    excel_path: PathLike,
+    *,
+    sheet_name: Optional[str] = None,
+    match_col: str = "项目名称",
+    name_out_col: str = "项目标准名称",
+    code_out_col: str = "项目编码",
+    summary_col: Optional[str] = None,
+    summary_out_col: Optional[str] = None,
+    process_summary: bool = False,
+    header_row: int = 1,
+    matcher: Optional[ProjectMatcher] = None,
+    prompt: bool = False,
+    interactive: bool = True,
+    parent=None,
+    only_empty: bool = False,
+    output_path: PathLike | None = None,
+    create_missing_columns: bool = True,
+    log=None,
+) -> dict:
+    """
+    读取 Excel，按「待匹配列」匹配标准项目名称与编码，写回指定列。
+
+    只修改目标列的单元格值，不改列宽、样式、冻结、筛选、其它列内容。
+    process_summary=True 时，按待匹配列的项目名称清理摘要前缀，写入摘要输出列。
+    """
+    from openpyxl import load_workbook
+
+    def _log(msg: str) -> None:
+        print(msg)
+        if log:
+            log(msg)
+
+    path = Path(excel_path).expanduser()
+    if not path.is_file():
+        raise FileNotFoundError(f"Excel 文件不存在: {path}")
+
+    out_path = Path(output_path).expanduser() if output_path else path
+    m = matcher or load_matcher()
+
+    _log(f"打开: {path}")
+    wb = load_workbook(path)
+    if sheet_name:
+        if sheet_name not in wb.sheetnames:
+            wb.close()
+            raise KeyError(f"工作表不存在: {sheet_name}；现有: {wb.sheetnames}")
+        ws = wb[sheet_name]
+    else:
+        ws = wb.active
+
+    header_map = _read_header_map(ws, header_row)
+    match_idx = _resolve_header_col(header_map, match_col, "项目名称", "工程名称")
+    if not match_idx:
+        wb.close()
+        raise KeyError(f"找不到待匹配列 {match_col!r}，当前表头: {list(header_map)}")
+
+    def _out_col(wanted: str, *fallback: str) -> int:
+        idx = _resolve_header_col(header_map, wanted, *fallback)
+        if idx:
+            return idx
+        if not create_missing_columns:
+            raise KeyError(f"找不到输出列 {wanted!r}，当前表头: {list(header_map)}")
+        _log(f"  新增列: {wanted}")
+        return _ensure_header_column(ws, header_row, wanted, header_map)
+
+    name_idx = _out_col(name_out_col, "项目标准名称", "标准项目名称")
+    code_idx = _out_col(code_out_col, "项目编码", "工程编码")
+
+    summary_idx = None
+    summary_out_idx = None
+    if process_summary:
+        summary_name = summary_col or "摘要"
+        summary_out_name = summary_out_col or "摘要处理"
+        summary_idx = _resolve_header_col(header_map, summary_name, "摘要")
+        if not summary_idx:
+            wb.close()
+            raise KeyError(f"找不到摘要列 {summary_name!r}，当前表头: {list(header_map)}")
+        summary_out_idx = _out_col(summary_out_name, "摘要处理")
+
+    max_row = ws.max_row or header_row
+    raw_names: List[str] = []
+    for row_idx in range(header_row + 1, max_row + 1):
+        value = ws.cell(row_idx, match_idx).value
+        if _cell_is_empty(value):
+            continue
+        raw_names.append(str(value).strip())
+
+    _log(
+        f"工作表「{ws.title}」共 {max_row - header_row} 行，"
+        f"待匹配列「{ws.cell(header_row, match_idx).value}」非空 {len(raw_names)}，"
+        f"唯一名称 {len({_normalize_key(n) for n in raw_names})}"
+    )
+    mapped = m.match_batch(
+        raw_names,
+        prompt=prompt,
+        interactive=interactive,
+        window_title="Excel 项目匹配",
+        parent=parent,
+    )
+    if prompt:
+        m.save()
+
+    matched = unmatched = empty_name = 0
+    summary_stripped = summary_processed = 0
+    unmatched_names: List[str] = []
+    seen_unmatched: set[str] = set()
+
+    for row_idx in range(header_row + 1, max_row + 1):
+        raw_val = ws.cell(row_idx, match_idx).value
+        if _cell_is_empty(raw_val):
+            empty_name += 1
+            raw_s = ""
+            std_name = ""
+            code = ""
+            hit = None
+        else:
+            raw_s = str(raw_val).strip()
+            hit = mapped.get(raw_s)
+            if _is_unmatched_hit(hit):
+                unmatched += 1
+                std_name = raw_s
+                code = ""
+                key = _normalize_key(raw_s)
+                if key not in seen_unmatched:
+                    seen_unmatched.add(key)
+                    unmatched_names.append(raw_s)
+            else:
+                matched += 1
+                std_name = str(hit.get("project_name") or raw_s).strip()
+                code = str(hit.get("project_code") or "").strip()
+
+        name_cell = ws.cell(row_idx, name_idx)
+        code_cell = ws.cell(row_idx, code_idx)
+        if not (only_empty and not _cell_is_empty(name_cell.value)):
+            name_cell.value = std_name or None
+        if not (only_empty and not _cell_is_empty(code_cell.value)):
+            code_cell.value = code or None
+
+        if process_summary and summary_idx and summary_out_idx:
+            summary_val = ws.cell(row_idx, summary_idx).value
+            processed = strip_project_prefix_from_summary(raw_s, summary_val)
+            out_cell = ws.cell(row_idx, summary_out_idx)
+            if not (only_empty and not _cell_is_empty(out_cell.value)):
+                out_cell.value = processed
+                summary_processed += 1
+                orig = "" if summary_val is None else str(summary_val)
+                new = "" if processed is None else str(processed)
+                if new != orig:
+                    summary_stripped += 1
+
+    sheet_title = ws.title
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = out_path.with_name(f".~{out_path.stem}.tmp{out_path.suffix}")
+    try:
+        wb.save(tmp_path)
+        os.replace(tmp_path, out_path)
+    except Exception:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+        raise
+    finally:
+        wb.close()
+
+    stats = {
+        "excel_path": str(path),
+        "output_path": str(out_path),
+        "sheet": sheet_title,
+        "rows": max_row - header_row,
+        "matched": matched,
+        "unmatched": unmatched,
+        "empty_name": empty_name,
+        "summary_stripped": summary_stripped,
+        "summary_processed": summary_processed,
+        "unique_names": len({_normalize_key(n) for n in raw_names}),
+        "unmatched_names": unmatched_names,
+    }
+    _log(
+        f"已保存: {out_path}\n"
+        f"  匹配 {matched} 行，未匹配 {unmatched} 行"
+        + (f"，摘要去掉项目名前缀 {summary_stripped} 行" if process_summary else "")
+    )
+    if unmatched_names:
+        preview = "、".join(unmatched_names[:20])
+        extra = f" 等 {len(unmatched_names)} 个" if len(unmatched_names) > 20 else ""
+        _log(f"  未匹配名称: {preview}{extra}")
+    return stats
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 def _cli(argv: Optional[List[str]] = None) -> int:
@@ -1017,12 +1377,16 @@ def _cli(argv: Optional[List[str]] = None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
+  python project_name_matcher.py              # 打开图形界面
+  python project_name_matcher.py gui
   python project_name_matcher.py match 永强
+  python project_name_matcher.py excel 台账.xlsx --process-summary
   python project_name_matcher.py refresh
   python project_name_matcher.py stats
         """,
     )
     sub = p.add_subparsers(dest="cmd")
+    sub.add_parser("gui", help="打开图形界面（选 Excel / 列 / 填写）")
 
     c = sub.add_parser("match", help="匹配一个名称")
     c.add_argument("name")
@@ -1038,12 +1402,25 @@ def _cli(argv: Optional[List[str]] = None) -> int:
     c = sub.add_parser("demo", help="演示 resolve 几个名称")
     c.add_argument("names", nargs="*", default=["永强", "樱花", "不存在的项目XYZ"])
 
+    c = sub.add_parser("excel", help="填写 Excel 标准名称/编码（保留原格式）")
+    c.add_argument("path", help="Excel 路径")
+    c.add_argument("--sheet", default="")
+    c.add_argument("--match", default="项目名称", help="待匹配列")
+    c.add_argument("--name-out", default="项目标准名称", help="标准名称输出列")
+    c.add_argument("--code-out", default="项目编码", help="项目编码输出列")
+    c.add_argument("--summary", default="", help="摘要列（处理摘要时用）")
+    c.add_argument("--summary-out", default="", help="摘要处理输出列")
+    c.add_argument("--process-summary", action="store_true", help="清理摘要前的项目名称")
+    c.add_argument("--prompt", action="store_true", help="未匹配时弹窗补录")
+    c.add_argument("--only-empty", action="store_true", help="只填空白单元格")
+    c.add_argument("--out", default="", help="另存路径，默认覆盖原文件")
+    c.add_argument("--db", default="")
+
     args = p.parse_args(argv)
-    if not args.cmd:
-        p.print_help()
-        print(f"\n默认库: {DEFAULT_DB_PATH}")
-        print(f"主数据: {find_info_excel() or '（未找到）'}")
-        return 0
+    if not args.cmd or args.cmd == "gui":
+        from project_name_matcher_gui import main as gui_main
+
+        return gui_main()
 
     if args.cmd == "match":
         m = load_matcher(
@@ -1073,6 +1450,27 @@ def _cli(argv: Optional[List[str]] = None) -> int:
         for n in args.names:
             name, code = m.resolve(n)
             print(f"  {n!r:20} → {name} | {code}")
+        return 0
+
+    if args.cmd == "excel":
+        m = load_matcher(db_path=args.db or None)
+        process_summary = bool(args.process_summary or args.summary or args.summary_out)
+        fill_excel_project_columns(
+            args.path,
+            sheet_name=args.sheet or None,
+            match_col=args.match,
+            name_out_col=args.name_out,
+            code_out_col=args.code_out,
+            summary_col=args.summary or None,
+            summary_out_col=args.summary_out or None,
+            process_summary=process_summary,
+            matcher=m,
+            prompt=args.prompt,
+            only_empty=args.only_empty,
+            output_path=args.out or None,
+        )
+        if args.prompt:
+            m.save()
         return 0
 
     return 0

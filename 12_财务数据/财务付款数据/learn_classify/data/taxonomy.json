@@ -1,6 +1,6 @@
 {
   "version": "2.5.0+auto",
-  "description": "代付款→0_分包计入成本；现场临建用房/现场临时围墙/集装箱租赁→6_管理费；备用金与资金调拨仍不计入成本 | 角钢/预埋钢板→材料采购；空调安装→办公费 | 治安安保安全→治安管理费；新增医务费用 | auto_register 2026-08-10 11:56:20: 1 nodes | auto_register 2026-08-14 17:33:17: 1 nodes",
+  "description": "代付款→0_分包计入成本；现场临建用房/现场临时围墙/集装箱租赁→6_管理费；备用金与资金调拨仍不计入成本 | 角钢/预埋钢板→材料采购；空调安装→办公费 | 治安安保安全→治安管理费；新增医务费用 | auto_register 2026-08-10 11:56:20: 1 nodes | auto_register 2026-08-14 17:33:17: 1 nodes | ledger_book 2026-08-29 17:24:18: 9 nodes",
   "granularity": {
     "level": "business_category_l3",
     "note": "三级仍为大类拆分，非型号规格"
@@ -79,6 +79,20 @@
       "order": 80,
       "active": true,
       "notes": "押金、投标/履约保证金等（独立大类）"
+    },
+    {
+      "id": "L1_auto_工程款",
+      "name": "工程款",
+      "order": 81,
+      "active": true,
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L1_auto_其他收款",
+      "name": "其他收款",
+      "order": 82,
+      "active": true,
+      "notes": "auto from ledger_book"
     }
   ],
   "level2": [
@@ -165,6 +179,24 @@
       "active": true,
       "aliases": [],
       "notes": ""
+    },
+    {
+      "id": "L2_auto_业主付款",
+      "name": "业主付款",
+      "parent": "L1_auto_工程款",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L2_auto_废旧物资处理",
+      "name": "废旧物资处理",
+      "parent": "L1_auto_其他收款",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
     },
     {
       "id": "L2_eq_tower",
@@ -254,6 +286,24 @@
       "notes": ""
     },
     {
+      "id": "L2_auto_地勘收款",
+      "name": "地勘收款",
+      "parent": "L1_auto_其他收款",
+      "order": 2,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L2_auto_进度款",
+      "name": "进度款",
+      "parent": "L1_auto_工程款",
+      "order": 2,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
       "id": "L2_eq_excavator",
       "name": "挖机租赁",
       "parent": "L1_equip",
@@ -334,6 +384,15 @@
         "行政办公"
       ],
       "notes": "管理费下二级；其下有三级：网络/邮寄/办公物品/其他办公"
+    },
+    {
+      "id": "L2_auto_工程款",
+      "name": "工程款",
+      "parent": "L1_auto_工程款",
+      "order": 3,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
     },
     {
       "id": "L2_eq_crane",
@@ -1139,6 +1198,15 @@
       "notes": "施工/园区/工业用水；不含桶装饮用水"
     },
     {
+      "id": "L2_auto_押金（及费用）",
+      "name": "押金（及费用）",
+      "parent": "L1_deposit",
+      "order": 31,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
       "id": "L2_mgmt_elec_fee",
       "name": "电费",
       "parent": "L1_mgmt",
@@ -1166,6 +1234,15 @@
         "郝阳报销"
       ],
       "notes": ""
+    },
+    {
+      "id": "L2_auto_投标保证金（退回）",
+      "name": "投标保证金（退回）",
+      "parent": "L1_deposit",
+      "order": 32,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
     },
     {
       "id": "L2_mgmt_drink_water",

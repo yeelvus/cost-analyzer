@@ -33,7 +33,7 @@
   "关税物流费": "L2_log_customs",
   "招待费": "L2_mgmt_entertain",
   "安全费用": "L2_mgmt_safety",
-  "办公费": "L2_mgmt_office",
+  "办公费": "L3_office_net",
   "备用金": "L2_mgmt_petty",
   "场地清理费": "L2_mgmt_clean",
   "车辆使用费": "L2_mgmt_vehicle",
@@ -103,5 +103,18 @@
   "报关带关费": "L2_log_customs_agent",
   "交通费": "L2_mgmt_transit",
   "砖及砌块": "L2_mat_brick",
-  "外加剂": "L2_mat_admix"
+  "外加剂": "L2_mat_admix",
+  "业主付款": "L2_auto_业主付款",
+  "押金（及费用）": "L2_auto_押金（及费用）",
+  "进度款": "L2_auto_进度款",
+  "银行手续费": "L2_mgmt_bank_fee",
+  "出差补助": "L2_mgmt_travel_allow",
+  "车辆用油": "L2_mgmt_fuel_vehicle",
+  "代付款": "L2_exclude_agent_pay",
+  "地坪硬化": "L2_mat_floor",
+  "劳保用品": "L2_mgmt_ppe",
+  "投标保证金（退回）": "L2_auto_投标保证金（退回）",
+  "废旧物资处理": "L2_auto_废旧物资处理",
+  "地勘收款": "L2_auto_地勘收款",
+  "工程款": "L2_auto_工程款"
 }

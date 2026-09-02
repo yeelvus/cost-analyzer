@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Tuple
 
 from .config import Paths
@@ -25,12 +26,13 @@ MENU_MAIN: Sequence[MenuItem] = (
 MENU_LEARN: Sequence[MenuItem] = (
     ("1", "pool", "导出学习池 → D_财务付款_学习池", ["pool"]),
     ("2", "apply", "应用确认 → 写入记忆 + 抬升未确认 + 刷分类", ["apply"]),
-    ("3", "reclassify", "仅重刷 B_std / 后续可再 classify", ["reclassify"]),
-    ("4", "health", "分类健康度（命中层 / 待复核率）", ["health"]),
-    ("5", "export-class", "导出付款分类总表（旧路径）", ["export-class"]),
-    ("6", "apply-class", "应用分类总表学习（旧路径）", ["apply-class"]),
-    ("7", "review", "导出待复核池", ["review"]),
-    ("8", "compact-memory", "压缩 memory / corrections", ["compact-memory"]),
+    ("3", "learn-ledger", "账簿已填科目 → 写入记忆（不改账簿）", ["learn-ledger"]),
+    ("4", "reclassify", "仅重刷 B_std / 后续可再 classify", ["reclassify"]),
+    ("5", "health", "分类健康度（命中层 / 待复核率）", ["health"]),
+    ("6", "export-class", "导出付款分类总表（旧路径）", ["export-class"]),
+    ("7", "apply-class", "应用分类总表学习（旧路径）", ["apply-class"]),
+    ("8", "review", "导出待复核池", ["review"]),
+    ("9", "compact-memory", "压缩 memory / corrections", ["compact-memory"]),
     ("0", "back", "返回主菜单", None),
 )
 
@@ -72,6 +74,8 @@ _DIRECT = frozenset(
         "import-taxonomy",
         "dropdowns",
         "learn",
+        "learn-ledger",
+        "ledger-learn",
         "maint",
     }
 )
@@ -82,10 +86,11 @@ def print_quick_help() -> None:
         """
 财务付款一体化 · 日常命令
 ────────────────────────────────────────
-  python 财务付款一体化.py           # 交互式菜单（推荐）
-  python 财务付款一体化.py pool      # ① 导出学习池（确认学习）
-  python 财务付款一体化.py apply     # ② 应用确认并学习
-  python 财务付款一体化.py run       # ③ 月结全流程
+  python 财务付款一体化.py                # 交互式菜单（推荐）
+  python 财务付款一体化.py pool           # ① 导出学习池（确认学习）
+  python 财务付款一体化.py apply          # ② 应用确认并学习
+  python 财务付款一体化.py learn-ledger   # 账簿已填科目 → 写入记忆
+  python 财务付款一体化.py run            # ③ 月结全流程
 
 菜单结构:
   [1] 确认学习组  pool / apply / reclassify / health / 分类总表…
@@ -96,7 +101,8 @@ def print_quick_help() -> None:
   A_raw → A1_raw_std → A2_classified → C_sum / B_std
 
 确认学习:
-  1(pool) 导出 → Excel 改科目或点「确认」→ 2(apply) 写记忆
+  学习池: 1(pool) 导出 → Excel 改科目或点「确认」→ 2(apply) 写记忆
+  账簿:   改一/二/三级 → 3(learn-ledger) 写入记忆
 """.strip()
     )
 
@@ -122,6 +128,7 @@ def print_learn_help() -> None:
 ────────────────────────────────────────
   pool           从明细导出学习池（D_财务付款_学习池）
   apply          读确认结果 → memory + 泛化 + 重分类
+  learn-ledger   账簿已填一/二/三级 → 写入记忆（不改账簿）
   reclassify     仅按当前记忆/规则重刷 B_std
   health         看命中层与待复核率
   export-class   导出分类总表（旧）
@@ -129,7 +136,9 @@ def print_learn_help() -> None:
   review         导出待复核池
   compact-memory 压缩学习记忆文件
 
-推荐顺序: pool → 人工确认 Excel → apply
+推荐顺序:
+  学习池: pool → 人工确认 Excel → apply
+  账簿:   改科目后选 3(learn-ledger)
 """.strip()
     )
 
@@ -207,6 +216,26 @@ def _maybe_prompt_project(argv: List[str]) -> List[str]:
     return argv
 
 
+def _prompt_learn_ledger(argv: List[str]) -> List[str]:
+    """交互确认账簿路径；可选仅预览。"""
+    if not argv or argv[0] not in {"learn-ledger", "ledger-learn"}:
+        return argv
+    if "--ledger" in argv or not sys.stdin.isatty():
+        return argv
+    default = Paths().ledger_xlsx
+    exists = "存在" if default.is_file() else "不存在"
+    print()
+    print(f"  默认账簿: {default}")
+    print(f"  文件状态: {exists}")
+    ans = _read_choice("回车用默认，或粘贴账簿路径: ")
+    ledger = Path(ans.strip().strip('"').strip("'")).expanduser() if ans else default
+    extra = ["--ledger", str(ledger)]
+    dry = _read_choice("仅预览、不写入记忆？[y/N]: ")
+    if dry in {"y", "yes", "是", "1"}:
+        extra.append("--dry-run")
+    return argv + extra
+
+
 def interactive_learn_menu(dispatch: Callable[[Optional[list]], int]) -> int:
     """确认学习组子菜单。"""
     last = 0
@@ -217,6 +246,7 @@ def interactive_learn_menu(dispatch: Callable[[Optional[list]], int]) -> int:
         print("=" * 56)
         print()
         print("  推荐: 1(pool) → Excel 改科目/点确认 → 2(apply)")
+        print("        账簿改科目后 → 3(learn-ledger) 写入记忆")
         print()
         _print_items(MENU_LEARN)
         choice = _read_choice("确认学习，请选择: ")
@@ -228,10 +258,13 @@ def interactive_learn_menu(dispatch: Callable[[Optional[list]], int]) -> int:
             continue
 
         argv = None
-        for key, name, _d, a in MENU_LEARN:
-            if choice in {key, name}:
-                argv = list(a) if a is not None else None
-                break
+        if choice in {"账簿", "账簿学习", "写入记忆", "ledger"}:
+            argv = ["learn-ledger"]
+        else:
+            for key, name, _d, a in MENU_LEARN:
+                if choice in {key, name}:
+                    argv = list(a) if a is not None else None
+                    break
         if argv is None and choice in _DIRECT:
             argv = [choice]
         if argv is None:
@@ -239,7 +272,7 @@ def interactive_learn_menu(dispatch: Callable[[Optional[list]], int]) -> int:
             _pause()
             continue
 
-        # apply 后可选是否立刻 reclassify（默认走 apply 自带逻辑，不再追问）
+        argv = _prompt_learn_ledger(argv)
         last = _run(dispatch, argv)
         _pause()
 

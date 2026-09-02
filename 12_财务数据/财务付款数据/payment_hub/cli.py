@@ -28,6 +28,7 @@ from .pipeline import (
     step_health,
     step_import_taxonomy,
     step_learn,
+    step_learn_ledger,
     step_raw_std,
     step_reclassify,
     step_std,
@@ -43,6 +44,7 @@ _CMD_ALIASES = {
     "month": "run",
     "help-guide": "help",
     "compact": "compact-memory",
+    "ledger-learn": "learn-ledger",
 }
 
 
@@ -61,6 +63,8 @@ def _paths_from_args(args: Any) -> Paths:
         p.review_xlsx = p.classify_data / "待复核池.xlsx"
         p.rules_suggest_xlsx = p.classify_data / "规则建议.xlsx"
         p.class_master_xlsx = p.classify_data / "付款分类总表.xlsx"
+    if getattr(args, "ledger", None):
+        p.ledger_xlsx = Path(args.ledger)
     return p
 
 
@@ -186,6 +190,21 @@ def build_parser() -> argparse.ArgumentParser:
     c = sub.add_parser("learn", help="[旧] 从纠正表学习")
     _add_path_args(c)
     c.add_argument("-i", "--input", default=None)
+
+    c = sub.add_parser(
+        "learn-ledger",
+        aliases=["ledger-learn"],
+        help="账簿已填一/二/三级 → 写入记忆（不改账簿）",
+    )
+    _add_path_args(c)
+    c.add_argument("--ledger", default=None, help="账簿 Excel，默认 Paths.ledger_xlsx")
+    c.add_argument("--sheet", default="", help="工作表名，默认有「汇总」用汇总")
+    c.add_argument("--dry-run", action="store_true", help="仅预览，不写 memory / taxonomy")
+    c.add_argument(
+        "--no-auto-taxonomy",
+        action="store_true",
+        help="禁止自动登记体系里没有的新科目",
+    )
 
     c = sub.add_parser("suggest-rules", help="规则建议")
     _add_path_args(c)
@@ -331,6 +350,17 @@ def _dispatch(cmd: str, paths: Paths, args: Any) -> int:
 
     if cmd == "learn":
         step_learn(paths, Path(args.input) if getattr(args, "input", None) else None)
+        return 0
+
+    if cmd == "learn-ledger":
+        sheet = str(getattr(args, "sheet", "") or "").strip()
+        step_learn_ledger(
+            paths,
+            Path(args.ledger) if getattr(args, "ledger", None) else paths.ledger_xlsx,
+            sheet=sheet or None,
+            auto_taxonomy=not bool(getattr(args, "no_auto_taxonomy", False)),
+            dry_run=bool(getattr(args, "dry_run", False)),
+        )
         return 0
 
     if cmd == "export-class":

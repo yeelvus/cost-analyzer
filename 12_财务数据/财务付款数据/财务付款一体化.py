@@ -7,9 +7,10 @@
   python 财务付款一体化.py           # 交互式菜单（直接选 1/2/3…）
 
 也可直接子命令：
-  python 财务付款一体化.py pool      # 导出学习池
-  python 财务付款一体化.py apply     # 应用确认
-  python 财务付款一体化.py run       # 月结出账
+  python 财务付款一体化.py pool          # 导出学习池
+  python 财务付款一体化.py apply         # 应用确认
+  python 财务付款一体化.py learn-ledger  # 账簿已填科目 → 写入记忆
+  python 财务付款一体化.py run           # 月结出账
 
 旧命令名（export-learn-pool / all / apply-class 等）仍兼容。
 """

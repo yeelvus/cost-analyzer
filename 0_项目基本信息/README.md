@@ -41,6 +41,25 @@ m = load_matcher()
 print(m.resolve("樱花"))
 ```
 
+## 图形界面（选 Excel / 列 / 填写）
+
+```bash
+cd /Users/wyattsun/Desktop/code/0_项目基本信息
+python project_name_matcher.py          # 无参数即打开界面
+python project_name_matcher.py gui
+python project_name_matcher_gui.py
+```
+
+在界面里选择 Excel、待匹配列、标准名称输出列、项目编码输出列；可选「处理摘要列」。
+只改这些列的单元格值，列宽、样式、日期、筛选等原格式保持不变。
+
+摘要处理规则：若摘要以待匹配列的项目名称开头，则删去该前缀；删完后若以 `-`（或同类连接符）开头，再删掉连接符。
+
+```bash
+python project_name_matcher.py excel 台账.xlsx --process-summary
+python project_name_matcher.py excel 台账.xlsx --match 项目名称 --name-out 项目标准名称 --code-out 项目编码 --process-summary --prompt
+```
+
 ## 命令行
 
 ```bash
@@ -74,6 +93,6 @@ save_db(db_path, db)
 1. 精确别名 / 标准名  
 2. 去空格归一化  
 3. 软匹配（清洗全等 / 唯一子串 / 高相似度）  
-4. 曾「保留原名」→ 静默原名，不再弹窗  
+4. 曾「保留原名」→ 自动批处理静默原名；**手动运行 / 勾选弹窗补录时仍会弹出对话框**  
 
 软匹配成功会自动写入别名，下次精确命中。

@@ -137,6 +137,34 @@ def step_learn(paths: Paths, input_xlsx: Optional[Path] = None) -> dict:
     return stats
 
 
+def step_learn_ledger(
+    paths: Paths,
+    ledger: Optional[Path] = None,
+    *,
+    sheet: Optional[str] = None,
+    auto_taxonomy: bool = True,
+    dry_run: bool = False,
+) -> dict:
+    _banner("账簿已填科目 → 写入记忆")
+    ensure_code_root()
+    from ledger_book_classify import learn_from_ledger
+
+    path = Path(ledger) if ledger else Path(paths.ledger_xlsx)
+    print(f"账簿: {path}")
+    print(f"学习库: {paths.classify_data}")
+    if dry_run:
+        print("模式: 仅预览，不写 memory / taxonomy")
+    stats = learn_from_ledger(
+        path,
+        paths.classify_data,
+        sheet_name=(sheet or None),
+        auto_taxonomy=auto_taxonomy,
+        dry_run=dry_run,
+    )
+    print(f"✅ learn-ledger: learned={stats.get('learned')} unchanged={stats.get('skipped_unchanged')}")
+    return stats
+
+
 def step_health(paths: Paths) -> None:
     _banner("分类健康度")
     ensure_code_root()

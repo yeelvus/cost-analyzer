@@ -50,6 +50,12 @@ class Paths:
     classify_data: Path = field(
         default_factory=lambda: CODE_DIR / "learn_classify" / "data"
     )
+    # 账簿：已填一/二/三级 → learn-ledger 写入记忆
+    ledger_xlsx: Path = field(
+        default_factory=lambda: Path(
+            "/Users/wyattsun/Desktop/财务数据/账簿汇总_v7_分类整理2026-08-29_副本.xlsx"
+        )
+    )
     review_xlsx: Path = field(
         default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "待复核池.xlsx"
     )
