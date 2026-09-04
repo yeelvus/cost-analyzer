@@ -38,9 +38,36 @@ def parse_folder_name(name: str) -> tuple[str, str]:
 
 
 def load_json(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data if isinstance(data, dict) else {}
+    raw = path.read_bytes()
+    last_error: Exception | None = None
+    for encoding in ("utf-8-sig", "gb18030"):
+        try:
+            text = raw.decode(encoding)
+        except UnicodeDecodeError as exc:
+            last_error = exc
+            continue
+
+        repaired_lines = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith('"  ""'):
+                if stripped.endswith('",'):
+                    stripped = stripped[1:-2] + ","
+                elif stripped.endswith('"'):
+                    stripped = stripped[1:-1]
+                line = stripped.replace('""', '"')
+            repaired_lines.append(line)
+        repaired = "\n".join(repaired_lines)
+
+        for candidate in (text, repaired):
+            try:
+                data = json.loads(candidate)
+            except json.JSONDecodeError as exc:
+                last_error = exc
+                continue
+            return data if isinstance(data, dict) else {}
+
+    raise ValueError(f"无法读取 JSON 文件: {path}") from last_error
 
 
 def collect_rows(root: Path) -> list[dict]:
