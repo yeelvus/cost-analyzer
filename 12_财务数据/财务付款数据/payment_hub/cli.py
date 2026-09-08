@@ -96,11 +96,12 @@ def build_parser() -> argparse.ArgumentParser:
         prog="财务付款一体化",
         description="财务付款：学习池 + 月结（日常 pool / apply / run）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="无参数且在终端中 → 交互菜单",
+        epilog="无参数 → 图形窗口；--menu → 终端菜单",
     )
     _add_path_args(p)
     _add_project_match_args(p)
-    p.add_argument("--menu", action="store_true", help="强制交互菜单")
+    p.add_argument("--gui", action="store_true", help="打开图形窗口")
+    p.add_argument("--menu", action="store_true", help="终端交互菜单（不打开窗口）")
     p.add_argument("--no-menu", action="store_true", help="无子命令只打印帮助")
     p.add_argument("--skip-std", action="store_true")
     p.add_argument("--skip-summary", action="store_true")
@@ -146,6 +147,7 @@ def build_parser() -> argparse.ArgumentParser:
             _add_project_match_args(c)
 
     sub.add_parser("help", aliases=["help-guide"], help="用法说明")
+    sub.add_parser("gui", help="打开图形窗口")
     sub.add_parser("maint", help="维护子菜单 / 列表")
     c = sub.add_parser("show-paths", help="默认路径")
     _add_path_args(c)
@@ -483,17 +485,32 @@ def main(argv=None) -> int:
     cmd = _normalize_cmd(args.cmd)
 
     if not cmd:
-        if getattr(args, "menu", False) or (
-            not getattr(args, "no_menu", False)
-            and sys.stdin.isatty()
-            and sys.stdout.isatty()
-        ):
+        if getattr(args, "no_menu", False):
+            print_quick_help()
+            return 0
+        if getattr(args, "menu", False):
+            return interactive_menu(main)
+        try:
+            from .gui import gui_available, launch_gui
+
+            if getattr(args, "gui", False) or gui_available():
+                return launch_gui()
+        except SystemExit:
+            raise
+        except Exception as e:
+            print(f"图形窗口未能启动（{e}），改用终端菜单。", file=sys.stderr)
+        if sys.stdin.isatty() and sys.stdout.isatty():
             return interactive_menu(main)
         print_quick_help()
         return 0
 
     if cmd == "help":
         return _cmd_help_guide()
+
+    if cmd == "gui":
+        from .gui import launch_gui
+
+        return launch_gui()
 
     if cmd == "maint":
         if sys.stdin.isatty() and sys.stdout.isatty():
