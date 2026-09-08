@@ -13,7 +13,7 @@
 数据源（自动找最新）
 ------------------
 预算:
-  01成本统计/3_预算部分/2_人材机_std/【总汇总】所有标段_*.xlsx
+  01成本统计/3_预算部分/2_人材机_std/【总汇总】所有标段.xlsx
   回退: 18_output/项目汇总索引.xlsx · 预算金额
 
 过程:
@@ -169,7 +169,7 @@ def budget_to_thb(amount: float, currency: str, fx: float) -> float:
 
 def load_budget(fx: float) -> Tuple[pd.DataFrame, str]:
     """返回预算表（金额已转为万泰铢）与来源说明。"""
-    summary = find_latest(BUDGET_STD_DIR, "【总汇总】所有标段_*.xlsx")
+    summary = find_latest(BUDGET_STD_DIR, "【总汇总】所有标段*.xlsx")
     source = ""
     if summary and summary.exists():
         df = pd.read_excel(summary, sheet_name="总汇总")

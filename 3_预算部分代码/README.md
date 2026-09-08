@@ -32,7 +32,7 @@
         │  budget glodon
         ▼
 2_人材机_std/*_processed.xlsx
-        + 【总汇总】所有标段_*.xlsx
+        + 【总汇总】所有标段.xlsx
         │  budget dashboard
         ▼
 总汇总项目看板.html

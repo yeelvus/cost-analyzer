@@ -8,7 +8,6 @@ import json
 import logging
 import re
 import difflib
-from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -37,6 +36,7 @@ from budget.config import (  # noqa: E402
     AMOUNT_COL,
     BASE_COLUMNS,
     CATEGORY_COL,
+    CNY_TO_THB_RATE,
     CODE_COL,
     FALLBACK_TARGET_COL_NAME,
     FINAL_COLUMNS,
@@ -60,6 +60,7 @@ from budget.config import (  # noqa: E402
     SELECTED_COLUMNS,
     SUMMARY_SHEET_NAME,
     TARGET_COL_NAME,
+    TOTAL_SUMMARY_FILENAME,
     TOTAL_SUMMARY_PREFIX,
     UNIT_COL,
 )
@@ -259,6 +260,25 @@ def detect_currency(df):
     except Exception as e:
         logger.warning(f"  币种判断失败: {e}")
         return "Unknown"
+
+
+def is_cny_currency(currency) -> bool:
+    cur = str(currency or "").strip().upper()
+    if not cur:
+        return False
+    return cur in {"CNY", "RMB", "人民币", "元", "￥"} or cur.startswith("CNY")
+
+
+def cny_amount_to_thb(value, currency, rate: float = CNY_TO_THB_RATE) -> float:
+    """CNY 金额折泰铢；数量等非金额不要走这里。"""
+    try:
+        num = float(value or 0)
+    except (TypeError, ValueError):
+        num = 0.0
+    if is_cny_currency(currency):
+        return round(num * rate, 2)
+    return round(num, 2)
+
 
 def choose_columns(columns):
     # 自动模式：直接使用 SELECTED_COLUMNS 或全部
@@ -867,6 +887,12 @@ def generate_summary_report(folder):
             for col in BASE_COLUMNS[1:]:
                 row[col] = 0.0
 
+        if is_cny_currency(currency):
+            for col in BASE_COLUMNS:
+                row[col] = cny_amount_to_thb(row.get(col, 0.0), currency)
+            row["币种"] = f"CNY×{CNY_TO_THB_RATE:g}"
+            logger.info(f"  [{idx}] CNY 金额已 ×{CNY_TO_THB_RATE:g} 折泰铢")
+
         all_data.append(row)
         code_display = f"({project_code})" if project_code else "(无编码)"
         logger.info(f"  [{idx}] {code_display} {project_name}")
@@ -884,9 +910,7 @@ def generate_summary_report(folder):
         total_row[col] = result_df[col].sum()
     result_df = pd.concat([result_df, pd.DataFrame([total_row])], ignore_index=True)
 
-    # 添加时间戳
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = os.path.join(folder, f"{TOTAL_SUMMARY_PREFIX}{timestamp}.xlsx")
+    output_path = os.path.join(folder, TOTAL_SUMMARY_FILENAME)
 
     try:
         with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
@@ -965,7 +989,10 @@ def generate_summary_report(folder):
                     currency = detect_currency(df_for_currency)
                 except Exception as e:
                     logger.debug(f"检测币种失败 {file}: {e}")
-                mat_row["币种"] = currency
+                if is_cny_currency(currency):
+                    mat_row["币种"] = f"CNY×{CNY_TO_THB_RATE:g}"
+                else:
+                    mat_row["币种"] = currency
 
                 try:
                     df_summary = pd.read_excel(file_path, sheet_name=SUMMARY_SHEET_NAME)
@@ -978,7 +1005,9 @@ def generate_summary_report(folder):
                                 df_summary[CATEGORY_COL].astype(str),
                                 pd.to_numeric(df_summary[AMOUNT_COL], errors='coerce').fillna(0)
                             ))
-                            mat_amount = round(float(cat_to_amt.get(mat, 0.0)), 2)
+                            mat_amount = cny_amount_to_thb(
+                                cat_to_amt.get(mat, 0.0), currency
+                            )
 
                         # 从对应材料 Sheet 读取数量（统一换算到基准单位）
                         mat_quantity = 0.0

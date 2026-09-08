@@ -31,7 +31,7 @@ CODE_ROOT_DIR = SCRIPT_DIR.parent
 DEFAULT_MATCHER_DIR = CODE_ROOT_DIR / "0_项目基本信息"
 
 CONFIG = {
-"base_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/A_成本统计_raw",
+"base_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_std",
 "output_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_sum/项目统计数据汇总_全月份.xlsx",
 "profit_rate_chart_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report/项目毛利率变化图.html",
 "project_matcher_dir": str(DEFAULT_MATCHER_DIR),
@@ -455,6 +455,69 @@ def parse_month_sort_key(month_text):
         return (0, 0)
     return (int(match.group(1)), int(match.group(2)))
 
+
+COST_FILE_RE = re.compile(
+    r"^(?P<project>.+?)_成本统计_(?P<yyyymm>\d{6})(?:\(\d+\))?\s*\.(?P<ext>xlsx|xls|xlsm)$",
+    re.IGNORECASE,
+)
+COST_FILE_RE_ALT = re.compile(
+    r"^(?P<year>\d{4})年(?P<month>\d{1,2})月_成本统计_(?P<project>.+?)\s*\.(?P<ext>xlsx|xls|xlsm)$",
+    re.IGNORECASE,
+)
+MONTH_FOLDER_RE = re.compile(r"^(\d{4}年\d{1,2}月)$")
+
+
+def yyyymm_to_month_label(yyyymm: str) -> str:
+    return f"{int(yyyymm[:4])}年{int(yyyymm[4:6]):02d}月"
+
+
+def parse_cost_stat_filename(name: str):
+    """从成本统计文件名解析 (月份标签, 项目名)。无法识别则返回 None。"""
+    if name.startswith("~$") or name.startswith(".") or "汇总" in name:
+        return None
+    match = COST_FILE_RE.match(name)
+    if match:
+        return yyyymm_to_month_label(match.group("yyyymm")), match.group("project").strip()
+    match = COST_FILE_RE_ALT.match(name)
+    if match:
+        return (
+            f"{int(match.group('year'))}年{int(match.group('month')):02d}月",
+            match.group("project").strip(),
+        )
+    return None
+
+
+def collect_cost_stat_files(base_path: Path):
+    """收集成本统计 Excel。
+
+    两种布局都支持：
+    - 按月子目录（A_成本统计_raw）
+    - 扁平目录，月份写在文件名里（B_成本统计_std）
+    """
+    grouped = defaultdict(list)
+    skipped = []
+    month_folders = [
+        item for item in base_path.iterdir()
+        if item.is_dir() and MONTH_FOLDER_RE.match(item.name)
+    ]
+    search_roots = month_folders if month_folders else [base_path]
+    use_folder_month = bool(month_folders)
+
+    for root in search_roots:
+        for file in sorted(root.glob("*.xls*"), key=lambda p: p.name):
+            if not file.is_file():
+                continue
+            parsed = parse_cost_stat_filename(file.name)
+            if not parsed:
+                if not file.name.startswith("~$") and not file.name.startswith("."):
+                    skipped.append(file)
+                continue
+            month_label, project_name = parsed
+            if use_folder_month:
+                month_label = root.name
+            grouped[month_label].append((file, project_name))
+    return grouped, skipped
+
 def header_col_index(headers, header_name):
     return headers.index(header_name) + 1 if header_name in headers else None
 
@@ -824,51 +887,35 @@ def process_all_projects():
         divisor=10000.0,
     )
 
-    month_folder_pattern = re.compile(r'^(\d{4}年\d{1,2}月)$')
-    month_folders = [
-        item for item in base_path.iterdir()
-        if item.is_dir() and month_folder_pattern.match(item.name)
-    ]
-    month_folders.sort(key=lambda x: parse_month_sort_key(x.name), reverse=True)
-    if not month_folders:
-        print(f"⚠️ 未找到月份文件夹")
+    print(f"✓ 成本统计源目录: {base_path}")
+    files_by_month, skipped_files = collect_cost_stat_files(base_path)
+    month_labels = sorted(files_by_month.keys(), key=parse_month_sort_key, reverse=True)
+    if not month_labels:
+        print("⚠️ 未找到成本统计文件（需要「项目名_成本统计_YYYYMM.xlsx/.xlsm」）")
         return
 
-    print(f"✓ 找到 {len(month_folders)} 个月份文件夹:\n")
-    for folder in month_folders:
-        print(f" - {folder.name}")
+    print(f"✓ 找到 {len(month_labels)} 个月份、{sum(len(v) for v in files_by_month.values())} 个项目文件:\n")
+    for month_label in month_labels:
+        print(f" - {month_label}  ({len(files_by_month[month_label])} 个)")
+    for skipped in skipped_files:
+        print(f" ✗ 跳过不符合格式的文件: {skipped.name}")
     print()
 
     summary_list = []
 
-    pattern1 = re.compile(r'^(.+?)_成本统计_(\d{6})\.xls[mx]?$')
-    pattern2 = re.compile(r'^(\d{4}年\d{1,2}月)_成本统计_(.+)\.xls[mx]?$')
-
-    for month_folder in month_folders:
+    for month_label in month_labels:
         print(f"\n{'='*60}")
-        print(f"处理月份: {month_folder.name}")
+        print(f"处理月份: {month_label}")
         print(f"{'='*60}")
-        files = []
-        for f in sorted(month_folder.glob("*.xls*"), key=lambda p: p.name):
-            if f.name.startswith("~$") or '汇总' in f.name:
-                continue
-            match = pattern1.match(f.name)
-            if match:
-                files.append((f, match.group(1)))
-                continue
-            match = pattern2.match(f.name)
-            if match:
-                files.append((f, match.group(2)))
-            else:
-                print(f" ✗ 跳过不符合格式的文件: {f.name}")
+        files = files_by_month[month_label]
         if not files:
-            print(f" ⚠️ 该月份文件夹中未找到符合格式的文件\n")
+            print(" ⚠️ 该月份未找到符合格式的文件\n")
             continue
 
         for file, project_name in files:
             print(f"\n  正在分析项目文件: {file.name}")
             row_data = {
-"月份": month_folder.name,
+"月份": month_label,
 "项目名称": project_name,
 "完整文件名": file.name
             }

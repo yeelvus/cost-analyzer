@@ -240,9 +240,9 @@ def resolve_input_paths() -> Dict:
         resolved["财务分包"] = finance_latest
 
     budget_latest = pick_latest_existing([
-        (BASE_DIR / "3_预算部分/2_人材机_std", "【总汇总】所有标段_*.xlsx", False),
-        (BASE_DIR / "3_预算部分/5.1_主材汇总（广联达软件导出）", "【总汇总】所有标段_*.xlsx", False),
-        (BASE_DIR / "3_预算部分", "【总汇总】所有标段_*.xlsx", True),
+        (BASE_DIR / "3_预算部分/2_人材机_std", "【总汇总】所有标段*.xlsx", False),
+        (BASE_DIR / "3_预算部分/5.1_主材汇总（广联达软件导出）", "【总汇总】所有标段*.xlsx", False),
+        (BASE_DIR / "3_预算部分", "【总汇总】所有标段*.xlsx", True),
     ])
     if budget_latest:
         resolved["预算金额"] = budget_latest

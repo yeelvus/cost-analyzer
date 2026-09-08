@@ -317,7 +317,7 @@ def load_company(month_hint: Optional[str]) -> Tuple[List[Dict], str, str]:
 
 def load_budget(fx: float) -> Tuple[Dict[str, Dict], Dict[str, Dict], str]:
     """预算人材机 + 材料量。金额→万泰铢。"""
-    summary = find_latest(BUDGET_STD, "【总汇总】所有标段_*.xlsx")
+    summary = find_latest(BUDGET_STD, "【总汇总】所有标段*.xlsx")
     if not summary:
         return {}, {}, "缺失"
     df = pd.read_excel(summary, sheet_name="总汇总")

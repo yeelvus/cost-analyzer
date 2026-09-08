@@ -61,7 +61,11 @@ MECH_CATS = {"设", "机"}
 QUANTITY_COL = "数量"
 AMOUNT_COL = "金额"
 SUMMARY_SHEET_NAME = "汇总_不含税市场价"
-TOTAL_SUMMARY_PREFIX = "【总汇总】所有标段_"
+# 总汇总文件名固定、不带时间戳；PREFIX 用于匹配新旧文件（含历史带时间戳的）
+TOTAL_SUMMARY_PREFIX = "【总汇总】所有标段"
+TOTAL_SUMMARY_FILENAME = "【总汇总】所有标段.xlsx"
+# 总汇总中 CNY 行金额折泰铢（与成本统计口径一致）
+CNY_TO_THB_RATE = 5.0
 MATERIAL_SHEET_NAME = "材料汇总"
 UNIT_ANOMALY_SHEET = "单位异常明细"
 DASHBOARD_HTML_NAME = "总汇总项目看板.html"
