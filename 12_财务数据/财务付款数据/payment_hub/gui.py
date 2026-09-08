@@ -56,8 +56,8 @@ class PaymentHubApp:
         self.ttk = ttk
         self.root = root
         self.root.title("财务付款一体化")
-        self.root.geometry("920x720")
-        self.root.minsize(780, 600)
+        self.root.geometry("940x820")
+        self.root.minsize(800, 680)
 
         self.paths = Paths()
         self._running = False
@@ -66,10 +66,20 @@ class PaymentHubApp:
         self.ledger_dry_run = tk.BooleanVar(value=False)
         self.only_confirmed = tk.BooleanVar(value=False)
         self.ledger_path = tk.StringVar(value=str(self.paths.ledger_xlsx))
+        self.sheet_name = tk.StringVar()
+        self.header_row = tk.StringVar(value="1")
+        self.summary_col = tk.StringVar()
+        self.l1_col = tk.StringVar()
+        self.l2_col = tk.StringVar()
+        self.l3_col = tk.StringVar()
         self.status = tk.StringVar(value="就绪")
+        self._sheets: list[str] = []
+        self._headers: dict[str, list[str]] = {}
 
         self._build()
         self.root.after(120, self._drain_log)
+        if Path(self.ledger_path.get()).is_file():
+            self.root.after(200, lambda: self._reload_headers(silent=True))
 
     def _build(self) -> None:
         ttk = self.ttk
@@ -78,7 +88,6 @@ class PaymentHubApp:
         main = ttk.Frame(self.root, padding=12)
         main.pack(fill="both", expand=True)
         main.columnconfigure(0, weight=1)
-        main.rowconfigure(5, weight=1)
 
         ttk.Label(
             main,
@@ -100,7 +109,6 @@ class PaymentHubApp:
         self._btns(learn, [
             ("导出学习池", self._cmd("pool")),
             ("应用确认", self._apply),
-            ("账簿写入记忆", self._learn_ledger),
             ("重刷分类", self._cmd("reclassify")),
             ("健康度", self._cmd("health")),
             ("待复核池", self._cmd("review")),
@@ -137,37 +145,75 @@ class PaymentHubApp:
             ("打开汇总文件夹", self._open_sum),
         ], cols=4)
 
-        opt = ttk.Frame(main)
-        opt.grid(row=5, column=0, sticky="nsew", **pad)
-        opt.columnconfigure(1, weight=1)
-        opt.rowconfigure(2, weight=1)
+        excel = ttk.LabelFrame(main, text="从 Excel 学习分类（选摘要列 + 一/二/三级科目列）", padding=8)
+        excel.grid(row=5, column=0, sticky="ew", **pad)
+        excel.columnconfigure(1, weight=1)
+        excel.columnconfigure(3, weight=1)
 
-        ttk.Label(opt, text="账簿 Excel").grid(row=0, column=0, sticky="e", padx=4)
-        ttk.Entry(opt, textvariable=self.ledger_path).grid(
-            row=0, column=1, sticky="ew", padx=4
+        ttk.Label(excel, text="Excel").grid(row=0, column=0, sticky="e", padx=4, pady=2)
+        ttk.Entry(excel, textvariable=self.ledger_path).grid(
+            row=0, column=1, columnspan=3, sticky="ew", padx=4, pady=2
         )
-        ttk.Button(opt, text="浏览…", command=self._browse_ledger).grid(
-            row=0, column=2, sticky="w", padx=4
+        ttk.Button(excel, text="浏览…", command=self._browse_ledger).grid(
+            row=0, column=4, sticky="w", padx=4, pady=2
         )
-        ttk.Checkbutton(opt, text="账簿仅预览，不写记忆", variable=self.ledger_dry_run).grid(
-            row=1, column=1, sticky="w", padx=4
+
+        ttk.Label(excel, text="工作表").grid(row=1, column=0, sticky="e", padx=4, pady=2)
+        self.sheet_combo = ttk.Combobox(
+            excel, textvariable=self.sheet_name, state="readonly", width=22
+        )
+        self.sheet_combo.grid(row=1, column=1, sticky="ew", padx=4, pady=2)
+        self.sheet_combo.bind("<<ComboboxSelected>>", lambda _e: self._apply_sheet_headers())
+        ttk.Label(excel, text="表头行").grid(row=1, column=2, sticky="e", padx=4, pady=2)
+        ttk.Spinbox(excel, from_=1, to=20, textvariable=self.header_row, width=6).grid(
+            row=1, column=3, sticky="w", padx=4, pady=2
+        )
+        ttk.Button(excel, text="读取表头", command=self._reload_headers).grid(
+            row=1, column=4, sticky="w", padx=4, pady=2
+        )
+
+        ttk.Label(excel, text="摘要列").grid(row=2, column=0, sticky="e", padx=4, pady=2)
+        self.summary_combo = ttk.Combobox(excel, textvariable=self.summary_col, width=22)
+        self.summary_combo.grid(row=2, column=1, sticky="ew", padx=4, pady=2)
+        ttk.Label(excel, text="一级科目").grid(row=2, column=2, sticky="e", padx=4, pady=2)
+        self.l1_combo = ttk.Combobox(excel, textvariable=self.l1_col, width=22)
+        self.l1_combo.grid(row=2, column=3, sticky="ew", padx=4, pady=2)
+
+        ttk.Label(excel, text="二级科目").grid(row=3, column=0, sticky="e", padx=4, pady=2)
+        self.l2_combo = ttk.Combobox(excel, textvariable=self.l2_col, width=22)
+        self.l2_combo.grid(row=3, column=1, sticky="ew", padx=4, pady=2)
+        ttk.Label(excel, text="三级科目").grid(row=3, column=2, sticky="e", padx=4, pady=2)
+        self.l3_combo = ttk.Combobox(excel, textvariable=self.l3_col, width=22)
+        self.l3_combo.grid(row=3, column=3, sticky="ew", padx=4, pady=2)
+
+        ttk.Checkbutton(excel, text="仅预览，不写记忆", variable=self.ledger_dry_run).grid(
+            row=4, column=1, sticky="w", padx=4, pady=2
         )
         ttk.Checkbutton(
-            opt, text="apply 仅学习「确认」行", variable=self.only_confirmed
-        ).grid(row=1, column=2, sticky="w", padx=4)
+            excel, text="apply 仅学习「确认」行", variable=self.only_confirmed
+        ).grid(row=4, column=3, sticky="w", padx=4, pady=2)
+        ttk.Button(excel, text="开始学习分类", command=self._learn_ledger).grid(
+            row=4, column=4, sticky="ew", padx=4, pady=2
+        )
+
+        opt = ttk.Frame(main)
+        opt.grid(row=6, column=0, sticky="nsew", **pad)
+        opt.columnconfigure(0, weight=1)
+        opt.rowconfigure(0, weight=1)
+        main.rowconfigure(6, weight=1)
 
         log_fr = ttk.LabelFrame(opt, text="运行日志", padding=4)
-        log_fr.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
+        log_fr.grid(row=0, column=0, sticky="nsew")
         log_fr.columnconfigure(0, weight=1)
         log_fr.rowconfigure(0, weight=1)
-        self.log = tk.Text(log_fr, height=16, wrap="word", font=("Menlo", 11))
+        self.log = tk.Text(log_fr, height=12, wrap="word", font=("Menlo", 11))
         scroll = ttk.Scrollbar(log_fr, command=self.log.yview)
         self.log.configure(yscrollcommand=scroll.set)
         self.log.grid(row=0, column=0, sticky="nsew")
         scroll.grid(row=0, column=1, sticky="ns")
 
         bar = ttk.Frame(main)
-        bar.grid(row=6, column=0, sticky="ew")
+        bar.grid(row=7, column=0, sticky="ew")
         ttk.Label(bar, textvariable=self.status).pack(side="left")
         ttk.Button(bar, text="清空日志", command=self._clear_log).pack(side="right")
 
@@ -202,9 +248,37 @@ class PaymentHubApp:
     def _learn_ledger(self) -> None:
         path = self.ledger_path.get().strip()
         if not path:
-            self.messagebox.showwarning("账簿", "请先选择账簿 Excel。")
+            self.messagebox.showwarning("从 Excel 学习", "请先选择 Excel 文件。")
             return
-        argv = ["learn-ledger", "--ledger", path]
+        if not Path(path).is_file():
+            self.messagebox.showwarning("从 Excel 学习", f"文件不存在：\n{path}")
+            return
+        summary = self.summary_col.get().strip()
+        l1 = self.l1_col.get().strip()
+        l2 = self.l2_col.get().strip()
+        if not summary or not l1 or not l2:
+            self.messagebox.showwarning(
+                "从 Excel 学习", "请指定摘要列、一级科目列、二级科目列。"
+            )
+            return
+        argv = [
+            "learn-ledger",
+            "--ledger",
+            path,
+            "--summary-col",
+            summary,
+            "--l1-col",
+            l1,
+            "--l2-col",
+            l2,
+            "--l3-col",
+            self.l3_col.get().strip(),
+            "--header-row",
+            str(self.header_row.get() or "1"),
+        ]
+        sheet = self.sheet_name.get().strip()
+        if sheet:
+            argv.extend(["--sheet", sheet])
         if self.ledger_dry_run.get():
             argv.append("--dry-run")
         self._run_argv(argv)
@@ -221,12 +295,67 @@ class PaymentHubApp:
     def _browse_ledger(self) -> None:
         initial = Path(self.ledger_path.get() or str(self.paths.ledger_xlsx))
         path = self.filedialog.askopenfilename(
-            title="选择账簿 Excel",
+            title="选择要学习的 Excel",
             initialdir=str(initial.parent if initial.parent.exists() else Path.home()),
             filetypes=[("Excel", "*.xlsx *.xlsm"), ("全部", "*.*")],
         )
         if path:
             self.ledger_path.set(path)
+            self._reload_headers()
+
+    def _reload_headers(self, silent: bool = False) -> None:
+        path = self.ledger_path.get().strip()
+        if not path or not Path(path).is_file():
+            if not silent:
+                self.messagebox.showwarning("读取表头", "请先选择有效的 Excel 文件。")
+            return
+        try:
+            row = int(str(self.header_row.get() or "1").strip() or "1")
+        except ValueError:
+            row = 1
+            self.header_row.set("1")
+        try:
+            from .pkg import ensure_code_root
+
+            ensure_code_root()
+            from ledger_book_classify import peek_excel_sheets_and_headers
+
+            sheets, headers = peek_excel_sheets_and_headers(Path(path), header_row=row)
+        except Exception as e:
+            self.messagebox.showerror("读取表头失败", str(e))
+            return
+        self._sheets = sheets
+        self._headers = headers
+        self.sheet_combo["values"] = sheets
+        preferred = self.sheet_name.get().strip()
+        if preferred not in sheets:
+            preferred = "汇总" if "汇总" in sheets else (sheets[0] if sheets else "")
+        self.sheet_name.set(preferred)
+        self._apply_sheet_headers()
+
+    def _apply_sheet_headers(self) -> None:
+        cols = list(self._headers.get(self.sheet_name.get().strip(), []))
+        empty_plus = [""] + cols
+        for combo in (
+            self.summary_combo,
+            self.l1_combo,
+            self.l2_combo,
+            self.l3_combo,
+        ):
+            combo["values"] = cols if combo is not self.l3_combo else empty_plus
+        self.summary_col.set(self._pick_col(cols, ("摘要", "业务摘要", "摘要处理")))
+        self.l1_col.set(self._pick_col(cols, ("一级科目", "正确一级科目", "正确一级", "一级")))
+        self.l2_col.set(self._pick_col(cols, ("二级科目", "正确二级科目", "正确二级", "二级")))
+        self.l3_col.set(self._pick_col(cols, ("三级科目", "正确三级科目", "正确三级", "三级"), allow_empty=True))
+
+    @staticmethod
+    def _pick_col(columns: list[str], candidates: tuple[str, ...], *, allow_empty: bool = False) -> str:
+        for name in candidates:
+            if name in columns:
+                return name
+        if allow_empty:
+            return ""
+        return columns[0] if columns else ""
 
     def _open_learn_pool(self) -> None:
         self._open_dir(self.paths.learn_pool_root)

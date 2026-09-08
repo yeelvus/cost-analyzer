@@ -201,6 +201,11 @@ def build_parser() -> argparse.ArgumentParser:
     _add_path_args(c)
     c.add_argument("--ledger", default=None, help="账簿 Excel，默认 Paths.ledger_xlsx")
     c.add_argument("--sheet", default="", help="工作表名，默认有「汇总」用汇总")
+    c.add_argument("--header-row", type=int, default=1, help="表头行号，从 1 起")
+    c.add_argument("--summary-col", default=None, help="摘要列名")
+    c.add_argument("--l1-col", default=None, help="一级科目列名")
+    c.add_argument("--l2-col", default=None, help="二级科目列名")
+    c.add_argument("--l3-col", default=None, help="三级科目列名（可空）")
     c.add_argument("--dry-run", action="store_true", help="仅预览，不写 memory / taxonomy")
     c.add_argument(
         "--no-auto-taxonomy",
@@ -356,12 +361,18 @@ def _dispatch(cmd: str, paths: Paths, args: Any) -> int:
 
     if cmd == "learn-ledger":
         sheet = str(getattr(args, "sheet", "") or "").strip()
+        header_row = int(getattr(args, "header_row", 1) or 1)
         step_learn_ledger(
             paths,
             Path(args.ledger) if getattr(args, "ledger", None) else paths.ledger_xlsx,
             sheet=sheet or None,
             auto_taxonomy=not bool(getattr(args, "no_auto_taxonomy", False)),
             dry_run=bool(getattr(args, "dry_run", False)),
+            header_row=header_row,
+            summary_col=getattr(args, "summary_col", None) or None,
+            l1_col=getattr(args, "l1_col", None) or None,
+            l2_col=getattr(args, "l2_col", None) or None,
+            l3_col=getattr(args, "l3_col", None),
         )
         return 0
 

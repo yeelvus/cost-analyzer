@@ -1,6 +1,6 @@
 {
   "version": "2.5.0+auto",
-  "description": "代付款→0_分包计入成本；现场临建用房/现场临时围墙/集装箱租赁→6_管理费；备用金与资金调拨仍不计入成本 | 角钢/预埋钢板→材料采购；空调安装→办公费 | 治安安保安全→治安管理费；新增医务费用 | auto_register 2026-08-10 11:56:20: 1 nodes | auto_register 2026-08-14 17:33:17: 1 nodes | ledger_book 2026-08-29 17:24:18: 9 nodes",
+  "description": "代付款→0_分包计入成本；现场临建用房/现场临时围墙/集装箱租赁→6_管理费；备用金与资金调拨仍不计入成本 | 角钢/预埋钢板→材料采购；空调安装→办公费 | 治安安保安全→治安管理费；新增医务费用 | auto_register 2026-08-10 11:56:20: 1 nodes | auto_register 2026-08-14 17:33:17: 1 nodes | ledger_book 2026-08-29 17:24:18: 9 nodes | ledger_book 2026-09-08 15:07:38: 19 nodes",
   "granularity": {
     "level": "business_category_l3",
     "note": "三级仍为大类拆分，非型号规格"
@@ -91,6 +91,41 @@
       "id": "L1_auto_其他收款",
       "name": "其他收款",
       "order": 82,
+      "active": true,
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L1_auto_9_备用金",
+      "name": "9_备用金",
+      "order": 83,
+      "active": true,
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L1_auto_1_工程款",
+      "name": "1_工程款",
+      "order": 84,
+      "active": true,
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L1_auto_3_收入",
+      "name": "3_收入",
+      "order": 85,
+      "active": true,
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L1_auto_9_押金",
+      "name": "9_押金",
+      "order": 86,
+      "active": true,
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L1_auto_2_搅拌站销售",
+      "name": "2_搅拌站销售",
+      "order": 87,
       "active": true,
       "notes": "auto from ledger_book"
     }
@@ -190,9 +225,54 @@
       "notes": "auto from ledger_book"
     },
     {
+      "id": "L2_auto_备用金（冲）",
+      "name": "备用金（冲）",
+      "parent": "L1_auto_9_备用金",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
       "id": "L2_auto_废旧物资处理",
       "name": "废旧物资处理",
       "parent": "L1_auto_其他收款",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L2_auto_押金退款",
+      "name": "押金退款",
+      "parent": "L1_auto_9_押金",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L2_auto_泵车",
+      "name": "泵车",
+      "parent": "L1_auto_2_搅拌站销售",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L2_auto_银行利息",
+      "name": "银行利息",
+      "parent": "L1_auto_3_收入",
+      "order": 1,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L2_auto_项目收款",
+      "name": "项目收款",
+      "parent": "L1_auto_1_工程款",
       "order": 1,
       "active": true,
       "aliases": [],
@@ -286,9 +366,27 @@
       "notes": ""
     },
     {
+      "id": "L2_auto_分包管理费",
+      "name": "分包管理费",
+      "parent": "L1_auto_1_工程款",
+      "order": 2,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
       "id": "L2_auto_地勘收款",
       "name": "地勘收款",
       "parent": "L1_auto_其他收款",
+      "order": 2,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
+      "id": "L2_auto_无摘要",
+      "name": "无摘要",
+      "parent": "L1_auto_3_收入",
       "order": 2,
       "active": true,
       "aliases": [],
@@ -438,6 +536,15 @@
         "预支"
       ],
       "notes": ""
+    },
+    {
+      "id": "L2_auto_业主多付款",
+      "name": "业主多付款",
+      "parent": "L1_exclude",
+      "order": 4,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
     },
     {
       "id": "L2_eq_truckcrane",
@@ -619,6 +726,15 @@
       "notes": ""
     },
     {
+      "id": "L2_auto_个税",
+      "name": "个税",
+      "parent": "L1_labor",
+      "order": 7,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
       "id": "L2_eq_boom",
       "name": "曲臂车租赁",
       "parent": "L1_equip",
@@ -638,6 +754,15 @@
         "换汇"
       ],
       "notes": "兜底；安保费已独立"
+    },
+    {
+      "id": "L2_auto_正式工",
+      "name": "正式工",
+      "parent": "L1_labor",
+      "order": 8,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
     },
     {
       "id": "L2_eq_flatbed",
@@ -661,6 +786,15 @@
         "柴油"
       ],
       "notes": "无法区分机具/车辆用油时的兜底"
+    },
+    {
+      "id": "L2_auto_劳务工资",
+      "name": "劳务工资",
+      "parent": "L1_labor",
+      "order": 9,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
     },
     {
       "id": "L2_eq_general",
@@ -1357,6 +1491,15 @@
       "notes": "施工机具、发电机用柴油等"
     },
     {
+      "id": "L2_auto_固定资产",
+      "name": "固定资产",
+      "parent": "L1_equip",
+      "order": 41,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
       "id": "L2_mgmt_fuel_vehicle",
       "name": "车辆用油",
       "parent": "L1_mgmt",
@@ -1509,6 +1652,15 @@
       "notes": "seed extra | 已迁移到 L1_deposit，见 L2_dep_*"
     },
     {
+      "id": "L2_auto_回款",
+      "name": "回款",
+      "parent": "L1_mat",
+      "order": 83,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
+    },
+    {
       "id": "L2_mat_temp_build",
       "name": "现场临建用房",
       "parent": "L1_mgmt",
@@ -1547,6 +1699,15 @@
       "active": true,
       "aliases": [],
       "notes": "集装箱租赁（非集装箱房临建）；归属 6_管理费"
+    },
+    {
+      "id": "L2_auto_服务费",
+      "name": "服务费",
+      "parent": "L1_mgmt",
+      "order": 93,
+      "active": true,
+      "aliases": [],
+      "notes": "auto from ledger_book"
     }
   ],
   "level3": [

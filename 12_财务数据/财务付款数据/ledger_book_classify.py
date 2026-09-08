@@ -373,28 +373,85 @@ def classify_ledger_excel(
     return stats
 
 
+def _col_index(headers: Dict[str, int], chosen: Optional[str], *fallbacks: str) -> Optional[int]:
+    """chosen 为 None 时用 fallback；为空字符串表示明确不用该列。"""
+    if chosen is not None:
+        key = str(chosen).strip()
+        if not key:
+            return None
+        if key in headers:
+            return headers[key]
+        raise KeyError(f"找不到列 {chosen!r}，当前表头: {list(headers)}")
+    for name in fallbacks:
+        key = str(name or "").strip()
+        if key and key in headers:
+            return headers[key]
+    return None
+
+
+def peek_excel_sheets_and_headers(
+    excel_path: Path, *, header_row: int = 1
+) -> Tuple[List[str], Dict[str, List[str]]]:
+    """读工作表名和各表表头，供图形界面选列。"""
+    path = Path(excel_path)
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        sheets = list(wb.sheetnames)
+        headers: Dict[str, List[str]] = {}
+        row_i = max(1, int(header_row or 1))
+        for name in sheets:
+            ws = wb[name]
+            raw = next(
+                ws.iter_rows(min_row=row_i, max_row=row_i, values_only=True),
+                None,
+            )
+            cols: List[str] = []
+            seen = set()
+            for cell in raw or ():
+                if cell is None:
+                    continue
+                key = str(cell).strip()
+                if key and key not in seen:
+                    seen.add(key)
+                    cols.append(key)
+            headers[name] = cols
+        return sheets, headers
+    finally:
+        wb.close()
+
+
 def _iter_ledger_learn_rows(
     excel_path: Path,
     *,
     sheet_name: Optional[str] = None,
     header_row: int = 1,
+    summary_col: Optional[str] = None,
+    l1_col: Optional[str] = None,
+    l2_col: Optional[str] = None,
+    l3_col: Optional[str] = None,
+    project_col: Optional[str] = None,
+    vendor_col: Optional[str] = None,
 ) -> Tuple[str, List[dict]]:
-    """读取账簿用于学习的行：摘要 / 一二三级 / 项目名称。"""
+    """读取账簿用于学习的行：摘要 / 一二三级 / 项目名称。列名可指定。"""
     path = Path(excel_path)
     wb = load_workbook(path, data_only=True)
     try:
         ws = _select_sheet(wb, sheet_name)
         title = ws.title
         headers = _header_map(ws, header_row)
-        for required in ("摘要", "一级科目", "二级科目"):
-            if required not in headers:
-                raise KeyError(f"缺少列 {required!r}，当前表头: {list(headers)}")
-        summ_i = headers["摘要"]
-        l1_i = headers["一级科目"]
-        l2_i = headers["二级科目"]
-        l3_i = headers.get("三级科目")
-        name_i = headers.get("项目名称")
-        vend_i = headers.get("供应商名称") or headers.get("供应商") or headers.get("收款单位")
+        summ_i = _col_index(headers, summary_col, "摘要", "业务摘要", "摘要处理")
+        l1_i = _col_index(headers, l1_col, "一级科目", "正确一级科目", "正确一级")
+        l2_i = _col_index(headers, l2_col, "二级科目", "正确二级科目", "正确二级")
+        if not summ_i or not l1_i or not l2_i:
+            raise KeyError(
+                "需要摘要列、一级科目列、二级科目列。"
+                f"当前表头: {list(headers)}"
+            )
+        l3_i = _col_index(headers, l3_col, "三级科目", "正确三级科目", "正确三级")
+        name_i = _col_index(headers, project_col, "项目名称", "标准项目名称", "工程名称")
+        vend_i = _col_index(
+            headers, vendor_col, "供应商名称", "供应商", "收款单位", "收款人"
+        )
         rows: List[dict] = []
         for r in ws.iter_rows(min_row=header_row + 1, values_only=True):
             def col(idx: Optional[int]) -> str:
@@ -428,6 +485,12 @@ def learn_from_ledger(
     auto_taxonomy: bool = True,
     dry_run: bool = False,
     header_row: int = 1,
+    summary_col: Optional[str] = None,
+    l1_col: Optional[str] = None,
+    l2_col: Optional[str] = None,
+    l3_col: Optional[str] = None,
+    project_col: Optional[str] = None,
+    vendor_col: Optional[str] = None,
 ) -> dict:
     """
     把账簿已填的一/二/三级科目写入学习库。
@@ -441,7 +504,15 @@ def learn_from_ledger(
     data_dir = Path(data_dir)
     print(f"从账簿学习: {path}")
     sheet_title, rows = _iter_ledger_learn_rows(
-        path, sheet_name=sheet_name, header_row=header_row
+        path,
+        sheet_name=sheet_name,
+        header_row=header_row,
+        summary_col=summary_col,
+        l1_col=l1_col,
+        l2_col=l2_col,
+        l3_col=l3_col,
+        project_col=project_col,
+        vendor_col=vendor_col,
     )
     print(f"  工作表: {sheet_title} · 有摘要 {len(rows)} 行")
 

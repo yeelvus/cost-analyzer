@@ -144,6 +144,11 @@ def step_learn_ledger(
     sheet: Optional[str] = None,
     auto_taxonomy: bool = True,
     dry_run: bool = False,
+    header_row: int = 1,
+    summary_col: Optional[str] = None,
+    l1_col: Optional[str] = None,
+    l2_col: Optional[str] = None,
+    l3_col: Optional[str] = None,
 ) -> dict:
     _banner("账簿已填科目 → 写入记忆")
     ensure_code_root()
@@ -152,6 +157,14 @@ def step_learn_ledger(
     path = Path(ledger) if ledger else Path(paths.ledger_xlsx)
     print(f"账簿: {path}")
     print(f"学习库: {paths.classify_data}")
+    if sheet:
+        print(f"工作表: {sheet}")
+    if summary_col or l1_col or l2_col:
+        print(
+            f"列: 摘要={summary_col or '自动'}  "
+            f"一级={l1_col or '自动'}  二级={l2_col or '自动'}  "
+            f"三级={l3_col or '自动/可空'}"
+        )
     if dry_run:
         print("模式: 仅预览，不写 memory / taxonomy")
     stats = learn_from_ledger(
@@ -160,6 +173,11 @@ def step_learn_ledger(
         sheet_name=(sheet or None),
         auto_taxonomy=auto_taxonomy,
         dry_run=dry_run,
+        header_row=header_row,
+        summary_col=summary_col,
+        l1_col=l1_col,
+        l2_col=l2_col,
+        l3_col=l3_col,
     )
     print(f"✅ learn-ledger: learned={stats.get('learned')} unchanged={stats.get('skipped_unchanged')}")
     return stats
