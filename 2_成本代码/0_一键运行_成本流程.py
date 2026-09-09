@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.
+#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -8,7 +8,9 @@ from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent
+SYNC_SCRIPT = BASE_DIR.parent / "0_项目基本信息" / "copy_latest_cost_excel.py"
 SCRIPT_SEQUENCE = [
+    SYNC_SCRIPT,
     BASE_DIR / "成本_汇总按月收集成本统计.py",
     BASE_DIR / "成本_数据分析.py",  # shim → S_数据分析模块/analysis/
     BASE_DIR / "预计毛利率对比_数据统计与环比.py",  # shim → S_数据分析模块/analysis/
@@ -20,7 +22,7 @@ COMPREHENSIVE_HTML_SCRIPT = BASE_DIR.parent / "S_数据分析模块" / "dashboar
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="一键顺序运行成本统计、成本分析和预计毛利率对比脚本"
+        description="一键：STD↔RAW 同步 → 成本汇总 → 成本分析 → 毛利率对比"
     )
     parser.add_argument(
         "--continue-on-error",
