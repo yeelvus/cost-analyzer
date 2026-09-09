@@ -43,6 +43,7 @@ def normalize_header_text(value):
     text = normalize_text(value)
     if not text:
         return ""
+    text = text.replace("&#10;", "").replace("&#13;", "")
     text = text.replace("\n", "").replace("\r", "").replace(" ", "")
     text = text.replace("（", "(").replace("）", ")")
     return text.lower()
@@ -52,7 +53,8 @@ from budget.config import RESP_RAW_DIR, RESP_STD_DIR
 RAW_INPUT_PATH = RESP_RAW_DIR
 TARGET_BASE_PATH = RESP_STD_DIR.parent
 OUTPUT_FOLDER = RESP_STD_DIR
-REPORT_FILE = OUTPUT_FOLDER / "完整处理报告.xlsx"
+REPORT_FILE = OUTPUT_FOLDER / "责任成本汇总.xlsx"
+LEGACY_REPORT_FILE = OUTPUT_FOLDER / "完整处理报告.xlsx"
 LOG_FILE = Path.home() / ".project_cache" / "process_log.txt"
 AMOUNT_THRESHOLD = 100  # 金额阈值，≤100 为异常
 
@@ -88,17 +90,51 @@ def is_major_category(seq_str):
     
     return False
 
-def is_subtotal_row(name):
-    """判断是否为小计行或其他不需要的汇总行"""
-    if not name or not isinstance(name, str):
+def is_category_rollup_row(name):
+    """大类滚计行：小计 / 预计…小计 / 预计总成本合计 / 合同金额。
+
+    不含分部工程合计（如「室外工程合计」「机电工程合计」），那些是直接成本明细。
+    """
+    text = normalize_text(name)
+    if not text:
         return False
-    
-    exclude_keywords = [
-        "小计", "合计", "合同金额",
-        "预计成本合计", "预计收入合计",
-        "预计利润", "毛利"
-    ]
-    return any(kw in name for kw in exclude_keywords)
+    if text in {"小计", "合计"}:
+        return True
+    if "合同金额" in text:
+        return True
+    rollup_keywords = (
+        "预计成本合计",
+        "预计收入合计",
+        "预计总成本",
+        "预计利润",
+        "毛利",
+    )
+    if any(kw in text for kw in rollup_keywords):
+        return True
+    if text.endswith("小计"):
+        return True
+    return False
+
+
+def is_subtotal_row(name):
+    """兼容旧名：仅跳过大类滚计，保留分部「xx工程合计」。"""
+    return is_category_rollup_row(name)
+
+
+def sheet_preference_score(sheet_name):
+    """多 sheet 时优先：澄清稿 > 责任成本书 > 更高报价点。"""
+    name = normalize_text(sheet_name)
+    score = 0
+    if "澄清" in name:
+        score += 100
+    if "责任成本" in name:
+        score += 50
+    if "测算" in name:
+        score += 10
+    point_match = re.search(r"(\d+)\s*点", name)
+    if point_match:
+        score += int(point_match.group(1))
+    return score
 
 def check_amount_anomaly(category_totals):
     """检查汇总金额是否异常"""
@@ -122,7 +158,8 @@ def read_excel_data(excel_file):
     try:
         wb = load_workbook(excel_file, data_only=True)
         
-        for sheet_name in wb.sheetnames:
+        candidates = []
+        for sheet_index, sheet_name in enumerate(wb.sheetnames):
             ws = wb[sheet_name]
             
             rows = []
@@ -176,7 +213,7 @@ def read_excel_data(excel_file):
                 best_col = None
                 best_score = None
                 for candidate_col in amount_cols:
-                    header_text = str(header_row[candidate_col]) if header_row[candidate_col] is not None else ""
+                    header_text = normalize_header_text(header_row[candidate_col])
                     non_null_count = 0
                     non_zero_count = 0
                     for data_row in rows[header_row_idx + 1:]:
@@ -190,9 +227,9 @@ def read_excel_data(excel_file):
                     preference_score = 0
                     if "综合" in header_text:
                         preference_score += 50
-                    if "THB" in header_text.upper() or "泰铢" in header_text:
+                    if "thb" in header_text or "泰铢" in header_text or "铢" in header_text:
                         preference_score += 30
-                    if "CNY" in header_text.upper() or "人民币" in header_text:
+                    if "cny" in header_text or "人民币" in header_text:
                         preference_score -= 20
 
                     score = preference_score + non_zero_count * 2 + non_null_count
@@ -207,15 +244,17 @@ def read_excel_data(excel_file):
             
             if len(rows) > 0 and rows[0]:
                 first_cell_value = normalize_text(rows[0][0].value)
-                if first_cell_value and "项目" in first_cell_value:
-                    project_name = first_cell_value.replace("责任成本书", "").strip()
+                if first_cell_value and first_cell_value != "#REF!":
+                    if "项目" in first_cell_value or "工程" in first_cell_value:
+                        project_name = first_cell_value.replace("责任成本书", "").strip()
             
             header_info = {
                 "seq_header": header_row[seq_col],
                 "name_header": header_row[name_col],
                 "amount_header": header_row[amount_col],
                 "material_header": header_row[material_col] if material_col is not None else "",
-                "construction_header": header_row[construction_col] if construction_col is not None else ""
+                "construction_header": header_row[construction_col] if construction_col is not None else "",
+                "sheet_name": sheet_name,
             }
             
             data_rows = []
@@ -249,8 +288,23 @@ def read_excel_data(excel_file):
                 })
             
             if data_rows:
-                log_message(f"✓ 在工作表 '{sheet_name}' 中找到有效数据")
-                return project_name, data_rows, header_info
+                candidates.append((
+                    sheet_preference_score(sheet_name),
+                    -sheet_index,
+                    sheet_name,
+                    project_name,
+                    data_rows,
+                    header_info,
+                ))
+
+        if candidates:
+            candidates.sort(reverse=True)
+            _, _, sheet_name, project_name, data_rows, header_info = candidates[0]
+            log_message(f"✓ 在工作表 '{sheet_name}' 中找到有效数据")
+            if len(candidates) > 1:
+                others = ", ".join(item[2] for item in candidates[1:])
+                log_message(f"  已忽略其他候选表: {others}")
+            return project_name, data_rows, header_info
         
         log_message(f"⚠ 未找到表头行，跳过 {excel_file.name}")
         return None, [], None
@@ -259,56 +313,94 @@ def read_excel_data(excel_file):
         log_message(f"✗ 读取文件失败 ({excel_file.name}): {e}")
         return None, [], None
 
+def _flush_category_total(category_totals, category, rollup_amount, children_sum, header_amount, has_child_amount):
+    """大类金额：优先小计/滚计，其次子项合计，再次大类行自身金额。"""
+    if not category:
+        return
+    if rollup_amount is not None:
+        category_totals[category] = rollup_amount
+    elif has_child_amount:
+        category_totals[category] = children_sum
+    elif header_amount is not None:
+        category_totals[category] = header_amount
+    else:
+        category_totals[category] = children_sum
+
+
 def process_and_summarize(data_rows):
-    """处理数据行，提取所有成本大类及其子项（遇到收入/利润类大类时停止）"""
+    """处理数据行，提取所有成本大类及其子项（遇到收入/利润类大类时停止）。
+
+    兼容两种源表：
+    - 责任成本书：A / A.1 / A.2
+    - 投标成本测算统计表：A 下为 0101 等分部编码、B.4 机械费、室外工程合计
+    """
     result_rows = []
     category_totals = {}
-    
+
     current_major_category = None
-    current_category_sum = 0
-    
+    current_category_sum = 0.0
+    current_header_amount = None
+    current_rollup_amount = None
+    has_child_amount = False
+
     INCOME_STOP_KEYWORDS = ["收入", "利润", "毛利"]
-    
+
+    def flush_current():
+        _flush_category_total(
+            category_totals,
+            current_major_category,
+            current_rollup_amount,
+            current_category_sum,
+            current_header_amount,
+            has_child_amount,
+        )
+
     for row in data_rows:
         seq = row["序号"]
         name = row["名称"]
-        amount = row["金额"]
-        
-        if is_subtotal_row(name):
+        amount = parse_amount(row["金额"])
+        name_str = normalize_text(name)
+        seq_str = normalize_text(seq)
+
+        if seq is None and name is None and row.get("金额") is None:
             continue
-        
-        if seq is None and name is None and amount is None:
+
+        if is_category_rollup_row(name_str):
+            if current_major_category and amount is not None:
+                # 已有「小计」时，后面的光杆「合计」是 A+B+C 总计，不能覆盖大类
+                if name_str == "合计" and current_rollup_amount is not None:
+                    pass
+                elif "预计总成本" in name_str or "预计成本合计" in name_str:
+                    pass
+                elif "合同金额" in name_str:
+                    pass
+                else:
+                    current_rollup_amount = amount
             continue
-        
-        if seq and is_major_category(seq):
-            if current_major_category:
-                category_totals[current_major_category] = current_category_sum
-            
-            # 遇到收入/利润类大类时停止
-            name_str = str(name) if name else ""
+
+        if seq_str and is_major_category(seq_str):
+            flush_current()
             if any(kw in name_str for kw in INCOME_STOP_KEYWORDS):
+                current_major_category = None
                 break
 
-            current_major_category = seq
-            current_category_sum = 0
+            current_major_category = seq_str
+            current_category_sum = 0.0
+            current_header_amount = amount
+            current_rollup_amount = None
+            has_child_amount = False
             result_rows.append(row)
-        
-        elif current_major_category:
-            if seq is None or (isinstance(seq, str) and not seq.strip()):
-                # 无序号但有名称/金额的行，视为当前大类的子项
-                if name or amount is not None:
-                    result_rows.append(row)
-                    if amount and isinstance(amount, (int, float)):
-                        current_category_sum += amount
+            continue
+
+        if current_major_category:
+            if not name_str and amount is None:
                 continue
-            if isinstance(seq, str) and seq.startswith(current_major_category + '.'):
-                result_rows.append(row)
-                if amount and isinstance(amount, (int, float)):
-                    current_category_sum += amount
-    
-    if current_major_category:
-        category_totals[current_major_category] = current_category_sum
-    
+            result_rows.append(row)
+            if amount is not None:
+                current_category_sum += amount
+                has_child_amount = True
+
+    flush_current()
     return result_rows, category_totals
 
 def extract_contract_amount(data_rows):
@@ -344,8 +436,17 @@ def extract_contract_amount(data_rows):
 
     return income_total if income_total is not None else contract_amount
 
+def resolve_existing_report_file():
+    """优先读新文件名，兼容旧版「完整处理报告.xlsx」。"""
+    if REPORT_FILE.exists():
+        return REPORT_FILE
+    if LEGACY_REPORT_FILE.exists():
+        return LEGACY_REPORT_FILE
+    return REPORT_FILE
+
+
 def read_old_report(report_file):
-    """读取之前生成的完整处理报告"""
+    """读取之前生成的责任成本汇总"""
     if not report_file.exists():
         return None
     try:
@@ -501,11 +602,17 @@ def write_excel_output(data_rows, project_name, output_file, project_code, heade
         wb = Workbook()
         ws = cast(Worksheet, wb.active)
         
+        def display_header(value, default=""):
+            text = normalize_text(value) or default
+            return text.replace("&#10;", "\n").replace("&#13;", "\n")
+
         row_num = 1
         # 首行直接写表头
-        ws.cell(row=row_num, column=1).value = header_info.get("seq_header", "序号")
-        ws.cell(row=row_num, column=2).value = header_info.get("name_header", "名称")
-        ws.cell(row=row_num, column=3).value = header_info.get("amount_header", "金额（人民币）")
+        ws.cell(row=row_num, column=1).value = display_header(header_info.get("seq_header"), "序号")
+        ws.cell(row=row_num, column=2).value = display_header(header_info.get("name_header"), "名称")
+        ws.cell(row=row_num, column=3).value = display_header(
+            header_info.get("amount_header"), "金额（人民币）"
+        )
         ws.cell(row=row_num, column=4).value = "材料合价（THB）"
         ws.cell(row=row_num, column=5).value = "施工合价（THB）"
         row_num += 1
@@ -557,17 +664,17 @@ def write_excel_output(data_rows, project_name, output_file, project_code, heade
         return False
 
 # ============================================================================
-# 第三部分：生成完整报告
+# 第三部分：生成责任成本汇总
 # ============================================================================
 def write_complete_report(report_data, report_file):
     """
-    生成完整处理报告 Excel 文件
+    生成责任成本汇总 Excel 文件
     包含：项目信息、Excel提取情况、处理结果
     """
     try:
         wb = Workbook()
         ws = cast(Worksheet, wb.active)
-        ws.title = "完整处理报告"
+        ws.title = "责任成本汇总"
         
         # 写入表头
         headers = [
@@ -643,11 +750,11 @@ def write_complete_report(report_data, report_file):
         
         # 保存文件
         wb.save(report_file)
-        log_message(f"✓ 生成完整报告: {report_file.name}")
+        log_message(f"✓ 生成责任成本汇总: {report_file.name}")
         return True
     
     except Exception as e:
-        log_message(f"✗ 生成完整报告失败: {e}")
+        log_message(f"✗ 生成责任成本汇总失败: {e}")
         return False
 
 # ============================================================================
@@ -655,10 +762,10 @@ def write_complete_report(report_data, report_file):
 # ============================================================================
 def main():
     log_message("=" * 70)
-    log_message("开始完整处理责任成本文件")
+    log_message("开始处理责任成本文件")
     log_message(f"步骤1: 从 raw 目录读取 Excel 文件")
     log_message(f"步骤2: 处理并生成汇总版本")
-    log_message(f"步骤3: 生成完整报告")
+    log_message(f"步骤3: 生成责任成本汇总")
     log_message("=" * 70)
     
     # 创建目标文件夹
@@ -832,14 +939,14 @@ def main():
             })
     
     # ========================================================================
-    # 步骤3: 生成完整报告
+    # 步骤3: 生成责任成本汇总
     # ========================================================================
     log_message("\n" + "=" * 70)
-    log_message("步骤3: 生成完整报告")
+    log_message("步骤3: 生成责任成本汇总")
     log_message("=" * 70)
     
     # 读取旧报告数据（用于对比）
-    old_report_data = read_old_report(REPORT_FILE)
+    old_report_data = read_old_report(resolve_existing_report_file())
 
     # 合并旧报告中的项目，避免本次汇总缺失历史项目
     if old_report_data:
@@ -889,7 +996,14 @@ def main():
     log_message(f"  成功输出汇总: {processed_count} 个文件")
     log_message(f"  异常未输出: {anomaly_count} 个文件")
     log_message(f"  处理失败: {failed_count} 个文件")
-    log_message(f"  完整报告: {REPORT_FILE}")
+    if LEGACY_REPORT_FILE.exists() and LEGACY_REPORT_FILE != REPORT_FILE:
+        try:
+            LEGACY_REPORT_FILE.unlink()
+            log_message(f"✓ 已移除旧文件: {LEGACY_REPORT_FILE.name}")
+        except OSError as e:
+            log_message(f"⚠ 未能移除旧文件 {LEGACY_REPORT_FILE.name}: {e}")
+
+    log_message(f"  责任成本汇总: {REPORT_FILE}")
     log_message("=" * 70)
 
 if __name__ == "__main__":
