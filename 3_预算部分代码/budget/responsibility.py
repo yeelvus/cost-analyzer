@@ -20,7 +20,7 @@ def normalize_text(value):
     text = str(value).strip()
     if text.lower() == "nan":
         return ""
-    return text
+    return re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", text)
 
 def parse_amount(value):
     """Parse numeric amounts from cells or strings."""
@@ -49,6 +49,7 @@ def normalize_header_text(value):
     return text.lower()
 
 from budget.config import RESP_RAW_DIR, RESP_STD_DIR
+from budget.xlsx_safe import excel_cell_value, safe_save_workbook
 
 RAW_INPUT_PATH = RESP_RAW_DIR
 TARGET_BASE_PATH = RESP_STD_DIR.parent
@@ -154,9 +155,10 @@ def check_amount_anomaly(category_totals):
     return False, "正常"
 
 def read_excel_data(excel_file):
-    """读取 Excel 文件，提取序号、名称、金额三列"""
+    """读取 Excel 文件，提取序号、名称、金额三列。只读不写回源文件。"""
+    wb = None
     try:
-        wb = load_workbook(excel_file, data_only=True)
+        wb = load_workbook(excel_file, data_only=True, keep_links=False)
         
         candidates = []
         for sheet_index, sheet_name in enumerate(wb.sheetnames):
@@ -312,6 +314,12 @@ def read_excel_data(excel_file):
     except Exception as e:
         log_message(f"✗ 读取文件失败 ({excel_file.name}): {e}")
         return None, [], None
+    finally:
+        if wb is not None:
+            try:
+                wb.close()
+            except Exception:
+                pass
 
 def _flush_category_total(category_totals, category, rollup_amount, children_sum, header_amount, has_child_amount):
     """大类金额：优先小计/滚计，其次子项合计，再次大类行自身金额。"""
@@ -450,20 +458,23 @@ def read_old_report(report_file):
     if not report_file.exists():
         return None
     try:
-        wb = load_workbook(report_file, data_only=True)
-        ws = wb.active
-        old_data = []
-        for row_idx, row in enumerate(ws.iter_rows(values_only=True), 1):
-            if row_idx == 1:
-                # 表头行
-                headers = row
-                continue
-            # 跳过空行
-            if not row[0]:
-                continue
-            row_dict = {headers[col_idx]: row[col_idx] for col_idx in range(len(headers)) if col_idx < len(row)}
-            old_data.append(row_dict)
-        return old_data
+        wb = load_workbook(report_file, data_only=True, keep_links=False)
+        try:
+            ws = wb.active
+            old_data = []
+            for row_idx, row in enumerate(ws.iter_rows(values_only=True), 1):
+                if row_idx == 1:
+                    # 表头行
+                    headers = row
+                    continue
+                # 跳过空行
+                if not row[0]:
+                    continue
+                row_dict = {headers[col_idx]: row[col_idx] for col_idx in range(len(headers)) if col_idx < len(row)}
+                old_data.append(row_dict)
+            return old_data
+        finally:
+            wb.close()
     except Exception as e:
         log_message(f"⚠ 读取旧报告失败: {e}")
         return None
@@ -618,29 +629,29 @@ def write_excel_output(data_rows, project_name, output_file, project_code, heade
         row_num += 1
         
         for row_data in data_rows:
-            ws.cell(row=row_num, column=1).value = row_data.get("序号")
-            ws.cell(row=row_num, column=2).value = row_data.get("名称")
+            ws.cell(row=row_num, column=1).value = excel_cell_value(row_data.get("序号"))
+            ws.cell(row=row_num, column=2).value = excel_cell_value(row_data.get("名称"))
 
             amount_raw = row_data.get("金额")
             amount_num = parse_amount(amount_raw)
             if amount_num is not None:
-                ws.cell(row=row_num, column=3).value = amount_num
+                ws.cell(row=row_num, column=3).value = excel_cell_value(amount_num)
             else:
-                ws.cell(row=row_num, column=3).value = amount_raw
+                ws.cell(row=row_num, column=3).value = excel_cell_value(amount_raw)
 
             material_raw = row_data.get("材料合价（THB）")
             material_num = parse_amount(material_raw)
             if material_num is not None:
-                ws.cell(row=row_num, column=4).value = material_num
+                ws.cell(row=row_num, column=4).value = excel_cell_value(material_num)
             else:
-                ws.cell(row=row_num, column=4).value = material_raw
+                ws.cell(row=row_num, column=4).value = excel_cell_value(material_raw)
 
             construction_raw = row_data.get("施工合价（THB）")
             construction_num = parse_amount(construction_raw)
             if construction_num is not None:
-                ws.cell(row=row_num, column=5).value = construction_num
+                ws.cell(row=row_num, column=5).value = excel_cell_value(construction_num)
             else:
-                ws.cell(row=row_num, column=5).value = construction_raw
+                ws.cell(row=row_num, column=5).value = excel_cell_value(construction_raw)
             row_num += 1
 
         # 金额列统一设置为带千分位逗号格式
@@ -655,7 +666,7 @@ def write_excel_output(data_rows, project_name, output_file, project_code, heade
         ws.column_dimensions["D"].width = 18
         ws.column_dimensions["E"].width = 18
         
-        wb.save(output_file)
+        safe_save_workbook(wb, output_file)
         log_message(f"✓ 生成汇总文件: {output_file.name}")
         return True
     
@@ -693,7 +704,7 @@ def write_complete_report(report_data, report_file):
         for row_idx, data in enumerate(report_data, 2):
             for header, value in data.items():
                 if header in header_to_col:
-                    ws.cell(row=row_idx, column=header_to_col[header]).value = value
+                    ws.cell(row=row_idx, column=header_to_col[header]).value = excel_cell_value(value)
 
             is_normal = data.get("异常标记", "") == "正常"
             if is_normal:
@@ -749,7 +760,7 @@ def write_complete_report(report_data, report_file):
             ws.column_dimensions[get_column_letter(col_idx)].width = width
         
         # 保存文件
-        wb.save(report_file)
+        safe_save_workbook(wb, report_file)
         log_message(f"✓ 生成责任成本汇总: {report_file.name}")
         return True
     
@@ -978,10 +989,13 @@ def main():
         log_message(f"✓ 检测到 {len(changes)} 个数据变化")
         # 打开报告文件，追加变化追踪sheet
         try:
-            wb = load_workbook(REPORT_FILE)
-            write_changes_tracking(wb, changes)
-            wb.save(REPORT_FILE)
-            log_message("✓ 已追加数据变化追踪sheet")
+            wb = load_workbook(REPORT_FILE, keep_links=False)
+            try:
+                write_changes_tracking(wb, changes)
+                safe_save_workbook(wb, REPORT_FILE)
+                log_message("✓ 已追加数据变化追踪sheet")
+            finally:
+                wb.close()
         except Exception as e:
             log_message(f"✗ 追加变化追踪失败: {e}")
     else:

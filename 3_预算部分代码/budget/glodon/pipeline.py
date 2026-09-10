@@ -64,6 +64,7 @@ from budget.config import (  # noqa: E402
     TOTAL_SUMMARY_PREFIX,
     UNIT_COL,
 )
+from budget.xlsx_safe import sanitize_xlsx, safe_save_workbook
 from budget.units import (  # noqa: E402
     MATERIAL_BASE_UNITS as MATERIAL_UNITS,
     normalize_unit,
@@ -760,7 +761,7 @@ def process_file(in_path, out_dir, selected_cols_global=None):
 
     # 保存
     try:
-        wb.save(out_path)
+        safe_save_workbook(wb, out_path)
         logger.info(f"  已生成：{out_path}")
     except Exception as e:
         logger.error(f"  保存失败：{e}")
@@ -1193,6 +1194,8 @@ def generate_summary_report(folder):
                 cell.font = sum_font
             
             ws_mat.freeze_panes = "A2"
+
+        sanitize_xlsx(output_path)
 
         # 删除旧的“所有标段总汇总”Excel，仅保留当前新文件
         cleanup_old_total_summary_excels(folder, output_path)
