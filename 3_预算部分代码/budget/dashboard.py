@@ -1411,7 +1411,7 @@ def parse_args():
     parser.add_argument(
         "--output-html",
         default="",
-        help="输出HTML路径（不填默认写到 Z_report/总汇总项目看板.html）",
+        help="输出HTML路径（不填默认写到 0_html/总汇总项目看板.html）",
     )
     return parser.parse_args()
 

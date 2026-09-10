@@ -10,7 +10,7 @@
 4. master 全月份（可选）          → 多月趋势
 
 输出：
-  Z_report/全过程成本分析看板_最新.html
+  0_html/全过程成本分析看板_最新.html
 
 用法：
   python build_full_lifecycle_dashboard.py
