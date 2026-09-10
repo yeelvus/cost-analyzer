@@ -53,7 +53,7 @@ python3 build_unified_cost_dashboard.py
 python3 2_成本代码/成本_数据分析.py
 ```
 
-输出一般在数据目录 `01成本统计/Z_report/`（见根目录 `settings.py`）。
+HTML 输出在数据目录 `01成本统计/0_html/`（也可写成 `html`）；Excel 报告仍在 `Z_report/`。
 
 ## 与流水线的关系
 

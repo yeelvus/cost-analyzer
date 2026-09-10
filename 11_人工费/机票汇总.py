@@ -25,11 +25,18 @@ from common.project import (
 )
 from common.excel import apply_common_excel_layout
 from settings import MATCH_DB_PATH as _SETTINGS_MATCH_DB_PATH, REPORT_ROOT
+from common.paths import html_data_path, raw_data_path
 
 
 # ====================== 配置区 ======================
 class Config:
-    INPUT_SOURCE = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_2_飞签机票/A_飞签台账_raw"
+    INPUT_SOURCE = str(
+        raw_data_path(
+            "人工费",
+            "机票",
+            legacy=Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻\u200d♂️/A_2_飞签机票/A_飞签台账_raw'),
+        )
+    )
     INPUT_GLOB = "*.xlsx"
 
     MAPPING_EXCEL_PATH = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
@@ -757,7 +764,7 @@ def main():
     print("\n🎉 机票台账处理完成！")
 
     # ========== 输出 HTML 分析报告 ==========
-    html_path = Path(Config.OUTPUT_Z_REPORT) / "机票分析报告.html"
+    html_path = html_data_path() / "机票分析报告.html"
     build_html_report(df, out_path=html_path)
     print(f"✅ HTML 报告已输出：{html_path}")
 

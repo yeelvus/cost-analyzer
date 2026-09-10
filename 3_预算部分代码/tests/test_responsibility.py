@@ -7,8 +7,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+CODE = ROOT.parent
+for _p in (str(CODE), str(ROOT)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from budget.responsibility import (  # noqa: E402
     extract_contract_amount,
@@ -19,7 +21,13 @@ from budget.responsibility import (  # noqa: E402
     sheet_preference_score,
 )
 
-RESP_RAW = Path.home() / "Desktop/邯郸中材/01成本统计/3.1_责任成本/1_责任成本_raw"
+from common.paths import raw_data_path  # noqa: E402
+
+RESP_RAW = raw_data_path(
+    "责任成本",
+    legacy=Path.home() / "Desktop/邯郸中材/01成本统计/3.1_责任成本/1_责任成本_raw",
+    create=False,
+)
 JINGSAI = RESP_RAW / "THCC-2026-005_晶赛科技.xlsx"
 TIANDUN = RESP_RAW / "THCC-2026-004_天顿科技.xlsx"
 

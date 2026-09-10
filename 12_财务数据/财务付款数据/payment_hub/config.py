@@ -3,20 +3,32 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 CODE_DIR = Path(__file__).resolve().parent.parent  # 财务付款数据/
-DESKTOP_COST = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
+_CODE_ROOT = CODE_DIR.parent.parent
+if str(_CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_CODE_ROOT))
+
+from common.paths import html_data_path, raw_data_path  # noqa: E402
+from settings import DATA_ROOT, REPORT_ROOT  # noqa: E402
+
+DESKTOP_COST = DATA_ROOT
 PAY_ROOT = DESKTOP_COST / "12-财务数据💰" / "A_财务付款数据"
-REPORT_ROOT = DESKTOP_COST / "Z_report"
 
 
 @dataclass
 class Paths:
     """全流程路径。"""
 
-    raw_dir: Path = field(default_factory=lambda: PAY_ROOT / "A_财务付款_raw")
+    raw_dir: Path = field(
+        default_factory=lambda: raw_data_path(
+            "财务付款",
+            legacy=PAY_ROOT / "A_财务付款_raw",
+        )
+    )
     # raw 标准化合并结果（第一步 raw_std）
     raw_std_dir: Path = field(
         default_factory=lambda: PAY_ROOT / "A1_财务付款_raw_std"
@@ -37,8 +49,7 @@ class Paths:
     )
 
     cashflow_html: Path = field(
-        default_factory=lambda: REPORT_ROOT
-        / "财务付款"
+        default_factory=lambda: html_data_path("财务付款")
         / "财务付款项目现金流量分析.html"
     )
     project_info_xlsx: Path = field(

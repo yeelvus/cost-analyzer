@@ -77,10 +77,17 @@ import pandas as pd
 # ── paths ──────────────────────────────────────────────────────────
 try:
     from settings import CODE_ROOT, DATA_ROOT, REPORT_ROOT
+    from common.paths import html_data_path
 except Exception:
     CODE_ROOT = Path(__file__).resolve().parents[2]  # .../code
     DATA_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
     REPORT_ROOT = DATA_ROOT / "Z_report"
+
+    def html_data_path(*parts, create=True):
+        p = DATA_ROOT.joinpath("0_html", *parts)
+        if create:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
 
 BUDGET_STD_DIR = DATA_ROOT / "3_预算部分" / "2_人材机_std"
 INDEX_XLSX = DATA_ROOT / "18_output" / "项目汇总索引.xlsx"
@@ -1063,14 +1070,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="预算 vs 过程 · 人材机结构对比（可每月重跑）")
     parser.add_argument("--fx", type=float, default=None, help="CNY→THB 汇率，覆盖 config")
     parser.add_argument("--month", default=None, help="业务月标签，如 2026-06 或 2026年06月")
-    parser.add_argument("--output-dir", default=None, help="输出目录，默认 Z_report")
+    parser.add_argument("--output-dir", default=None, help="输出目录，默认 0_html")
     parser.add_argument("--no-html", action="store_true", help="只生成 Excel")
     parser.add_argument("--open", action="store_true", help="生成后尝试打开 HTML")
     args = parser.parse_args(argv)
 
     cfg = load_or_init_config()
     fx = args.fx if args.fx is not None else float(cfg.get("fx_cny_to_thb", DEFAULT_FX_CNY_TO_THB))
-    out_dir = Path(args.output_dir) if args.output_dir else REPORT_ROOT
+    out_dir = Path(args.output_dir) if args.output_dir else html_data_path()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")

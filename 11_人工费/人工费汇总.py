@@ -26,11 +26,18 @@ from common.project import (
 )
 from common.excel import apply_common_excel_layout
 from settings import MATCH_DB_PATH as _SETTINGS_MATCH_DB_PATH
+from common.paths import html_data_path, raw_data_path
 
 # ====================== 配置区 ======================
 class Config:
     # 输入
-    INPUT_SOURCE = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_1_人工费台账/A_人工费台账_raw"
+    INPUT_SOURCE = str(
+        raw_data_path(
+            "人工费",
+            "人工费台账",
+            legacy=Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻\u200d♂️/A_1_人工费台账/A_人工费台账_raw'),
+        )
+    )
     INPUT_GLOB = "泰国子公司项目人工费统计台账*.xlsx"
     
     # 项目匹配
@@ -938,7 +945,7 @@ def main():
     for project in project_data:
         project_data[project].sort(key=lambda x: x.month)
 
-    html_file = Path(Config.OUTPUT_Z_REPORT) / f'人工费汇总分析_{base_name}.html'
+    html_file = html_data_path() / f'人工费汇总分析_{base_name}.html'
     html_content = make_labor_html(project_data, months_sorted)
     html_file.write_text(html_content, encoding='utf-8')
     print(f"✅ HTML 图表生成完成：{html_file}")

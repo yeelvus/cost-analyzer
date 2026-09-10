@@ -6,8 +6,18 @@ import importlib.util
 
 # ===== 项目配置与客户映射 =====
 CODE_ROOT = os.path.dirname(os.path.abspath(__file__))
+_CODE_ROOT = os.path.dirname(CODE_ROOT)
+if _CODE_ROOT not in sys.path:
+    sys.path.insert(0, _CODE_ROOT)
+from common.paths import raw_data_path  # noqa: E402
+
 DEFAULT_DATA_WORKSPACE = '/Users/wyattsun/Desktop/邯郸中材/01成本统计'
-DEFAULT_RAW_DATA_DIR = '/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_商混站🚛/A_商混站_raw'
+DEFAULT_RAW_DATA_DIR = str(
+    raw_data_path(
+        "商混站",
+        legacy='/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_商混站🚛/A_商混站_raw',
+    )
+)
 DEFAULT_STD_OUTPUT_DIR = '/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_商混站🚛/B_商混站_std'
 
 

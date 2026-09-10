@@ -26,10 +26,22 @@ for p in (str(MACHINE_CODE_DIR), str(CODE_ROOT)):
 
 try:
     from settings import DATA_ROOT, MATCH_DB_PATH, REPORT_ROOT  # type: ignore
+    from common.paths import html_data_path, raw_data_path  # type: ignore
 except Exception:
     DATA_ROOT = Path(os.environ.get("COST_DATA_ROOT", str(Path.home() / "Desktop/邯郸中材/01成本统计")))
     MATCH_DB_PATH = CODE_ROOT / "0_项目基本信息" / "project_name_match_db.json"
     REPORT_ROOT = DATA_ROOT / "Z_report"
+
+    def raw_data_path(*parts, legacy=None, create=True):  # type: ignore
+        if legacy:
+            return Path(legacy)
+        return DATA_ROOT.joinpath("0_Raw", *parts)
+
+    def html_data_path(*parts, create=True):  # type: ignore
+        p = DATA_ROOT.joinpath("0_html", *parts)
+        if create:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
 
 
 def first_existing(*candidates: Path) -> Path:
@@ -42,12 +54,12 @@ def first_existing(*candidates: Path) -> Path:
 MACHINE_ROOT = first_existing(DATA_ROOT / "10_机具费🚜", DATA_ROOT / "10_机具费")
 
 # ---------- 数据目录（A→F 顺序）----------
-RAW_DIR = MACHINE_ROOT / "A_机具费_raw"                 # A 原始台账
+RAW_DIR = raw_data_path("机具费", legacy=MACHINE_ROOT / "A_机具费_raw")  # 原始台账 → 0_Raw
 RAW_SUM_DIR = MACHINE_ROOT / "B_机具费_raw_sum"         # B 过程合并
 RAW_SPLIT_DIR = MACHINE_ROOT / "C_机具费_raw_split"     # C 原始拆分
 STD_SUM_DIR = MACHINE_ROOT / "D_机具费_std_sum"         # D 标准汇总
 STD_SPLIT_DIR = MACHINE_ROOT / "E_机具费_std_split"     # E 标准拆分
-REPORT_DIR = REPORT_ROOT / "机具费分析"                 # 分析报告 HTML / Excel（Z_report）
+REPORT_DIR = html_data_path("机具费分析")  # HTML 分析报告 → 0_html
 LEGACY_REPORT_DIR = MACHINE_ROOT / "F_机具费_report"    # 旧分析报告目录
 
 # 兼容旧路径（回退查找 / 迁移源）

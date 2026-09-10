@@ -24,7 +24,21 @@ from project_name_matcher import (
 from excel_formatting_utils import apply_common_excel_layout
 
 # ====================== 配置区 ======================
-excel_path = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_材料欠款/A_材料欠款_raw/泰国子公司各项目采购欠款汇总7.31.xlsx"
+_CODE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _CODE_ROOT not in sys.path:
+    sys.path.insert(0, _CODE_ROOT)
+from common.paths import iter_excel_files, raw_data_path  # noqa: E402
+
+_raw_dir = raw_data_path(
+    "材料欠款",
+    legacy="/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_材料欠款/A_材料欠款_raw",
+)
+_raw_files = iter_excel_files(_raw_dir)
+excel_path = (
+    str(_raw_files[0])
+    if _raw_files
+    else os.path.join(str(_raw_dir), "泰国子公司各项目采购欠款汇总7.31.xlsx")
+)
 db_path = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
 
 # 输出目录（模块自己的 std，不写 Z_report）

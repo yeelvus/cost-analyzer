@@ -28,16 +28,16 @@
 ## 数据流
 
 ```text
-1_广联达导出人材料机_raw
+0_Raw/3_预算部分（广联达原始导出）
         │  budget glodon
         ▼
-2_人材机_std/*_processed.xlsx
+3_预算部分/2_人材机_std/*_processed.xlsx
         + 【总汇总】所有标段.xlsx
         │  budget dashboard
         ▼
 总汇总项目看板.html
 
-3.1_责任成本/1_责任成本_raw
+0_Raw/3.1_责任成本
         │  budget responsibility
         ▼
 3.1_责任成本/2_责任成本_std + 责任成本汇总.xlsx
@@ -85,9 +85,9 @@ export COST_DATA_ROOT="/Users/wyattsun/Desktop/邯郸中材/01成本统计"
 
 | 配置 | 含义 |
 |------|------|
-| `GLODON_RAW_DIR` | 广联达原始导出 |
+| `GLODON_RAW_DIR` | 广联达原始导出（`0_Raw/3_预算部分`） |
 | `GLODON_STD_DIR` | 标准化 + 总汇总输出 |
-| `RESP_RAW_DIR` / `RESP_STD_DIR` | 责任成本 |
+| `RESP_RAW_DIR` / `RESP_STD_DIR` | 责任成本 raw 在 `0_Raw/3.1_责任成本` |
 
 ## 扩展新功能
 

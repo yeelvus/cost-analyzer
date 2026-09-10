@@ -22,6 +22,7 @@ if str(CODE_ROOT) not in sys.path:
 
 try:
     from settings import DATA_ROOT, MATCH_DB_PATH, REPORT_ROOT  # type: ignore
+    from common.paths import html_data_path, raw_data_path  # type: ignore
 except Exception:
     DATA_ROOT = Path(
         os.environ.get(
@@ -32,15 +33,32 @@ except Exception:
     MATCH_DB_PATH = CODE_ROOT / "0_项目基本信息" / "project_name_match_db.json"
     REPORT_ROOT = DATA_ROOT / "Z_report"
 
+    def raw_data_path(*parts, legacy=None, create=True):  # type: ignore
+        if legacy:
+            return Path(legacy)
+        return DATA_ROOT.joinpath("0_Raw", *parts)
+
+    def html_data_path(*parts, create=True):  # type: ignore
+        p = DATA_ROOT.joinpath("0_html", *parts)
+        if create:
+            (p if parts else p).mkdir(parents=True, exist_ok=True)
+        return p
+
 # ---------- 广联达人材机路径 ----------
 BUDGET_ROOT = DATA_ROOT / "3_预算部分"
-GLODON_RAW_DIR = BUDGET_ROOT / "1_广联达导出人材料机_raw"
+GLODON_RAW_DIR = raw_data_path(
+    "预算部分",
+    legacy=BUDGET_ROOT / "1_广联达导出人材料机_raw",
+)
 GLODON_STD_DIR = BUDGET_ROOT / "2_人材机_std"
 PROJECT_CODE_MAPPING_XLSX = DATA_ROOT / "0_项目基本信息情况" / "项目编码名称汇总.xlsx"
 
 # ---------- 责任成本路径 ----------
 RESP_ROOT = DATA_ROOT / "3.1_责任成本"
-RESP_RAW_DIR = RESP_ROOT / "1_责任成本_raw"
+RESP_RAW_DIR = raw_data_path(
+    "责任成本",
+    legacy=RESP_ROOT / "1_责任成本_raw",
+)
 RESP_STD_DIR = RESP_ROOT / "2_责任成本_std"
 
 # ---------- 广联达处理参数 ----------
@@ -69,7 +87,7 @@ CNY_TO_THB_RATE = 5.0
 MATERIAL_SHEET_NAME = "材料汇总"
 UNIT_ANOMALY_SHEET = "单位异常明细"
 DASHBOARD_HTML_NAME = "总汇总项目看板.html"
-DASHBOARD_HTML_PATH = REPORT_ROOT / DASHBOARD_HTML_NAME
+DASHBOARD_HTML_PATH = html_data_path() / DASHBOARD_HTML_NAME
 
 # include_kw, exclude_kw, unit_codes（标准码；空=不限制单位）
 # 砂浆/碎石允许 m³ 与 t/kg（重量按容重折 m³，见 budget.units）

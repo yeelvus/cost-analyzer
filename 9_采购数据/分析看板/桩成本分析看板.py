@@ -47,7 +47,7 @@ except Exception:
     SUMMARY_INPUT_ROOTS = [
         _DATA_ROOT / "E_采购部采购台账_sum",
     ]
-    ANALYSIS_OUTPUT_ROOT = _PROJECT_ROOT / "Z_report" / "C_采购数据分析"
+    ANALYSIS_OUTPUT_ROOT = _PROJECT_ROOT / "0_html" / "采购数据分析"
 INPUT_GLOB = "*std_sum*.xlsx"
 DEFAULT_SHEET_NAME = "合并数据"
 OUTPUT_SUFFIX = "_桩成本分析看板"

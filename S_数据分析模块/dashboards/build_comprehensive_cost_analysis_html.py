@@ -81,6 +81,7 @@ import pandas as pd
 # 复用项目设置与路径
 try:
     from settings import DATA_ROOT, REPORT_ROOT, data_path, report_path
+    from common.paths import html_data_path
     from common.paths import find_latest_excel_file as _common_find_latest  # type: ignore
 except Exception:
     DATA_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
@@ -89,11 +90,17 @@ except Exception:
     report_path = lambda *p: REPORT_ROOT.joinpath(*p)
     _common_find_latest = None
 
+    def html_data_path(*parts, create=True):
+        p = DATA_ROOT.joinpath("0_html", *parts)
+        if create:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
+
 
 # ==================== 默认路径（与现有成本流程对齐） ====================
 DEFAULT_SUMMARY_DIR = DATA_ROOT / "2_成本统计收集" / "B_成本统计_sum"
 DEFAULT_INPUT_GLOB = "*项目统计数据汇总*全月份*.xlsx"
-DEFAULT_OUTPUT_HTML = REPORT_ROOT / "项目成本统计综合分析报告.html"
+DEFAULT_OUTPUT_HTML = html_data_path() / "项目成本统计综合分析报告.html"
 
 # 数值列（与成本_数据分析.py 保持一致，扩展）
 NUMERIC_COLS = [

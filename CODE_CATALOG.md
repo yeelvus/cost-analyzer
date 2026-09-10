@@ -7,8 +7,9 @@
 ## 一、总览心智模型
 
 ```text
+0_Raw（数据根下）   全部原始收集；目录名可带 0_/1_ 序号
 0_项目基本信息     主数据：项目编码/别名匹配/单位映射
-编号业务目录       各领域 raw → std → sum（ETL）
+编号业务目录       std / sum（ETL 产物；raw 已集中到 0_Raw）
 2_成本代码         中央聚合 master 宽表 + 一键流程
 S_数据分析模块     看板 / 分析 / 报告（消费 std/sum/master）
 common / settings  公共路径与修正工具
@@ -36,7 +37,7 @@ common / settings  公共路径与修正工具
 | `S_数据分析模块/` | **分析** | 全过程/综合看板、成本分析、配置驱动报告 |
 | `common/` | 公共库 | paths、corrections、excel、project |
 | `templates/` | 资源 | 看板 HTML 模板与 chart.js |
-| `settings.py` | 配置 | `CODE_ROOT` / `DATA_ROOT` / `REPORT_ROOT` |
+| `settings.py` | 配置 | `CODE_ROOT` / `DATA_ROOT` / `REPORT_ROOT`(Excel) / `0_html`(看板) |
 | `WORKFLOW.md` | 文档 | 月度增量与治理目标架构 |
 
 ---

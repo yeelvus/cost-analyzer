@@ -60,12 +60,19 @@ import pandas as pd
 
 try:
     from settings import CODE_ROOT, DATA_ROOT, REPORT_ROOT
+    from common.paths import html_data_path
 except Exception:
     CODE_ROOT = Path(__file__).resolve().parents[2]  # .../code
     DATA_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
     REPORT_ROOT = DATA_ROOT / "Z_report"
 
-OUT_DIR = REPORT_ROOT / "综合成本看板"
+    def html_data_path(*parts, create=True):
+        p = DATA_ROOT.joinpath("0_html", *parts)
+        if create:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
+
+OUT_DIR = html_data_path("综合成本看板")
 ARCHIVE_DIR = OUT_DIR / "archive"
 CONFIG_PATH = CODE_ROOT / "common" / "budget_vs_process_config.json"
 
@@ -896,7 +903,7 @@ def main() -> int:
     (OUT_DIR / "生成信息.txt").write_text("\n".join(info), encoding="utf-8")
 
     # 在 Z_report 放一个跳转说明，避免多入口
-    jump = REPORT_ROOT / "打开综合成本看板.html"
+    jump = html_data_path() / "打开综合成本看板.html"
     jump.write_text(
         f"""<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <meta http-equiv="refresh" content="0;url=综合成本看板/index.html"/>

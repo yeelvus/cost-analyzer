@@ -28,7 +28,7 @@ if str(_CODE_ROOT) not in sys.path:
 if str(PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(PACKAGE_ROOT))
 
-from common.paths import data_path, find_child_dir, find_script as find_script_file
+from common.paths import data_path, find_child_dir, find_script as find_script_file, raw_data_path
 
 _DATA_BASE = data_path("9_采购台账📦")
 _SCRIPT_BASE = PACKAGE_ROOT
@@ -119,10 +119,10 @@ def _resolve_or_create_data_dir(
 
 # ── 数据目录（按流水线 A→F）────────────────────────────────
 # A 原始 → B 去重提取 → C 格式标准 → D 纯合并 → E 标准汇总 → F 按项目拆分
-RAW_DIR = _resolve_or_create_data_dir(
-    "采购部采购台账_raw",
-    DIR_RAW,
-    legacy_names=("A_采购部采购台账_raw",),
+# 原始台账在 0_Raw/9_采购台账（可带序号）；未迁移时回退旧目录
+RAW_DIR = raw_data_path(
+    "采购台账",
+    legacy=_DATA_BASE / DIR_RAW,
 )
 EXTRACT_DIR = _resolve_or_create_data_dir(
     "采购部采购台账_extract",
@@ -164,11 +164,11 @@ PROJECT_INFO_FILE = data_path("0_项目基本信息情况") / "项目基本信�
 # 月度汇率：年月 / 人民币对泰铢 / 美元对泰铢 / 人民币对美元
 FX_RATE_FILE = data_path("0_项目基本信息情况") / "汇率三表.xlsx"
 try:
-    from common.paths import report_path as _report_path
+    from common.paths import html_data_path as _html_data_path
 
-    ANALYSIS_DIR = _report_path("C_采购数据分析")
+    ANALYSIS_DIR = _html_data_path("采购数据分析")
 except Exception:
-    ANALYSIS_DIR = data_path("Z_report") / "C_采购数据分析"
+    ANALYSIS_DIR = data_path("0_html") / "采购数据分析"
 
 # 纯合并（C_std 直接拼表，无内容标准化）→ D_raw_sum
 RAW_SUM_FILE_NAME = "采购部采购台账_raw_sum.xlsx"

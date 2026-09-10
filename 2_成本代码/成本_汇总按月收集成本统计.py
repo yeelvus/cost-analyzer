@@ -33,7 +33,7 @@ DEFAULT_MATCHER_DIR = CODE_ROOT_DIR / "0_项目基本信息"
 CONFIG = {
 "base_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_std",
 "output_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_sum/项目统计数据汇总_全月份.xlsx",
-"profit_rate_chart_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report/项目毛利率变化图.html",
+"profit_rate_chart_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_html/项目毛利率变化图.html",
 "project_matcher_dir": str(DEFAULT_MATCHER_DIR),
 "project_match_db_file": "",
 "project_info_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx",
@@ -464,7 +464,7 @@ COST_FILE_RE_ALT = re.compile(
     r"^(?P<year>\d{4})年(?P<month>\d{1,2})月_成本统计_(?P<project>.+?)\s*\.(?P<ext>xlsx|xls|xlsm)$",
     re.IGNORECASE,
 )
-MONTH_FOLDER_RE = re.compile(r"^(\d{4}年\d{1,2}月)$")
+MONTH_FOLDER_RE = re.compile(r"^(?:\d+(?:\.\d+)?[_-])*(\d{4}年\d{1,2}月)$")
 
 
 def yyyymm_to_month_label(yyyymm: str) -> str:
@@ -514,7 +514,8 @@ def collect_cost_stat_files(base_path: Path):
                 continue
             month_label, project_name = parsed
             if use_folder_month:
-                month_label = root.name
+                m = MONTH_FOLDER_RE.match(root.name)
+                month_label = m.group(1) if m else root.name
             grouped[month_label].append((file, project_name))
     return grouped, skipped
 
@@ -1312,7 +1313,7 @@ def process_all_projects():
 
         chart_output = CONFIG.get("profit_rate_chart_file")
         if not chart_output:
-            chart_output = str(Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report") / "项目毛利率变化图.html")
+            chart_output = str(Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_html") / "项目毛利率变化图.html")
         generate_profit_rate_chart(chart_source_df, chart_output)
         save_db_fn(matcher['db_path'], match_db)
         print(f"✓ 匹配库已保存: {matcher['db_path']}")

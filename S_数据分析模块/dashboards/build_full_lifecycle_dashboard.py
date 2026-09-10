@@ -51,15 +51,22 @@ import pandas as pd
 
 try:
     from settings import DATA_ROOT, REPORT_ROOT
+    from common.paths import html_data_path
 except Exception:
     DATA_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
     REPORT_ROOT = DATA_ROOT / "Z_report"
+
+    def html_data_path(*parts, create=True):
+        p = DATA_ROOT.joinpath("0_html", *parts)
+        if create:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
 
 COMPANY_DIR = DATA_ROOT / "1_成本报公司"
 INDEX_XLSX = DATA_ROOT / "18_output" / "项目汇总索引.xlsx"
 PROJECT_INFO = DATA_ROOT / "0_项目基本信息情况" / "项目基本信息表.xlsx"
 MASTER_XLSX = DATA_ROOT / "2_成本统计收集" / "B_成本统计_sum" / "项目统计数据汇总_全月份.xlsx"
-OUTPUT_HTML = REPORT_ROOT / "全过程成本分析看板_最新.html"
+OUTPUT_HTML = html_data_path() / "全过程成本分析看板_最新.html"
 
 
 # ───────────────────────── helpers ─────────────────────────
@@ -937,7 +944,7 @@ def main():
     projects = enrich(active + done, wan, bud, info)
     trend = load_master_trend()
 
-    REPORT_ROOT.mkdir(parents=True, exist_ok=True)
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     html = build_html(projects, month, report_path.name, trend)
     out = Path(args.output)
     out.write_text(html, encoding="utf-8")

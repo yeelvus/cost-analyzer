@@ -194,10 +194,12 @@ def run_merge_raw(
     from machine.config import LEGACY_STD_DIR
     _cleanup_legacy_clean(LEGACY_STD_DIR)
 
-    files = sorted(
-        f for f in raw_dir.iterdir()
-        if f.suffix.lower() == ".xlsx" and not f.name.startswith("~$")
-    )
+    from common.paths import iter_excel_files as _iter_xlsx
+
+    files = [
+        f for f in _iter_xlsx(raw_dir, recursive=True)
+        if f.suffix.lower() == ".xlsx"
+    ]
     print(f"找到 {len(files)} 个 raw 文件: {[f.name for f in files]}")
     if not files:
         raise FileNotFoundError(f"raw 目录无 xlsx: {raw_dir}")

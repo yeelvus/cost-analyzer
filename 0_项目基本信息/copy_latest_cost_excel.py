@@ -18,11 +18,20 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 from collections import defaultdict
 from pathlib import Path
 
-# 数据目录（脚本已移至 code 目录，路径写死为绝对路径）
-SRC = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/A_成本统计_raw")
+_CODE_ROOT = Path(__file__).resolve().parents[1]
+if str(_CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_CODE_ROOT))
+from common.paths import find_named_dir, month_label_from_dirname, raw_data_path  # noqa: E402
+
+# 原始成本统计在 0_Raw/2_成本统计收集；未迁移时回退旧 raw 目录
+SRC = raw_data_path(
+    "成本统计收集",
+    legacy=Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/A_成本统计_raw"),
+)
 DST = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_std")
 
 EXCEL_EXTS = {".xlsx", ".xls", ".xlsm"}
@@ -64,6 +73,13 @@ def parse_project_name(filename: str) -> str | None:
 
 def month_folder_name(yyyymm: str) -> str:
     return f"{int(yyyymm[:4])}年{int(yyyymm[4:6]):02d}月"
+
+
+def resolve_month_dir(parent: Path, yyyymm: str) -> Path:
+    """已有 1_2026年08月 或 2026年08月 都算同一月份。"""
+    label = month_folder_name(yyyymm)
+    found = find_named_dir(parent, label)
+    return found if found is not None else parent / label
 
 
 def existing_projects_in_dst(dst: Path) -> dict[str, Path]:
@@ -187,7 +203,7 @@ def sync_std_back_to_raw() -> tuple[int, int, int]:
             print(f"  [跳过命名] {src.name}")
             continue
         _project, yyyymm = parsed
-        dest_dir = SRC / month_folder_name(yyyymm)
+        dest_dir = resolve_month_dir(SRC, yyyymm)
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / src.name
         existed = dest.exists()

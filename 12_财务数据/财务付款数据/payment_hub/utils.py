@@ -158,6 +158,8 @@ def list_raw_groups(raw_dir: Path | str) -> List[tuple[str, Path]]:
     规则：只认 raw 下的一级子文件夹；组内多个 Excel 合并处理。
     若一级子目录均无 Excel，但 raw 根目录有 Excel，则回退为单组「未分组」。
     """
+    from common.paths import strip_order_prefix as _strip_pfx
+
     raw_dir = Path(raw_dir)
     if not raw_dir.is_dir():
         return []
@@ -170,7 +172,7 @@ def list_raw_groups(raw_dir: Path | str) -> List[tuple[str, Path]]:
             continue
         if not iter_excel_files(child):
             continue
-        groups.append((child.name, child))
+        groups.append((_strip_pfx(child.name) or child.name, child))
 
     if groups:
         return groups

@@ -56,13 +56,21 @@ import pandas as pd
 
 # ==================== 路径配置（与现有系统一致） ====================
 DATA_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
+try:
+    from common.paths import html_data_path as _html_data_path
+except Exception:
+    def _html_data_path(*parts, create=True):
+        p = DATA_ROOT.joinpath("0_html", *parts)
+        if create:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
 Z_REPORT = DATA_ROOT / "Z_report"
 MASTER_SUMMARY = DATA_ROOT / "2_成本统计收集/B_成本统计_sum/项目统计数据汇总_全月份.xlsx"
 LABOR_SPLIT_DIR = DATA_ROOT / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std/按项目拆分"
 MACHINE_SUM_DIR = DATA_ROOT / "10_机具费🚜/B_机具费_sum"
 PROC_SUM_DIR = DATA_ROOT / "9_采购台账📦/E_采购部采购台账_sum"
 
-OUTPUT_HTML = Z_REPORT / "成本控制看板_最新.html"
+OUTPUT_HTML = _html_data_path() / "成本控制看板_最新.html"
 
 
 def safe_float(v: Any) -> float:
