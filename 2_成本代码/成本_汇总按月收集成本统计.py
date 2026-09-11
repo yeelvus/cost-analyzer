@@ -32,7 +32,7 @@ DEFAULT_MATCHER_DIR = CODE_ROOT_DIR / "0_项目基本信息"
 
 CONFIG = {
 "base_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_std",
-"output_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_sum/项目统计数据汇总_全月份.xlsx",
+"output_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/2_成本统计收集/项目统计数据汇总_全月份.xlsx",
 "profit_rate_chart_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_html/项目毛利率变化图.html",
 "project_matcher_dir": str(DEFAULT_MATCHER_DIR),
 "project_match_db_file": "",
@@ -40,11 +40,11 @@ CONFIG = {
 "finance_payment_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰",
 "contract_management_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑",
 "contract_management_sheet": "1_总包分包汇总(全部)",
-"procurement_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/9_采购台账📦/E_采购部采购台账_sum",
-"tool_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/10_机具费🚜/B_机具费_sum",
-"labor_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std",
-"concrete_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_商混站🚛/B_商混站_std",
-"subcontract_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_分包合同台账_std",
+"procurement_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/9_采购台账",
+"tool_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/10_机具费",
+"labor_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/11_人工费",
+"concrete_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/9.1_商混站",
+"subcontract_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/5.1_分包合同",
 "finance_payment_date": "2026-03-14",
 "rmb_exchange_rate": 5,
 "items": {

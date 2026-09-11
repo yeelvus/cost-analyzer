@@ -42,6 +42,7 @@ from budget.config import (  # noqa: E402
     FINAL_COLUMNS,
     GLODON_RAW_DIR,
     GLODON_STD_DIR,
+    GLODON_SUM_DIR,
     GROUP1,
     GROUP2,
     KEYWORD_IN_SHEETNAME,
@@ -911,7 +912,9 @@ def generate_summary_report(folder):
         total_row[col] = result_df[col].sum()
     result_df = pd.concat([result_df, pd.DataFrame([total_row])], ignore_index=True)
 
-    output_path = os.path.join(folder, TOTAL_SUMMARY_FILENAME)
+    sum_dir = Path(GLODON_SUM_DIR)
+    sum_dir.mkdir(parents=True, exist_ok=True)
+    output_path = str(sum_dir / TOTAL_SUMMARY_FILENAME)
 
     try:
         with pd.ExcelWriter(output_path, engine='openpyxl') as writer:

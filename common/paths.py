@@ -36,6 +36,7 @@ RAW_CREATE_NAMES: dict[str, str] = {
     "采购数据分析": "采购数据分析",
     "综合成本看板": "综合成本看板",
     "财务付款分析": "财务付款",
+    "sum": "0_Sum",
 }
 
 
@@ -186,6 +187,49 @@ def html_data_path(*parts: str, create: bool = True) -> Path:
     return resolve_under(root, *parts, create=create)
 
 
+def discover_sum_root(data_root: Path | None = None) -> Path:
+    """定位 Sum / 0_Sum；没有则使用 0_Sum。"""
+    root = Path(data_root or DATA_ROOT)
+    found = find_named_dir(root, "Sum")
+    if found is not None:
+        return found
+    return root / "0_Sum"
+
+
+def ensure_sum_root() -> Path:
+    root = discover_sum_root()
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+SUM_ROOT = discover_sum_root()
+
+
+def sum_data_path(
+    *parts: str,
+    create: bool = True,
+    legacy: Path | str | None = None,
+) -> Path:
+    """合并汇总 Excel 目录：0_Sum（也可写成 Sum / 1_Sum）。
+
+    写出用 create=True（始终落在 0_Sum）。
+    读取可传 legacy：0_Sum 尚空时回退旧 sum 目录。
+    """
+    root = discover_sum_root()
+    preferred = resolve_under(root, *parts, create=False) if parts else root
+    if _dir_has_entries(preferred):
+        return preferred
+    if legacy:
+        legacy_path = Path(legacy)
+        if _dir_has_entries(legacy_path):
+            return legacy_path
+    if create:
+        root.mkdir(parents=True, exist_ok=True)
+        preferred = resolve_under(root, *parts, create=True) if parts else root
+        preferred.mkdir(parents=True, exist_ok=True)
+    return preferred
+
+
 def raw_data_path(*parts: str, legacy: Path | str | None = None, create: bool = True) -> Path:
     """原始数据目录：优先 0_Raw 下（忽略序号）；若尚未迁移则回退 legacy。"""
     raw_root = discover_raw_root()
@@ -243,16 +287,20 @@ __all__ = [
     "REPORT_ROOT",
     "RAW_ROOT",
     "HTML_ROOT",
+    "SUM_ROOT",
     "EXCEL_EXTS",
     "code_path",
     "data_path",
     "report_path",
     "raw_data_path",
     "html_data_path",
+    "sum_data_path",
     "discover_raw_root",
     "ensure_raw_root",
     "discover_html_root",
     "ensure_html_root",
+    "discover_sum_root",
+    "ensure_sum_root",
     "strip_order_prefix",
     "dir_key",
     "names_match",

@@ -49,12 +49,13 @@ def normalize_header_text(value):
     return text.lower()
 
 from budget.config import RESP_RAW_DIR, RESP_STD_DIR
+from common.paths import sum_data_path
 from budget.xlsx_safe import excel_cell_value, safe_save_workbook
 
 RAW_INPUT_PATH = RESP_RAW_DIR
 TARGET_BASE_PATH = RESP_STD_DIR.parent
 OUTPUT_FOLDER = RESP_STD_DIR
-REPORT_FILE = OUTPUT_FOLDER / "责任成本汇总.xlsx"
+REPORT_FILE = sum_data_path("责任成本", legacy=OUTPUT_FOLDER) / "责任成本汇总.xlsx"
 LEGACY_REPORT_FILE = OUTPUT_FOLDER / "完整处理报告.xlsx"
 LOG_FILE = Path.home() / ".project_cache" / "process_log.txt"
 AMOUNT_THRESHOLD = 100  # 金额阈值，≤100 为异常

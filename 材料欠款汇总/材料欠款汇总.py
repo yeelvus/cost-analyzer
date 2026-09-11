@@ -27,7 +27,7 @@ from excel_formatting_utils import apply_common_excel_layout
 _CODE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _CODE_ROOT not in sys.path:
     sys.path.insert(0, _CODE_ROOT)
-from common.paths import iter_excel_files, raw_data_path  # noqa: E402
+from common.paths import iter_excel_files, raw_data_path, sum_data_path  # noqa: E402
 
 _raw_dir = raw_data_path(
     "材料欠款",
@@ -41,8 +41,8 @@ excel_path = (
 )
 db_path = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
 
-# 输出目录（模块自己的 std，不写 Z_report）
-output_dir = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_材料欠款/B_材料欠款_std"
+# 输出目录（合并汇总 → 0_Sum）
+output_dir = str(sum_data_path("材料欠款"))
 os.makedirs(output_dir, exist_ok=True)
 
 sheet_name = "汇总表"

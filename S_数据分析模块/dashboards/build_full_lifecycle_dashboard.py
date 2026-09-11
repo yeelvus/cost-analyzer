@@ -65,7 +65,11 @@ except Exception:
 COMPANY_DIR = DATA_ROOT / "1_成本报公司"
 INDEX_XLSX = DATA_ROOT / "18_output" / "项目汇总索引.xlsx"
 PROJECT_INFO = DATA_ROOT / "0_项目基本信息情况" / "项目基本信息表.xlsx"
-MASTER_XLSX = DATA_ROOT / "2_成本统计收集" / "B_成本统计_sum" / "项目统计数据汇总_全月份.xlsx"
+try:
+    from common.paths import sum_data_path as _sum_data_path
+    MASTER_XLSX = _sum_data_path("成本统计收集", create=False) / "项目统计数据汇总_全月份.xlsx"
+except Exception:
+    MASTER_XLSX = DATA_ROOT / "0_Sum" / "2_成本统计收集" / "项目统计数据汇总_全月份.xlsx"
 OUTPUT_HTML = html_data_path() / "全过程成本分析看板_最新.html"
 
 

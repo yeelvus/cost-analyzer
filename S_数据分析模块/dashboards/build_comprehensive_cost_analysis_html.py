@@ -98,7 +98,11 @@ except Exception:
 
 
 # ==================== 默认路径（与现有成本流程对齐） ====================
-DEFAULT_SUMMARY_DIR = DATA_ROOT / "2_成本统计收集" / "B_成本统计_sum"
+try:
+    from common.paths import sum_data_path as _sum_data_path
+    DEFAULT_SUMMARY_DIR = _sum_data_path("成本统计收集", create=False)
+except Exception:
+    DEFAULT_SUMMARY_DIR = DATA_ROOT / "0_Sum" / "2_成本统计收集"
 DEFAULT_INPUT_GLOB = "*项目统计数据汇总*全月份*.xlsx"
 DEFAULT_OUTPUT_HTML = html_data_path() / "项目成本统计综合分析报告.html"
 
@@ -457,7 +461,11 @@ def normalize_project_code(value):
 
 def load_procurement_map() -> Dict[str, float]:
     """加载最新采购项目汇总（材）。优先 E_采购部采购台账_sum 下的 merged/标准版。"""
-    base = DATA_ROOT / "9_采购台账📦" / "E_采购部采购台账_sum"
+    try:
+        from common.paths import sum_data_path as _sum_proc
+        base = _sum_proc("采购台账", create=False)
+    except Exception:
+        base = DATA_ROOT / "0_Sum" / "9_采购台账"
     candidates = [
         base / "采购部采购台账_std_merged.xlsx",
         base / "采购部采购台账_标准版.xlsx",

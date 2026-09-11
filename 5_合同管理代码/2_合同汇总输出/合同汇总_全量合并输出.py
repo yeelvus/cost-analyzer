@@ -107,10 +107,18 @@ def export_merged(
         print("\n>>> [0/3] 跳过分包台账全量合并（--skip-subpackage）")
 
     root_dir = root_dir or get_contract_root()
+    try:
+        _code = Path(__file__).resolve().parents[2]
+        if str(_code) not in sys.path:
+            sys.path.insert(0, str(_code))
+        from common.paths import sum_data_path as _sum_data_path
+        default_out = str(_sum_data_path("合同管理") / MERGED_OUTPUT_NAME)
+    except Exception:
+        default_out = os.path.join(root_dir, MERGED_OUTPUT_NAME)
     if not os.path.isdir(root_dir):
         raise FileNotFoundError(f"合同根目录无效：{root_dir}")
 
-    output_path = output_path or os.path.join(root_dir, MERGED_OUTPUT_NAME)
+    output_path = output_path or default_out
     print("\n" + "=" * 80)
     print("合同汇总 · 全量合并输出")
     print("=" * 80)

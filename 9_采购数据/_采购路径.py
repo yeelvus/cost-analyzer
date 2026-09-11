@@ -28,7 +28,13 @@ if str(_CODE_ROOT) not in sys.path:
 if str(PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(PACKAGE_ROOT))
 
-from common.paths import data_path, find_child_dir, find_script as find_script_file, raw_data_path
+from common.paths import (
+    data_path,
+    find_child_dir,
+    find_script as find_script_file,
+    raw_data_path,
+    sum_data_path,
+)
 
 _DATA_BASE = data_path("9_采购台账📦")
 _SCRIPT_BASE = PACKAGE_ROOT
@@ -139,18 +145,13 @@ STD_DIR = _resolve_or_create_data_dir(
     legacy_names=("B_采购部采购台账_std",),  # 旧 B_
 )
 # 注意：keyword 用 raw_sum / sum / std_split，避免「_std」误匹配 std_split
-RAW_SUM_DIR = _resolve_or_create_data_dir(
-    "采购部采购台账_raw_sum",
-    DIR_RAW_SUM,
-    legacy_names=("C_采购部采购台账_raw_sum",),  # 旧 C_
+RAW_SUM_DIR = sum_data_path(
+    "采购台账",
+    legacy=_DATA_BASE / DIR_RAW_SUM,
 )
-SUM_DIR = _resolve_or_create_data_dir(
-    "采购部采购台账_sum",
-    DIR_SUM,
-    legacy_names=(
-        "D_采购部采购台账_sum",  # 旧 D_
-        "B_采购部采购台账_sum",  # 更早历史
-    ),
+SUM_DIR = sum_data_path(
+    "采购台账",
+    legacy=_DATA_BASE / DIR_SUM,
 )
 STD_SPLIT_DIR = _resolve_or_create_data_dir(
     "采购部采购台账_std_split",

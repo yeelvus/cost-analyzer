@@ -25,7 +25,7 @@ from common.project import (
 )
 from common.excel import apply_common_excel_layout
 from settings import MATCH_DB_PATH as _SETTINGS_MATCH_DB_PATH, REPORT_ROOT
-from common.paths import html_data_path, raw_data_path
+from common.paths import html_data_path, raw_data_path, sum_data_path
 
 
 # ====================== 配置区 ======================
@@ -722,7 +722,8 @@ def main():
     # ========== 输出主汇总 Excel ==========
     out_dir = Path(Config.OUTPUT_STD)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "机票汇总.xlsx"
+    out_path = sum_data_path("人工费") / "机票汇总.xlsx"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     display_cols = [c for c in Config.TARGET_COLUMNS if c in df.columns]
 

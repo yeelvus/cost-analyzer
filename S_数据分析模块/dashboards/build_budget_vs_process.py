@@ -77,7 +77,7 @@ import pandas as pd
 # ── paths ──────────────────────────────────────────────────────────
 try:
     from settings import CODE_ROOT, DATA_ROOT, REPORT_ROOT
-    from common.paths import html_data_path
+    from common.paths import html_data_path, sum_data_path as _sum_p
 except Exception:
     CODE_ROOT = Path(__file__).resolve().parents[2]  # .../code
     DATA_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
@@ -89,12 +89,18 @@ except Exception:
             p.mkdir(parents=True, exist_ok=True)
         return p
 
+    def _sum_p(*parts, create=True, legacy=None):
+        p = DATA_ROOT.joinpath("0_Sum", *parts)
+        if create:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
+
 BUDGET_STD_DIR = DATA_ROOT / "3_预算部分" / "2_人材机_std"
 INDEX_XLSX = DATA_ROOT / "18_output" / "项目汇总索引.xlsx"
-LABOR_XLSX = REPORT_ROOT / "人工费汇总.xlsx"
-PROC_SUM = DATA_ROOT / "9_采购台账📦" / "E_采购部采购台账_sum" / "采购部采购台账_std_merged.xlsx"
-MACH_SUM = DATA_ROOT / "10_机具费🚜" / "B_机具费_sum" / "机具费汇总_全量标准化_汇总.xlsx"
-READY_MIX_DIR = REPORT_ROOT
+LABOR_XLSX = _sum_p("人工费", create=False) / "人工费汇总.xlsx"
+PROC_SUM = _sum_p("采购台账", create=False) / "采购部采购台账_std_sum.xlsx"
+MACH_SUM = _sum_p("机具费", create=False) / "机具费汇总_全量标准化_汇总.xlsx"
+READY_MIX_DIR = _sum_p("商混站", create=False)
 CONFIG_PATH = CODE_ROOT / "common" / "budget_vs_process_config.json"
 
 DEFAULT_FX_CNY_TO_THB = 4.90  # 可在 config 或 --fx 覆盖；约 1 CNY ≈ 4.9 THB

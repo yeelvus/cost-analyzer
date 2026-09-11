@@ -26,7 +26,7 @@ from common.project import (
 )
 from common.excel import apply_common_excel_layout
 from settings import MATCH_DB_PATH as _SETTINGS_MATCH_DB_PATH
-from common.paths import html_data_path, raw_data_path
+from common.paths import html_data_path, raw_data_path, sum_data_path
 
 # ====================== 配置区 ======================
 class Config:
@@ -863,8 +863,7 @@ def main():
 
     # ====================== 输出 ======================
     output_files = [
-        Path(Config.OUTPUT_STD) / "人工费汇总.xlsx",
-        Path(Config.OUTPUT_Z_REPORT) / "人工费汇总.xlsx"
+        sum_data_path("人工费") / "人工费汇总.xlsx",
     ]
     metrics = money_columns + ['总人工费']
 

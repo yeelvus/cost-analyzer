@@ -69,6 +69,12 @@ def test_html_key():
     print("html key OK")
 
 
+def test_sum_key():
+    assert dir_key("0_Sum") == "sum"
+    assert dir_key("Sum") == "sum"
+    print("sum key OK")
+
+
 if __name__ == "__main__":
     from tempfile import TemporaryDirectory
 
@@ -77,4 +83,5 @@ if __name__ == "__main__":
     with TemporaryDirectory() as d:
         test_find_named_and_resolve(Path(d))
     test_html_key()
+    test_sum_key()
     print("all path tests OK")

@@ -12,7 +12,7 @@ _CODE_ROOT = CODE_DIR.parent.parent
 if str(_CODE_ROOT) not in sys.path:
     sys.path.insert(0, str(_CODE_ROOT))
 
-from common.paths import html_data_path, raw_data_path  # noqa: E402
+from common.paths import html_data_path, raw_data_path, sum_data_path  # noqa: E402
 from settings import DATA_ROOT, REPORT_ROOT  # noqa: E402
 
 DESKTOP_COST = DATA_ROOT
@@ -40,11 +40,17 @@ class Paths:
     std_dir: Path = field(default_factory=lambda: PAY_ROOT / "B_财务付款_std")
 
     sum_xlsx: Path = field(
-        default_factory=lambda: PAY_ROOT / "C_财务付款_sum" / "财务付款数据汇总.xlsx"
+        default_factory=lambda: sum_data_path(
+            "财务付款",
+            legacy=PAY_ROOT / "C_财务付款_sum",
+        )
+        / "财务付款数据汇总.xlsx"
     )
     amount_mismatch_xlsx: Path = field(
-        default_factory=lambda: PAY_ROOT
-        / "C_财务付款_sum"
+        default_factory=lambda: sum_data_path(
+            "财务付款",
+            legacy=PAY_ROOT / "C_财务付款_sum",
+        )
         / "财务付款_应付与预扣实付不平明细.xlsx"
     )
 

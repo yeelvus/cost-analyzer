@@ -77,18 +77,28 @@ def extract_timestamp_from_name(file_name: str):
 
 
 def find_latest_summary_file(output_dir: Path):
-    if not output_dir.exists():
+    from budget.config import GLODON_SUM_DIR
+
+    search_dirs = []
+    for d in (GLODON_SUM_DIR, output_dir):
+        p = Path(d)
+        if p.exists() and p not in search_dirs:
+            search_dirs.append(p)
+    if not search_dirs:
         raise FileNotFoundError(f"输出目录不存在: {output_dir}")
 
     candidates = []
-    for path in output_dir.iterdir():
-        if not path.is_file():
+    for folder in search_dirs:
+        if not folder.exists():
             continue
-        if not path.name.startswith(SUMMARY_PREFIX):
-            continue
-        if path.suffix.lower() not in {".xlsx", ".xlsm", ".xls"}:
-            continue
-        candidates.append(path)
+        for path in folder.iterdir():
+            if not path.is_file():
+                continue
+            if not path.name.startswith(SUMMARY_PREFIX):
+                continue
+            if path.suffix.lower() not in {".xlsx", ".xlsm", ".xls"}:
+                continue
+            candidates.append(path)
 
     if not candidates:
         raise FileNotFoundError(f"未找到总汇总文件: {output_dir}/{SUMMARY_PREFIX}*.xlsx")

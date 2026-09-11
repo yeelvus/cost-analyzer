@@ -9,7 +9,7 @@ CODE_ROOT = os.path.dirname(os.path.abspath(__file__))
 _CODE_ROOT = os.path.dirname(CODE_ROOT)
 if _CODE_ROOT not in sys.path:
     sys.path.insert(0, _CODE_ROOT)
-from common.paths import raw_data_path  # noqa: E402
+from common.paths import raw_data_path, sum_data_path  # noqa: E402
 
 DEFAULT_DATA_WORKSPACE = '/Users/wyattsun/Desktop/邯郸中材/01成本统计'
 DEFAULT_RAW_DATA_DIR = str(
@@ -719,8 +719,8 @@ def process_concrete_data():
             else:
                 output_base = "搅拌站混凝土汇总报表"
 
-            z_report_dir = '/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report'
-            os.makedirs(z_report_dir, exist_ok=True)
+            sum_dir = str(sum_data_path("商混站"))
+            os.makedirs(sum_dir, exist_ok=True)
 
             def sort_month_cols(cols):
                 return sorted(cols, key=lambda s: (int(str(s).split('-')[0]), int(str(s).split('-')[1])))
@@ -773,13 +773,9 @@ def process_concrete_data():
                 monthly_amount_pivot = monthly_amount_pivot.sort_values(by='项目编码', ascending=False, na_position='last')
 
                 output_name = f"{output_base}{name_suffix}.xlsx"
-                output_path = os.path.join(output_dir, output_name)
+                output_path = os.path.join(sum_dir, output_name)
                 _write_outputs(source_df, detail_summary, customer_summary, monthly_volume_pivot, monthly_amount_pivot, output_path)
-
-                z_report_path = os.path.join(z_report_dir, output_name)
-                import shutil
-                shutil.copy2(output_path, z_report_path)
-                print(f"  已同步到 Z_report: {z_report_path}")
+                print(f"  已写入 0_Sum: {output_path}")
 
             # 保留原始全量版本
             build_and_write_report(merged_df, '')
