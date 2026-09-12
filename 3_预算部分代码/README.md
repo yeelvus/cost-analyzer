@@ -31,16 +31,16 @@
 0_Raw/3_预算部分（广联达原始导出）
         │  budget glodon
         ▼
-3_预算部分/2_人材机_std/*_processed.xlsx
-        + 【总汇总】所有标段.xlsx
+0_Std/3_预算部分/*_processed.xlsx
+0_Sum/3_预算部分/【总汇总】所有标段.xlsx
         │  budget dashboard
         ▼
-总汇总项目看板.html
+0_html/总汇总项目看板.html
 
 0_Raw/3.1_责任成本
         │  budget responsibility
         ▼
-3.1_责任成本/2_责任成本_std + 责任成本汇总.xlsx
+0_Std/3.1_责任成本 + 0_Sum/3.1_责任成本/责任成本汇总.xlsx
 ```
 
 默认 `all` 会按顺序跑完：**广联达 → 看板 → 责任成本**。
@@ -86,8 +86,9 @@ export COST_DATA_ROOT="/Users/wyattsun/Desktop/邯郸中材/01成本统计"
 | 配置 | 含义 |
 |------|------|
 | `GLODON_RAW_DIR` | 广联达原始导出（`0_Raw/3_预算部分`） |
-| `GLODON_STD_DIR` | 标准化 + 总汇总输出 |
-| `RESP_RAW_DIR` / `RESP_STD_DIR` | 责任成本 raw 在 `0_Raw/3.1_责任成本` |
+| `GLODON_STD_DIR` | 标准化中间结果（`0_Std/3_预算部分`） |
+| `GLODON_SUM_DIR` | 总汇总 Excel（`0_Sum/3_预算部分`） |
+| `RESP_RAW_DIR` / `RESP_STD_DIR` | 责任成本 raw 在 `0_Raw`，std 在 `0_Std` |
 
 ## 扩展新功能
 

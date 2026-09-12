@@ -33,6 +33,7 @@ from common.paths import (
     find_child_dir,
     find_script as find_script_file,
     raw_data_path,
+    std_data_path,
     sum_data_path,
 )
 
@@ -130,19 +131,15 @@ RAW_DIR = raw_data_path(
     "采购台账",
     legacy=_DATA_BASE / DIR_RAW,
 )
-EXTRACT_DIR = _resolve_or_create_data_dir(
-    "采购部采购台账_extract",
+EXTRACT_DIR = std_data_path(
+    "采购台账",
     DIR_EXTRACT,
-    legacy_names=(
-        "A_采购部采购台账_extract",  # 旧：与 raw 同为 A_
-        "A_采购台账提取",
-        "B_采购台账提取",
-    ),
+    legacy=_DATA_BASE / DIR_EXTRACT,
 )
-STD_DIR = _resolve_or_create_data_dir(
-    "采购部采购台账_std",
+STD_DIR = std_data_path(
+    "采购台账",
     DIR_STD,
-    legacy_names=("B_采购部采购台账_std",),  # 旧 B_
+    legacy=_DATA_BASE / DIR_STD,
 )
 # 注意：keyword 用 raw_sum / sum / std_split，避免「_std」误匹配 std_split
 RAW_SUM_DIR = sum_data_path(
@@ -153,10 +150,10 @@ SUM_DIR = sum_data_path(
     "采购台账",
     legacy=_DATA_BASE / DIR_SUM,
 )
-STD_SPLIT_DIR = _resolve_or_create_data_dir(
-    "采购部采购台账_std_split",
+STD_SPLIT_DIR = std_data_path(
+    "采购台账",
     DIR_STD_SPLIT,
-    legacy_names=("E_采购部采购台账_std_split",),  # 旧 E_
+    legacy=_DATA_BASE / DIR_STD_SPLIT,
 )
 SIMPLIFY_DIR = find_data_dir("采购部采购台账_simplify")
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-A_成本统计_raw 与 B_成本统计_std 双向同步。
+0_Raw/2_成本统计收集 与 0_Std/2_成本统计收集 双向同步。
 
 默认流程（一键运行会先做这一步）：
 1. 把 STD 里已有文件全部回写到 RAW 对应月份文件夹（覆盖 RAW 同名文件，保留你在 STD 的修改）
@@ -25,14 +25,17 @@ from pathlib import Path
 _CODE_ROOT = Path(__file__).resolve().parents[1]
 if str(_CODE_ROOT) not in sys.path:
     sys.path.insert(0, str(_CODE_ROOT))
-from common.paths import find_named_dir, month_label_from_dirname, raw_data_path  # noqa: E402
+from common.paths import find_named_dir, month_label_from_dirname, raw_data_path, std_data_path  # noqa: E402
 
 # 原始成本统计在 0_Raw/2_成本统计收集；未迁移时回退旧 raw 目录
 SRC = raw_data_path(
     "成本统计收集",
     legacy=Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/A_成本统计_raw"),
 )
-DST = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_std")
+DST = std_data_path(
+    "成本统计收集",
+    legacy=Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_std"),
+)
 
 EXCEL_EXTS = {".xlsx", ".xls", ".xlsm"}
 # 支持 正鑫源项目_成本统计_202604.xlsm 以及 正鑫源项目_成本统计_202604(2).xlsm

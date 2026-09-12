@@ -19,10 +19,11 @@ from typing import List, Dict, Tuple, Optional
 # =========================
 # 配置区域
 # =========================
-SUMMARY_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_分包合同台账_std"
+SUMMARY_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Std/5.1_分包合同"
 # 兼容历史目录名，按顺序查找可用目录
 SUMMARY_DIR_CANDIDATES = [
     SUMMARY_DIR,
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_分包合同台账_std",
     "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_整理标准化汇总分包签订合同文件",
 ]
 CONTRACT_BASE_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑/B_分包合同"

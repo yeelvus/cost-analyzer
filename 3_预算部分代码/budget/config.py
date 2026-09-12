@@ -22,7 +22,7 @@ if str(CODE_ROOT) not in sys.path:
 
 try:
     from settings import DATA_ROOT, MATCH_DB_PATH, REPORT_ROOT  # type: ignore
-    from common.paths import html_data_path, raw_data_path, sum_data_path  # type: ignore
+    from common.paths import html_data_path, raw_data_path, std_data_path, sum_data_path  # type: ignore
 except Exception:
     DATA_ROOT = Path(
         os.environ.get(
@@ -50,14 +50,27 @@ except Exception:
             p.mkdir(parents=True, exist_ok=True)
         return p
 
+    def std_data_path(*parts, create=True, legacy=None):  # type: ignore
+        if not create and legacy:
+            lp = Path(legacy)
+            if lp.exists():
+                return lp
+        p = DATA_ROOT.joinpath("0_Std", *parts)
+        if create:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
+
 # ---------- 广联达人材机路径 ----------
 BUDGET_ROOT = DATA_ROOT / "3_预算部分"
 GLODON_RAW_DIR = raw_data_path(
     "预算部分",
     legacy=BUDGET_ROOT / "1_广联达导出人材料机_raw",
 )
-GLODON_STD_DIR = BUDGET_ROOT / "2_人材机_std"
-GLODON_SUM_DIR = sum_data_path("预算部分", legacy=GLODON_STD_DIR)
+GLODON_STD_DIR = std_data_path(
+    "预算部分",
+    legacy=BUDGET_ROOT / "2_人材机_std",
+)
+GLODON_SUM_DIR = sum_data_path("预算部分", legacy=BUDGET_ROOT / "2_人材机_std")
 PROJECT_CODE_MAPPING_XLSX = DATA_ROOT / "0_项目基本信息情况" / "项目编码名称汇总.xlsx"
 
 # ---------- 责任成本路径 ----------
@@ -66,7 +79,10 @@ RESP_RAW_DIR = raw_data_path(
     "责任成本",
     legacy=RESP_ROOT / "1_责任成本_raw",
 )
-RESP_STD_DIR = RESP_ROOT / "2_责任成本_std"
+RESP_STD_DIR = std_data_path(
+    "责任成本",
+    legacy=RESP_ROOT / "2_责任成本_std",
+)
 
 # ---------- 广联达处理参数 ----------
 AUTO_MODE = True

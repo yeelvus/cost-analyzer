@@ -31,7 +31,7 @@ CODE_ROOT_DIR = SCRIPT_DIR.parent
 DEFAULT_MATCHER_DIR = CODE_ROOT_DIR / "0_项目基本信息"
 
 CONFIG = {
-"base_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_std",
+"base_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Std/2_成本统计收集",
 "output_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/2_成本统计收集/项目统计数据汇总_全月份.xlsx",
 "profit_rate_chart_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_html/项目毛利率变化图.html",
 "project_matcher_dir": str(DEFAULT_MATCHER_DIR),
@@ -492,7 +492,7 @@ def collect_cost_stat_files(base_path: Path):
 
     两种布局都支持：
     - 按月子目录（A_成本统计_raw）
-    - 扁平目录，月份写在文件名里（B_成本统计_std）
+    - 扁平目录，月份写在文件名里（0_Std/2_成本统计收集）
     """
     grouped = defaultdict(list)
     skipped = []

@@ -77,7 +77,7 @@ import pandas as pd
 # ── paths ──────────────────────────────────────────────────────────
 try:
     from settings import CODE_ROOT, DATA_ROOT, REPORT_ROOT
-    from common.paths import html_data_path, sum_data_path as _sum_p
+    from common.paths import html_data_path, std_data_path as _std_p, sum_data_path as _sum_p
 except Exception:
     CODE_ROOT = Path(__file__).resolve().parents[2]  # .../code
     DATA_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
@@ -95,7 +95,14 @@ except Exception:
             p.mkdir(parents=True, exist_ok=True)
         return p
 
-BUDGET_STD_DIR = DATA_ROOT / "3_预算部分" / "2_人材机_std"
+    def _std_p(*parts, create=True, legacy=None):
+        p = DATA_ROOT.joinpath("0_Std", *parts)
+        if create:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
+
+BUDGET_SUM_DIR = _sum_p("预算部分", create=False)
+BUDGET_STD_DIR = _std_p("预算部分", create=False, legacy=DATA_ROOT / "3_预算部分" / "2_人材机_std")
 INDEX_XLSX = DATA_ROOT / "18_output" / "项目汇总索引.xlsx"
 LABOR_XLSX = _sum_p("人工费", create=False) / "人工费汇总.xlsx"
 PROC_SUM = _sum_p("采购台账", create=False) / "采购部采购台账_std_sum.xlsx"
@@ -182,7 +189,9 @@ def budget_to_thb(amount: float, currency: str, fx: float) -> float:
 
 def load_budget(fx: float) -> Tuple[pd.DataFrame, str]:
     """返回预算表（金额已转为万泰铢）与来源说明。"""
-    summary = find_latest(BUDGET_STD_DIR, "【总汇总】所有标段*.xlsx")
+    summary = find_latest(BUDGET_SUM_DIR, "【总汇总】所有标段*.xlsx") or find_latest(
+        BUDGET_STD_DIR, "【总汇总】所有标段*.xlsx"
+    )
     source = ""
     if summary and summary.exists():
         df = pd.read_excel(summary, sheet_name="总汇总")

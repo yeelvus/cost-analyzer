@@ -60,7 +60,7 @@ import pandas as pd
 
 try:
     from settings import CODE_ROOT, DATA_ROOT, REPORT_ROOT
-    from common.paths import html_data_path, sum_data_path as _sum_p
+    from common.paths import html_data_path, std_data_path as _std_p, sum_data_path as _sum_p
 except Exception:
     CODE_ROOT = Path(__file__).resolve().parents[2]  # .../code
     DATA_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
@@ -78,12 +78,19 @@ except Exception:
             p.mkdir(parents=True, exist_ok=True)
         return p
 
+    def _std_p(*parts, create=True, legacy=None):
+        p = DATA_ROOT.joinpath("0_Std", *parts)
+        if create:
+            p.mkdir(parents=True, exist_ok=True)
+        return p
+
 OUT_DIR = html_data_path("综合成本看板")
 ARCHIVE_DIR = OUT_DIR / "archive"
 CONFIG_PATH = CODE_ROOT / "common" / "budget_vs_process_config.json"
 
 COMPANY_DIR = DATA_ROOT / "1_成本报公司"
-BUDGET_STD = DATA_ROOT / "3_预算部分" / "2_人材机_std"
+BUDGET_SUM = _sum_p("预算部分", create=False)
+BUDGET_STD = _std_p("预算部分", create=False, legacy=DATA_ROOT / "3_预算部分" / "2_人材机_std")
 INDEX_XLSX = DATA_ROOT / "18_output" / "项目汇总索引.xlsx"
 LABOR_XLSX = _sum_p("人工费", create=False) / "人工费汇总.xlsx"
 PROC_SUM = _sum_p("采购台账", create=False) / "采购部采购台账_std_sum.xlsx"
@@ -91,7 +98,7 @@ PROC_CAT = _sum_p("采购台账", create=False) / "项目采购分类汇总.xlsx
 MACH_SUM = _sum_p("机具费", create=False) / "机具费汇总_全量标准化_汇总.xlsx"
 SUB_SUM = _sum_p("分包合同", create=False)
 FIN_SUM = _sum_p("财务付款", create=False) / "财务付款数据汇总.xlsx"
-RESP_DIR = DATA_ROOT / "3.1_责任成本" / "2_责任成本_std"
+RESP_DIR = _std_p("责任成本", create=False, legacy=DATA_ROOT / "3.1_责任成本" / "2_责任成本_std")
 INFO_XLSX = DATA_ROOT / "0_项目基本信息情况" / "项目基本信息表.xlsx"
 
 DEFAULT_FX = 4.90
@@ -330,7 +337,9 @@ def load_company(month_hint: Optional[str]) -> Tuple[List[Dict], str, str]:
 
 def load_budget(fx: float) -> Tuple[Dict[str, Dict], Dict[str, Dict], str]:
     """预算人材机 + 材料量。金额→万泰铢。"""
-    summary = find_latest(BUDGET_STD, "【总汇总】所有标段*.xlsx")
+    summary = find_latest(BUDGET_SUM, "【总汇总】所有标段*.xlsx") or find_latest(
+        BUDGET_STD, "【总汇总】所有标段*.xlsx"
+    )
     if not summary:
         return {}, {}, "缺失"
     df = pd.read_excel(summary, sheet_name="总汇总")

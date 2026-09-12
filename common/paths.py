@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""路径工具：数据根、0_Raw，以及忽略 0_/1_/3.1_ 序号前缀的目录匹配。"""
+"""路径工具：数据根、0_Raw / 0_Std / 0_Sum / 0_html，以及忽略序号前缀的目录匹配。"""
 
 from __future__ import annotations
 
@@ -37,6 +37,17 @@ RAW_CREATE_NAMES: dict[str, str] = {
     "综合成本看板": "综合成本看板",
     "财务付款分析": "财务付款",
     "sum": "0_Sum",
+    "std": "0_Std",
+    "采购部采购台账extract": "B_采购部采购台账_extract",
+    "采购部采购台账std": "C_采购部采购台账_std",
+    "采购部采购台账stdsplit": "F_采购部采购台账_std_split",
+    "机具费rawsplit": "C_机具费_raw_split",
+    "机具费stdsplit": "E_机具费_std_split",
+    "人工费台账std": "B_人工费台账_std",
+    "飞签机票std": "B_飞签机票_std",
+    "财务付款rawstd": "A1_财务付款_raw_std",
+    "财务付款classified": "A2_财务付款_classified",
+    "财务付款std": "B_财务付款_std",
 }
 
 
@@ -230,6 +241,51 @@ def sum_data_path(
     return preferred
 
 
+def discover_std_root(data_root: Path | None = None) -> Path:
+    """定位 Std / 0_Std；没有则使用 0_Std。"""
+    root = Path(data_root or DATA_ROOT)
+    found = find_named_dir(root, "Std")
+    if found is not None:
+        return found
+    return root / "0_Std"
+
+
+def ensure_std_root() -> Path:
+    root = discover_std_root()
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+STD_ROOT = discover_std_root()
+
+
+def std_data_path(
+    *parts: str,
+    create: bool = True,
+    legacy: Path | str | None = None,
+) -> Path:
+    """标准化中间结果：0_Std（也可写成 Std / 1_Std）。
+
+    写出用 create=True（始终落在 0_Std）。
+    读取可传 legacy：0_Std 尚空时回退旧 std 目录。
+    """
+    root = discover_std_root()
+    preferred = resolve_under(root, *parts, create=False) if parts else root
+    if _dir_has_entries(preferred):
+        return preferred
+    if not create and legacy:
+        legacy_path = Path(legacy)
+        if _dir_has_entries(legacy_path):
+            return legacy_path
+        if legacy_path.is_dir():
+            return legacy_path
+    if create:
+        root.mkdir(parents=True, exist_ok=True)
+        preferred = resolve_under(root, *parts, create=True) if parts else root
+        preferred.mkdir(parents=True, exist_ok=True)
+    return preferred
+
+
 def raw_data_path(*parts: str, legacy: Path | str | None = None, create: bool = True) -> Path:
     """原始数据目录：优先 0_Raw 下（忽略序号）；若尚未迁移则回退 legacy。"""
     raw_root = discover_raw_root()
@@ -288,6 +344,7 @@ __all__ = [
     "RAW_ROOT",
     "HTML_ROOT",
     "SUM_ROOT",
+    "STD_ROOT",
     "EXCEL_EXTS",
     "code_path",
     "data_path",
@@ -295,12 +352,15 @@ __all__ = [
     "raw_data_path",
     "html_data_path",
     "sum_data_path",
+    "std_data_path",
     "discover_raw_root",
     "ensure_raw_root",
     "discover_html_root",
     "ensure_html_root",
     "discover_sum_root",
     "ensure_sum_root",
+    "discover_std_root",
+    "ensure_std_root",
     "strip_order_prefix",
     "dir_key",
     "names_match",

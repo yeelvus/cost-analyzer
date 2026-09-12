@@ -26,7 +26,7 @@ from common.project import (
 )
 from common.excel import apply_common_excel_layout
 from settings import MATCH_DB_PATH as _SETTINGS_MATCH_DB_PATH
-from common.paths import html_data_path, raw_data_path, sum_data_path
+from common.paths import html_data_path, raw_data_path, std_data_path, sum_data_path
 
 # ====================== 配置区 ======================
 class Config:
@@ -45,7 +45,13 @@ class Config:
     MATCH_DB_PATH = str(_SETTINGS_MATCH_DB_PATH)
     
     # 输出
-    OUTPUT_STD = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std"
+    OUTPUT_STD = str(
+        std_data_path(
+            "人工费",
+            "B_人工费台账_std",
+            legacy=Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻\u200d♂️/A_1_人工费台账/B_人工费台账_std'),
+        )
+    )
     OUTPUT_Z_REPORT = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report"
     
     MONEY_COLUMNS = ['中方正式工铢', '中方劳务工铢', '子公司属地工铢', '劳务公司铢', '签证费']
@@ -951,7 +957,7 @@ def main():
 
     print("\n🎉 处理完成！")
     print(f"共记录项目：{len(summary_df)} 个")
-    print(f"Excel 输出位置：{Config.OUTPUT_STD} 和 {Config.OUTPUT_Z_REPORT}")
+    print(f"Excel 输出位置：按项目拆分 → {Config.OUTPUT_STD} ；汇总 → 0_Sum/11_人工费")
 
 
 if __name__ == "__main__":

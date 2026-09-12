@@ -23,7 +23,7 @@ AMOUNT_OUTPUT_NAME = "合同管理_总包分包汇总.xlsx"
 MERGED_OUTPUT_NAME = "合同管理_总包分包全量汇总.xlsx"
 
 # 分包台账标准化目录（用于与文件夹汇总的分包额交叉核对）
-SUBPACKAGE_STD_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_分包合同台账_std"
+SUBPACKAGE_STD_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Std/5.1_分包合同"
 # 分包额对比容差（泰铢）；超过则着色标注（约等于原 0.01 万泰铢）
 SUBPACKAGE_COMPARE_TOLERANCE_THB = 100.0
 
@@ -84,6 +84,7 @@ def get_subpackage_std_dir() -> str:
     return resolve_existing_path(
         SUBPACKAGE_STD_DIR,
         [
+            os.path.expanduser("~/Desktop/邯郸中材/01成本统计/0_Std/5.1_分包合同"),
             os.path.expanduser("~/Desktop/邯郸中材/01成本统计/5.1_分包合同/2_分包合同台账_std"),
         ],
     )

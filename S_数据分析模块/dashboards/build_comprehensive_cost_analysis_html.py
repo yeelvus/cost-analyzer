@@ -494,7 +494,11 @@ def load_procurement_map() -> Dict[str, float]:
 
 def find_per_project_labor_file(project_code: str, project_name: str) -> Optional[Path]:
     """在人工费 按项目拆分 目录找匹配的 per-project 明细文件（人）。"""
-    labor_dir = DATA_ROOT / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std/按项目拆分"
+    try:
+        from common.paths import std_data_path as _std_labor
+        labor_dir = _std_labor("人工费", "B_人工费台账_std", create=False) / "按项目拆分"
+    except Exception:
+        labor_dir = DATA_ROOT / "0_Std" / "11_人工费" / "B_人工费台账_std" / "按项目拆分"
     if not labor_dir.exists():
         return None
     # 优先用编码匹配
@@ -548,13 +552,19 @@ def load_labor_detail_for_project(project_code: str, project_name: str) -> Dict[
 
 def find_per_project_machine_file(project_code: str, project_name: str) -> Optional[Path]:
     """找机具 per-project 汇总（机）。"""
-    mach_dir = DATA_ROOT / "10_机具费🚜/B_机具费_sum"
+    try:
+        from common.paths import std_data_path as _std_mach
+        mach_dir = _std_mach("机具费", "E_机具费_std_split", create=False)
+    except Exception:
+        mach_dir = DATA_ROOT / "0_Std" / "10_机具费" / "E_机具费_std_split"
     if not mach_dir.exists():
         return None
+    patterns = (f"*{project_code}*_机具费.xlsx", f"*{project_code}*_机具费_汇总.xlsx")
     if project_code and project_code != "未匹配":
-        for p in mach_dir.glob(f"*{project_code}*_机具费_汇总.xlsx"):
-            return p
-    for p in mach_dir.glob("*_机具费_汇总.xlsx"):
+        for pat in patterns:
+            for p in mach_dir.glob(pat):
+                return p
+    for p in list(mach_dir.glob("*_机具费.xlsx")) + list(mach_dir.glob("*_机具费_汇总.xlsx")):
         if project_code and project_code in p.name:
             return p
         if project_name and project_name.split("项目")[0] in p.name:

@@ -14,6 +14,7 @@ CODE_ROOT = Path(__file__).resolve().parent
 DATA_ROOT = Path.home() / "Desktop" / "邯郸中材" / "01成本统计"
 REPORT_ROOT = DATA_ROOT / "Z_report"
 # 原始收集：DATA_ROOT/0_Raw（也可写成 Raw）→ common.paths.raw_data_path
+# 标准化中间：DATA_ROOT/0_Std（也可写成 Std）→ common.paths.std_data_path
 # HTML 看板：DATA_ROOT/0_html（也可写成 html）→ common.paths.html_data_path
 # 合并汇总 Excel：DATA_ROOT/0_Sum（也可写成 Sum）→ common.paths.sum_data_path
 

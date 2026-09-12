@@ -25,7 +25,7 @@ from common.project import (
 )
 from common.excel import apply_common_excel_layout
 from settings import MATCH_DB_PATH as _SETTINGS_MATCH_DB_PATH, REPORT_ROOT
-from common.paths import html_data_path, raw_data_path, sum_data_path
+from common.paths import html_data_path, raw_data_path, std_data_path, sum_data_path
 
 
 # ====================== 配置区 ======================
@@ -43,7 +43,13 @@ class Config:
     MATCH_DB_PATH = str(_SETTINGS_MATCH_DB_PATH)
     OUTPUT_Z_REPORT = str(REPORT_ROOT)
 
-    OUTPUT_STD = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻‍♂️/A_2_飞签机票/B_飞签机票_std"
+    OUTPUT_STD = str(
+        std_data_path(
+            "人工费",
+            "B_飞签机票_std",
+            legacy=Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻\u200d♂️/A_2_飞签机票/B_飞签机票_std'),
+        )
+    )
 
     MONEY_COL = "本次机票价格（泰铢）"
 

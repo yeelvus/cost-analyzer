@@ -62,17 +62,17 @@ except Exception:
 
 INPUT_PATHS = {
     "合同管理": BASE_DIR / "5_合同管理📑",
-    "采购明细": BASE_DIR / "9_采购台账📦/E_采购部采购台账_sum/采购部采购台账_std_sum.xlsx",
-    "材料欠款": BASE_DIR / "9.1_材料欠款/B_材料欠款_std/泰国子公司材料采购欠款汇总_标准化.xlsx",
-    "商混混凝土": [BASE_DIR / "9.1_商混站🚛/B_商混站_std/搅拌站混凝土汇总报表.xlsx"],
-    "机具使用费": BASE_DIR / "10_机具费🚜/D_机具费_std_sum/机具费汇总_全量标准化_汇总.xlsx",
-    "人工费汇总": BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std/人工费汇总.xlsx",
-    "财务分包": BASE_DIR / "12-财务数据💰/A_财务付款数据/C_财务付款_sum/银行账/银行账_财务付款数据汇总.xlsx",
-    "分包合同台账": BASE_DIR / "5.1_分包合同/2_分包合同台账_std/分包签订合同汇总_2026-07.xlsx",
-    "成本统计": BASE_DIR / "2_成本统计收集/B_成本统计_sum/项目统计数据汇总_全月份.xlsx",
+    "采购明细": BASE_DIR / "0_Sum/9_采购台账/采购部采购台账_std_sum.xlsx",
+    "材料欠款": BASE_DIR / "0_Sum/9.1_材料欠款/泰国子公司材料采购欠款汇总_标准化.xlsx",
+    "商混混凝土": [BASE_DIR / "0_Sum/9.1_商混站/搅拌站混凝土汇总报表.xlsx"],
+    "机具使用费": BASE_DIR / "0_Sum/10_机具费/机具费汇总_全量标准化_汇总.xlsx",
+    "人工费汇总": BASE_DIR / "0_Sum/11_人工费/人工费汇总.xlsx",
+    "财务分包": BASE_DIR / "0_Sum/12_财务付款/银行账/银行账_财务付款数据汇总.xlsx",
+    "分包合同台账": BASE_DIR / "0_Std/5.1_分包合同/分包签订合同汇总_2026-07.xlsx",
+    "成本统计": BASE_DIR / "0_Sum/2_成本统计收集/项目统计数据汇总_全月份.xlsx",
     "项目经理": BASE_DIR / "0_项目基本信息情况/项目基本信息表.xlsx",
-    "预算金额": BASE_DIR / "3_预算部分/2_人材机_std/【总汇总】所有标段_20260721_143929.xlsx",
-    "责任成本": BASE_DIR / "3.1_责任成本/2_责任成本_std",
+    "预算金额": BASE_DIR / "0_Sum/3_预算部分/【总汇总】所有标段.xlsx",
+    "责任成本": BASE_DIR / "0_Std/3.1_责任成本",
 }
 
 FORCED_EQUIPMENT_FILE = None
@@ -281,6 +281,7 @@ def resolve_input_paths() -> Dict:
         resolved["人工费汇总"] = labor_default
     else:
         labor_latest = pick_latest_existing([
+            (BASE_DIR / "0_Sum/11_人工费", "人工费汇总.xlsx", False),
             (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费汇总.xlsx", False),
             (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费汇总_*.xlsx", False),
             (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费汇总*.xlsx", False),
@@ -302,6 +303,8 @@ def resolve_input_paths() -> Dict:
     procurement_default = INPUT_PATHS.get("采购明细")
     proc_latest = pick_latest_existing(
         [
+            (BASE_DIR / "0_Sum/9_采购台账", "采购部采购台账_std_sum.xlsx", False),
+            (BASE_DIR / "0_Sum/9_采购台账", "*_std_sum.xlsx", False),
             (BASE_DIR / "9_采购台账📦/E_采购部采购台账_sum", "采购部采购台账_std_sum.xlsx", False),
             (BASE_DIR / "9_采购台账📦/E_采购部采购台账_sum", "*_std_sum.xlsx", False),
             (BASE_DIR / "9_采购台账📦/E_采购部采购台账_sum", "*_采购台账_std_merged.xlsx", False),
@@ -317,6 +320,7 @@ def resolve_input_paths() -> Dict:
 
     arrears_default = INPUT_PATHS.get("材料欠款")
     arrears_latest = pick_latest_existing([
+        (BASE_DIR / "0_Sum/9.1_材料欠款", "*欠款汇总*.xlsx", False),
         (BASE_DIR / "9.1_材料欠款/B_材料欠款_std", "*材料采购欠款汇总*_标准化*.xlsx", False),
         (BASE_DIR / "9.1_材料欠款/B_材料欠款_std", "*欠款汇总*.xlsx", False),
         (BASE_DIR / "9.1_材料欠款", "*材料采购欠款汇总*_标准化*.xlsx", True),
@@ -334,6 +338,7 @@ def resolve_input_paths() -> Dict:
     else:
         concrete_latest = pick_latest_existing(
             [
+                (BASE_DIR / "0_Sum/9.1_商混站", "搅拌站混凝土汇总报表.xlsx", False),
                 (BASE_DIR / "9.1_商混站🚛/B_商混站_std", "搅拌站混凝土汇总报表.xlsx", False),
                 (BASE_DIR / "9.1_商混站🚛/B_商混站_std", "搅拌站混凝土汇总报表_*.xlsx", False),
                 (BASE_DIR / "9.1_商混站🚛/B_商混站_std", "*.xlsx", False),
@@ -349,6 +354,8 @@ def resolve_input_paths() -> Dict:
 
     sub_contract_latest = pick_latest_existing(
         [
+            (BASE_DIR / "0_Std/5.1_分包合同", "分包签订合同汇总_*.xlsx", False),
+            (BASE_DIR / "0_Sum/5.1_分包合同", "分包合同台账_全量汇总.xlsx", False),
             (BASE_DIR / "5.1_分包合同/2_分包合同台账_std", "分包签订合同汇总_*.xlsx", False),
             (BASE_DIR / "5.1_分包合同/2_分包合同台账_std", "*.xlsx", False),
             (BASE_DIR / "5.1_分包合同/3_分包合同_sum", "分包签订合同汇总_*.xlsx", False),
@@ -359,6 +366,7 @@ def resolve_input_paths() -> Dict:
         resolved["分包合同台账"] = sub_contract_latest
 
     resp_dir = _first_existing_dir([
+        BASE_DIR / "0_Std/3.1_责任成本",
         BASE_DIR / "3.1_责任成本/2_责任成本_std",
         BASE_DIR / "3_预算部分/6.1_责任成本书/汇总版",
         BASE_DIR / "3.1_责任成本/1_责任成本_raw",

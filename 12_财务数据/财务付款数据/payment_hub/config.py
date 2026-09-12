@@ -12,7 +12,7 @@ _CODE_ROOT = CODE_DIR.parent.parent
 if str(_CODE_ROOT) not in sys.path:
     sys.path.insert(0, str(_CODE_ROOT))
 
-from common.paths import html_data_path, raw_data_path, sum_data_path  # noqa: E402
+from common.paths import html_data_path, raw_data_path, std_data_path, sum_data_path  # noqa: E402
 from settings import DATA_ROOT, REPORT_ROOT  # noqa: E402
 
 DESKTOP_COST = DATA_ROOT
@@ -31,13 +31,27 @@ class Paths:
     )
     # raw 标准化合并结果（第一步 raw_std）
     raw_std_dir: Path = field(
-        default_factory=lambda: PAY_ROOT / "A1_财务付款_raw_std"
+        default_factory=lambda: std_data_path(
+            "财务付款",
+            "A1_财务付款_raw_std",
+            legacy=PAY_ROOT / "A1_财务付款_raw_std",
+        )
     )
     # 摘要分类结果（第二步 classify，供 sum / std 复用）
     classified_dir: Path = field(
-        default_factory=lambda: PAY_ROOT / "A2_财务付款_classified"
+        default_factory=lambda: std_data_path(
+            "财务付款",
+            "A2_财务付款_classified",
+            legacy=PAY_ROOT / "A2_财务付款_classified",
+        )
     )
-    std_dir: Path = field(default_factory=lambda: PAY_ROOT / "B_财务付款_std")
+    std_dir: Path = field(
+        default_factory=lambda: std_data_path(
+            "财务付款",
+            "B_财务付款_std",
+            legacy=PAY_ROOT / "B_财务付款_std",
+        )
+    )
 
     sum_xlsx: Path = field(
         default_factory=lambda: sum_data_path(
