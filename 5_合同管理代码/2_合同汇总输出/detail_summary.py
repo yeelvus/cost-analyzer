@@ -24,6 +24,7 @@ from summary_config import (
     TARGET_KEYWORDS,
     get_contract_root,
     get_project_db,
+    logical_key,
 )
 
 
@@ -125,6 +126,18 @@ def extract_project_code_from_folder_name(folder_name: str) -> str:
     return text.split("_", 1)[0].strip()
 
 
+def match_target_keyword(folder_name: str, target_keywords: list[str]) -> str | None:
+    """匹配总包/分包目录。``A_总包合同`` / ``5_总包合同`` 都算总包合同。"""
+    core = logical_key(folder_name)
+    for kw in target_keywords:
+        if core == logical_key(kw):
+            return kw
+    for kw in target_keywords:
+        if kw in folder_name:
+            return kw
+    return None
+
+
 def resolve_project_by_code(raw_project_name: str, code_to_meta: dict) -> tuple[str, str]:
     raw = str(raw_project_name).strip()
     if not raw:
@@ -199,14 +212,14 @@ def scan_contract_details(
 
     for current_root, dirs, _files in os.walk(root_dir):
         folder_name = os.path.basename(current_root)
-        if not any(kw in folder_name for kw in target_keywords):
+        hit_kw = match_target_keyword(folder_name, target_keywords)
+        if not hit_kw:
             continue
         parent_name = os.path.basename(os.path.dirname(current_root))
-        if any(kw in parent_name for kw in target_keywords):
+        if match_target_keyword(parent_name, target_keywords):
             continue
 
         dirs[:] = []
-        hit_kw = next(kw for kw in target_keywords if kw in folder_name)
 
         if hit_kw not in all_data:
             all_data[hit_kw] = []

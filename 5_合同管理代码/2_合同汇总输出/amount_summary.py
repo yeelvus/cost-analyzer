@@ -24,6 +24,7 @@ from summary_config import (
     get_contract_root,
     get_project_db,
     get_subpackage_std_dir,
+    resolve_named_dir,
 )
 
 # 金额列名（单位：泰铢，原始精度，不四舍五入）
@@ -139,26 +140,8 @@ def extract_project_code(project_dir_name: str) -> str | None:
 
 
 def resolve_contract_dir_name(base_dir: str, logical_name: str) -> str:
-    exact_path = os.path.join(base_dir, logical_name)
-    if os.path.isdir(exact_path):
-        return logical_name
-
-    candidates = []
-    try:
-        for name in os.listdir(base_dir):
-            path = os.path.join(base_dir, name)
-            if os.path.isdir(path) and not name.startswith("."):
-                candidates.append(name)
-    except OSError:
-        return logical_name
-
-    suffix_matches = sorted([name for name in candidates if name.endswith(logical_name)])
-    if suffix_matches:
-        return suffix_matches[0]
-    contains_matches = sorted([name for name in candidates if logical_name in name])
-    if contains_matches:
-        return contains_matches[0]
-    return logical_name
+    """匹配总包/分包目录，忽略 A_ / 5_ 这类 ``_`` 前前缀。"""
+    return resolve_named_dir(base_dir, logical_name)
 
 
 def collect_contract_project_paths(base_dir: str, contract_dir_name: str) -> dict:

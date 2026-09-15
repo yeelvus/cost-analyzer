@@ -12,7 +12,9 @@
   - 金额侧（原「合同管理_总包分包汇总.xlsx」）
       1_总包分包汇总(全部) / 2_人民币项目(CNY) / 3_泰铢项目(THB) / 4_混合币种项目
 
-默认输出：{合同根目录}/合同管理_总包分包全量汇总.xlsx
+默认输出：{0_Sum/合同管理}/合同管理_总包分包全量汇总.xlsx
+
+合同根目录按业务名「合同管理」查找，``5_合同管理📑`` / ``6_合同管理`` 均可。
 
 用法：
   python 合同汇总_全量合并输出.py
@@ -50,20 +52,28 @@ from detail_summary import (  # noqa: E402
 )
 from summary_config import (  # noqa: E402
     MERGED_OUTPUT_NAME,
+    find_code_folder,
+    find_named_script,
     get_contract_root,
 )
 
-# 5.1 分包合同台账 · 全量合并入口
-_SUBPACKAGE_MERGE_SCRIPT = (
-    Path(__file__).resolve().parents[2]
-    / "5.1_分包合同台账处理"
-    / "00_全量合并汇总.py"
-)
+
+def _subpackage_merge_script() -> Path:
+    """定位 5.1_分包合同台账处理/00_全量合并汇总.py；序号前缀可改。"""
+    folder = find_code_folder("分包合同台账处理")
+    if folder is None:
+        raise FileNotFoundError(
+            "未找到「分包合同台账处理」目录（可为 5.1_分包合同台账处理）"
+        )
+    script = find_named_script(folder, "全量合并汇总")
+    if script is None:
+        raise FileNotFoundError(f"未找到全量合并汇总脚本: {folder}")
+    return script
 
 
 def run_subpackage_ledger_merge(*, skip_std: bool = False) -> Path:
     """先跑 5.1 分包台账 1+2+4 全量合并，刷新 std 与汇总。"""
-    script = _SUBPACKAGE_MERGE_SCRIPT
+    script = _subpackage_merge_script()
     if not script.is_file():
         raise FileNotFoundError(f"未找到分包台账全量合并脚本: {script}")
 
