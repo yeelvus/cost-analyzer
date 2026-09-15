@@ -262,7 +262,7 @@ else:
     )
 
     # 保存
-    output_dir = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report"
+    output_dir = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况"
     os.makedirs(output_dir, exist_ok=True)
     date_tag = today.strftime("%Y%m%d")
     output_path = os.path.join(output_dir, f"在建项目甘特图_{date_tag}.png")

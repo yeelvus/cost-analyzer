@@ -12,7 +12,7 @@ from typing import Iterable, List, Optional
 from .amount_mismatch import run_amount_mismatch
 from .cashflow_build import run_cashflow
 from .classify_raw_std import run_classify_raw_std
-from .config import Paths
+from .config import LEGACY_SUM_DIR, Paths
 from .pkg import ensure_code_root
 from .raw_std_build import run_raw_std
 from .std_build import run_std
@@ -236,7 +236,8 @@ def step_export_class_master(paths: Paths, out: Optional[Path] = None) -> str:
     dest = Path(out) if out else paths.class_master_xlsx
     engine = ClassifyEngine.from_data_dir(paths.classify_data)
     preserve = None
-    for cand in (dest, paths.class_master_xlsx, paths.class_master_xlsx_sum):
+    legacy_master = LEGACY_SUM_DIR / "付款分类总表.xlsx"
+    for cand in (dest, paths.class_master_xlsx, paths.class_master_xlsx_sum, legacy_master):
         if cand and Path(cand).is_file():
             preserve = Path(cand)
             break
@@ -252,7 +253,7 @@ def step_export_class_master(paths: Paths, out: Optional[Path] = None) -> str:
         shutil.copy2(path, paths.class_master_xlsx_sum)
         print(f"   副本: {paths.class_master_xlsx_sum}")
     except Exception as e:
-        print(f"  ⚠️ 复制到 C_sum 失败: {e}")
+        print(f"  ⚠️ 复制到 Sum 失败: {e}")
     print(f"✅ 分类总表: {path}  （{n} 行）")
     return str(path)
 
@@ -275,7 +276,13 @@ def step_apply_class_master(
     candidates = []
     if master:
         candidates.append(Path(master))
-    candidates.extend([paths.class_master_xlsx, paths.class_master_xlsx_sum])
+    candidates.extend(
+        [
+            paths.class_master_xlsx,
+            paths.class_master_xlsx_sum,
+            LEGACY_SUM_DIR / "付款分类总表.xlsx",
+        ]
+    )
     src = next((Path(p) for p in candidates if p and Path(p).is_file()), None)
     if src is None:
         raise FileNotFoundError(
@@ -375,7 +382,7 @@ def run_pipeline(
     print(f"A_raw:        {paths.raw_dir}/{{组名}}/")
     print(f"A1_raw_std:   {paths.raw_std_dir}/{{组名}}/*_raw_std.xlsx")
     print(f"A2_classified:{paths.classified_dir}/{{组名}}/*_classified.xlsx")
-    print(f"C_sum:        {paths.sum_dir}/{{组名}}/财务付款数据汇总.xlsx")
+    print(f"Sum:          {paths.sum_dir}/{{组名}}/财务付款数据汇总.xlsx")
     print(f"B_std:        {paths.std_dir}/{{组名}}/有支出|未支出/")
     print(f"项目弹窗: {'开' if prompt_project else '关'}（--prompt-project）")
     print(f"步骤: {' → '.join(order)}")

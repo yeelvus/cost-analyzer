@@ -98,7 +98,7 @@ class PaymentHubApp:
         path_line = (
             f"学习池  {self.paths.learn_pool_root}\n"
             f"A_raw   {self.paths.raw_dir}\n"
-            f"B_std   {self.paths.std_dir}    C_sum  {self.paths.sum_xlsx.parent}"
+            f"B_std   {self.paths.std_dir}    Sum  {self.paths.sum_xlsx.parent}"
         )
         ttk.Label(main, text=path_line, foreground="#444", wraplength=880).grid(
             row=1, column=0, sticky="w", **pad

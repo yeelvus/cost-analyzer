@@ -24,7 +24,7 @@ MENU_MAIN: Sequence[MenuItem] = (
 
 # 确认学习组
 MENU_LEARN: Sequence[MenuItem] = (
-    ("1", "pool", "导出学习池 → D_财务付款_学习池", ["pool"]),
+    ("1", "pool", "导出学习池 → Std/财务付款/D_财务付款_学习池", ["pool"]),
     ("2", "apply", "应用确认 → 写入记忆 + 抬升未确认 + 刷分类", ["apply"]),
     ("3", "learn-ledger", "账簿已填科目 → 写入记忆（不改账簿）", ["learn-ledger"]),
     ("4", "reclassify", "仅重刷 B_std / 后续可再 classify", ["reclassify"]),
@@ -98,7 +98,7 @@ def print_quick_help() -> None:
   [3] 维护分步    raw-std / classify / summary / std / cashflow…
 
 快路径数据:
-  A_raw → A1_raw_std → A2_classified → C_sum / B_std
+  A_raw → A1_raw_std → A2_classified → Sum / B_std
 
 确认学习:
   学习池: 1(pool) 导出 → Excel 改科目或点「确认」→ 2(apply) 写记忆
@@ -126,7 +126,7 @@ def print_learn_help() -> None:
         """
 确认学习组
 ────────────────────────────────────────
-  pool           从明细导出学习池（D_财务付款_学习池）
+  pool           从明细导出学习池（02_Std/12_财务付款/D_财务付款_学习池）
   apply          读确认结果 → memory + 泛化 + 重分类
   learn-ledger   账簿已填一/二/三级 → 写入记忆（不改账簿）
   reclassify     仅按当前记忆/规则重刷 B_std
@@ -154,7 +154,7 @@ def _print_banner(paths: Optional[Paths] = None) -> None:
             print(f"  A1_raw_std: {paths.raw_std_dir}")
             print(f"  A2_classified: {paths.classified_dir}")
             print(f"  B_std: {paths.std_dir}/{{组名}}/…")
-            print(f"  C_sum: {paths.sum_dir}/{{组名}}/…")
+            print(f"  Sum: {paths.sum_dir}/{{组名}}/…")
         except Exception:
             pass
     print()

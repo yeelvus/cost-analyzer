@@ -48,6 +48,7 @@ RAW_CREATE_NAMES: dict[str, str] = {
     "财务付款rawstd": "A1_财务付款_raw_std",
     "财务付款classified": "A2_财务付款_classified",
     "财务付款std": "B_财务付款_std",
+    "财务付款学习池": "D_财务付款_学习池",
 }
 
 

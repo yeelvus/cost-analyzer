@@ -5,7 +5,7 @@
 架构：
   cli / menu     入口与交互菜单
   pipeline       步骤编排（std / summary / cashflow / 分类）
-  learn_pool     D_ 学习池 export / apply
+  learn_pool     学习池 export / apply（Std/财务付款/D_财务付款_学习池）
   std_build      raw → B_std
   summary_build  B_std → 汇总 Excel
   cashflow_build B_std → 现金流 HTML

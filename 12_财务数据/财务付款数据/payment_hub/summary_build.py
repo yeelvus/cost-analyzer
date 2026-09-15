@@ -37,7 +37,13 @@ INCLUDE_COST_AMOUNT_COLUMNS = [f"计入成本_{c}" for c in AMOUNT_COLUMNS]
 SUBJECT_WIDE_SHEET = "一级二级科目宽表"
 SUBJECT_SUMMARY_ROW = "一级科目汇总"
 PROJECT_LEVEL1_SHEET = "项目一级科目汇总"
-EXCLUDED_SCAN_DIRS = {"C_财务付款_sum"}
+EXCLUDED_SCAN_DIRS = {
+    "C_财务付款_sum",
+    "D_财务付款_学习池",
+    "03_Sum",
+    "0_Sum",
+    "12_财务付款",
+}
 
 
 def is_exclude_cost_l1(level1) -> bool:
@@ -1145,8 +1151,8 @@ def run_summary_for_group(
 
 def _archive_ungrouped_root_outputs(paths: Paths, active_groups: List[str]) -> None:
     """
-    把 C_sum 根目录下旧的「未分组」总表挪到 _历史未分组，
-    避免与 C_sum/流水、C_sum/银行账 混淆。
+    把 Sum 根目录下旧的「未分组」总表挪到 _历史未分组，
+    避免与 Sum/流水、Sum/银行账 混淆。
     """
     import shutil
     from datetime import datetime
@@ -1175,7 +1181,7 @@ def _archive_ungrouped_root_outputs(paths: Paths, active_groups: List[str]) -> N
 
 
 def _write_group_index(paths: Paths, group_stats: List[dict]) -> Path:
-    """C_sum/分组汇总索引.xlsx：每组一行，标明路径与合计。"""
+    """Sum/分组汇总索引.xlsx：每组一行，标明路径与合计。"""
     index_path = paths.sum_dir / "分组汇总索引.xlsx"
     df = pd.DataFrame(group_stats)
     index_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1189,7 +1195,7 @@ def run_summary(paths: Paths) -> List[str]:
     优先快路径：读 A2_classified 已分类明细 → 直接汇总
     回退：扫 B_std/{组名}/ 多项目文件
 
-    写出 C_sum/{组名}/{组名}_财务付款数据汇总.xlsx
+    写出 Sum/{组名}/{组名}_财务付款数据汇总.xlsx
     """
     from .classify_raw_std import list_classified_groups, load_classified_detail
 

@@ -67,7 +67,7 @@ INPUT_PATHS = {
     "商混混凝土": [BASE_DIR / "0_Sum/9.1_商混站/搅拌站混凝土汇总报表.xlsx"],
     "机具使用费": BASE_DIR / "0_Sum/10_机具费/机具费汇总_全量标准化_汇总.xlsx",
     "人工费汇总": BASE_DIR / "0_Sum/11_人工费/人工费汇总.xlsx",
-    "财务分包": BASE_DIR / "0_Sum/12_财务付款/银行账/银行账_财务付款数据汇总.xlsx",
+    "财务分包": BASE_DIR / "03_Sum/12_财务付款/银行账/银行账_财务付款数据汇总.xlsx",
     "分包合同台账": BASE_DIR / "0_Std/5.1_分包合同/分包签订合同汇总_2026-07.xlsx",
     "成本统计": BASE_DIR / "0_Sum/2_成本统计收集/项目统计数据汇总_全月份.xlsx",
     "项目经理": BASE_DIR / "0_项目基本信息情况/项目基本信息表.xlsx",
@@ -227,6 +227,12 @@ def resolve_input_paths() -> Dict:
 
     finance_latest = pick_latest_existing(
         [
+            (BASE_DIR / "03_Sum/12_财务付款/银行账", "*财务付款数据汇总.xlsx", False),
+            (BASE_DIR / "03_Sum/12_财务付款/流水", "*财务付款数据汇总.xlsx", False),
+            (BASE_DIR / "0_Sum/12_财务付款/银行账", "*财务付款数据汇总.xlsx", False),
+            (BASE_DIR / "0_Sum/12_财务付款/流水", "*财务付款数据汇总.xlsx", False),
+            (BASE_DIR / "03_Sum/12_财务付款", "财务付款数据汇总.xlsx", False),
+            (BASE_DIR / "03_Sum/12_财务付款", "*财务付款数据汇总.xlsx", True),
             (BASE_DIR / "12-财务数据💰/A_财务付款数据/C_财务付款_sum/银行账", "*财务付款数据汇总.xlsx", False),
             (BASE_DIR / "12-财务数据💰/A_财务付款数据/C_财务付款_sum/流水", "*财务付款数据汇总.xlsx", False),
             (BASE_DIR / "12-财务数据💰/A_财务付款数据/C_财务付款_sum", "财务付款数据汇总.xlsx", False),

@@ -202,6 +202,7 @@ def run(*, dry_run: bool = False) -> None:
             "A1_财务付款_raw_std",
             "A2_财务付款_classified",
             "B_财务付款_std",
+            "D_财务付款_学习池",
         ):
             n += _job(
                 f"财务 {folder}",

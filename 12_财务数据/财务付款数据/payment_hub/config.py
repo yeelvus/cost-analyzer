@@ -17,6 +17,32 @@ from settings import DATA_ROOT, REPORT_ROOT  # noqa: E402
 
 DESKTOP_COST = DATA_ROOT
 PAY_ROOT = DESKTOP_COST / "12-财务数据💰" / "A_财务付款数据"
+# 旧汇总目录；写出一律走 sum_data_path（03_Sum/12_财务付款）
+LEGACY_SUM_DIR = PAY_ROOT / "C_财务付款_sum"
+# 旧学习池；写出一律走 02_Std/12_财务付款/D_财务付款_学习池
+LEGACY_LEARN_POOL_DIR = PAY_ROOT / "D_财务付款_学习池"
+
+
+def _pay_sum_dir() -> Path:
+    return sum_data_path("财务付款", legacy=LEGACY_SUM_DIR)
+
+
+def _nonempty_dir(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    try:
+        return any(p.name not in {".DS_Store"} for p in path.iterdir())
+    except OSError:
+        return False
+
+
+def _pay_learn_pool_dir() -> Path:
+    preferred = std_data_path("财务付款") / "D_财务付款_学习池"
+    if _nonempty_dir(preferred):
+        return preferred
+    if _nonempty_dir(LEGACY_LEARN_POOL_DIR):
+        return LEGACY_LEARN_POOL_DIR
+    return preferred
 
 
 @dataclass
@@ -54,18 +80,10 @@ class Paths:
     )
 
     sum_xlsx: Path = field(
-        default_factory=lambda: sum_data_path(
-            "财务付款",
-            legacy=PAY_ROOT / "C_财务付款_sum",
-        )
-        / "财务付款数据汇总.xlsx"
+        default_factory=lambda: _pay_sum_dir() / "财务付款数据汇总.xlsx"
     )
     amount_mismatch_xlsx: Path = field(
-        default_factory=lambda: sum_data_path(
-            "财务付款",
-            legacy=PAY_ROOT / "C_财务付款_sum",
-        )
-        / "财务付款_应付与预扣实付不平明细.xlsx"
+        default_factory=lambda: _pay_sum_dir() / "财务付款_应付与预扣实付不平明细.xlsx"
     )
 
     cashflow_html: Path = field(
@@ -93,12 +111,12 @@ class Paths:
     rules_suggest_xlsx: Path = field(
         default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "规则建议.xlsx"
     )
-    # 分类总表：一份 Excel 调全部分类（也复制到 C_sum 便于查找）
+    # 分类总表：一份 Excel 调全部分类（也复制到 03_Sum/12_财务付款 便于查找）
     class_master_xlsx: Path = field(
         default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "付款分类总表.xlsx"
     )
     class_master_xlsx_sum: Path = field(
-        default_factory=lambda: PAY_ROOT / "C_财务付款_sum" / "付款分类总表.xlsx"
+        default_factory=lambda: _pay_sum_dir() / "付款分类总表.xlsx"
     )
     taxonomy_xlsx: Path = field(
         default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "科目体系.xlsx"
@@ -108,73 +126,56 @@ class Paths:
         default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "学习记录.xlsx"
     )
     learn_log_xlsx_sum: Path = field(
-        default_factory=lambda: PAY_ROOT / "C_财务付款_sum" / "学习记录.xlsx"
+        default_factory=lambda: _pay_sum_dir() / "学习记录.xlsx"
     )
     # 分类质量/修正报告（含仍待人工_高频）
     class_fix_report_xlsx: Path = field(
         default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "分类修正记录.xlsx"
     )
     class_fix_report_xlsx_sum: Path = field(
-        default_factory=lambda: PAY_ROOT / "C_财务付款_sum" / "分类修正记录.xlsx"
+        default_factory=lambda: _pay_sum_dir() / "分类修正记录.xlsx"
     )
 
     # 学习池：汇总 / 按项目 / 按月份 + 已确认总表
-    learn_pool_root: Path = field(
-        default_factory=lambda: PAY_ROOT / "D_财务付款_学习池"
-    )
+    learn_pool_root: Path = field(default_factory=_pay_learn_pool_dir)
     learn_pool_all: Path = field(
-        default_factory=lambda: PAY_ROOT / "D_财务付款_学习池" / "00_汇总"
+        default_factory=lambda: _pay_learn_pool_dir() / "00_汇总"
     )
     # 兼容旧路径；00_汇总现拆为 4 个：有/无编码 × 来源分组
     learn_pool_all_xlsx: Path = field(
-        default_factory=lambda: PAY_ROOT
-        / "D_财务付款_学习池"
-        / "00_汇总"
-        / "全部摘要_学习池.xlsx"
+        default_factory=lambda: _pay_learn_pool_dir() / "00_汇总" / "全部摘要_学习池.xlsx"
     )
     learn_pool_by_project: Path = field(
-        default_factory=lambda: PAY_ROOT / "D_财务付款_学习池" / "01_按项目"
+        default_factory=lambda: _pay_learn_pool_dir() / "01_按项目"
     )
     # 无正式项目编码：合并待核对，不与正式项目混排
     learn_pool_no_code: Path = field(
-        default_factory=lambda: PAY_ROOT
-        / "D_财务付款_学习池"
-        / "01b_待核对_无项目编码"
+        default_factory=lambda: _pay_learn_pool_dir() / "01b_待核对_无项目编码"
     )
     learn_pool_no_code_xlsx: Path = field(
-        default_factory=lambda: PAY_ROOT
-        / "D_财务付款_学习池"
+        default_factory=lambda: _pay_learn_pool_dir()
         / "01b_待核对_无项目编码"
         / "待核对_无项目编码汇总.xlsx"
     )
     learn_pool_by_month: Path = field(
-        default_factory=lambda: PAY_ROOT / "D_财务付款_学习池" / "02_按月份"
+        default_factory=lambda: _pay_learn_pool_dir() / "02_按月份"
     )
     learn_pool_priority_xlsx: Path = field(
-        default_factory=lambda: PAY_ROOT
-        / "D_财务付款_学习池"
-        / "00_汇总"
-        / "00_处理优先级_总览.xlsx"
+        default_factory=lambda: _pay_learn_pool_dir() / "00_汇总" / "00_处理优先级_总览.xlsx"
     )
     learn_pool_confirmed: Path = field(
-        default_factory=lambda: PAY_ROOT
-        / "D_财务付款_学习池"
-        / "03_已确认"
-        / "已确认分类.xlsx"
+        default_factory=lambda: _pay_learn_pool_dir() / "03_已确认" / "已确认分类.xlsx"
     )
     learn_pool_snapshot: Path = field(
-        default_factory=lambda: PAY_ROOT / "D_财务付款_学习池" / "_export_snapshot.json"
+        default_factory=lambda: _pay_learn_pool_dir() / "_export_snapshot.json"
     )
     learn_pool_conflicts: Path = field(
-        default_factory=lambda: PAY_ROOT
-        / "D_财务付款_学习池"
-        / "03_已确认"
-        / "冲突记录.xlsx"
+        default_factory=lambda: _pay_learn_pool_dir() / "03_已确认" / "冲突记录.xlsx"
     )
 
     @property
     def sum_dir(self) -> Path:
-        """C_财务付款_sum 根目录（分组输出写在其下一级子目录）。"""
+        """汇总根目录（03_Sum/12_财务付款；分组输出写在其下一级子目录）。"""
         return self.sum_xlsx.parent
 
     def group_raw_std_dir(self, group: str) -> Path:
@@ -203,12 +204,12 @@ class Paths:
         return self.std_dir / name
 
     def group_sum_dir(self, group: str) -> Path:
-        """C_sum/{组名}/"""
+        """Sum/{组名}/"""
         name = (group or "").strip() or "未分组"
         return self.sum_dir / name
 
     def group_sum_xlsx(self, group: str) -> Path:
-        """C_sum/{组名}/{组名}_财务付款数据汇总.xlsx"""
+        """Sum/{组名}/{组名}_财务付款数据汇总.xlsx"""
         name = (group or "").strip() or "未分组"
         return self.group_sum_dir(name) / f"{name}_财务付款数据汇总.xlsx"
 
