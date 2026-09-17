@@ -39,7 +39,7 @@
    - 第 2 层：面板内多 Tab（概况 / 人工(人) / 采购(材) / 机具(机) / 合同财务 / 历史），每个 Tab 展示该维度的具体数据 + 可视化。
    这解决了「html不只是一个层级」和「选择项目后要看到具体的人材机数据」的需求。
 
-输出默认：0_html/项目成本统计综合分析报告.html
+输出默认：04_html/项目成本统计综合分析报告.html
 可被 2_成本代码/0_一键运行_成本流程.py 自动调用（在三个成本脚本之后）。
 
 运行示例见文件末尾。
@@ -82,16 +82,14 @@ import pandas as pd
 try:
     from settings import DATA_ROOT, REPORT_ROOT, data_path, report_path
     from common.paths import html_data_path
-    from common.paths import find_latest_excel_file as _common_find_latest  # type: ignore
 except Exception:
     DATA_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
     REPORT_ROOT = DATA_ROOT / "Z_report"
     data_path = lambda *p: DATA_ROOT.joinpath(*p)
     report_path = lambda *p: REPORT_ROOT.joinpath(*p)
-    _common_find_latest = None
 
     def html_data_path(*parts, create=True):
-        p = DATA_ROOT.joinpath("0_html", *parts)
+        p = DATA_ROOT.joinpath("04_html", *parts)
         if create:
             p.mkdir(parents=True, exist_ok=True)
         return p

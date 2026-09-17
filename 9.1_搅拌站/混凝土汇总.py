@@ -9,16 +9,19 @@ CODE_ROOT = os.path.dirname(os.path.abspath(__file__))
 _CODE_ROOT = os.path.dirname(CODE_ROOT)
 if _CODE_ROOT not in sys.path:
     sys.path.insert(0, _CODE_ROOT)
+from settings import DATA_ROOT  # noqa: E402
 from common.paths import raw_data_path, sum_data_path  # noqa: E402
 
-DEFAULT_DATA_WORKSPACE = '/Users/wyattsun/Desktop/邯郸中材/01成本统计'
+DEFAULT_DATA_WORKSPACE = str(DATA_ROOT)
 DEFAULT_RAW_DATA_DIR = str(
     raw_data_path(
         "商混站",
-        legacy='/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_商混站🚛/A_商混站_raw',
+        legacy=DATA_ROOT / "9.1_商混站🚛" / "A_商混站_raw",
     )
 )
-DEFAULT_STD_OUTPUT_DIR = '/Users/wyattsun/Desktop/邯郸中材/01成本统计/9.1_商混站🚛/B_商混站_std'
+DEFAULT_STD_OUTPUT_DIR = str(DATA_ROOT / "9.1_商混站🚛" / "B_商混站_std")
+PROJECT_INFO_DIR = DATA_ROOT / "0_项目基本信息情况"
+PRICE_FILE_NAME = "混凝土报价单.xlsx"
 
 
 def _data_workspace():
@@ -294,16 +297,35 @@ def _normalize_detail_df(detail_df):
 
     return detail_df
 
-def _find_price_file(base_dir):
-    """查找报价单：优先当前目录，其次上级目录（兼容 A_raw + 上级报价单 布局）。"""
-    search_dirs = [base_dir]
-    parent_dir = os.path.dirname(base_dir)
-    if parent_dir and parent_dir not in search_dirs:
-        search_dirs.append(parent_dir)
+def _price_search_dirs(base_dir):
+    """报价单查找目录：项目基本信息情况优先，再回退 raw / 旧商混站目录。"""
+    dirs = [
+        str(PROJECT_INFO_DIR),
+        base_dir,
+        os.path.dirname(base_dir) if base_dir else "",
+        str(DATA_ROOT / "9.1_商混站🚛"),
+        str(DATA_ROOT),
+    ]
+    seen = set()
+    out = []
+    for d in dirs:
+        if not d or d in seen:
+            continue
+        seen.add(d)
+        out.append(d)
+    return out
 
+
+def _find_price_file(base_dir):
+    """查找混凝土报价单。优先 0_项目基本信息情况/混凝土报价单.xlsx。"""
+    explicit = os.environ.get("CONCRETE_PRICE_FILE", "").strip()
+    if explicit and os.path.isfile(explicit):
+        return explicit
+
+    search_dirs = _price_search_dirs(base_dir)
     for d in search_dirs:
-        direct = os.path.join(d, '混凝土报价单.xlsx')
-        if os.path.exists(direct):
+        direct = os.path.join(d, PRICE_FILE_NAME)
+        if os.path.isfile(direct):
             return direct
 
     for d in search_dirs:
@@ -311,15 +333,17 @@ def _find_price_file(base_dir):
             continue
         candidates = []
         for f in os.listdir(d):
-            if f.startswith('~$'):
+            if f.startswith("~$"):
                 continue
-            if not f.lower().endswith(('.xlsx', '.xlsm')):
+            if not f.lower().endswith((".xlsx", ".xlsm")):
                 continue
-            if '报价' in f:
+            if "报价" in f:
                 candidates.append(os.path.join(d, f))
         if candidates:
-            # 优先 xlsx，再按文件名排序保证稳定
-            candidates = sorted(candidates, key=lambda p: (0 if p.lower().endswith('.xlsx') else 1, os.path.basename(p)))
+            candidates = sorted(
+                candidates,
+                key=lambda p: (0 if p.lower().endswith(".xlsx") else 1, os.path.basename(p)),
+            )
             return candidates[0]
 
     return None
@@ -413,9 +437,10 @@ def process_concrete_data():
         price_path = _find_price_file(data_dir)
         if not price_path:
             raise RuntimeError(
-                "未找到报价单文件，请在以下目录放置含‘报价’的 Excel："
-                f"{data_dir} 或 {os.path.dirname(data_dir)}"
+                "未找到报价单文件，请将「混凝土报价单.xlsx」放到："
+                f"{PROJECT_INFO_DIR}"
             )
+        print(f"报价单: {price_path}")
         price_df = pd.read_excel(price_path)
         price_df.columns = _make_unique_columns(price_df.columns)
 

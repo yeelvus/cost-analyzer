@@ -60,7 +60,7 @@ try:
     from common.paths import html_data_path as _html_data_path, std_data_path as _std_data_path
 except Exception:
     def _html_data_path(*parts, create=True):
-        p = DATA_ROOT.joinpath("0_html", *parts)
+        p = DATA_ROOT.joinpath("04_html", *parts)
         if create:
             p.mkdir(parents=True, exist_ok=True)
         return p

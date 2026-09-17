@@ -39,7 +39,7 @@ except Exception:
         return DATA_ROOT.joinpath("0_Raw", *parts)
 
     def html_data_path(*parts, create=True):  # type: ignore
-        p = DATA_ROOT.joinpath("0_html", *parts)
+        p = DATA_ROOT.joinpath("04_html", *parts)
         if create:
             (p if parts else p).mkdir(parents=True, exist_ok=True)
         return p

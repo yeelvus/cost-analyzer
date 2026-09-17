@@ -73,7 +73,7 @@ def main() -> None:
     for script_path in SCRIPT_SEQUENCE:
         print(f"- {script_path.name}")
     print(f"{'=' * 72}")
-    print("  + 标准综合分析报告：项目成本统计综合分析报告.html （位于 0_html）")
+    print("  + 标准综合分析报告：项目成本统计综合分析报告.html （位于 04_html）")
 
     # ==================== 扩展：生成统一综合分析 HTML ====================
     if COMPREHENSIVE_HTML_SCRIPT.exists():
@@ -87,7 +87,7 @@ def main() -> None:
                 check=True,
                 cwd=str(BASE_DIR.parent),
             )
-            print("[完成] 综合分析 HTML 报告已生成（默认输出到 0_html/项目成本统计综合分析报告.html）")
+            print("[完成] 综合分析 HTML 报告已生成（默认输出到 04_html/项目成本统计综合分析报告.html）")
         except subprocess.CalledProcessError as exc:
             print(f"[失败] 综合HTML报告生成失败，退出码: {exc.returncode}")
             if not args.continue_on_error:

@@ -35,7 +35,11 @@ warnings.filterwarnings('ignore')
 
 # ==================== 配置区 ====================
 BASE_DIR = Path(__file__).resolve().parent
-SUMMARY_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/2_成本统计收集")
+try:
+    from common.paths import sum_data_path as _sum_data_path
+    SUMMARY_DIR = _sum_data_path("成本统计收集", create=False)
+except Exception:
+    SUMMARY_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/03_Sum/2_成本统计收集")
 INPUT_EXCEL = SUMMARY_DIR / "项目统计数据汇总_全月份.xlsx"
 OUTPUT_DIR = SUMMARY_DIR / "项目成本分析报告_TEXT"
 

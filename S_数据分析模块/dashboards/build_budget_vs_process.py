@@ -84,7 +84,7 @@ except Exception:
     REPORT_ROOT = DATA_ROOT / "Z_report"
 
     def html_data_path(*parts, create=True):
-        p = DATA_ROOT.joinpath("0_html", *parts)
+        p = DATA_ROOT.joinpath("04_html", *parts)
         if create:
             p.mkdir(parents=True, exist_ok=True)
         return p

@@ -1,4 +1,5 @@
 import os
+import sys
 import pandas as pd
 from pathlib import Path
 import importlib.util
@@ -28,23 +29,29 @@ SUBCONTRACT_PAID_COL_NAME = "工程部记录分包已付款"
 # ==================== 自动化指令编辑区 ====================
 SCRIPT_DIR = Path(__file__).resolve().parent
 CODE_ROOT_DIR = SCRIPT_DIR.parent
+if str(CODE_ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(CODE_ROOT_DIR))
+
+from settings import DATA_ROOT  # noqa: E402
+from common.paths import html_data_path, std_data_path, sum_data_path  # noqa: E402
+
 DEFAULT_MATCHER_DIR = CODE_ROOT_DIR / "0_项目基本信息"
 
 CONFIG = {
-"base_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Std/2_成本统计收集",
-"output_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/2_成本统计收集/项目统计数据汇总_全月份.xlsx",
-"profit_rate_chart_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_html/项目毛利率变化图.html",
+"base_dir": str(std_data_path("成本统计收集", create=False)),
+"output_file": str(sum_data_path("成本统计收集") / "项目统计数据汇总_全月份.xlsx"),
+"profit_rate_chart_file": str(html_data_path() / "项目毛利率变化图.html"),
 "project_matcher_dir": str(DEFAULT_MATCHER_DIR),
 "project_match_db_file": "",
-"project_info_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx",
-"finance_payment_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/12-财务数据💰",
-"contract_management_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑",
+"project_info_file": str(DATA_ROOT / "0_项目基本信息情况" / "项目基本信息表.xlsx"),
+"finance_payment_dir": str(sum_data_path("财务付款", create=False, legacy=DATA_ROOT / "12-财务数据💰")),
+"contract_management_dir": str(sum_data_path("合同管理", create=False, legacy=DATA_ROOT / "5_合同管理📑")),
 "contract_management_sheet": "1_总包分包汇总(全部)",
-"procurement_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/9_采购台账",
-"tool_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/10_机具费",
-"labor_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/11_人工费",
-"concrete_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/9.1_商混站",
-"subcontract_summary_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_Sum/5.1_分包合同",
+"procurement_summary_dir": str(sum_data_path("采购台账", create=False)),
+"tool_summary_dir": str(sum_data_path("机具费", create=False)),
+"labor_summary_dir": str(sum_data_path("人工费", create=False)),
+"concrete_summary_dir": str(sum_data_path("商混站", create=False)),
+"subcontract_summary_dir": str(sum_data_path("分包合同", create=False)),
 "finance_payment_date": "2026-03-14",
 "rmb_exchange_rate": 5,
 "items": {
@@ -189,43 +196,129 @@ class ProjectProcessor:
                     total += safe_to_float(ws.cell(row=row, column=col_idx).value)
         return total / divisor if divisor != 0 else 0.0
 
+def _skip_temp_xlsx(path: Path) -> bool:
+    name = path.name
+    return name.startswith("~$") or name.startswith(".")
+
+
 def find_latest_finance_file(directory):
+    """财务付款汇总：优先 03_Sum/12_财务付款/银行账，其次流水，再回退旧分包台账。"""
     base_dir_path = Path(directory)
     preferred_subdir = base_dir_path / "B_输出汇总文件"
     dir_path = preferred_subdir if preferred_subdir.exists() else base_dir_path
     if not dir_path.exists():
         print(f"⚠️ 财务数据目录不存在: {directory}")
         return None
-    files = [f for f in dir_path.rglob("分包台账汇总_*.xlsx") if not f.name.startswith("~$")]
+
+    skip_names = {"付款分类总表.xlsx", "学习记录.xlsx", "分组汇总索引.xlsx"}
+    bank = [
+        f for f in dir_path.rglob("*财务付款数据汇总.xlsx")
+        if not _skip_temp_xlsx(f) and "银行账" in str(f)
+    ]
+    flow = [
+        f for f in dir_path.rglob("*财务付款数据汇总.xlsx")
+        if not _skip_temp_xlsx(f) and "流水" in str(f)
+    ]
+    files = bank or flow
     if not files:
-        files = [f for f in dir_path.rglob("*.xlsx") if not f.name.startswith("~$")]
+        files = [
+            f for f in dir_path.rglob("分包台账汇总_*.xlsx") if not _skip_temp_xlsx(f)
+        ]
+    if not files:
+        files = [
+            f
+            for f in dir_path.rglob("*.xlsx")
+            if not _skip_temp_xlsx(f) and f.name not in skip_names
+        ]
     if not files:
         print(f"⚠️ 未找到财务汇总Excel: {dir_path}")
         return None
     ts_pattern = re.compile(r"分包台账汇总_(\d{8})_(\d{6})\.xlsx$")
+
     def sort_key(path_obj):
         filename = path_obj.name
         match = ts_pattern.match(filename)
         if match:
             return (1, match.group(1) + match.group(2))
         return (0, f"{os.path.getmtime(path_obj):020.6f}")
+
     latest_file = max(files, key=sort_key)
-    print(f"✓ 自动选择最新的分包台账文件: {latest_file.name}")
+    print(f"✓ 自动选择财务付款汇总: {latest_file.name}")
     print(f" 文件路径: {latest_file}")
     return str(latest_file)
+
+
+def load_finance_payment_maps(finance_file: str):
+    """返回 (by_code, by_name)，金额单位：万泰铢。"""
+    xls = pd.ExcelFile(finance_file)
+    sheets = set(xls.sheet_names)
+    by_code = {}
+    by_name = {}
+
+    def _ingest(df, amount_col, divisor):
+        for _, row in df.iterrows():
+            payment_amount = safe_to_float(row.get(amount_col, 0))
+            if divisor:
+                payment_amount = payment_amount / divisor
+            normalized_code = normalize_project_code(row.get("项目编码"))
+            if normalized_code:
+                by_code[normalized_code] = by_code.get(normalized_code, 0.0) + payment_amount
+            standard_name = str(row.get("标准项目名称") or row.get("项目名称") or "").strip()
+            if standard_name:
+                by_name[standard_name] = by_name.get(standard_name, 0.0) + payment_amount
+
+    if "项目一级科目汇总" in sheets:
+        df = pd.read_excel(finance_file, sheet_name="项目一级科目汇总")
+        if "0_分包" not in df.columns:
+            raise KeyError(f"项目一级科目汇总缺少 0_分包，当前列: {list(df.columns)}")
+        _ingest(df, "0_分包", 10000.0)
+        print(f"已加载 {len(by_code)} 个项目的财务分包付款（项目一级科目汇总 / 0_分包）")
+        return by_code, by_name
+
+    if "总体汇总" in sheets:
+        df = pd.read_excel(finance_file, sheet_name="总体汇总")
+        amount_col = next(
+            (c for c in ("计入成本_实付金额", "实付金额") if c in df.columns),
+            None,
+        )
+        if not amount_col:
+            raise KeyError(f"总体汇总缺少实付金额列，当前列: {list(df.columns)}")
+        _ingest(df, amount_col, 10000.0)
+        print(f"已加载 {len(by_code)} 个项目的财务付款（总体汇总 / {amount_col}）")
+        return by_code, by_name
+
+    df = pd.read_excel(finance_file, sheet_name="项目汇总（万泰铢）")
+    required_finance_cols = {"项目编码", "付款汇总（万泰铢）"}
+    missing_finance_cols = required_finance_cols - set(df.columns)
+    if missing_finance_cols:
+        raise KeyError(f"财务sheet缺少必要列: {', '.join(missing_finance_cols)}")
+    _ingest(df, "付款汇总（万泰铢）", 1.0)
+    print(f"已加载 {len(by_code)} 个项目的财务付款数据")
+    return by_code, by_name
 
 def find_latest_contract_file(directory):
     dir_path = Path(directory)
     if not dir_path.exists():
         print(f"⚠️ 合同管理目录不存在: {directory}")
         return None
-    files = list(dir_path.rglob("合同管理_总包分包汇总_*.xlsx"))
+    files = [
+        f
+        for f in dir_path.rglob("*.xlsx")
+        if not _skip_temp_xlsx(f)
+        and (
+            f.name == "合同管理_总包分包全量汇总.xlsx"
+            or f.name.startswith("合同管理_总包分包汇总_")
+            or ("总包分包" in f.name and "汇总" in f.name)
+        )
+    ]
     if not files:
         print(f"⚠️ 未找到合同管理汇总文件: {directory}")
         return None
     ts_pattern = re.compile(r"合同管理_总包分包汇总_(\d{8})_(\d{6})\.xlsx$")
     def sort_key(path_obj):
         filename = path_obj.name
+        if filename == "合同管理_总包分包全量汇总.xlsx":
+            return (2, f"{os.path.getmtime(path_obj):020.6f}")
         match = ts_pattern.match(filename)
         if match:
             return (1, match.group(1) + match.group(2))
@@ -492,8 +585,12 @@ def collect_cost_stat_files(base_path: Path):
 
     两种布局都支持：
     - 按月子目录（A_成本统计_raw）
-    - 扁平目录，月份写在文件名里（0_Std/2_成本统计收集）
+    - 扁平目录，月份写在文件名里（02_Std/2_成本统计收集）
     """
+    if not base_path.is_dir():
+        raise FileNotFoundError(
+            f"成本统计源目录不存在: {base_path}（期望 02_Std/2_成本统计收集）"
+        )
     grouped = defaultdict(list)
     skipped = []
     month_folders = [
@@ -770,20 +867,7 @@ def process_all_projects():
         finance_file = find_latest_finance_file(CONFIG["finance_payment_dir"])
         if not finance_file:
             raise FileNotFoundError("未找到财务数据文件")
-        finance_df = pd.read_excel(finance_file, sheet_name='项目汇总（万泰铢）')
-        required_finance_cols = {'项目编码', '付款汇总（万泰铢）'}
-        missing_finance_cols = required_finance_cols - set(finance_df.columns)
-        if missing_finance_cols:
-            raise KeyError(f"财务sheet缺少必要列: {', '.join(missing_finance_cols)}")
-        print(f"已加载 {len(finance_df)} 个项目的财务付款数据")
-        for _, row in finance_df.iterrows():
-            payment_amount = safe_to_float(row.get('付款汇总（万泰铢）', 0))
-            normalized_code = normalize_project_code(row.get('项目编码'))
-            if normalized_code:
-                finance_dict_by_code[normalized_code] = payment_amount
-            standard_name = str(row.get('标准项目名称', '')).strip()
-            if standard_name:
-                finance_dict_by_name[standard_name] = payment_amount
+        finance_dict_by_code, finance_dict_by_name = load_finance_payment_maps(finance_file)
     except Exception as e:
         print(f"⚠️ 加载财务数据失败: {e}")
         finance_dict_by_code = {}
@@ -828,24 +912,61 @@ def process_all_projects():
     subcontract_paid_dict_by_code = {}
     try:
         sc_dir = CONFIG.get("subcontract_summary_dir", "")
-        sc_file = find_latest_excel_file(sc_dir) if sc_dir else None
+        sc_path = Path(sc_dir) if sc_dir else None
+        sc_file = None
+        if sc_path and sc_path.is_dir():
+            preferred = sc_path / "分包合同台账_全量汇总.xlsx"
+            sc_file = str(preferred) if preferred.is_file() else find_latest_excel_file(sc_dir)
+        elif sc_dir:
+            sc_file = find_latest_excel_file(sc_dir)
         if not sc_file:
             raise FileNotFoundError(f"未找到分包合同台账汇总文件: {sc_dir}")
-        sc_df = pd.read_excel(sc_file)
+        xls = pd.ExcelFile(sc_file)
+        divisor = 10000.0
+        if "项目付款汇总_万泰铢" in xls.sheet_names:
+            sc_df = pd.read_excel(sc_file, sheet_name="项目付款汇总_万泰铢")
+            divisor = 1.0
+        elif "项目分包合同汇总" in xls.sheet_names:
+            sc_df = pd.read_excel(sc_file, sheet_name="项目分包合同汇总")
+        else:
+            sc_df = pd.read_excel(sc_file)
         sc_code_col = next((c for c in ["项目编码", "标准项目编码"] if c in sc_df.columns), None)
-        sc_amount_col = next((c for c in ["合同额（泰铢）", "合同额(泰铢）", "合同额(泰铢)"] if c in sc_df.columns), None)
-        sc_paid_col = next((c for c in ["分包已付款", "公司实付含税"] if c in sc_df.columns), None)
+        sc_amount_col = next(
+            (
+                c
+                for c in [
+                    "合同额（万泰铢）",
+                    "分包合同汇总金额",
+                    "合同额（泰铢）",
+                    "合同额(泰铢）",
+                    "合同额(泰铢)",
+                ]
+                if c in sc_df.columns
+            ),
+            None,
+        )
+        sc_paid_col = next(
+            (
+                c
+                for c in ["分包已付款（万泰铢）", "分包已付款", "公司实付含税"]
+                if c in sc_df.columns
+            ),
+            None,
+        )
         if not sc_code_col or not sc_amount_col:
             raise KeyError(f"分包台账缺少必要列，找到列: {list(sc_df.columns)}")
+        if "万泰铢" in str(sc_amount_col):
+            divisor = 1.0
         for _, row in sc_df.iterrows():
             code = normalize_project_code(row.get(sc_code_col))
             if not code:
                 continue
             amt = safe_to_float(row.get(sc_amount_col, 0))
-            subcontract_contract_dict_by_code[code] = subcontract_contract_dict_by_code.get(code, 0.0) + (amt / 10000.0)
+            subcontract_contract_dict_by_code[code] = subcontract_contract_dict_by_code.get(code, 0.0) + (amt / divisor)
             if sc_paid_col:
                 paid = safe_to_float(row.get(sc_paid_col, 0))
-                subcontract_paid_dict_by_code[code] = subcontract_paid_dict_by_code.get(code, 0.0) + (paid / 10000.0)
+                paid_div = 1.0 if "万泰铢" in str(sc_paid_col) else divisor
+                subcontract_paid_dict_by_code[code] = subcontract_paid_dict_by_code.get(code, 0.0) + (paid / paid_div)
         print(f"已构建 {len(subcontract_contract_dict_by_code)} 个项目编码的分包合同额索引\n")
     except Exception as e:
         print(f"⚠️ 加载工程部分包合同台账失败: {e}")
@@ -1066,6 +1187,7 @@ def process_all_projects():
         remaining_cols = [c for c in df.columns if c not in existing_ordered_cols]
         df = df[existing_ordered_cols + remaining_cols]
 
+        Path(CONFIG["output_file"]).parent.mkdir(parents=True, exist_ok=True)
         df.to_excel(CONFIG["output_file"], index=False, engine='openpyxl')
 
         wb = openpyxl.load_workbook(CONFIG["output_file"])
@@ -1313,7 +1435,7 @@ def process_all_projects():
 
         chart_output = CONFIG.get("profit_rate_chart_file")
         if not chart_output:
-            chart_output = str(Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_html") / "项目毛利率变化图.html")
+            chart_output = str(html_data_path() / "项目毛利率变化图.html")
         generate_profit_rate_chart(chart_source_df, chart_output)
         save_db_fn(matcher['db_path'], match_db)
         print(f"✓ 匹配库已保存: {matcher['db_path']}")

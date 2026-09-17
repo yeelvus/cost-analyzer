@@ -31,7 +31,7 @@ RAW_CREATE_NAMES: dict[str, str] = {
     "人工费台账": "1_人工费台账",
     "机票": "2_机票",
     "财务付款": "12_财务付款",
-    "html": "0_html",
+    "html": "04_html",
     "机具费分析": "机具费分析",
     "采购数据分析": "采购数据分析",
     "综合成本看板": "综合成本看板",
@@ -172,12 +172,15 @@ RAW_ROOT = discover_raw_root()
 
 
 def discover_html_root(data_root: Path | None = None) -> Path:
-    """定位 html / 0_html；没有则使用 0_html。"""
+    """定位 04_html / html / 0_html；优先 04_html。"""
     root = Path(data_root or DATA_ROOT)
+    preferred = root / "04_html"
+    if preferred.is_dir():
+        return preferred
     found = find_named_dir(root, "html")
     if found is not None:
         return found
-    return root / "0_html"
+    return preferred
 
 
 def ensure_html_root() -> Path:
@@ -190,7 +193,7 @@ HTML_ROOT = discover_html_root()
 
 
 def html_data_path(*parts: str, create: bool = True) -> Path:
-    """HTML 输出目录：0_html（也可写成 html / 1_html）。"""
+    """HTML 输出目录：04_html（也可写成 html / 0_html）。"""
     root = ensure_html_root() if create else discover_html_root()
     if not parts:
         if create:
