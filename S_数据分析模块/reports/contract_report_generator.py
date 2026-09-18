@@ -65,13 +65,13 @@ INPUT_PATHS = {
     "采购明细": BASE_DIR / "0_Sum/9_采购台账/采购部采购台账_std_sum.xlsx",
     "材料欠款": BASE_DIR / "0_Sum/9.1_材料欠款/泰国子公司材料采购欠款汇总_标准化.xlsx",
     "商混混凝土": [BASE_DIR / "0_Sum/9.1_商混站/搅拌站混凝土汇总报表.xlsx"],
-    "机具使用费": BASE_DIR / "0_Sum/10_机具费/机具费汇总_全量标准化_汇总.xlsx",
+    "机具使用费": BASE_DIR / "0_Sum/10_机具费/机具费_汇总.xlsx",
     "人工费汇总": BASE_DIR / "0_Sum/11_人工费/人工费汇总.xlsx",
     "财务分包": BASE_DIR / "03_Sum/12_财务付款/银行账/银行账_财务付款数据汇总.xlsx",
     "分包合同台账": BASE_DIR / "0_Std/5.1_分包合同/分包签订合同汇总_2026-07.xlsx",
     "成本统计": BASE_DIR / "0_Sum/2_成本统计收集/项目统计数据汇总_全月份.xlsx",
     "项目经理": BASE_DIR / "0_项目基本信息情况/项目基本信息表.xlsx",
-    "预算金额": BASE_DIR / "0_Sum/3_预算部分/【总汇总】所有标段.xlsx",
+    "预算金额": BASE_DIR / "0_Sum/3_预算部分/预算人材机汇总.xlsx",
     "责任成本": BASE_DIR / "0_Std/3.1_责任成本",
 }
 
@@ -246,9 +246,9 @@ def resolve_input_paths() -> Dict:
         resolved["财务分包"] = finance_latest
 
     budget_latest = pick_latest_existing([
-        (BASE_DIR / "3_预算部分/2_人材机_std", "【总汇总】所有标段*.xlsx", False),
-        (BASE_DIR / "3_预算部分/5.1_主材汇总（广联达软件导出）", "【总汇总】所有标段*.xlsx", False),
-        (BASE_DIR / "3_预算部分", "【总汇总】所有标段*.xlsx", True),
+        (BASE_DIR / "3_预算部分/2_人材机_std", "预算人材机汇总*.xlsx", False),
+        (BASE_DIR / "3_预算部分/5.1_主材汇总（广联达软件导出）", "预算人材机汇总*.xlsx", False),
+        (BASE_DIR / "3_预算部分", "预算人材机汇总*.xlsx", True),
     ])
     if budget_latest:
         resolved["预算金额"] = budget_latest
@@ -361,7 +361,7 @@ def resolve_input_paths() -> Dict:
     sub_contract_latest = pick_latest_existing(
         [
             (BASE_DIR / "0_Std/5.1_分包合同", "分包签订合同汇总_*.xlsx", False),
-            (BASE_DIR / "0_Sum/5.1_分包合同", "分包合同台账_全量汇总.xlsx", False),
+            (BASE_DIR / "0_Sum/5.1_分包合同", "分包合同台账_汇总.xlsx", False),
             (BASE_DIR / "5.1_分包合同/2_分包合同台账_std", "分包签订合同汇总_*.xlsx", False),
             (BASE_DIR / "5.1_分包合同/2_分包合同台账_std", "*.xlsx", False),
             (BASE_DIR / "5.1_分包合同/3_分包合同_sum", "分包签订合同汇总_*.xlsx", False),

@@ -436,7 +436,9 @@ def build_project_summary(
 ):
     main_df = ensure_columns(main_df, ["项目编码", "项目简称", "项目状态", "金额_THB", "是否采购类合同"])
     sub_df = ensure_columns(sub_df, ["项目编码", "项目简称", "项目状态", "金额_THB", "是否采购类合同"])
-    procurement_df = ensure_columns(procurement_df, ["项目编码", "金额_THB"])
+    procurement_df = ensure_columns(
+        procurement_df, ["项目编码", "金额_THB", "标准项目名称"]
+    )
     material_arrears_df = ensure_columns(material_arrears_df, ["项目编码", "欠款金额_THB", "标准项目名称"])
     concrete_df = ensure_columns(concrete_df, ["项目编码", "金额_THB", "标准项目名称"])
     equipment_df = ensure_columns(equipment_df, ["项目编码", "金额_THB", "标准项目名称"])
@@ -449,6 +451,7 @@ def build_project_summary(
         finance_category_df = pd.DataFrame()
     if budget_df is None:
         budget_df = pd.DataFrame()
+    budget_df = ensure_columns(budget_df, ["项目编码", "项目名称", "币种"])
 
     all_codes = set(main_df.get("项目编码", pd.Series(dtype=str)).unique())
     all_codes |= set(sub_df.get("项目编码", pd.Series(dtype=str)).unique())
