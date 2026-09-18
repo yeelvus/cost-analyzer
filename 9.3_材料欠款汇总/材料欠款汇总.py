@@ -48,7 +48,7 @@ os.makedirs(output_dir, exist_ok=True)
 sheet_name = "汇总表"
 
 # 输出文件名（不再带时间戳，按要求固定名称）
-output_path = os.path.join(output_dir, "泰国子公司材料采购欠款汇总_标准化.xlsx")
+output_path = os.path.join(output_dir, "材料采购欠款_汇总.xlsx")
 
 # 非交互模式：存在 --non-interactive / -y 时不弹窗
 INTERACTIVE = not any(a in ("--non-interactive", "-y", "--yes") for a in sys.argv[1:])
