@@ -28,6 +28,8 @@ _SORT_PREFIX_RE = re.compile(r"^(?:\d+(?:\.\d+)?|[A-Za-z])[_-]")
 
 # 合同根目录逻辑名（实际磁盘名可以带任意前缀，如 5_合同管理📑）
 CONTRACT_ROOT_LOGICAL = "合同管理"
+# 合同源文件目录：优先使用移动硬盘路径，未挂载时回退到 DATA_ROOT 下的目录。
+CONTRACT_ROOT_OVERRIDE = Path("/Volumes/PC-SunYongtao/5_合同管理📑")
 PROJECT_CODE_DB = str(MATCH_DB_PATH)
 
 # 明细汇总（原 03）相关
@@ -138,6 +140,8 @@ def resolve_existing_path(path: str, fallbacks: list[str] | None = None) -> str:
 
 
 def get_contract_root() -> str:
+    if CONTRACT_ROOT_OVERRIDE.is_dir():
+        return str(CONTRACT_ROOT_OVERRIDE)
     found = find_named_folder(DATA_ROOT, CONTRACT_ROOT_LOGICAL)
     if found is not None:
         return str(found)
