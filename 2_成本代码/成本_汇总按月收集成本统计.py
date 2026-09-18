@@ -915,7 +915,7 @@ def process_all_projects():
         sc_path = Path(sc_dir) if sc_dir else None
         sc_file = None
         if sc_path and sc_path.is_dir():
-            preferred = sc_path / "分包合同台账_全量汇总.xlsx"
+            preferred = sc_path / "分包合同台账_汇总.xlsx"
             sc_file = str(preferred) if preferred.is_file() else find_latest_excel_file(sc_dir)
         elif sc_dir:
             sc_file = find_latest_excel_file(sc_dir)

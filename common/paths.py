@@ -41,6 +41,7 @@ RAW_CREATE_NAMES: dict[str, str] = {
     "采购部采购台账extract": "B_采购部采购台账_extract",
     "采购部采购台账std": "C_采购部采购台账_std",
     "采购部采购台账stdsplit": "F_采购部采购台账_std_split",
+    "机具费rawsum": "B_机具费_raw_sum",
     "机具费rawsplit": "C_机具费_raw_split",
     "机具费stdsplit": "E_机具费_std_split",
     "人工费台账std": "B_人工费台账_std",

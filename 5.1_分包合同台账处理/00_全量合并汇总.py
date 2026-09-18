@@ -9,7 +9,7 @@
   → 全部 Sheet 写入同一个 Excel
 
 输出默认：
-  {DATA}/5.1_分包合同/3_分包合同_sum/分包合同台账_全量汇总.xlsx
+    {DATA}/5.1_分包合同/3_分包合同_sum/分包合同台账_汇总.xlsx
 
 用法：
   python 00_全量合并汇总.py
@@ -125,7 +125,7 @@ def main() -> None:
         "-o",
         "--output",
         default=None,
-        help="输出 Excel 路径（默认 sum 目录下 分包合同台账_全量汇总.xlsx）",
+        help="输出 Excel 路径（默认 sum 目录下 分包合同台账_汇总.xlsx）",
     )
     args = parser.parse_args()
     export_merged(skip_std=args.skip_std, output_path=args.output)

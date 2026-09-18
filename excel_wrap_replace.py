@@ -1,4 +1,4 @@
-#!/opt/anaconda3/bin/python
+#!/opt/an.conda3/bin/python
 # -*- coding: utf-8 -*-
 """
 Excel 批量包裹替换（图形界面）

@@ -95,7 +95,7 @@ INDEX_XLSX = DATA_ROOT / "18_output" / "项目汇总索引.xlsx"
 LABOR_XLSX = _sum_p("人工费", create=False) / "人工费汇总.xlsx"
 PROC_SUM = _sum_p("采购台账", create=False) / "采购部采购台账_std_sum.xlsx"
 PROC_CAT = _sum_p("采购台账", create=False) / "项目采购分类汇总.xlsx"
-MACH_SUM = _sum_p("机具费", create=False) / "机具费汇总_全量标准化_汇总.xlsx"
+MACH_SUM = _sum_p("机具费", create=False) / "机具费_汇总.xlsx"
 SUB_SUM = _sum_p("分包合同", create=False)
 FIN_SUM = _sum_p("财务付款", create=False) / "财务付款数据汇总.xlsx"
 RESP_DIR = _std_p("责任成本", create=False, legacy=DATA_ROOT / "3.1_责任成本" / "2_责任成本_std")
@@ -337,8 +337,8 @@ def load_company(month_hint: Optional[str]) -> Tuple[List[Dict], str, str]:
 
 def load_budget(fx: float) -> Tuple[Dict[str, Dict], Dict[str, Dict], str]:
     """预算人材机 + 材料量。金额→万泰铢。"""
-    summary = find_latest(BUDGET_SUM, "【总汇总】所有标段*.xlsx") or find_latest(
-        BUDGET_STD, "【总汇总】所有标段*.xlsx"
+    summary = find_latest(BUDGET_SUM, "预算人材机汇总*.xlsx") or find_latest(
+        BUDGET_STD, "预算人材机汇总*.xlsx"
     )
     if not summary:
         return {}, {}, "缺失"

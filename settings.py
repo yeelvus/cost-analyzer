@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -.- coding: utf-8 -*-
 """全库共享路径配置（Desktop/code 根）。
 
 数据与代码分离：

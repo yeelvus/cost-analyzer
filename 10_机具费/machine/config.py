@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """机具费统一配置。
 
-数据目录按字母顺序（10_机具费🚜/）：
-  A_机具费_raw/              原始台账
-  B_机具费_raw_sum/          机具费_raw合并.xlsx（过程全量合并 + 项目匹配）
-  C_机具费_raw_split/        原始拆分：{编码}_{项目}_机具费.xlsx
-  D_机具费_std_sum/          标准汇总：机具费汇总_全量标准化_汇总.xlsx
-  E_机具费_std_split/        标准拆分：标准汇总按项目拆分
-分析报告 HTML / Excel 输出到 Z_report/机具费分析/
+  01_Raw/10_机具费/                 原始台账
+  02_Std/10_机具费/
+    B_机具费_raw_sum/              机具费_raw合并.xlsx（过程全量合并 + 项目匹配）
+    C_机具费_raw_split/            原始拆分：{编码}_{项目}_机具费.xlsx
+    E_机具费_std_split/            标准拆分：标准汇总按项目
+  03_Sum/10_机具费/                 机具费_汇总.xlsx
+分析报告 HTML 输出到 04_html/机具费分析/
 """
 from __future__ import annotations
 
@@ -70,8 +70,12 @@ def first_existing(*candidates: Path) -> Path:
 MACHINE_ROOT = first_existing(DATA_ROOT / "10_机具费🚜", DATA_ROOT / "10_机具费")
 
 # ---------- 数据目录（A→F 顺序）----------
-RAW_DIR = raw_data_path("机具费", legacy=MACHINE_ROOT / "A_机具费_raw")  # 原始台账 → 0_Raw
-RAW_SUM_DIR = sum_data_path("机具费", legacy=MACHINE_ROOT / "B_机具费_raw_sum")
+RAW_DIR = raw_data_path("机具费", legacy=MACHINE_ROOT / "A_机具费_raw")  # 原始台账 → 01_Raw
+RAW_SUM_DIR = std_data_path(
+    "机具费",
+    "B_机具费_raw_sum",
+    legacy=MACHINE_ROOT / "B_机具费_raw_sum",
+)
 RAW_SPLIT_DIR = std_data_path(
     "机具费",
     "C_机具费_raw_split",
@@ -199,7 +203,7 @@ OUTPUT_FILE_SUFFIX = "汇总"
 RAW_MERGE_NAME = "机具费_raw合并.xlsx"
 LEGACY_CLEAN_MERGE_NAME = "clean_机具费_raw合并.xlsx"
 PROJECT_STD_SUFFIX = "_机具费.xlsx"
-FULL_SUMMARY_BASENAME = f"{OUTPUT_FILENAME_PREFIX}_全量标准化"
+FULL_SUMMARY_BASENAME = "机具费"
 FULL_SUMMARY_FILENAME = f"{FULL_SUMMARY_BASENAME}_{OUTPUT_FILE_SUFFIX}.xlsx"
 
 SUMMARY_SHEET_NAME = "汇总"

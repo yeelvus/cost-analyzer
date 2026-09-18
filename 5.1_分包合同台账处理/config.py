@@ -24,7 +24,7 @@ SUM_DIR = sum_data_path("分包合同", legacy=SUBPACKAGE_ROOT / "3_分包合同
 PROJECT_INFO_XLSX = DATA_ROOT / "0_项目基本信息情况" / "项目基本信息表.xlsx"
 
 # 输出文件名
-MERGED_OUTPUT_NAME = "分包合同台账_全量汇总.xlsx"
+MERGED_OUTPUT_NAME = "分包合同台账_汇总.xlsx"
 COMPARISON_ONLY_NAME = "分包合同汇总逐月对比汇总.xlsx"
 PAID_ONLY_SUFFIX = "_项目汇总.xlsx"
 

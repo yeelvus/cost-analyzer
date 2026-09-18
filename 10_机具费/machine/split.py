@@ -6,7 +6,7 @@
    输出：C_机具费_raw_split/{项目编码}_{项目名称}_机具费.xlsx
 
 2) 标准拆分 split_std_summary_by_project
-   输入：D_机具费_std_sum/机具费汇总_全量标准化_汇总.xlsx
+    输入：D_机具费_std_sum/机具费_汇总.xlsx
    输出：E_机具费_std_split/{项目编码}_{项目名称}_机具费.xlsx
 """
 from __future__ import annotations

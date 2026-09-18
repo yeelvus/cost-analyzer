@@ -170,7 +170,7 @@ def run(*, dry_run: bool = False) -> None:
     machine = _domain("机具费")
     if machine:
         dest_base = resolve_under(std_root, "机具费", create=not dry_run)
-        for folder in ("C_机具费_raw_split", "E_机具费_std_split"):
+        for folder in ("B_机具费_raw_sum", "C_机具费_raw_split", "E_机具费_std_split"):
             n += _job(
                 f"机具 {folder}",
                 machine / folder,

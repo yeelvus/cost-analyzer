@@ -184,7 +184,7 @@ def run_merge_raw(
     *,
     split_by_project: bool = True,
 ) -> Path:
-    """合并 raw → B_B_机具费_raw_sum/机具费_raw合并.xlsx，并按项目拆到 C_机具费_raw_split。"""
+    """合并 raw → B_机具费_raw_sum/机具费_raw合并.xlsx，并按项目拆到 C_机具费_raw_split。"""
     ensure_data_dirs()
     raw_dir = Path(raw_dir or RAW_DIR)
     out_dir = Path(out_dir or RAW_SUM_DIR)

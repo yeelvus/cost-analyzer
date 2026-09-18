@@ -122,7 +122,6 @@ def run(*, dry_run: bool = False) -> None:
         dest = resolve_under(sum_root, "机具费", create=not dry_run)
         print(f"\n[机具费] → {dest}")
         n += _move_xlsx_in_dir(machine / "D_机具费_std_sum", dest, dry_run=dry_run)
-        n += _move_xlsx_in_dir(machine / "B_机具费_raw_sum", dest, dry_run=dry_run)
 
     labor = _domain("人工费")
     if labor:

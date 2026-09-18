@@ -16,6 +16,7 @@ from openpyxl.utils import get_column_letter
 from machine.config import (
     CODE_ROOT,
     EXCEL_FILE_OVERRIDE,
+    FULL_SUMMARY_BASENAME,
     MACHINE_MAPPING_JSON,
     MACHINE_MAPPING_TXT,
     OUTPUT_FILE_SUFFIX,
@@ -1379,7 +1380,7 @@ def main(excel_path_override=None, output_basename_override=None):
 
 
 def _keep_only_full_summary_in_d() -> None:
-    """D_机具费_std_sum 仅保留 机具费汇总_全量标准化_汇总.xlsx。"""
+    """D_机具费_std_sum 仅保留 机具费_汇总.xlsx。"""
     from machine.config import FULL_SUMMARY_FILENAME, STD_SUM_DIR
 
     keep_name = FULL_SUMMARY_FILENAME
@@ -1416,13 +1417,13 @@ def run_summarize_batch() -> None:
         return
 
     if RUN_MODE == "all":
-        # D_机具费_std_sum 只保留「机具费汇总_全量标准化_汇总.xlsx」
+        # D_机具费_std_sum 只保留「机具费_汇总.xlsx」
         # 按项目的结果在 E_机具费_std_split，不再在 D 写单项目汇总
         print(
             f"自动发现原始拆分文件 {len(all_input_files)} 个，"
             f"一次汇总写入 D_机具费_std_sum（仅全量标准化汇总）..."
         )
-        main(all_input_files, output_basename_override=f"{OUTPUT_FILENAME_PREFIX}_全量标准化")
+        main(all_input_files, output_basename_override=FULL_SUMMARY_BASENAME)
         _keep_only_full_summary_in_d()
         try:
             from machine.split import split_std_summary_by_project

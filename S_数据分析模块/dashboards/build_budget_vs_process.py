@@ -106,7 +106,7 @@ BUDGET_STD_DIR = _std_p("预算部分", create=False, legacy=DATA_ROOT / "3_预�
 INDEX_XLSX = DATA_ROOT / "18_output" / "项目汇总索引.xlsx"
 LABOR_XLSX = _sum_p("人工费", create=False) / "人工费汇总.xlsx"
 PROC_SUM = _sum_p("采购台账", create=False) / "采购部采购台账_std_sum.xlsx"
-MACH_SUM = _sum_p("机具费", create=False) / "机具费汇总_全量标准化_汇总.xlsx"
+MACH_SUM = _sum_p("机具费", create=False) / "机具费_汇总.xlsx"
 READY_MIX_DIR = _sum_p("商混站", create=False)
 CONFIG_PATH = CODE_ROOT / "common" / "budget_vs_process_config.json"
 
@@ -189,8 +189,8 @@ def budget_to_thb(amount: float, currency: str, fx: float) -> float:
 
 def load_budget(fx: float) -> Tuple[pd.DataFrame, str]:
     """返回预算表（金额已转为万泰铢）与来源说明。"""
-    summary = find_latest(BUDGET_SUM_DIR, "【总汇总】所有标段*.xlsx") or find_latest(
-        BUDGET_STD_DIR, "【总汇总】所有标段*.xlsx"
+    summary = find_latest(BUDGET_SUM_DIR, "预算人材机汇总*.xlsx") or find_latest(
+        BUDGET_STD_DIR, "预算人材机汇总*.xlsx"
     )
     source = ""
     if summary and summary.exists():
