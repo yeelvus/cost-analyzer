@@ -10,8 +10,10 @@
     规格标准化/ / 单位转换/ / 内容标准化/
     分析看板/ / 工具/
 
-数据目录（磁盘 9_采购台账📦，前缀按流水线顺序）：
-  A_raw → B_extract → C_std → D_raw_sum → E_sum → F_std_split
+数据目录：
+  01_Raw/9_采购台账            A_raw
+  02_Std/9_采购台账            B_extract / C_std / D_raw_sum / F_std_split
+  03_Sum/9_采购台账            E_sum（采购部采购台账_std_sum.xlsx）
 """
 from __future__ import annotations
 
@@ -141,9 +143,10 @@ STD_DIR = std_data_path(
     DIR_STD,
     legacy=_DATA_BASE / DIR_STD,
 )
-# 注意：keyword 用 raw_sum / sum / std_split，避免「_std」误匹配 std_split
-RAW_SUM_DIR = sum_data_path(
+# 过程纯合并放 02_Std；全量标准化汇总仍在 03_Sum
+RAW_SUM_DIR = std_data_path(
     "采购台账",
+    DIR_RAW_SUM,
     legacy=_DATA_BASE / DIR_RAW_SUM,
 )
 SUM_DIR = sum_data_path(
@@ -170,6 +173,17 @@ except Exception:
 
 # 纯合并（C_std 直接拼表，无内容标准化）→ D_raw_sum
 RAW_SUM_FILE_NAME = "采购部采购台账_raw_sum.xlsx"
+
+
+def raw_sum_xlsx() -> Path:
+    """D_raw_sum 主文件；若尚未迁移则回退 03_Sum 旧副本。"""
+    preferred = RAW_SUM_DIR / RAW_SUM_FILE_NAME
+    if preferred.is_file():
+        return preferred
+    legacy = SUM_DIR / RAW_SUM_FILE_NAME
+    if legacy.is_file():
+        return legacy
+    return preferred
 # 兼容旧名引用
 MERGED_PLAIN_NAME = RAW_SUM_FILE_NAME
 # 标准化+对比（唯一 E_sum 主文件，数据源 D_raw_sum）

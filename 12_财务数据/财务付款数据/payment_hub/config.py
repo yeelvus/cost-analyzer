@@ -27,6 +27,11 @@ def _pay_sum_dir() -> Path:
     return sum_data_path("财务付款", legacy=LEGACY_SUM_DIR)
 
 
+def _pay_std_root() -> Path:
+    """02_Std/12_财务付款（分类总表 / 学习记录 / 分组索引副本）。"""
+    return std_data_path("财务付款")
+
+
 def _nonempty_dir(path: Path) -> bool:
     if not path.is_dir():
         return False
@@ -111,12 +116,12 @@ class Paths:
     rules_suggest_xlsx: Path = field(
         default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "规则建议.xlsx"
     )
-    # 分类总表：一份 Excel 调全部分类（也复制到 03_Sum/12_财务付款 便于查找）
+    # 分类总表：一份 Excel 调全部分类（也复制到 02_Std/12_财务付款 便于查找）
     class_master_xlsx: Path = field(
         default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "付款分类总表.xlsx"
     )
     class_master_xlsx_sum: Path = field(
-        default_factory=lambda: _pay_sum_dir() / "付款分类总表.xlsx"
+        default_factory=lambda: _pay_std_root() / "付款分类总表.xlsx"
     )
     taxonomy_xlsx: Path = field(
         default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "科目体系.xlsx"
@@ -126,14 +131,17 @@ class Paths:
         default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "学习记录.xlsx"
     )
     learn_log_xlsx_sum: Path = field(
-        default_factory=lambda: _pay_sum_dir() / "学习记录.xlsx"
+        default_factory=lambda: _pay_std_root() / "学习记录.xlsx"
     )
     # 分类质量/修正报告（含仍待人工_高频）
     class_fix_report_xlsx: Path = field(
         default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "分类修正记录.xlsx"
     )
     class_fix_report_xlsx_sum: Path = field(
-        default_factory=lambda: _pay_sum_dir() / "分类修正记录.xlsx"
+        default_factory=lambda: _pay_std_root() / "分类修正记录.xlsx"
+    )
+    group_index_xlsx: Path = field(
+        default_factory=lambda: _pay_std_root() / "分组汇总索引.xlsx"
     )
 
     # 学习池：汇总 / 按项目 / 按月份 + 已确认总表
@@ -179,14 +187,13 @@ class Paths:
         return self.sum_xlsx.parent
 
     def group_raw_std_dir(self, group: str) -> Path:
-        """A1_raw_std/{组名}/"""
-        name = (group or "").strip() or "未分组"
-        return self.raw_std_dir / name
+        """A1_raw_std 根目录（不再按组建子文件夹）。"""
+        return self.raw_std_dir
 
     def group_raw_std_xlsx(self, group: str) -> Path:
-        """A1_raw_std/{组名}/{组名}_财务付款_raw_std.xlsx"""
+        """A1_raw_std/{组名}_财务付款_raw_std.xlsx"""
         name = (group or "").strip() or "未分组"
-        return self.group_raw_std_dir(name) / f"{name}_财务付款_raw_std.xlsx"
+        return self.raw_std_dir / f"{name}_财务付款_raw_std.xlsx"
 
     def group_classified_dir(self, group: str) -> Path:
         """A2_classified/{组名}/"""
@@ -204,14 +211,13 @@ class Paths:
         return self.std_dir / name
 
     def group_sum_dir(self, group: str) -> Path:
-        """Sum/{组名}/"""
-        name = (group or "").strip() or "未分组"
-        return self.sum_dir / name
+        """Sum 根目录（不再按组建子文件夹）。"""
+        return self.sum_dir
 
     def group_sum_xlsx(self, group: str) -> Path:
-        """Sum/{组名}/{组名}_财务付款数据汇总.xlsx"""
+        """Sum/{组名}_财务付款数据_汇总.xlsx"""
         name = (group or "").strip() or "未分组"
-        return self.group_sum_dir(name) / f"{name}_财务付款数据汇总.xlsx"
+        return self.sum_dir / f"{name}_财务付款数据_汇总.xlsx"
 
     def group_cashflow_html(self, group: str) -> Path:
         name = (group or "").strip() or "未分组"
@@ -224,7 +230,7 @@ class Paths:
         name = (group or "").strip() or "未分组"
         stem = Path(self.amount_mismatch_xlsx).stem
         suffix = Path(self.amount_mismatch_xlsx).suffix
-        return self.group_sum_dir(name) / f"{name}_{stem}{suffix}"
+        return self.sum_dir / f"{name}_{stem}{suffix}"
 
     def ensure_output_parents(self) -> None:
         self.raw_std_dir.mkdir(parents=True, exist_ok=True)

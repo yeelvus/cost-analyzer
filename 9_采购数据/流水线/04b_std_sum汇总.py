@@ -45,6 +45,7 @@ from _采购路径 import (
     SUM_DIR,
     UNIT_PIPELINE,
     is_excel,
+    raw_sum_xlsx,
 )
 
 # 正式输出列（merged / std_merged 不变）
@@ -798,7 +799,7 @@ def build_compare_workbook_from_raw_sum(
       3) 单位转换 → 转换单位/计算数量
       4) 写出对比版结构
     """
-    raw_sum_path = Path(raw_sum_path) if raw_sum_path else (RAW_SUM_DIR / RAW_SUM_FILE_NAME)
+    raw_sum_path = Path(raw_sum_path) if raw_sum_path else raw_sum_xlsx()
     if not raw_sum_path.is_file():
         print(
             f"⚠️ 对比版跳过：未找到 raw_sum 源文件\n"
@@ -1098,7 +1099,7 @@ def main() -> None:
     raw_sum_path = (
         Path(args.raw_sum).expanduser()
         if args.raw_sum
-        else (RAW_SUM_DIR / RAW_SUM_FILE_NAME)
+        else raw_sum_xlsx()
     )
     out_dir.mkdir(parents=True, exist_ok=True)
 

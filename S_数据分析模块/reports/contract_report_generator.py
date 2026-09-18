@@ -66,8 +66,8 @@ INPUT_PATHS = {
     "材料欠款": BASE_DIR / "0_Sum/9.1_材料欠款/泰国子公司材料采购欠款汇总_标准化.xlsx",
     "商混混凝土": [BASE_DIR / "0_Sum/9.1_商混站/搅拌站混凝土汇总报表.xlsx"],
     "机具使用费": BASE_DIR / "0_Sum/10_机具费/机具费_汇总.xlsx",
-    "人工费汇总": BASE_DIR / "0_Sum/11_人工费/人工费汇总.xlsx",
-    "财务分包": BASE_DIR / "03_Sum/12_财务付款/银行账/银行账_财务付款数据汇总.xlsx",
+    "人工费汇总": BASE_DIR / "0_Sum/11_人工费/人工费_汇总.xlsx",
+    "财务分包": BASE_DIR / "03_Sum/12_财务付款/银行账_财务付款数据_汇总.xlsx",
     "分包合同台账": BASE_DIR / "0_Std/5.1_分包合同/分包签订合同汇总_2026-07.xlsx",
     "成本统计": BASE_DIR / "0_Sum/2_成本统计收集/项目统计数据汇总_全月份.xlsx",
     "项目经理": BASE_DIR / "0_项目基本信息情况/项目基本信息表.xlsx",
@@ -227,6 +227,9 @@ def resolve_input_paths() -> Dict:
 
     finance_latest = pick_latest_existing(
         [
+            (BASE_DIR / "03_Sum/12_财务付款", "银行账_财务付款数据_汇总.xlsx", False),
+            (BASE_DIR / "03_Sum/12_财务付款", "流水_财务付款数据_汇总.xlsx", False),
+            (BASE_DIR / "03_Sum/12_财务付款", "*财务付款数据_汇总.xlsx", False),
             (BASE_DIR / "03_Sum/12_财务付款/银行账", "*财务付款数据汇总.xlsx", False),
             (BASE_DIR / "03_Sum/12_财务付款/流水", "*财务付款数据汇总.xlsx", False),
             (BASE_DIR / "0_Sum/12_财务付款/银行账", "*财务付款数据汇总.xlsx", False),
@@ -287,8 +290,8 @@ def resolve_input_paths() -> Dict:
         resolved["人工费汇总"] = labor_default
     else:
         labor_latest = pick_latest_existing([
-            (BASE_DIR / "0_Sum/11_人工费", "人工费汇总.xlsx", False),
-            (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费汇总.xlsx", False),
+            (BASE_DIR / "0_Sum/11_人工费", "人工费_汇总.xlsx", False),
+            (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费_汇总.xlsx", False),
             (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费汇总_*.xlsx", False),
             (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费汇总*.xlsx", False),
             (BASE_DIR / "11_人工费🙎🏻‍♂️", "综合汇总_*.xlsx", True),
@@ -299,7 +302,7 @@ def resolve_input_paths() -> Dict:
             (BASE_DIR, "11_人工费*/**/综合汇总*.xlsx", False),
             (BASE_DIR, "**/人工费汇总_*.xlsx", False),
             (BASE_DIR, "**/人工费汇总*.xlsx", False),
-            (BASE_DIR / "Z_report", "人工费汇总.xlsx", False),
+            (BASE_DIR / "Z_report", "人工费_汇总.xlsx", False),
         ], exclude_substrings=["分析"])
         if labor_latest:
             resolved["人工费汇总"] = labor_latest

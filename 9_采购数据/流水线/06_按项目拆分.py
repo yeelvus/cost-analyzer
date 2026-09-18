@@ -40,6 +40,7 @@ from _采购路径 import (
     STD_SUM_FILE_NAME,
     SUM_DIR,
     latest_sum_file,
+    raw_sum_xlsx,
 )
 
 # 与 04b 非泰铢换算标绿一致
@@ -316,7 +317,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.input:
         src = Path(args.input).expanduser()
     elif args.from_raw_sum:
-        src = RAW_SUM_DIR / RAW_SUM_FILE_NAME
+        src = raw_sum_xlsx()
     else:
         src = default_std
 

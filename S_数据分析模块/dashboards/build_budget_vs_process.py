@@ -104,7 +104,7 @@ except Exception:
 BUDGET_SUM_DIR = _sum_p("预算部分", create=False)
 BUDGET_STD_DIR = _std_p("预算部分", create=False, legacy=DATA_ROOT / "3_预算部分" / "2_人材机_std")
 INDEX_XLSX = DATA_ROOT / "18_output" / "项目汇总索引.xlsx"
-LABOR_XLSX = _sum_p("人工费", create=False) / "人工费汇总.xlsx"
+LABOR_XLSX = _sum_p("人工费", create=False) / "人工费_汇总.xlsx"
 PROC_SUM = _sum_p("采购台账", create=False) / "采购部采购台账_std_sum.xlsx"
 MACH_SUM = _sum_p("机具费", create=False) / "机具费_汇总.xlsx"
 READY_MIX_DIR = _sum_p("商混站", create=False)
@@ -237,7 +237,7 @@ def load_budget(fx: float) -> Tuple[pd.DataFrame, str]:
 def load_labor() -> Tuple[pd.DataFrame, str]:
     path = LABOR_XLSX
     if not path.exists():
-        for p in DATA_ROOT.rglob("人工费汇总.xlsx"):
+        for p in DATA_ROOT.rglob("人工费_汇总.xlsx"):
             if p.name.startswith("~$"):
                 continue
             path = p

@@ -1036,6 +1036,34 @@ def _write_summary_workbook(
     apply_formatting(path, detail_groups=detail_groups)
 
 
+def _cleanup_legacy_sum_files(path: Path, group_label: str = "") -> None:
+    """删除旧组名子目录 / 无下划线文件名的汇总，避免和扁平新文件并存。"""
+    path = Path(path)
+    name = (group_label or "").strip()
+    candidates = [path.parent / "财务付款数据汇总.xlsx"]
+    if name:
+        candidates.extend(
+            [
+                path.parent / f"{name}_财务付款数据汇总.xlsx",
+                path.parent / name / f"{name}_财务付款数据汇总.xlsx",
+                path.parent / name / f"{name}_财务付款数据_汇总.xlsx",
+            ]
+        )
+    for legacy in candidates:
+        if not legacy.is_file():
+            continue
+        try:
+            if legacy.resolve() == path.resolve():
+                continue
+            legacy.unlink()
+            print(f"   🗑️ 移除旧汇总: {legacy}")
+            parent = legacy.parent
+            if parent != path.parent and parent.is_dir() and not any(parent.iterdir()):
+                parent.rmdir()
+        except OSError as exc:
+            print(f"  ⚠️ 无法删除旧汇总 {legacy}: {exc}")
+
+
 def run_summary_for_detail_df(
     detail_df: pd.DataFrame,
     *,
@@ -1054,14 +1082,7 @@ def run_summary_for_detail_df(
     )
 
     path = Path(sum_xlsx)
-    # 清理旧文件名 财务付款数据汇总.xlsx（无组名前缀）
-    legacy = path.parent / "财务付款数据汇总.xlsx"
-    if legacy.is_file() and legacy.resolve() != path.resolve():
-        try:
-            legacy.unlink()
-            print(f"   🗑️ 移除旧汇总文件名: {legacy.name}")
-        except OSError:
-            pass
+    _cleanup_legacy_sum_files(path, group_label or "")
     _write_summary_workbook(
         path,
         summary_df=summary_df,
@@ -1124,6 +1145,7 @@ def run_summary_for_group(
     )
 
     path = Path(sum_xlsx)
+    _cleanup_legacy_sum_files(path, label)
     _write_summary_workbook(
         path,
         summary_df=summary_df,
@@ -1152,7 +1174,7 @@ def run_summary_for_group(
 def _archive_ungrouped_root_outputs(paths: Paths, active_groups: List[str]) -> None:
     """
     把 Sum 根目录下旧的「未分组」总表挪到 _历史未分组，
-    避免与 Sum/流水、Sum/银行账 混淆。
+    避免与 {组名}_财务付款数据_汇总.xlsx 混淆。
     """
     import shutil
     from datetime import datetime
@@ -1181,8 +1203,8 @@ def _archive_ungrouped_root_outputs(paths: Paths, active_groups: List[str]) -> N
 
 
 def _write_group_index(paths: Paths, group_stats: List[dict]) -> Path:
-    """Sum/分组汇总索引.xlsx：每组一行，标明路径与合计。"""
-    index_path = paths.sum_dir / "分组汇总索引.xlsx"
+    """Std/分组汇总索引.xlsx：每组一行，标明路径与合计。"""
+    index_path = Path(paths.group_index_xlsx)
     df = pd.DataFrame(group_stats)
     index_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_excel(index_path, index=False)
@@ -1195,7 +1217,7 @@ def run_summary(paths: Paths) -> List[str]:
     优先快路径：读 A2_classified 已分类明细 → 直接汇总
     回退：扫 B_std/{组名}/ 多项目文件
 
-    写出 Sum/{组名}/{组名}_财务付款数据汇总.xlsx
+    写出 Sum/{组名}_财务付款数据_汇总.xlsx
     """
     from .classify_raw_std import list_classified_groups, load_classified_detail
 
@@ -1206,7 +1228,7 @@ def run_summary(paths: Paths) -> List[str]:
     if classified_groups:
         print(f"汇总快路径（A2_classified）: {', '.join(g for g, _ in classified_groups)}")
         print(f"  源: {paths.classified_dir}/{{组名}}/*_classified.xlsx")
-        print(f"  出: {paths.sum_dir}/{{组名}}/财务付款数据汇总.xlsx")
+        print(f"  出: {paths.sum_dir}/{{组名}}_财务付款数据_汇总.xlsx")
 
         for group_name, class_xlsx in classified_groups:
             print(f"\n{'=' * 64}")

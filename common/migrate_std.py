@@ -158,6 +158,7 @@ def run(*, dry_run: bool = False) -> None:
         for folder in (
             "B_采购部采购台账_extract",
             "C_采购部采购台账_std",
+            "D_采购部采购台账_raw_sum",
             "F_采购部采购台账_std_split",
         ):
             n += _job(

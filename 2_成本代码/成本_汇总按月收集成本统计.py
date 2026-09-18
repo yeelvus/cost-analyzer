@@ -211,14 +211,15 @@ def find_latest_finance_file(directory):
         return None
 
     skip_names = {"付款分类总表.xlsx", "学习记录.xlsx", "分组汇总索引.xlsx"}
-    bank = [
-        f for f in dir_path.rglob("*财务付款数据汇总.xlsx")
-        if not _skip_temp_xlsx(f) and "银行账" in str(f)
-    ]
-    flow = [
-        f for f in dir_path.rglob("*财务付款数据汇总.xlsx")
-        if not _skip_temp_xlsx(f) and "流水" in str(f)
-    ]
+    def _finance_sum_files():
+        files = []
+        for pat in ("*财务付款数据_汇总.xlsx", "*财务付款数据汇总.xlsx"):
+            files.extend(dir_path.rglob(pat))
+        return [f for f in files if not _skip_temp_xlsx(f)]
+
+    all_sum = _finance_sum_files()
+    bank = [f for f in all_sum if "银行账" in str(f)]
+    flow = [f for f in all_sum if "流水" in str(f)]
     files = bank or flow
     if not files:
         files = [

@@ -869,7 +869,7 @@ def main():
 
     # ====================== 输出 ======================
     output_files = [
-        sum_data_path("人工费") / "人工费汇总.xlsx",
+        sum_data_path("人工费") / "人工费_汇总.xlsx",
     ]
     metrics = money_columns + ['总人工费']
 

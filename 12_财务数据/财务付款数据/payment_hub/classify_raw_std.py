@@ -59,29 +59,48 @@ def list_classified_groups(paths: Paths) -> List[Tuple[str, Path]]:
     return out
 
 
+def _existing_raw_std_xlsx(paths: Paths, name: str) -> Optional[Path]:
+    """扁平路径优先，兼容旧的 A1/{组名}/{组名}_财务付款_raw_std.xlsx。"""
+    flat = paths.group_raw_std_xlsx(name)
+    if flat.is_file():
+        return flat
+    nested = Path(paths.raw_std_dir) / name / f"{name}_财务付款_raw_std.xlsx"
+    if nested.is_file():
+        return nested
+    return None
+
+
 def list_raw_std_groups(paths: Paths) -> List[Tuple[str, Path]]:
     """A1 raw_std 分组：(组名, raw_std xlsx)。优先 A_raw 一级目录名。"""
     groups = list_raw_groups(paths.raw_dir)
     result: List[Tuple[str, Path]] = []
     if groups:
         for name, _ in groups:
-            p = paths.group_raw_std_xlsx(name)
-            if p.is_file():
+            p = _existing_raw_std_xlsx(paths, name)
+            if p is not None:
                 result.append((name, p))
             else:
-                print(f"  ⚠️ 缺少 raw_std: {p}")
+                print(f"  ⚠️ 缺少 raw_std: {paths.group_raw_std_xlsx(name)}")
         return result
 
-    # 回退：扫 A1 目录
+    # 回退：扫 A1 根目录扁平文件，再扫旧的组名子目录
     root = Path(paths.raw_std_dir)
     if not root.is_dir():
         return []
+    seen: set[str] = set()
     for child in sorted(root.iterdir(), key=lambda p: p.name):
+        if child.is_file() and child.name.endswith("_财务付款_raw_std.xlsx"):
+            name = child.name[: -len("_财务付款_raw_std.xlsx")]
+            if name and name not in seen:
+                result.append((name, child))
+                seen.add(name)
+            continue
         if not child.is_dir():
             continue
-        p = paths.group_raw_std_xlsx(child.name)
-        if p.is_file():
+        p = _existing_raw_std_xlsx(paths, child.name)
+        if p is not None and child.name not in seen:
             result.append((child.name, p))
+            seen.add(child.name)
     return result
 
 
@@ -248,7 +267,7 @@ def classify_one_group(
 
 def run_classify_raw_std(paths: Paths) -> List[str]:
     """
-    A1_raw_std/{组}/*_raw_std.xlsx
+    A1_raw_std/{组}_财务付款_raw_std.xlsx
       → A2_classified/{组}/*_classified.xlsx
     """
     ensure_code_root()

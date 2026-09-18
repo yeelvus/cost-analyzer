@@ -28,7 +28,7 @@ def _banner(title: str) -> None:
 def step_raw_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
     _banner("步骤 · raw 标准化合并 (raw_std)")
     print(f"输入: {paths.raw_dir}/{{组名}}/*.xlsx")
-    print(f"输出: {paths.raw_std_dir}/{{组名}}/{{组名}}_财务付款_raw_std.xlsx")
+    print(f"输出: {paths.raw_std_dir}/{{组名}}_财务付款_raw_std.xlsx")
     print(
         f"项目匹配: 精确别名"
         f"{' + 弹窗' if prompt_project else '（弹窗关，--prompt-project 可开）'}"
@@ -41,7 +41,7 @@ def step_raw_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
 
 def step_classify(paths: Paths) -> List[str]:
     _banner("步骤 · 摘要科目分类 (classify)")
-    print(f"输入: {paths.raw_std_dir}/{{组名}}/*_raw_std.xlsx")
+    print(f"输入: {paths.raw_std_dir}/{{组名}}_财务付款_raw_std.xlsx")
     print(f"输出: {paths.classified_dir}/{{组名}}/*_classified.xlsx")
     print("分类: 学习记忆 + 规则 → 一级/二级/三级科目")
     t0 = time.time()
@@ -237,7 +237,14 @@ def step_export_class_master(paths: Paths, out: Optional[Path] = None) -> str:
     engine = ClassifyEngine.from_data_dir(paths.classify_data)
     preserve = None
     legacy_master = LEGACY_SUM_DIR / "付款分类总表.xlsx"
-    for cand in (dest, paths.class_master_xlsx, paths.class_master_xlsx_sum, legacy_master):
+    old_sum_master = paths.sum_dir / "付款分类总表.xlsx"
+    for cand in (
+        dest,
+        paths.class_master_xlsx,
+        paths.class_master_xlsx_sum,
+        old_sum_master,
+        legacy_master,
+    ):
         if cand and Path(cand).is_file():
             preserve = Path(cand)
             break
@@ -253,7 +260,7 @@ def step_export_class_master(paths: Paths, out: Optional[Path] = None) -> str:
         shutil.copy2(path, paths.class_master_xlsx_sum)
         print(f"   副本: {paths.class_master_xlsx_sum}")
     except Exception as e:
-        print(f"  ⚠️ 复制到 Sum 失败: {e}")
+        print(f"  ⚠️ 复制到 Std 失败: {e}")
     print(f"✅ 分类总表: {path}  （{n} 行）")
     return str(path)
 
@@ -280,6 +287,7 @@ def step_apply_class_master(
         [
             paths.class_master_xlsx,
             paths.class_master_xlsx_sum,
+            paths.sum_dir / "付款分类总表.xlsx",
             LEGACY_SUM_DIR / "付款分类总表.xlsx",
         ]
     )
@@ -380,9 +388,9 @@ def run_pipeline(
 
     _banner("财务付款快路径流水线（按文件夹分组）")
     print(f"A_raw:        {paths.raw_dir}/{{组名}}/")
-    print(f"A1_raw_std:   {paths.raw_std_dir}/{{组名}}/*_raw_std.xlsx")
+    print(f"A1_raw_std:   {paths.raw_std_dir}/{{组名}}_财务付款_raw_std.xlsx")
     print(f"A2_classified:{paths.classified_dir}/{{组名}}/*_classified.xlsx")
-    print(f"Sum:          {paths.sum_dir}/{{组名}}/财务付款数据汇总.xlsx")
+    print(f"Sum:          {paths.sum_dir}/{{组名}}_财务付款数据_汇总.xlsx")
     print(f"B_std:        {paths.std_dir}/{{组名}}/有支出|未支出/")
     print(f"项目弹窗: {'开' if prompt_project else '关'}（--prompt-project）")
     print(f"步骤: {' → '.join(order)}")

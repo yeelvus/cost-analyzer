@@ -92,12 +92,24 @@ COMPANY_DIR = DATA_ROOT / "1_成本报公司"
 BUDGET_SUM = _sum_p("预算部分", create=False)
 BUDGET_STD = _std_p("预算部分", create=False, legacy=DATA_ROOT / "3_预算部分" / "2_人材机_std")
 INDEX_XLSX = DATA_ROOT / "18_output" / "项目汇总索引.xlsx"
-LABOR_XLSX = _sum_p("人工费", create=False) / "人工费汇总.xlsx"
+LABOR_XLSX = _sum_p("人工费", create=False) / "人工费_汇总.xlsx"
 PROC_SUM = _sum_p("采购台账", create=False) / "采购部采购台账_std_sum.xlsx"
 PROC_CAT = _sum_p("采购台账", create=False) / "项目采购分类汇总.xlsx"
 MACH_SUM = _sum_p("机具费", create=False) / "机具费_汇总.xlsx"
 SUB_SUM = _sum_p("分包合同", create=False)
-FIN_SUM = _sum_p("财务付款", create=False) / "财务付款数据汇总.xlsx"
+_FIN_SUM_DIR = _sum_p("财务付款", create=False)
+FIN_SUM = next(
+    (
+        p
+        for p in (
+            _FIN_SUM_DIR / "银行账_财务付款数据_汇总.xlsx",
+            _FIN_SUM_DIR / "流水_财务付款数据_汇总.xlsx",
+            _FIN_SUM_DIR / "财务付款数据汇总.xlsx",
+        )
+        if p.exists()
+    ),
+    _FIN_SUM_DIR / "银行账_财务付款数据_汇总.xlsx",
+)
 RESP_DIR = _std_p("责任成本", create=False, legacy=DATA_ROOT / "3.1_责任成本" / "2_责任成本_std")
 INFO_XLSX = DATA_ROOT / "0_项目基本信息情况" / "项目基本信息表.xlsx"
 

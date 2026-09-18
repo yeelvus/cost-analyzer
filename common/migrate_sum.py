@@ -97,7 +97,7 @@ def run(*, dry_run: bool = False) -> None:
     proc = _domain("采购台账")
     if proc:
         dest = resolve_under(sum_root, "采购台账", create=not dry_run)
-        for subdir in ("E_采购部采购台账_sum", "D_采购部采购台账_raw_sum"):
+        for subdir in ("E_采购部采购台账_sum",):
             src = proc / subdir
             print(f"\n[采购 {subdir}] {src} → {dest}")
             n += _move_xlsx_in_dir(src, dest, dry_run=dry_run)
@@ -129,16 +129,16 @@ def run(*, dry_run: bool = False) -> None:
         print(f"\n[人工费] → {dest}")
         n += _move_file(
             labor / "A_1_人工费台账" / "B_人工费台账_std" / "人工费汇总.xlsx",
-            dest / "人工费汇总.xlsx",
+            dest / "人工费_汇总.xlsx",
             dry_run=dry_run,
         )
         n += _move_file(
-            labor / "A_2_飞签机票" / "B_飞签机票_std" / "机票汇总.xlsx",
-            dest / "机票汇总.xlsx",
+            labor / "A_2_飞签机票" / "B_飞签机票_std" / "机票_汇总.xlsx",
+            dest / "机票_汇总.xlsx",
             dry_run=dry_run,
         )
         if REPORT_ROOT.is_dir():
-            n += _move_file(REPORT_ROOT / "人工费汇总.xlsx", dest / "人工费汇总.xlsx", dry_run=dry_run)
+            n += _move_file(REPORT_ROOT / "人工费_汇总.xlsx", dest / "人工费_汇总.xlsx", dry_run=dry_run)
 
     finance = _domain("财务数据") or _domain("财务付款")
     if finance:

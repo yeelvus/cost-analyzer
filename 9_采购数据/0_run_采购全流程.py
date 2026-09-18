@@ -50,6 +50,7 @@ from _采购路径 import (  # noqa: E402
     SUM_DIR,
     TOOLS_DIR,
     UNIT_DIR,
+    raw_sum_xlsx,
 )
 
 # id, 说明, 脚本, 是否默认日常
@@ -119,20 +120,22 @@ def _print_tree() -> None:
                 print(f"  │     {d.name}/")
     print("\n数据目录")
     for name, path in [
-        ("A_raw", RAW_DIR),
-        ("B_extract", EXTRACT_DIR),
-        ("C_std", STD_DIR),
-        ("D_raw_sum", RAW_SUM_DIR),
-        ("E_sum", SUM_DIR),
-        ("F_split", STD_SPLIT_DIR),
-        ("ANALYSIS", ANALYSIS_DIR),
+        ("A_raw     01_Raw", RAW_DIR),
+        ("B_extract 02_Std", EXTRACT_DIR),
+        ("C_std     02_Std", STD_DIR),
+        ("D_raw_sum 02_Std", RAW_SUM_DIR),
+        ("E_sum     03_Sum", SUM_DIR),
+        ("F_split   02_Std", STD_SPLIT_DIR),
+        ("ANALYSIS  04_html", ANALYSIS_DIR),
     ]:
         flag = "✓" if path.exists() else "·"
-        print(f"  {flag} {name:12} {path}")
-    print(f"\n  raw_sum  → {RAW_SUM_DIR / RAW_SUM_FILE_NAME}")
-    print(f"  std_sum  → {SUM_DIR / STD_SUM_FILE_NAME}")
+        print(f"  {flag} {name:22} {path}")
+    rs = raw_sum_xlsx()
+    ss = SUM_DIR / STD_SUM_FILE_NAME
+    print(f"\n  raw_sum  → {rs}{' ✓' if rs.is_file() else ''}")
+    print(f"  std_sum  → {ss}{' ✓' if ss.is_file() else ''}")
     print(f"  split    → {STD_SPLIT_DIR}/{{编码}}_{{名称}}_采购数据.xlsx")
-    print("\n目录顺序: A_raw → B_extract → C_std → D_raw_sum → E_sum → F_split")
+    print("\n目录顺序: A_raw → B_extract → C_std → D_raw_sum(02_Std) → E_sum(03_Sum) → F_split")
     print("默认日常: 04a → 04b → 06")
     print("手动准备: 01 / 02 / 03")
 
@@ -251,11 +254,20 @@ def main(argv: list[str] | None = None) -> int:
     print("=" * 60)
     print("采购台账流水线")
     print(f"  步骤: {' → '.join(s[0] + ' ' + s[1].split('（')[0] for s in order)}")
-    print(f"  C_std:   {STD_DIR}")
-    print(f"  D_raw:   {RAW_SUM_DIR}")
-    print(f"  E_sum:   {SUM_DIR}")
-    print(f"  F_split: {STD_SPLIT_DIR}")
+    print(f"  C_std:    {STD_DIR}")
+    print(f"  D_raw_sum:{RAW_SUM_DIR / RAW_SUM_FILE_NAME}")
+    print(f"  E_sum:    {SUM_DIR / STD_SUM_FILE_NAME}")
+    print(f"  F_split:  {STD_SPLIT_DIR}")
     print("=" * 60)
+
+    ids = {s[0] for s in order}
+    if "04a" in ids and not STD_DIR.is_dir():
+        print(f"❌ 缺少 C_std 输入目录: {STD_DIR}")
+        return 2
+    if "04b" in ids and "04a" not in ids and not raw_sum_xlsx().is_file():
+        print(f"❌ 缺少 raw_sum: {RAW_SUM_DIR / RAW_SUM_FILE_NAME}")
+        print("   请先跑 04a，或去掉 --no-raw-sum")
+        return 2
 
     t_all = time.time()
     for sid, title, script in order:

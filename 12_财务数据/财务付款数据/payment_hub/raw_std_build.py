@@ -2,7 +2,7 @@
 """
 步骤 raw_std：A_财务付款_raw/{组名}/*.xlsx
   → 列标准化 + 标准项目名称匹配 + 组内合并
-  → A1_财务付款_raw_std/{组名}/{组名}_财务付款_raw_std.xlsx
+  → A1_财务付款_raw_std/{组名}_财务付款_raw_std.xlsx
 
 标准列（顺序）：
   项目编码, 项目名称, 原始项目名称, 摘要,
@@ -507,7 +507,7 @@ def run_raw_std_for_group(
 def run_raw_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
     """
     A_raw 一级文件夹 → 每组合并一份标准化 Excel：
-      A1_财务付款_raw_std/{组名}/{组名}_财务付款_raw_std.xlsx
+      A1_财务付款_raw_std/{组名}_财务付款_raw_std.xlsx
     """
     raw_dir = Path(paths.raw_dir)
     out_root = Path(paths.raw_std_dir)
@@ -521,7 +521,7 @@ def run_raw_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
         return []
 
     print(f"raw_std 分组: {', '.join(g for g, _ in groups)}")
-    print(f"输出目录: {out_root}/{{组名}}/")
+    print(f"输出目录: {out_root}/{{组名}}_财务付款_raw_std.xlsx")
     print(
         f"项目匹配弹窗: {'开启' if prompt_project else '关闭'}"
         f"（--prompt-project / --no-prompt-project）"
