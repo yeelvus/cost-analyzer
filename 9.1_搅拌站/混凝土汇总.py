@@ -385,13 +385,23 @@ def _iter_detail_files(data_dir):
             detail_items.append({'folder': name, 'detail_paths': detail_paths, 'output_dir': output_dir})
     return detail_items
 
-def _write_outputs(merged_df, detail_summary, customer_summary, monthly_volume_pivot, monthly_amount_pivot, output_path):
+def _write_outputs(
+    merged_df,
+    detail_summary,
+    customer_summary,
+    monthly_volume_pivot,
+    monthly_amount_pivot,
+    output_path,
+    coded_customer_summary=None,
+):
     # 在导出前确保包含“金额（万泰铢）”列（写入后会用公式填充）
     if '金额（万泰铢）' not in merged_df.columns:
         merged_df['金额（万泰铢）'] = ""
 
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
         customer_summary.to_excel(writer, sheet_name='客户总额汇总', index=False)
+        if coded_customer_summary is not None:
+            coded_customer_summary.to_excel(writer, sheet_name='仅有项目编码客户汇总', index=False)
         monthly_volume_pivot.to_excel(writer, sheet_name='月度方量汇总', index=False)
         monthly_amount_pivot.to_excel(writer, sheet_name='月度金额汇总', index=False)
         merged_df.to_excel(writer, sheet_name='计算明细(全)', index=False)
@@ -400,7 +410,14 @@ def _write_outputs(merged_df, detail_summary, customer_summary, monthly_volume_p
     from openpyxl import load_workbook
     wb = load_workbook(output_path)
 
-    for sheet_name in ['计算明细(全)', '客户强度明细汇总', '客户总额汇总', '月度方量汇总', '月度金额汇总']:
+    for sheet_name in [
+        '计算明细(全)',
+        '客户强度明细汇总',
+        '客户总额汇总',
+        '仅有项目编码客户汇总',
+        '月度方量汇总',
+        '月度金额汇总',
+    ]:
         if sheet_name in wb.sheetnames:
             wsx = wb[sheet_name]
             wsx.row_dimensions[1].height = 40
@@ -740,9 +757,9 @@ def process_concrete_data():
             ]
             merged_df = merged_df.reindex(columns=[c for c in keep_cols if c in merged_df.columns])
             if total_groups > 1:
-                output_base = f"搅拌站混凝土汇总报表_{idx_item:02d}"
+                output_base = f"搅拌站混凝土_汇总{idx_item:02d}"
             else:
-                output_base = "搅拌站混凝土汇总报表"
+                output_base = "搅拌站混凝土_汇总"
 
             sum_dir = str(sum_data_path("商混站"))
             os.makedirs(sum_dir, exist_ok=True)
@@ -750,8 +767,8 @@ def process_concrete_data():
             def sort_month_cols(cols):
                 return sorted(cols, key=lambda s: (int(str(s).split('-')[0]), int(str(s).split('-')[1])))
 
-            def build_and_write_report(source_df, name_suffix=''):
-                customer_summary = source_df.groupby(['项目编码', '项目名称']).agg({
+            def build_customer_summary(summary_source):
+                customer_summary = summary_source.groupby(['项目编码', '项目名称']).agg({
                     '总方量': 'sum',
                     '金额': 'sum',
                     '总车次': 'sum'
@@ -759,7 +776,15 @@ def process_concrete_data():
                 customer_summary = customer_summary.sort_values(by='项目编码', ascending=False, na_position='last')
                 customer_summary['金额（万泰铢）'] = customer_summary['金额'] / 10000
                 cs_order = ['项目编码', '项目名称', '总方量', '总车次', '金额', '金额（万泰铢）']
-                customer_summary = customer_summary.reindex(columns=[c for c in cs_order if c in customer_summary.columns])
+                return customer_summary.reindex(columns=[c for c in cs_order if c in customer_summary.columns])
+
+            def build_and_write_report(source_df, name_suffix='', coded_customer_source=None):
+                customer_summary = build_customer_summary(source_df)
+                coded_customer_summary = (
+                    build_customer_summary(coded_customer_source)
+                    if coded_customer_source is not None
+                    else None
+                )
 
                 detail_summary = source_df.groupby(['项目编码', '项目名称', '砼强度', '塌落度']).agg({
                     '总方量': 'sum',
@@ -799,17 +824,22 @@ def process_concrete_data():
 
                 output_name = f"{output_base}{name_suffix}.xlsx"
                 output_path = os.path.join(sum_dir, output_name)
-                _write_outputs(source_df, detail_summary, customer_summary, monthly_volume_pivot, monthly_amount_pivot, output_path)
+                _write_outputs(
+                    source_df,
+                    detail_summary,
+                    customer_summary,
+                    monthly_volume_pivot,
+                    monthly_amount_pivot,
+                    output_path,
+                    coded_customer_summary=coded_customer_summary,
+                )
                 print(f"  已写入 0_Sum: {output_path}")
 
-            # 保留原始全量版本
-            build_and_write_report(merged_df, '')
-
-            # 新增仅有项目编码版本：项目编码为空/空白的行不显示且不参与汇总
+            # 保留原有全量汇总，并在同一文件中增加仅有项目编码的客户汇总 sheet
             code_series = merged_df['项目编码'].astype(str).str.strip()
             coded_mask = merged_df['项目编码'].notna() & (code_series != '') & (code_series.str.lower() != 'nan')
             coded_df = merged_df.loc[coded_mask].copy()
-            build_and_write_report(coded_df, '_仅有项目编码')
+            build_and_write_report(merged_df, '', coded_customer_source=coded_df)
 
         print("数据处理成功！")
         print(f"文件保存位置: {data_dir}")

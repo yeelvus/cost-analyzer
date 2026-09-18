@@ -39,7 +39,7 @@ DEFAULT_MATCHER_DIR = CODE_ROOT_DIR / "0_项目基本信息"
 
 CONFIG = {
 "base_dir": str(std_data_path("成本统计收集", create=False)),
-"output_file": str(sum_data_path("成本统计收集") / "项目统计数据汇总_全月份.xlsx"),
+"output_file": str(sum_data_path("成本统计收集") / "项目成本统计数据_汇总.xlsx"),
 "profit_rate_chart_file": str(html_data_path() / "项目毛利率变化图.html"),
 "project_matcher_dir": str(DEFAULT_MATCHER_DIR),
 "project_match_db_file": "",
