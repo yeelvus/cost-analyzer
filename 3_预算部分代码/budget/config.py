@@ -103,8 +103,8 @@ QUANTITY_COL = "数量"
 AMOUNT_COL = "金额"
 SUMMARY_SHEET_NAME = "汇总_不含税市场价"
 # 总汇总文件名固定、不带时间戳；PREFIX 用于匹配同名前缀文件
-TOTAL_SUMMARY_PREFIX = "预算人材机汇总"
-TOTAL_SUMMARY_FILENAME = "预算人材机汇总.xlsx"
+TOTAL_SUMMARY_PREFIX = "预算人材机_汇总"
+TOTAL_SUMMARY_FILENAME = "预算人材机_汇总.xlsx"
 # 总汇总中 CNY 行金额折泰铢（与成本统计口径一致）
 CNY_TO_THB_RATE = 5.0
 MATERIAL_SHEET_NAME = "材料汇总"

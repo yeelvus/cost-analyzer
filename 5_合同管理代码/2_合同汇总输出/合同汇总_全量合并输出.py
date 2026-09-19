@@ -12,7 +12,7 @@
   - 金额侧（原「合同管理_总包分包汇总.xlsx」）
       1_总包分包汇总(全部) / 2_人民币项目(CNY) / 3_泰铢项目(THB) / 4_混合币种项目
 
-默认输出：{0_Sum/合同管理}/合同管理_总包分包全量汇总.xlsx
+默认输出：/Users/wyattsun/Desktop/邯郸中材/01成本统计/03_Sum/4_合同管理/合同管理_总包分包_汇总.xlsx
 
 合同根目录按业务名「合同管理」查找，``5_合同管理📑`` / ``6_合同管理`` 均可。
 
@@ -51,6 +51,7 @@ from detail_summary import (  # noqa: E402
     write_detail_sheets,
 )
 from summary_config import (  # noqa: E402
+    MERGED_OUTPUT_DIR,
     MERGED_OUTPUT_NAME,
     find_code_folder,
     find_named_script,
@@ -121,8 +122,7 @@ def export_merged(
         _code = Path(__file__).resolve().parents[2]
         if str(_code) not in sys.path:
             sys.path.insert(0, str(_code))
-        from common.paths import sum_data_path as _sum_data_path
-        default_out = str(_sum_data_path("合同管理") / MERGED_OUTPUT_NAME)
+        default_out = str(MERGED_OUTPUT_DIR / MERGED_OUTPUT_NAME)
     except Exception:
         default_out = os.path.join(root_dir, MERGED_OUTPUT_NAME)
     if not os.path.isdir(root_dir):

@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3,..
 # -*- coding: utf-8 -*-
 """读取各项目文件夹中的 项目编码.json，汇总成 Excel。
 
-默认输出到业主结算额根目录：业主结算汇总.xlsx
+默认输出到成本统计汇总目录：业主结算额_汇总.xlsx
 """
 from __future__ import annotations
 
@@ -20,7 +20,13 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-from config import DEFAULT_SETTLEMENT_ROOT, EXCEL_NAME, JSON_NAME_TMPL, PROJECT_CODE_RE
+from config import (
+    DEFAULT_SETTLEMENT_OUTPUT_DIR,
+    DEFAULT_SETTLEMENT_ROOT,
+    EXCEL_NAME,
+    JSON_NAME_TMPL,
+    PROJECT_CODE_RE,
+)
 from schema import JSON_FIELDS, MONEY_FIELDS, effective_rate, to_thb
 
 CODE_RE = re.compile(PROJECT_CODE_RE)
@@ -192,7 +198,7 @@ def main() -> int:
     parser.add_argument(
         "--out",
         default="",
-        help="输出 xlsx 路径，默认写在根目录下 业主结算汇总.xlsx",
+        help="输出 xlsx 路径，默认写入成本统计汇总目录下的业主结算额_汇总.xlsx",
     )
     args = parser.parse_args()
 
@@ -202,7 +208,7 @@ def main() -> int:
         return 1
 
     rows = collect_rows(root)
-    out = Path(args.out) if args.out else root / EXCEL_NAME
+    out = Path(args.out) if args.out else DEFAULT_SETTLEMENT_OUTPUT_DIR / EXCEL_NAME
     write_excel(rows, out)
     print(f"项目 {len(rows)} 条 → {out}")
     return 0

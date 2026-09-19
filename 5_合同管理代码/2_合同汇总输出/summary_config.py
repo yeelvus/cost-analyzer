@@ -42,7 +42,10 @@ SUBPACKAGE_CONTRACT_DIR = "分包合同"
 AMOUNT_OUTPUT_NAME = "合同管理_总包分包汇总.xlsx"
 
 # 合并输出
-MERGED_OUTPUT_NAME = "合同管理_总包分包全量汇总.xlsx"
+MERGED_OUTPUT_DIR = Path(
+    "/Users/wyattsun/Desktop/邯郸中材/01成本统计/03_Sum/4_合同管理"
+)
+MERGED_OUTPUT_NAME = "合同管理_总包分包_汇总.xlsx"
 
 # 分包台账逻辑名（实际可为 5.1_分包合同）
 SUBPACKAGE_LEDGER_LOGICAL = "分包合同"
