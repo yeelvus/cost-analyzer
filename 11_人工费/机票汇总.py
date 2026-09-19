@@ -728,7 +728,7 @@ def main():
     # ========== 输出主汇总 Excel ==========
     out_dir = Path(Config.OUTPUT_STD)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = sum_data_path("人工费") / "机票_汇总.xlsx"
+    out_path = sum_data_path("人工费") / "机票费_汇总.xlsx"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     display_cols = [c for c in Config.TARGET_COLUMNS if c in df.columns]
