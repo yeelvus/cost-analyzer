@@ -386,7 +386,7 @@ def load_machines() -> Tuple[pd.DataFrame, str]:
 
 
 def try_match_code(name: str, code: str, lookup) -> Tuple[str, str]:
-    """可选：用 project_name_matcher 补全编码。"""
+    """可选：用 common.project 补全编码。"""
     if code:
         return code, name
     if not name or lookup is None:
@@ -404,18 +404,13 @@ def try_match_code(name: str, code: str, lookup) -> Tuple[str, str]:
 
 def get_matcher():
     try:
-        import importlib.util
-        p = CODE_ROOT / "0_项目基本信息" / "project_name_matcher.py"
-        if not p.exists():
-            return None
-        spec = importlib.util.spec_from_file_location("pnm", p)
-        m = importlib.util.module_from_spec(spec)
-        assert spec.loader
-        spec.loader.exec_module(m)
-        db = m.load_or_init_db()
+        from common.project import load_or_init_db, match_project
+        from settings import MATCH_DB_PATH
+
+        db = load_or_init_db(str(MATCH_DB_PATH))
 
         def _match(name: str):
-            return m.match_project(name, db)
+            return match_project(name, db)
 
         return _match
     except Exception:

@@ -27,6 +27,7 @@ for _p in (str(_PKG_ROOT), str(_CODE_ROOT)):
         sys.path.insert(0, _p)
 
 from settings import MATCH_DB_PATH
+from common import project_name_matcher as _matcher
 
 from _采购路径 import (
     EXTRACT_DIR,
@@ -36,23 +37,6 @@ from _采购路径 import (
     extract_project_name,
     list_excels,
 )
-
-# ── 项目匹配 ──────────────────────────────────────────────
-_MATCHER_PATH = _CODE_ROOT / "0_项目基本信息" / "project_name_matcher.py"
-
-
-def _load_matcher():
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("_proj_matcher", str(_MATCHER_PATH))
-    if spec is None or spec.loader is None:
-        raise ImportError(f"无法加载: {_MATCHER_PATH}")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_matcher = _load_matcher()
 
 # ── 列配置 ────────────────────────────────────────────────
 COLUMN_MAPPINGS = {
@@ -584,7 +568,7 @@ def main(argv: list[str] | None = None) -> None:
 
     print(f"输入(提取): {EXTRACT_DIR}")
     print(f"输出(标准): {STD_DIR}")
-    print(f"项目匹配: {_MATCHER_PATH}")
+    print(f"项目匹配: {MATCH_DB_PATH}")
     print(f"弹窗: {'关闭' if args.no_prompt else ('强制' if args.force_prompt else '仅新未匹配')}")
 
     projects = load_project_config()

@@ -26,12 +26,13 @@ CODE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(CODE_ROOT))
 
 from common.project import load_or_init_db, match_project  # noqa: E402
+from settings import MATCH_DB_PATH  # noqa: E402
 
 DEFAULT_INPUT = Path(
     "/Users/wyattsun/Desktop/财务数据/CNY这是现在用的金蝶里边的数据从23.07-26.07月！"
     "/明细分类账-泰国子公司; 开始期间-主账簿-2024年1期至2026年7期.xlsx"
 )
-DEFAULT_DB = CODE_ROOT / "0_项目基本信息" / "project_name_match_db.json"
+DEFAULT_DB = MATCH_DB_PATH
 
 DASH_CHARS = ("－", "—", "–", "﹣", "−")
 NOISE_PREFIX_RE = re.compile(

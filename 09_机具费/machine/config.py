@@ -29,7 +29,7 @@ try:
     from common.paths import html_data_path, raw_data_path, std_data_path, sum_data_path  # type: ignore
 except Exception:
     DATA_ROOT = Path(os.environ.get("COST_DATA_ROOT", str(Path.home() / "Desktop/邯郸中材/01成本统计")))
-    MATCH_DB_PATH = CODE_ROOT / "0_项目基本信息" / "project_name_match_db.json"
+    MATCH_DB_PATH = CODE_ROOT / "common" / "project_name_match_db.json"
     REPORT_ROOT = DATA_ROOT / "Z_report"
 
     def raw_data_path(*parts, legacy=None, create=True):  # type: ignore

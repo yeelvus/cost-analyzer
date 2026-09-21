@@ -6,9 +6,9 @@
 只改指定单元格的值，不改变原文件其它格式。
 
 启动：
-    python project_name_matcher.py
-    python project_name_matcher.py gui
-    python project_name_matcher_gui.py
+    python -m common.project_name_matcher
+    python -m common.project_name_matcher gui
+    python -m common.project_name_matcher_gui
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ import sys
 import traceback
 from pathlib import Path
 
-MODULE_DIR = Path(__file__).resolve().parent
-if str(MODULE_DIR) not in sys.path:
-    sys.path.insert(0, str(MODULE_DIR))
+_CODE_ROOT = Path(__file__).resolve().parents[1]
+if str(_CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_CODE_ROOT))
 
 try:
     import tkinter as tk
@@ -27,7 +27,7 @@ try:
 except Exception as exc:  # pragma: no cover
     raise SystemExit(f"无法加载 tkinter，图形界面不可用: {exc}") from exc
 
-from project_name_matcher import (
+from common.project_name_matcher import (
     fill_excel_project_columns,
     load_matcher,
     peek_excel_sheets_and_headers,

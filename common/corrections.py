@@ -5,10 +5,10 @@
 - 把所有“手动知识”（项目别名、物品名称映射、单位修正、分类调整、异常值修正等）
   从原始文件里剥离出来，变成显式、可版本化、可重放的结构。
 - 提供统一的加载 + 应用接口，让各标准化脚本都能方便地“应用历史修正”。
-- 参考并兼容现有的 project_name_matcher 模式。
+- 参考并兼容现有的 common.project 项目匹配模式。
 
 推荐用法：
-1. 项目别名继续用 project_name_matcher（已很成熟）。
+1. 项目别名继续用 common.project（已很成熟）。
 2. 物品/单位/分类等用本模块 + 一个中央 corrections/ 目录。
 3. 每个业务月处理时，加载“截至该月有效的所有修正”后应用。
 
@@ -57,7 +57,7 @@ class CorrectionsRegistry:
     # ---------------------- 加载接口 ----------------------
 
     def load_project_aliases(self, db_path: Path | str):
-        """兼容现有 project_name_matcher 的 JSON 结构"""
+        """兼容现有 common.project 的 JSON 结构"""
         db_path = Path(db_path)
         if not db_path.exists():
             return

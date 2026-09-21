@@ -18,22 +18,8 @@ REPORT_ROOT = DATA_ROOT / "Z_report"
 # HTML 看板：DATA_ROOT/04_html（也可写成 html / 0_html）→ common.paths.html_data_path
 # 合并汇总 Excel：DATA_ROOT/0_Sum（也可写成 Sum）→ common.paths.sum_data_path
 
-# 项目名匹配库（0_项目基本信息）
-_PROJECT_INFO_DIR_CANDIDATES = [
-    CODE_ROOT / "00_项目基本信息",
-    CODE_ROOT / "0_项目基本信息",
-]
-
-
-def _resolve_match_db_path() -> Path:
-    for candidate in _PROJECT_INFO_DIR_CANDIDATES:
-        db_path = candidate / "project_name_match_db.json"
-        if db_path.exists():
-            return db_path
-    return CODE_ROOT / "00_项目基本信息" / "project_name_match_db.json"
-
-
-MATCH_DB_PATH = _resolve_match_db_path()
+# 项目名匹配库（common/project_name_match_db.json）
+MATCH_DB_PATH = CODE_ROOT / "common" / "project_name_match_db.json"
 
 
 def code_path(*parts: str | Path) -> Path:

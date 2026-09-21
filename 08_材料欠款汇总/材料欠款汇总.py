@@ -4,30 +4,20 @@ import os
 from datetime import datetime
 import pandas as pd
 
-# ====================== 模块路径修复 ======================
-matcher_dir = "/Users/wyattsun/Desktop/code/0_项目基本信息"
-if matcher_dir not in sys.path:
-    sys.path.insert(0, matcher_dir)
+# ====================== 配置区 ======================
+_CODE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _CODE_ROOT not in sys.path:
+    sys.path.insert(0, _CODE_ROOT)
 
-# excel_formatting_utils.py 与匹配库同目录
-utils_dir = "/Users/wyattsun/Desktop/code/0_项目基本信息"
-if utils_dir not in sys.path:
-    sys.path.insert(0, utils_dir)
-
-from project_name_matcher import (
+from common.project import (
     load_or_init_db,
     match_project,
     prompt_unmatched_project_mappings,
     save_db,
 )
-
-from excel_formatting_utils import apply_common_excel_layout
-
-# ====================== 配置区 ======================
-_CODE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _CODE_ROOT not in sys.path:
-    sys.path.insert(0, _CODE_ROOT)
-from common.paths import iter_excel_files, raw_data_path, sum_data_path  # noqa: E402
+from common.excel import apply_common_excel_layout
+from common.paths import iter_excel_files, raw_data_path, sum_data_path
+from settings import MATCH_DB_PATH
 
 _raw_dir = raw_data_path(
     "材料欠款",
@@ -39,7 +29,7 @@ excel_path = (
     if _raw_files
     else os.path.join(str(_raw_dir), "泰国子公司各项目采购欠款汇总7.31.xlsx")
 )
-db_path = "/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json"
+db_path = str(MATCH_DB_PATH)
 
 # 输出目录（合并汇总 → 0_Sum）
 output_dir = str(sum_data_path("材料欠款"))

@@ -1,34 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-兼容入口：从项目基本信息表刷新匹配库。
+从项目基本信息表刷新匹配库。
 
 推荐直接：
-  python project_name_matcher.py refresh
-  或  ProjectMatcher().refresh_from_excel()
+  python -m common.project_name_matcher refresh
 """
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
-from project_name_matcher import (  # noqa: F401 — 再导出，兼容旧 import
-    DEFAULT_DB_PATH,
-    ProjectMatcher,
-    add_mapping,
-    build_standard_projects_from_dataframe,
-    clear_unmatched_aliases,
-    find_info_excel,
-    get_project_lookup,
-    get_project_options,
-    is_unmatched_alias,
-    load_matcher,
-    load_or_init_db,
-    mark_unmatched,
-    match_project,
-    prompt_unmatched_project_mappings,
-    save_db,
-    update_db_from_excel,
-)
+_CODE_ROOT = Path(__file__).resolve().parents[1]
+if str(_CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_CODE_ROOT))
+
+from common.project import DEFAULT_DB_PATH, ProjectMatcher, find_info_excel
 
 if __name__ == "__main__":
     db_path = DEFAULT_DB_PATH

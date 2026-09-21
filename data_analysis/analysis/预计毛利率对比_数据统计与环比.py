@@ -27,10 +27,9 @@ import pandas as pd
 CONFIG = {
     "source_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/1_成本报公司",
     "output_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/1_成本报公司/对比文件/项目预计毛利率对比_数据统计与环比.xlsx",
-    "matcher_file": r"/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_matcher.py",
-    "match_db_file": r"/Users/wyattsun/Desktop/code/0_项目基本信息/project_name_match_db.json",
+    "match_db_file": r"/Users/wyattsun/Desktop/code/common/project_name_match_db.json",
     "project_info_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx",
-    "excel_formatting_utils_file": r"/Users/wyattsun/Desktop/code/0_项目基本信息/excel_formatting_utils.py",
+    "excel_formatting_utils_file": r"/Users/wyattsun/Desktop/code/00_项目基本信息/excel_formatting_utils.py",
 }
 
 FILE_PATTERN = re.compile(r"^(\d{4})年(\d{1,2})月泰国子公司各项目成本统计表\.xlsx$")
@@ -143,7 +142,7 @@ def extract_project_margin_rows(file_path, month_text, month_ts):
 
 
 def init_matcher_and_db(config):
-    matcher_module = load_module(Path(config["matcher_file"]), "project_name_matcher_for_margin_compare")
+    from common import project as matcher_module
 
     standard_projects = []
     project_info_file = Path(config["project_info_file"])

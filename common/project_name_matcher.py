@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-项目名称匹配（全仓库共用）
+项目名称匹配（全仓库共用，位于 common/）
 
 【推荐用法 — 三行搞定】
-    from project_name_matcher import ProjectMatcher
+    from common.project import ProjectMatcher
 
     m = ProjectMatcher()                    # 自动加载默认 JSON + 可选主数据表
     hit = m.match("永强")                   # → dict 或 None
@@ -11,9 +11,9 @@
     m.save()
 
 【图形界面】
-    python project_name_matcher.py
-    python project_name_matcher.py gui
-    python project_name_matcher.py excel 台账.xlsx --process-summary
+    python -m common.project_name_matcher
+    python -m common.project_name_matcher gui
+    python -m common.project_name_matcher excel 台账.xlsx --process-summary
 
 【批量 + 弹窗补录】
     mapped = m.match_batch(names, prompt=True)
@@ -22,7 +22,7 @@
 兼容已有脚本，无需立刻改写。
 
 默认路径：
-  本目录/project_name_match_db.json
+  common/project_name_match_db.json
   邯郸中材/…/0_项目基本信息情况/项目基本信息表.xlsx（若存在则合并标准名）
 """
 
@@ -50,6 +50,9 @@ except Exception:  # pragma: no cover
 # 路径
 # ---------------------------------------------------------------------------
 MODULE_DIR = Path(__file__).resolve().parent
+_CODE_ROOT = MODULE_DIR.parent
+if str(_CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_CODE_ROOT))
 DEFAULT_DB_PATH = MODULE_DIR / "project_name_match_db.json"
 
 # 项目基本信息表候选（按优先级）
@@ -72,11 +75,11 @@ PathLike = Union[str, Path]
 
 
 def ensure_on_sys_path() -> Path:
-    """把本目录加入 sys.path，便于其它脚本 `import project_name_matcher`。"""
-    p = str(MODULE_DIR)
+    """把 code 根目录加入 sys.path，便于 `from common.project import ...`。"""
+    p = str(_CODE_ROOT)
     if p not in sys.path:
         sys.path.insert(0, p)
-    return MODULE_DIR
+    return _CODE_ROOT
 
 
 def find_info_excel(explicit: PathLike | None = None) -> Optional[Path]:
@@ -1377,12 +1380,12 @@ def _cli(argv: Optional[List[str]] = None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  python project_name_matcher.py              # 打开图形界面
-  python project_name_matcher.py gui
-  python project_name_matcher.py match 永强
-  python project_name_matcher.py excel 台账.xlsx --process-summary
-  python project_name_matcher.py refresh
-  python project_name_matcher.py stats
+  python -m common.project_name_matcher              # 打开图形界面
+  python -m common.project_name_matcher gui
+  python -m common.project_name_matcher match 永强
+  python -m common.project_name_matcher excel 台账.xlsx --process-summary
+  python -m common.project_name_matcher refresh
+  python -m common.project_name_matcher stats
         """,
     )
     sub = p.add_subparsers(dest="cmd")
@@ -1418,7 +1421,7 @@ def _cli(argv: Optional[List[str]] = None) -> int:
 
     args = p.parse_args(argv)
     if not args.cmd or args.cmd == "gui":
-        from project_name_matcher_gui import main as gui_main
+        from common.project_name_matcher_gui import main as gui_main
 
         return gui_main()
 

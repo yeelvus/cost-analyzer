@@ -2,15 +2,22 @@ import pandas as pd
 import numpy as np
 import os
 import sys
-import importlib.util
 
 # ===== 项目配置与客户映射 =====
 CODE_ROOT = os.path.dirname(os.path.abspath(__file__))
 _CODE_ROOT = os.path.dirname(CODE_ROOT)
 if _CODE_ROOT not in sys.path:
     sys.path.insert(0, _CODE_ROOT)
-from settings import DATA_ROOT  # noqa: E402
+from settings import DATA_ROOT, MATCH_DB_PATH  # noqa: E402
 from common.paths import raw_data_path, sum_data_path  # noqa: E402
+from common.project import (  # noqa: E402
+    build_standard_projects_from_dataframe,
+    is_unmatched_alias,
+    load_or_init_db,
+    match_project,
+    prompt_unmatched_project_mappings,
+    save_db,
+)
 
 DEFAULT_DATA_WORKSPACE = str(DATA_ROOT)
 DEFAULT_RAW_DATA_DIR = str(
@@ -74,30 +81,7 @@ def _output_dir(data_dir):
     return out
 
 
-MATCHER_DIR = os.path.join(os.path.dirname(CODE_ROOT), '0_项目基本信息')
-
-
-def _load_module_from_path(module_name, file_path):
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"无法加载模块: {file_path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-_project_name_matcher = _load_module_from_path(
-    'project_name_matcher',
-    os.path.join(MATCHER_DIR, 'project_name_matcher.py')
-)
-build_standard_projects_from_dataframe = _project_name_matcher.build_standard_projects_from_dataframe
-is_unmatched_alias = _project_name_matcher.is_unmatched_alias
-load_or_init_db = _project_name_matcher.load_or_init_db
-match_project = _project_name_matcher.match_project
-prompt_unmatched_project_mappings = _project_name_matcher.prompt_unmatched_project_mappings
-save_db = _project_name_matcher.save_db
-
-PROJECT_MATCH_DB_PATH = os.path.join(MATCHER_DIR, 'project_name_match_db.json')
+PROJECT_MATCH_DB_PATH = str(MATCH_DB_PATH)
 
 def _norm(s):
     return (str(s).strip() if s is not None else '').upper()
@@ -435,7 +419,7 @@ def _write_outputs(
     wb.close()
 
 def find_project_for_customer(customer_name, match_db):
-    """统一使用 project_name_matcher 做客户名到标准项目映射。"""
+    """统一使用 common.project 做客户名到标准项目映射。"""
     if customer_name is None:
         return {'project_code': '', 'project_name': ''}
     hit = match_project(str(customer_name).strip(), match_db) if match_db else None

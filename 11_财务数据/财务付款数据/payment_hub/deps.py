@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""外部依赖探测：项目匹配库、Excel 样式工具。"""
+"""外部依赖：项目匹配库、Excel 样式工具。"""
 
 from __future__ import annotations
 
@@ -16,13 +16,17 @@ DESKTOP_CODE = Path("/Users/wyattsun/Desktop/code")
 
 
 def resolve_project_info_dir() -> Optional[Path]:
+    """定位 excel_formatting_utils 所在目录（00_项目基本信息）。"""
     candidates = [
-        CODE_ROOT.parent.parent / "0_项目基本信息",  # code/0_项目基本信息
-        CODE_ROOT.parent / "0_项目基本信息",
+        DESKTOP_CODE / "00_项目基本信息",
         DESKTOP_CODE / "0_项目基本信息",
+        CODE_ROOT.parent.parent / "00_项目基本信息",
+        CODE_ROOT.parent.parent / "0_项目基本信息",
+        CODE_ROOT.parent / "00_项目基本信息",
+        CODE_ROOT.parent / "0_项目基本信息",
     ]
     for p in candidates:
-        if p.is_dir():
+        if (p / "excel_formatting_utils.py").is_file():
             return p
     return None
 
@@ -55,23 +59,22 @@ def get_excel_layout_fn() -> Callable:
 
 @lru_cache(maxsize=1)
 def get_project_matcher_module() -> ModuleType:
-    """加载 project_name_matcher 模块（兼容旧函数式 API）。"""
-    info = resolve_project_info_dir()
-    if not info:
-        raise FileNotFoundError("未找到 0_项目基本信息 目录（需要 project_name_matcher.py）")
-    path = info / "project_name_matcher.py"
-    if not path.is_file():
-        raise FileNotFoundError(f"未找到: {path}")
-    if str(info) not in sys.path:
-        sys.path.insert(0, str(info))
-    return _load_module_from_path("project_name_matcher_hub", path)
+    """加载项目名称匹配模块（common.project_name_matcher）。"""
+    repo_root = DESKTOP_CODE
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    from common import project_name_matcher
+
+    return project_name_matcher
 
 
 def project_match_db_path() -> str:
-    info = resolve_project_info_dir()
-    if not info:
-        return str(CODE_ROOT / "project_name_match_db.json")
-    return str(info / "project_name_match_db.json")
+    repo_root = DESKTOP_CODE
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    from settings import MATCH_DB_PATH
+
+    return str(MATCH_DB_PATH)
 
 
 def get_project_matcher(load_info: bool = True):
@@ -80,16 +83,13 @@ def get_project_matcher(load_info: bool = True):
         m = get_project_matcher()
         name, code = m.resolve("永强")
     """
-    mod = get_project_matcher_module()
-    cls = getattr(mod, "ProjectMatcher", None)
-    if cls is None:
-        raise AttributeError("project_name_matcher 缺少 ProjectMatcher，请更新 0_项目基本信息")
-    return cls(db_path=project_match_db_path(), load_info=load_info)
+    from common.project import ProjectMatcher
+
+    return ProjectMatcher(db_path=project_match_db_path(), load_info=load_info)
 
 
 def get_subject_mapper(data_dir: Optional[Path] = None):
     """直接用 learn_classify 适配器，不依赖旧 subject_mapper 文件逻辑。"""
-    # 确保 财务付款数据 在 path 上
     parent = str(CODE_ROOT)
     if parent not in sys.path:
         sys.path.insert(0, parent)
