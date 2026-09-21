@@ -118,4 +118,4 @@ p.set_defaults(func=cmd_my_feature)
 ## 依赖
 
 - pandas, openpyxl
-- 处理旧版 `.xls` 时：`pip install 'xlrd<2'`
+- 处理旧版 `.xls` 时：`pip install 'xlrd>=2.0.1'`

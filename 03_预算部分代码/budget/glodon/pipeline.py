@@ -8,6 +8,7 @@ import json
 import logging
 import re
 import difflib
+import unicodedata
 from pathlib import Path
 
 import pandas as pd
@@ -124,6 +125,11 @@ def extract_project_code_and_name(filename):
     name = Path(filename).stem
     if "_processed" in name:
         name = name.replace("_processed", "")
+
+    def clean_project_name(value):
+        value = unicodedata.normalize("NFKC", str(value)).strip(" _-")
+        value = re.sub(r"[_ -]+", " ", value).strip()
+        return value
     
     # 尝试匹配项目编码格式 THCC-YYYY-XXX_
     code_match = re.match(r"^(THCC-\d{4}-\d{3})_(.*)", name)
@@ -132,23 +138,35 @@ def extract_project_code_and_name(filename):
         rest = code_match.group(2)
         # 提取项目名称（去除后缀）
         project_name = re.split(r"_标段|_单位工程|_人材机", rest)[0].strip()
-        return code, project_name
+        return code, clean_project_name(project_name)
+
+    # 兼容“标段人材机汇总-项目名”这类没有项目编码的导出文件。
+    # 这类文件仍应进入处理流程，项目编码留空即可。
+    for marker in ("单位工程人材机汇总", "标段人材机汇总", "人材机汇总"):
+        if name.startswith(marker):
+            project_name = name[len(marker):].lstrip(" _-")
+            if project_name:
+                return None, clean_project_name(project_name)
+        elif marker in name:
+            project_name = name.split(marker, 1)[0]
+            if project_name.strip(" _-"):
+                return None, clean_project_name(project_name)
     
     # 兼容旧格式（数字开头）
     match = re.match(r"^\d+[_ -]?(.*)", name)
     if match:
         project = match.group(1)
         project = re.sub(r"[_ -]?标段.*|0$", "", project, flags=re.IGNORECASE).strip()
-        return None, project if project else name
+        return None, clean_project_name(project if project else name)
     
     for suffix in ["标段人材机汇总", "标段", "汇总", "0"]:
         if suffix in name:
             project = name.split(suffix)[0].strip()
             project = re.sub(r"[_ -]+$", "", project)
             if project:
-                return None, project
+                return None, clean_project_name(project)
     
-    return None, re.sub(r"^\d+[_ -]*", "", name).strip()
+    return None, clean_project_name(re.sub(r"^\d+[_ -]*", "", name))
 
 def load_project_code_mapping():
     """加载项目编码映射表"""
@@ -525,7 +543,7 @@ def process_file(in_path, out_dir, selected_cols_global=None):
     try:
         if is_xls:
             if xlrd is None:
-                logger.error("  处理 .xls 需要安装 xlrd（pip install 'xlrd<2'）")
+                logger.error("  处理 .xls 需要安装 xlrd>=2.0.1（pip install 'xlrd>=2.0.1'）")
                 return
             source_book = xlrd.open_workbook(str(p), formatting_info=True)
         else:
