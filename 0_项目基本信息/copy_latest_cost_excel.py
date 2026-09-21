@@ -30,11 +30,11 @@ from common.paths import find_named_dir, month_label_from_dirname, raw_data_path
 # 原始成本统计在 0_Raw/2_成本统计收集；未迁移时回退旧 raw 目录
 SRC = raw_data_path(
     "成本统计收集",
-    legacy=Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/A_成本统计_raw"),
+    legacy=Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/01_Raw/2_成本统计收集"),
 )
 DST = std_data_path(
     "成本统计收集",
-    legacy=Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/2_成本统计收集/B_成本统计_std"),
+    legacy=Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/02_Std/2_成本统计收集"),
 )
 
 EXCEL_EXTS = {".xlsx", ".xls", ".xlsm"}
