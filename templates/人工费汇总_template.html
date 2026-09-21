@@ -1,226 +1,185 @@
-<!DOCTYPE html>
-<html lang="zh">
+<!doctype html>
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <title>人工费汇总分析</title>
-  <script src="https://cdn.plot.ly/plotly-2.27.1.min.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0 18px 32px; background: #f7f7fb; color: #222; }
-    h1 { font-size: 22px; margin: 16px 0 8px; }
-    .card { background: white; border-radius: 10px; padding: 14px 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); margin: 12px 0; }
-    .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: start; }
-    label { font-weight: 600; display: block; margin-bottom: 6px; }
-    select { width: 100%; min-height: 120px; }
-    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
-    button { cursor: pointer; padding: 6px 12px; border: none; border-radius: 6px; font-weight: 600; }
-    .primary { background: #4c7ef3; color: #fff; }
-    .secondary { background: #e4e7ef; color: #333; }
-    .range-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 4px; }
-    details { margin-top: 12px; border: 1px solid #e3e5ed; border-radius: 8px; background: #fff; }
-    summary { padding: 10px 12px; font-weight: 700; cursor: pointer; user-select: none; }
-    .chart { width: 100%; height: 360px; }
-    .empty { color: #888; padding: 12px; }
-  </style>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>人工费汇总分析</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg1: #f3f7f2;
+            --bg2: #f9efe4;
+            --card: rgba(255,255,255,0.9);
+            --line: #dde6dc;
+            --txt: #21322a;
+            --muted: #5e7167;
+            --accent: #2f7d61;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            color: var(--txt);
+            font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+            background: radial-gradient(circle at 20% 0%, #e8f2e3 0%, transparent 40%), radial-gradient(circle at 80% 0%, #f8e6d6 0%, transparent 35%), linear-gradient(160deg, var(--bg1), var(--bg2));
+            min-height: 100vh;
+            scroll-behavior: smooth;
+        }
+        .container { width: min(1400px, 97vw); margin: 28px auto 48px; }
+        .layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; align-items: start; }
+        .toc { position: sticky; top: 14px; max-height: calc(100vh - 28px); overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 20px rgba(36, 48, 41, 0.06); padding: 12px; }
+        .toc-title { margin: 0 0 8px; font-size: 14px; color: #2f4338; font-weight: 700; }
+        .toc-links { display: grid; gap: 6px; }
+        .toc-link { display: block; padding: 6px 8px; border-radius: 8px; color: #2a473c; text-decoration: none; font-size: 12px; line-height: 1.35; background: rgba(227, 237, 230, 0.4); }
+        .toc-link:hover { background: rgba(196, 106, 47, 0.18); }
+        .hero, .project-card { background: var(--card); border: 1px solid var(--line); box-shadow: 0 10px 20px rgba(36, 48, 41, 0.06); }
+        .hero { border-radius: 18px; padding: 18px 22px; margin-bottom: 16px; }
+        h1 { margin: 4px 0 8px; font-size: clamp(22px, 3vw, 32px); }
+        .hint { color: var(--muted); margin: 0; }
+        .project-card { border-radius: 16px; padding: 18px; margin: 14px 0; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .card-header h2 { margin: 4px 0; flex: 1; font-size: clamp(18px, 2.2vw, 24px); }
+        .status-tag { padding: 4px 10px; font-size: 12px; border-radius: 999px; background: rgba(47, 125, 97, 0.12); color: #285846; white-space: nowrap; }
+        h3 { margin: 0 0 8px; font-size: 14px; color: #2f4338; }
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 32px; }
+        .chart-wrap { width: 100%; height: 320px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+        th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: center; vertical-align: middle; }
+        th { color: #31453a; background: rgba(227, 237, 230, 0.55); }
+        td.num { text-align: center; font-variant-numeric: tabular-nums; }
+        td.metric-cell { font-size: 12px; }
+        td.remark-cell { font-size: 12px; line-height: 1.45; }
+        td.strong-cell { font-weight: 700; color: #244d3e; }
+        th, td { white-space: nowrap; }
+        .export-btn, .export-all-btn { padding: 6px 12px; font-size: 12px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap; transition: background 0.2s; }
+        .export-btn:hover, .export-all-btn:hover { background: #1f6348; }
+        .export-btn:active, .export-all-btn:active { transform: scale(0.98); }
+        @media (max-width: 768px) {
+            .layout { grid-template-columns: 1fr; }
+            .toc { position: static; max-height: none; }
+            .toc-links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .chart-grid { grid-template-columns: 1fr; margin-bottom: 24px; }
+            .chart-wrap { height: 270px; }
+            .project-card { overflow-x: auto; }
+            table { min-width: 980px; font-size: 12px; }
+            td.metric-cell, td.remark-cell { font-size: 11px; }
+            th, td { padding: 6px 4px; }
+        }
+        @media print {
+            body { background: white; }
+            .hero, .project-card { box-shadow: none; border: 1px solid #ccc; margin: 0; page-break-inside: avoid; }
+            .export-btn, .export-all-btn { display: none !important; }
+            .project-card { break-inside: avoid; page-break-inside: avoid; }
+        }
+    </style>
 </head>
 <body>
-  <h1>人工费汇总分析（含总人工费趋势）</h1>
-  <div class="card">
-    <div class="controls">
-      <div>
-        <label>项目状态（多选）</label>
-        <select id="statusSelect" multiple></select>
-        <div class="btn-row">
-          <button class="secondary" id="statusSelectAll">全选</button>
-          <button class="secondary" id="statusReset">重置</button>
+    <div class="container">
+        <div class="layout">
+            <aside class="toc">
+                <h3 class="toc-title">项目目录</h3>
+                <div class="toc-links">__TOC_HTML__</div>
+            </aside>
+            <main>
+                <section class="hero">
+                    <h1>人工费汇总分析</h1>
+                    <p class="hint">按项目展示人工费月度趋势与构成明细（单位：万泰铢）</p>
+                </section>
+                __ALL_SECTIONS__
+            </main>
         </div>
-      </div>
-      <div>
-        <label>项目名称（多选）</label>
-        <select id="projectSelect" multiple></select>
-        <div class="btn-row">
-          <button class="secondary" id="projectSelectAll">全选</button>
-          <button class="secondary" id="projectReset">重置</button>
-        </div>
-      </div>
-      <div>
-        <label>时间范围（年月）</label>
-        <div class="range-row">
-          <div>
-            <small>起始</small>
-            <select id="startMonth"></select>
-          </div>
-          <div>
-            <small>结束</small>
-            <select id="endMonth"></select>
-          </div>
-        </div>
-      </div>
     </div>
-    <div class="btn-row" style="margin-top:12px;">
-      <button class="primary" id="applyFilters">应用筛选</button>
-      <button class="secondary" id="resetAll">重置全部</button>
-    </div>
-  </div>
-
-  <div id="chartsContainer"></div>
-
-  <script>
-    const metricsOrder = __METRICS__;
-    const metricsData = __METRICS_DATA__;
-    const projectStatusMap = __PROJECT_STATUS__;
-    const months = __MONTHS__;
-    const statuses = ['全部', ...new Set(Object.values(projectStatusMap))];
-    const projects = __PROJECTS__;
-
-    const statusSelect = document.getElementById('statusSelect');
-    const projectSelect = document.getElementById('projectSelect');
-    const startMonth = document.getElementById('startMonth');
-    const endMonth = document.getElementById('endMonth');
-    const container = document.getElementById('chartsContainer');
-
-    function populateSelect(selectEl, options) {
-      selectEl.innerHTML = '';
-      options.forEach(opt => {
-        const o = document.createElement('option');
-        o.value = opt;
-        o.textContent = opt;
-        o.selected = true;
-        selectEl.appendChild(o);
-      });
-    }
-
-    function populateMonths() {
-      startMonth.innerHTML = '';
-      endMonth.innerHTML = '';
-      months.forEach((m, idx) => {
-        const s = document.createElement('option');
-        s.value = m; s.textContent = m;
-        if (idx === 0) s.selected = true;
-        startMonth.appendChild(s);
-        const e = document.createElement('option');
-        e.value = m; e.textContent = m;
-        if (idx === months.length - 1) e.selected = true;
-        endMonth.appendChild(e);
-      });
-    }
-
-    function getSelected(selectEl) {
-      return Array.from(selectEl.selectedOptions).map(o => o.value);
-    }
-
-    function selectAll(selectEl) {
-      Array.from(selectEl.options).forEach(o => { o.selected = true; });
-    }
-
-    function resetAllSelects() {
-      selectAll(statusSelect);
-      selectAll(projectSelect);
-      startMonth.selectedIndex = 0;
-      endMonth.selectedIndex = endMonth.options.length - 1;
-    }
-
-    function filteredProjects(statusesSel, projectsSel) {
-      const allowAllStatus = statusesSel.length === 0 || statusesSel.includes('全部');
-      const allowAllProject = projectsSel.length === 0;
-      return projects.filter(p => {
-        const status = projectStatusMap[p] || '未知';
-        const statusOk = allowAllStatus || statusesSel.includes(status);
-        const projOk = allowAllProject || projectsSel.includes(p);
-        return statusOk && projOk;
-      });
-    }
-
-    function monthRange() {
-      const start = startMonth.value || months[0];
-      const end = endMonth.value || months[months.length - 1];
-      const startIdx = months.indexOf(start);
-      const endIdx = months.indexOf(end);
-      if (startIdx === -1 || endIdx === -1) return months;
-      return months.slice(Math.min(startIdx, endIdx), Math.max(startIdx, endIdx) + 1);
-    }
-
-    function renderCharts() {
-      container.innerHTML = '';
-      const selStatuses = getSelected(statusSelect);
-      const selProjects = getSelected(projectSelect);
-      const allowedProjects = filteredProjects(selStatuses, selProjects);
-      const monthsSel = monthRange();
-
-      if (allowedProjects.length === 0) {
-        const div = document.createElement('div');
-        div.className = 'empty card';
-        div.textContent = '无符合条件的项目';
-        container.appendChild(div);
-        return;
-      }
-
-      metricsOrder.forEach((metric, metricIdx) => {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'card';
-
-        const title = document.createElement('div');
-        title.style.fontWeight = '700';
-        title.style.marginBottom = '6px';
-        title.textContent = metric + ' 趋势';
-        wrapper.appendChild(title);
-
-        const chartDiv = document.createElement('div');
-        chartDiv.className = 'chart';
-        const chartId = 'chart_idx_' + metricIdx;
-        chartDiv.id = chartId;
-        wrapper.appendChild(chartDiv);
-        container.appendChild(wrapper);
-
-        const traces = [];
-        allowedProjects.forEach(proj => {
-          const series = metricsData[metric]?.[proj];
-          if (!series) return;
-          const x = [];
-          const y = [];
-          monthsSel.forEach(m => {
-            const idx = series.x.indexOf(m);
-            x.push(m);
-            y.push(idx >= 0 ? series.y[idx] : 0);
-          });
-          const hasData = y.some(v => Math.abs(v) > 0);
-          if (!hasData) return;
-          traces.push({
-            x,
-            y,
-            mode: 'lines+markers',
-            name: proj,
-            hovertemplate: `<b>${proj}</b><br>年-月: %{x}<br>${metric}: %{y:,.0f}<extra></extra>`
-          });
+    <script>
+        const months = __MONTHS_JSON__;
+        const allData = __CHART_DATA_JSON__;
+        const amountFormatter = (v) => v == null ? '-' : Number(v).toLocaleString('zh-CN', {maximumFractionDigits: 2});
+        const labelFormatter = (v) => v == null ? '' : Number(v).toLocaleString('zh-CN', {maximumFractionDigits: 0});
+        const inlineDataLabelPlugin = {
+            id: 'inlineDataLabelPlugin',
+            afterDatasetsDraw(chart) {
+                const ctx = chart.ctx;
+                chart.data.datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chart.getDatasetMeta(datasetIndex);
+                    if (meta.hidden) return;
+                    meta.data.forEach((element, index) => {
+                        const raw = dataset.data[index];
+                        if (raw == null) return;
+                        const text = labelFormatter(raw);
+                        if (!text) return;
+                        const pos = element.tooltipPosition();
+                        ctx.save();
+                        ctx.fillStyle = '#24352d';
+                        ctx.font = '600 10px "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(text, pos.x, pos.y - 6);
+                        ctx.restore();
+                    });
+                });
+            }
+        };
+        Chart.register(inlineDataLabelPlugin);
+        const computeAmountBounds = (...seriesList) => {
+            const values = seriesList.flat().filter(v => v != null);
+            if (!values.length) return { min: 0, max: 1 };
+            const minVal = Math.min(...values);
+            const maxVal = Math.max(...values);
+            if (minVal >= 0) return { min: 0, max: maxVal * 1.15 + 1 };
+            const span = maxVal - minVal;
+            const pad = Math.max(span * 0.12, 1);
+            return { min: minVal - pad, max: maxVal + pad };
+        };
+        const toCumulative = (arr) => {
+            let sum = 0;
+            return (arr || []).map(v => { if (v != null) sum += Number(v); return sum; });
+        };
+        const makeDataset = (label, data, borderColor, backgroundColor, pointRadius = 3, borderWidth = 2) => ({ label, data, borderColor, backgroundColor, pointRadius, borderWidth, tension: 0.25, spanGaps: true });
+        const makeOptions = (bounds, labels = false) => ({
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top' },
+                ...(labels ? { inlineDataLabelPlugin: {} } : {}),
+                tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label || ''}: ${amountFormatter(ctx.raw)} 万泰铢` } }
+            },
+            scales: { y: { min: bounds.min, max: bounds.max, ticks: { callback: (v) => amountFormatter(v) } } }
         });
-
-        if (traces.length === 0) {
-          chartDiv.innerHTML = '<div class="empty">该指标在当前筛选下无数据</div>';
-          return;
+        Object.entries(allData).forEach(([chartKey, series]) => {
+            const idx = chartKey.split('_')[1];
+            const amountEl = document.getElementById(`chart_amount_${idx}`);
+            const detailEl = document.getElementById(`chart_detail_${idx}`);
+            if (!amountEl || !detailEl) return;
+            const colors = [['#2c7fb8', 'rgba(44,127,184,0.12)'], ['#3fae72', 'rgba(63,174,114,0.12)'], ['#d08b2f', 'rgba(208,139,47,0.12)'], ['#8f5ccf', 'rgba(143,92,207,0.12)']];
+            const names = ['中方正式工', '中方劳务工', '子公司属地工', '劳务公司'];
+            const keys = ['zh_formal', 'zh_labor', 'local_labor', 'outsourcing_labor'];
+            const cumulative = keys.map(key => toCumulative(series[key]));
+            const amountDatasets = cumulative.map((data, i) => makeDataset(`${names[i]}累计`, data, colors[i][0], colors[i][1]));
+            amountDatasets.push(makeDataset('总人工费累计', toCumulative(series.total_labor), '#245f4b', 'rgba(36,95,75,0.15)', 4, 2.5));
+            new Chart(amountEl, { type: 'line', data: { labels: months, datasets: amountDatasets }, options: makeOptions(computeAmountBounds(...amountDatasets.map(item => item.data)), true) });
+            const detailDatasets = keys.map((key, i) => makeDataset(`${names[i]}铢`, series[key], colors[i][0], colors[i][1]));
+            new Chart(detailEl, { type: 'line', data: { labels: months, datasets: detailDatasets }, options: makeOptions(computeAmountBounds(...keys.map(key => series[key]))) });
+        });
+        function exportCardPDF(cardId) {
+            const element = document.getElementById(cardId);
+            if (!element) return;
+            const allCards = document.querySelectorAll('.project-card');
+            allCards.forEach(card => { card.style.display = card.id === cardId ? 'block' : 'none'; });
+            const heroSection = document.querySelector('.hero');
+            const exportAllBtn = document.querySelector('.export-all-btn').parentElement;
+            heroSection.style.display = 'none';
+            exportAllBtn.style.display = 'none';
+            setTimeout(() => {
+                window.print();
+                allCards.forEach(card => { card.style.display = 'block'; });
+                heroSection.style.display = 'block';
+                exportAllBtn.style.display = 'block';
+            }, 100);
         }
-
-        Plotly.newPlot(chartId, traces, {
-          title: metric,
-          height: 360,
-          hovermode: 'closest',
-          legend: { orientation: 'h', y: -0.2 },
-          margin: { t: 40, l: 60, r: 20, b: 60 },
-          xaxis: { title: '年-月' },
-          yaxis: { title: metric }
-        }, {displaylogo: false});
-      });
-    }
-
-    populateSelect(statusSelect, statuses);
-    populateSelect(projectSelect, projects);
-    populateMonths();
-    renderCharts();
-
-    document.getElementById('applyFilters').onclick = renderCharts;
-    document.getElementById('resetAll').onclick = () => { resetAllSelects(); renderCharts(); };
-    document.getElementById('statusSelectAll').onclick = () => { selectAll(statusSelect); };
-    document.getElementById('projectSelectAll').onclick = () => { selectAll(projectSelect); };
-    document.getElementById('statusReset').onclick = () => { selectAll(statusSelect); };
-    document.getElementById('projectReset').onclick = () => { selectAll(projectSelect); };
-  </script>
+        function exportAllCardsPDF() {
+            const exportAllBtn = document.querySelector('.export-all-btn').parentElement;
+            exportAllBtn.style.display = 'none';
+            setTimeout(() => { window.print(); exportAllBtn.style.display = 'block'; }, 100);
+        }
+    </script>
 </body>
 </html>
