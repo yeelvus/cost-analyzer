@@ -532,12 +532,12 @@ def main():
         wb.save(out_path)
         print(f"✅ 已输出：{out_path}")
 
-    # 按项目拆分导出
+    # 按项目拆分导出，直接输出到标准目录，不再创建子目录
     export_per_project_excel(
         grouped=grouped,
         df_raw=df,
         money_columns=money_columns,
-        output_dir=Path(Config.OUTPUT_STD) / "按项目拆分",
+        output_dir=Path(Config.OUTPUT_STD),
     )
 
     # ====================== HTML 报告 ======================
@@ -576,7 +576,7 @@ def main():
 
     print("\n🎉 处理完成！")
     print(f"共记录项目：{len(summary_df)} 个")
-    print(f"Excel 输出位置：按项目拆分 → {Config.OUTPUT_STD} ；汇总 → 0_Sum/11_人工费")
+    print(f"Excel 输出位置：按项目拆分 → {Config.OUTPUT_STD}；汇总 → 0_Sum/11_人工费")
 
 
 if __name__ == "__main__":

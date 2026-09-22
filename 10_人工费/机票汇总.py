@@ -765,7 +765,7 @@ def main():
     # ========== 按项目拆分 Excel ==========
     export_per_project_excel(
         df=df,
-        output_dir=out_dir / "按项目拆分",
+        output_dir=out_dir,
     )
 
     print("\n🎉 机票台账处理完成！")
