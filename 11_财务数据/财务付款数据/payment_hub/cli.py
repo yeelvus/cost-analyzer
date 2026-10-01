@@ -31,6 +31,7 @@ from .pipeline import (
     step_learn_ledger,
     step_raw_std,
     step_reclassify,
+    step_recognize,
     step_std,
     step_summary,
 )
@@ -138,7 +139,8 @@ def build_parser() -> argparse.ArgumentParser:
             )
         if name == "run":
             c.add_argument("--skip-raw-std", action="store_true", help="跳过 raw 合并标准化")
-            c.add_argument("--skip-classify", action="store_true", help="跳过摘要科目分类")
+            c.add_argument("--skip-recognize", action="store_true", help="跳过摘要识别")
+            c.add_argument("--skip-classify", action="store_true", help="跳过业务摘要分类")
             c.add_argument("--skip-std", action="store_true")
             c.add_argument("--skip-summary", action="store_true")
             c.add_argument("--skip-cashflow", action="store_true")
@@ -154,8 +156,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     for name, help_ in [
         ("raw-std", "raw 标准化合并（按文件夹合并为一个 Excel）"),
-        ("classify", "A1_raw_std 摘要→一级/二级/三级科目（学习分类）"),
-        ("std", "按项目拆分到 B_std（优先读 A2_classified）"),
+        ("recognize", "A1 摘要识别：写出业务摘要、项目提示"),
+        ("classify", "业务摘要→一级/二级/三级科目（学习分类）"),
+        ("std", "按项目拆分到 B_std（只读 A2_classified）"),
         ("summary", "汇总（优先读 A2_classified）"),
         ("cashflow", "仅现金流"),
         ("amount-mismatch", "汇总应付≠预扣+实付的明细"),
@@ -237,6 +240,7 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--subject", default="")
     c.add_argument("--summary", required=True)
     c.add_argument("--vendor", default="")
+    c.add_argument("--project", default="", help="已知项目名称，用于去掉摘要前缀")
 
     c = sub.add_parser("compact-memory", aliases=["compact"], help="压缩 memory/corrections")
     _add_path_args(c)
@@ -284,6 +288,7 @@ def _dispatch(cmd: str, paths: Paths, args: Any) -> int:
             paths,
             steps=getattr(args, "steps", None),
             skip_raw_std=bool(getattr(args, "skip_raw_std", False)),
+            skip_recognize=bool(getattr(args, "skip_recognize", False)),
             skip_classify=bool(getattr(args, "skip_classify", False)),
             skip_std=bool(getattr(args, "skip_std", False)),
             skip_summary=bool(getattr(args, "skip_summary", False)),
@@ -295,6 +300,10 @@ def _dispatch(cmd: str, paths: Paths, args: Any) -> int:
 
     if cmd in {"raw-std", "raw_std"}:
         step_raw_std(paths, prompt_project=_prompt_project_from_args(args))
+        return 0
+
+    if cmd == "recognize":
+        step_recognize(paths)
         return 0
 
     if cmd == "classify":
@@ -446,14 +455,22 @@ def _dispatch(cmd: str, paths: Paths, args: Any) -> int:
         return 0
 
     if cmd in {"classify-one", "debug-classify"}:
+        from learn_classify.classify_text import classify_text
         from learn_classify.engine import ClassifyEngine
 
-        r = ClassifyEngine.from_data_dir(paths.classify_data).classify(
-            args.subject, args.summary, args.vendor
+        rec, r = classify_text(
+            ClassifyEngine.from_data_dir(paths.classify_data),
+            args.subject,
+            args.summary,
+            args.vendor,
+            getattr(args, "project", None),
         )
         print(
             json.dumps(
                 {
+                    "业务摘要": rec.business_summary,
+                    "项目提示": rec.project_hint,
+                    "记忆键": rec.memory_key,
                     "一级": r.l1_name,
                     "二级": r.l2_name,
                     "三级": r.l3_name,

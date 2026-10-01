@@ -9,7 +9,7 @@ D_财务付款_学习池（02_Std/12_财务付款/D_财务付款_学习池）
 - 03_已确认/已确认分类.xlsx
 
 摘要去重；行内按「应付金额占比」优先排序（大额先确认，控比例误差）。
-手改或确认后 apply → 记忆 + 剥离 + reclassify B_std（确认逻辑不变）。
+手改或确认后 apply → 按业务摘要写记忆 + 剥离 + 重写 A2 并重建 B_std。
 """
 
 from __future__ import annotations
@@ -294,6 +294,9 @@ def _std_path_meta(file_path: Path, std_dir: Path) -> Tuple[str, str]:
 
 def collect_raw_lines_from_std(std_dir: Path) -> List[Dict[str, Any]]:
     """从 B_std 收集明细行。"""
+    ensure_code_root()
+    from summary_recognize import recognize_summary
+
     std_dir = Path(std_dir)
     lines: List[Dict[str, Any]] = []
     for f in sorted(std_dir.rglob("*.xlsx")):
@@ -312,14 +315,21 @@ def collect_raw_lines_from_std(std_dir: Path) -> List[Dict[str, Any]]:
         src_group, spend_bucket = _std_path_meta(f, std_dir)
 
         for _, row in df.iterrows():
-            summ = safe_text(row.get("摘要"))
-            if not summ:
+            raw_summ = safe_text(row.get("摘要"))
+            biz_summ = safe_text(row.get("业务摘要"))
+            if not raw_summ and not biz_summ:
                 continue
             # 仅学习「有实付金额」的摘要；空实付不进入学习池
             if not has_actual_payment(row.get("实付金额")):
                 continue
             code = safe_text(row.get("项目编码")) or file_code or "未识别编码"
             pname = safe_text(row.get("项目名称")) or file_name or "未命名项目"
+            if biz_summ:
+                summ = biz_summ
+            else:
+                summ = recognize_summary(raw_summ, pname).business_summary or raw_summ
+            if not summ:
+                continue
             amt = pd.to_numeric(row.get("实付金额"), errors="coerce")
             payable = _line_payable(row)
             lines.append(
@@ -1198,7 +1208,7 @@ def apply_learn_pool(
     learn_unconfirmed_edits: bool = True,
 ) -> Dict[str, Any]:
     """
-    检测手改/确认 → 写记忆 → 合并已确认表 → 剥离 → 刷新未确认建议 → reclassify B_std。
+    检测手改/确认 → 按业务摘要写记忆 → 合并已确认表 → 剥离 → 刷新未确认建议 → 重写 A2 并重建 B_std。
 
     auto_taxonomy:
         学习池中填写了体系里不存在的一/二/三级时，自动登记到 taxonomy（先备份）。
@@ -1208,9 +1218,9 @@ def apply_learn_pool(
     ensure_code_root()
     from learn_classify.engine import ClassifyEngine
     from learn_classify.learn import learn_one
-    from learn_classify.review import reclassify_std_dir
     from learn_classify.store import CorrectionStore, MemoryStore
     from learn_classify.taxonomy import Taxonomy
+    from summary_recognize import recognize_summary
 
     paths.ensure_output_parents()
     snapshot = load_snapshot(paths.learn_pool_snapshot)
@@ -1311,6 +1321,7 @@ def apply_learn_pool(
     corrections = CorrectionStore(paths.classify_data / "corrections.jsonl")
     learned = 0
     learn_errors = 0
+    learned_texts: set[str] = set()
     tax_created_all: List[str] = []
     tax_backup: Optional[str] = None
     subject_map_hits: Dict[str, str] = {}
@@ -1329,13 +1340,17 @@ def apply_learn_pool(
                 tax_backup = str(bak)
                 print(f"  📦 taxonomy 已备份: {bak.name}")
 
+            learn_text = (
+                recognize_summary(summ, it.get("项目名称") or "").business_summary
+                or summ
+            )
             result = learn_one(
                 taxonomy=tax,
                 memory=memory,
                 corrections=corrections,
                 vendor_stats=None,
                 subject="",
-                summary=summ,
+                summary=learn_text,
                 vendor=it.get("供应商名称") or "",
                 new_l1=l1,
                 new_l2=l2 or l3,
@@ -1353,6 +1368,7 @@ def apply_learn_pool(
                 l1n, l2n, l3n, clog = result[0], result[1], result[2], result[3]
             else:
                 l1n, l2n, l3n, clog = result[0], result[1], result[2], []
+            learned_texts.add(learn_text)
             if clog:
                 tax_created_all.extend(clog)
                 print(f"  ＋ 新科目 {summ[:24]}… → {clog}")
@@ -1393,9 +1409,12 @@ def apply_learn_pool(
     confirmed = load_confirmed_summaries(paths.learn_pool_confirmed)
     for summ, it in locked.items():
         l1, l2, l3 = it["_triple"]
-        confirmed[summ] = {
+        learn_text = (
+            recognize_summary(summ, it.get("项目名称") or "").business_summary or summ
+        )
+        confirmed[learn_text] = {
             "确认状态": STATUS_CONFIRMED,
-            "摘要": summ,
+            "摘要": learn_text,
             "一级科目": l1,
             "二级科目": l2,
             "三级科目": l3,
@@ -1417,7 +1436,7 @@ def apply_learn_pool(
             print(f"  ⚠️ 写冲突表失败: {e}")
 
     # 从 00/01/01b/02 剥离锁定摘要
-    locked_keys = set(locked.keys())
+    locked_keys = set(locked.keys()) | learned_texts
     stripped_files = 0
     for d in (
         paths.learn_pool_all,
@@ -1435,7 +1454,13 @@ def apply_learn_pool(
             rows = _read_pool_file(f)
             if not rows:
                 continue
-            kept = [r for r in rows if r["摘要"] not in locked_keys]
+            kept = []
+            for r in rows:
+                cell = r["摘要"]
+                biz = recognize_summary(cell).business_summary or cell
+                if cell in locked_keys or biz in locked_keys:
+                    continue
+                kept.append(r)
             removed = len(rows) - len(kept)
             if removed == 0:
                 continue
@@ -1509,26 +1534,15 @@ def apply_learn_pool(
 
     reclass_stats = {}
     if reclassify and learned:
-        print("reclassify B_std …")
-        if eng is None:
-            eng = ClassifyEngine.from_data_dir(paths.classify_data)
+        print("重刷 A2，并按 A2 重建 B_std …")
         try:
-            reclass_stats = reclassify_std_dir(paths.std_dir, eng)
+            from .pipeline import step_reclassify
+
+            reclass_stats = step_reclassify(paths)
             print(f"reclassify: {reclass_stats}")
-            skipped = reclass_stats.get("skipped") or 0
-            if skipped:
-                print(
-                    f"  ⚠️ 有 {skipped} 个 B_std 文件损坏/无法打开，已跳过。"
-                    f"可重新运行 std 从 A2_classified 重建。"
-                )
-                bad = reclass_stats.get("skipped_files") or []
-                for name in bad[:10]:
-                    print(f"     - {name}")
-                if len(bad) > 10:
-                    print(f"     … 另有 {len(bad) - 10} 个")
         except Exception as e:
-            # 不因 reclassify 失败而丢掉已完成的 apply/学习结果
-            print(f"  ⚠️ reclassify B_std 失败（学习结果已保存）: {e}")
+            # 不因重刷失败而丢掉已完成的 apply/学习结果
+            print(f"  ⚠️ 重刷 A2/B_std 失败（学习结果已保存）: {e}")
             reclass_stats = {"error": str(e)}
 
     stats = {
@@ -1577,6 +1591,9 @@ def refresh_pool_suggestions(
     - 不改「确认状态」
     - 写回后与快照对齐，避免下次误判为手改
     """
+    ensure_code_root()
+    from summary_recognize import recognize_summary
+
     files_updated = 0
     rows_scanned = 0
     rows_changed = 0
@@ -1628,9 +1645,10 @@ def refresh_pool_suggestions(
 
                 old_t = _triple(r["一级科目"], r["二级科目"], r["三级科目"])
                 try:
+                    text = recognize_summary(r["摘要"]).business_summary or r["摘要"]
                     res = eng.classify(
                         "",
-                        r["摘要"],
+                        text,
                         r.get("供应商名称") or "",
                     )
                 except Exception:

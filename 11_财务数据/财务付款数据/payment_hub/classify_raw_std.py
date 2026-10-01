@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 步骤 classify：读取 A1_财务付款_raw_std 合并表，
-按 摘要(+科目/供应商) 学习分类 → 一级/二级/三级科目，
+用业务摘要（没有则现场识别）+ 科目 + 供应商 → 一级/二级/三级科目，
 写出 A2_财务付款_classified/{组名}/{组名}_classified.xlsx
 
 设计目标：一份组内明细只读一次、唯一三元组只分类一次，供后续 sum / std 复用。
@@ -17,6 +17,8 @@ import pandas as pd
 from .config import Paths
 from .pkg import ensure_code_root
 from .utils import has_actual_payment, list_raw_groups, safe_text, to_numeric_series
+
+RECOGNIZE_COLS = ["业务摘要", "项目提示"]
 
 AMOUNT_COLUMNS = ["应付金额", "预扣税额", "实付金额", "增值税额", "不含税额"]
 DEFAULT_L1 = "6_管理费"
@@ -113,10 +115,33 @@ def load_raw_std_detail(path: Path) -> pd.DataFrame:
     return df
 
 
+def _business_rows(df: pd.DataFrame) -> tuple[list[str], list[str]]:
+    """每行的业务摘要、项目提示。已有业务摘要不再剥第二次。"""
+    ensure_code_root()
+    from summary_recognize import resolve_business
+
+    n = len(df)
+    summaries = df["摘要"].map(_cell).tolist() if "摘要" in df.columns else [""] * n
+    projects = (
+        df["项目名称"].map(_cell).tolist() if "项目名称" in df.columns else [""] * n
+    )
+    given = (
+        df["业务摘要"].map(_cell).tolist() if "业务摘要" in df.columns else [""] * n
+    )
+    businesses: list[str] = []
+    hints: list[str] = []
+    for summary, project, business in zip(summaries, projects, given):
+        rec = resolve_business(summary, project, business)
+        businesses.append(rec.business_summary)
+        hints.append(rec.project_hint)
+    return businesses, hints
+
+
 def classify_dataframe(df: pd.DataFrame, engine) -> pd.DataFrame:
     """
     对明细附加一级/二级/三级科目（唯一三元组缓存）。
 
+    分类键是业务摘要，不是带项目名前缀的原始摘要。
     仅对「实付金额非空」的行做科目分类；实付为空的行不调用学习引擎，
     科目列留空，命中层标记为 skip_no_payment。
     """
@@ -133,9 +158,7 @@ def classify_dataframe(df: pd.DataFrame, engine) -> pd.DataFrame:
     subjects = (
         out["科目"].map(_cell).tolist() if "科目" in out.columns else [""] * n
     )
-    summaries = (
-        out["摘要"].map(_cell).tolist() if "摘要" in out.columns else [""] * n
-    )
+    businesses, hints = _business_rows(out)
     if "供应商名称" in out.columns:
         vendors = out["供应商名称"].map(_cell).tolist()
     elif "供应商" in out.columns:
@@ -143,13 +166,16 @@ def classify_dataframe(df: pd.DataFrame, engine) -> pd.DataFrame:
     else:
         vendors = [""] * n
 
+    out["业务摘要"] = businesses
+    out["项目提示"] = hints
+
     # 只对有实付金额的行建唯一三元组并分类
     pay_indices = [i for i, ok in enumerate(pay_mask.tolist()) if ok]
-    triples_pay = [(subjects[i], summaries[i], vendors[i]) for i in pay_indices]
+    triples_pay = [(subjects[i], businesses[i], vendors[i]) for i in pay_indices]
     unique = list(dict.fromkeys(triples_pay))
     print(
         f"  摘要分类: 总 {n} 行，有实付 {n_pay} 行（跳过空实付 {n_skip}），"
-        f"唯一 (科目,摘要,供应商) = {len(unique)}"
+        f"唯一 (科目,业务摘要,供应商) = {len(unique)}"
     )
 
     cache = engine.classify_unique_map(unique) if unique else {}
@@ -166,7 +192,7 @@ def classify_dataframe(df: pd.DataFrame, engine) -> pd.DataFrame:
             layers[i] = "skip_no_payment"
             confs[i] = None
             continue
-        t = (subjects[i], summaries[i], vendors[i])
+        t = (subjects[i], businesses[i], vendors[i])
         r = cache.get(t)
         if r is None:
             l1s[i] = DEFAULT_L1
@@ -191,14 +217,16 @@ def classify_dataframe(df: pd.DataFrame, engine) -> pd.DataFrame:
     out["命中层"] = layers
     out["置信度"] = confs
 
-    # 科目列插到摘要前，便于阅读
+    # 原始摘要 → 业务摘要 / 项目提示 → 科目
     prefer = CLASSIFY_COLS
-    cols = [c for c in out.columns if c not in prefer]
+    tail = RECOGNIZE_COLS
+    cols = [c for c in out.columns if c not in prefer and c not in tail]
+    block = tail + prefer
     if "摘要" in cols:
-        i = cols.index("摘要")
-        cols = cols[:i] + prefer + cols[i:]
+        i = cols.index("摘要") + 1
+        cols = cols[:i] + block + cols[i:]
     else:
-        cols = cols + prefer
+        cols = block + cols
     return out[cols]
 
 

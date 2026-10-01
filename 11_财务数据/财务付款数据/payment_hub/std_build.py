@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-步骤 std：原始付款 → 标准项目明细（原 3_）
+步骤 std：把 A2 已分类明细按项目拆到 B_std。
 
-优化点：
-- 直接使用 learn_classify，不依赖旧 3_ 脚本
-- 始终以最新 raw 数据重写项目文件（金额变更可刷新）
-- 分类附带供应商特征
+不读 A_raw，也不再分类。没有 A2 时直接停止，请先跑 classify。
 """
 
 from __future__ import annotations
@@ -567,8 +564,8 @@ def _process_group_std(
     prompt_project: bool = False,
 ) -> List[str]:
     """
-    处理单个业务分组：组内全部 Excel 合并 → 按项目写出 std。
-    输出：group_std_dir/{最新月份有支出|未支出}/编码_名称_财务付款数据.xlsx
+    旧路径：组内 Excel 合并后当场分类再拆分。
+    月结不再调用。请走 raw_std → recognize → classify → std。
     """
     group_std_dir = Path(group_std_dir)
     group_raw_dir = Path(group_raw_dir)
@@ -829,55 +826,13 @@ def run_std(
     cleanup_stale: bool = True,
     prompt_project: bool = False,
 ) -> List[str]:
-    """
-    优先：A2_classified → 按项目拆 B_std（快）
-    回退：A_raw 组内读 Excel → 匹配项目 → 分类 → 拆分（旧路径）
-    """
+    """只拆 A2_classified。分类在 classify 步骤完成。"""
     from .classify_raw_std import list_classified_groups
 
-    # 快路径
-    if list_classified_groups(paths):
-        return run_std_from_classified(paths, cleanup_stale=cleanup_stale)
-
-    raw_dir = Path(paths.raw_dir)
-    std_dir = Path(paths.std_dir)
-    if not raw_dir.is_dir():
-        raise FileNotFoundError(f"原始目录不存在: {raw_dir}")
-    std_dir.mkdir(parents=True, exist_ok=True)
-
-    groups = list_raw_groups(raw_dir)
-    if not groups:
-        print("未发现业务分组（A_raw 一级子目录中无 Excel），跳过 std")
-        return []
-
-    print(f"业务分组（回退路径 A_raw）: {', '.join(g for g, _ in groups)}")
-    print(
-        f"项目匹配弹窗: {'开启' if prompt_project else '关闭'}"
-        f"（CLI: --prompt-project / --no-prompt-project）"
-    )
-    mapper = get_subject_mapper(paths.classify_data)
-
-    all_outputs: List[str] = []
-    for group_name, group_raw in groups:
-        print(f"\n{'=' * 64}")
-        print(f"  分组 std · {group_name}")
-        print(f"{'=' * 64}")
-        group_std = paths.group_std_dir(group_name)
-        outs = _process_group_std(
-            group_name=group_name,
-            group_raw_dir=group_raw,
-            group_std_dir=group_std,
-            mapper=mapper,
-            classify_data=paths.classify_data,
-            cleanup_stale=cleanup_stale,
-            prompt_project=prompt_project,
+    if prompt_project:
+        print("std 不再匹配项目、不再分类。项目名称在 raw_std 里匹配。")
+    if not list_classified_groups(paths):
+        raise FileNotFoundError(
+            f"未找到 A2 分类结果: {paths.classified_dir}。请先运行 classify。"
         )
-        all_outputs.extend(outs)
-
-    if cleanup_stale:
-        _cleanup_legacy_flat_std(std_dir, {g for g, _ in groups})
-
-    print(
-        f"\n✅ std 全部完成：{len(groups)} 个分组，共 {len(all_outputs)} 个项目文件 → {std_dir}"
-    )
-    return all_outputs
+    return run_std_from_classified(paths, cleanup_stale=cleanup_stale)

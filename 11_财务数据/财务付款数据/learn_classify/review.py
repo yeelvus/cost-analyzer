@@ -49,9 +49,16 @@ def classify_dataframe(
             return [None] * n
         return out[name].tolist()
 
-    triples = list(
+    from summary_recognize import resolve_business
+
+    projects = col_vals("项目名称")
+    given = col_vals("业务摘要") if "业务摘要" in out.columns else [None] * n
+    triples = []
+    for i, (subject, summary, vendor) in enumerate(
         zip(col_vals(subject_col), col_vals(summary_col), col_vals(vendor_col))
-    )
+    ):
+        rec = resolve_business(summary, projects[i], given[i])
+        triples.append((subject, rec.business_summary, vendor))
     results = engine.classify_many(triples)
 
     out["一级科目"] = [r.l1_name for r in results]
@@ -227,14 +234,18 @@ def update_excel_classification_columns(
             layer_idx = ensure_col("命中层")
             conf_idx = ensure_col("置信度")
 
-        # 先扫一遍收集待分类行（仅有实付金额），去重后再写回
+        # 先扫一遍收集待分类行（仅有实付金额），按业务摘要去重后再写回
         amt_idx = header_to_col.get("实付金额")
-        pending: List[tuple] = []  # (row_idx, subj, summ, vend)
+        biz_idx = header_to_col.get("业务摘要")
+        name_idx = header_to_col.get("项目名称")
+        pending: List[tuple] = []  # (row_idx, subj, business, vend)
         for r in range(2, ws.max_row + 1):
             subject_value = ws.cell(row=r, column=subj_idx).value if subj_idx else None
             summary_value = ws.cell(row=r, column=summ_idx).value if summ_idx else None
             vendor_value = ws.cell(row=r, column=vend_idx).value if vend_idx else None
-            if subject_value is None and summary_value in (None, ""):
+            business_value = ws.cell(row=r, column=biz_idx).value if biz_idx else None
+            project_value = ws.cell(row=r, column=name_idx).value if name_idx else None
+            if subject_value is None and summary_value in (None, "") and not business_value:
                 continue
             # 空实付：不分类，清空科目列标记
             if amt_idx is not None:
@@ -260,7 +271,10 @@ def update_excel_classification_columns(
                     if conf_idx:
                         ws.cell(row=r, column=conf_idx, value=None)
                     continue
-            pending.append((r, subject_value, summary_value, vendor_value))
+            from summary_recognize import resolve_business
+
+            rec = resolve_business(summary_value, project_value, business_value)
+            pending.append((r, subject_value, rec.business_summary, vendor_value))
 
         results = engine.classify_many(
             [(s, m, v) for _, s, m, v in pending]

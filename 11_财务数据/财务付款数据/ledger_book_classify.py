@@ -6,10 +6,9 @@
 做「项目 × 一级科目」四列金额汇总。
 
 分类时只改一/二/三级科目列的值，不改原表其它内容/格式。
-摘要前几个字可能带项目名或与学习库略有差异：会同时用原文、去掉项目名前缀、
-去掉「名称-」短前缀 三种写法分类，取更可靠的结果。
+先做摘要识别，只用业务摘要（去掉项目名前缀）分类。
 
-学习：按摘要去重，把已填且有效的叶子科目写入 memory.jsonl；
+学习：按原始摘要去重，把已填且有效的叶子科目写到业务摘要的记忆键上；
 叶子与现有记忆相同则跳过；待复核/其他不学。默认不改账簿。
 
 用法：
@@ -23,13 +22,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import shutil
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
@@ -39,10 +37,12 @@ from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from learn_classify.classify_text import classify_text
 from learn_classify.engine import ClassifyEngine, ClassifyResult
 from learn_classify import DEFAULT_DATA_DIR
 from learn_classify.learn import learn_one
 from learn_classify.normalize import memory_key
+from summary_recognize import recognize_summary
 from learn_classify.store import CorrectionStore, MemoryStore
 from learn_classify.taxonomy import Taxonomy
 from payment_hub.utils import level1_sort_key, safe_text
@@ -54,10 +54,6 @@ AMOUNT_COLS = ("借方THB", "借方CNY", "实付金额THB", "实付金额CNY")
 BANK_CODES = {"1002", "1002.0"}
 PREFERRED_SHEET = "汇总"
 
-_DASH_PREFIX_RE = re.compile(r"^[\s\-－—–﹣−]+")
-_ACTION_PREFIX_RE = re.compile(
-    r"^(支付|采购|发放|报销|付款|转账|收款|报|借|取现|工资|费用|付)"
-)
 _PENDING_LAYERS = {"pending", "low_confidence", "conflict", "error"}
 _WEAK_L2 = {
     "待复核",
@@ -79,46 +75,6 @@ def _cell(v) -> str:
     return "" if s.lower() in {"nan", "none", "nat"} else s
 
 
-def strip_project_prefix(project_name: str, summary: str) -> str:
-    """摘要以项目名称开头则去掉该前缀及随后的连接符。"""
-    text = _cell(summary)
-    name = _cell(project_name)
-    if name and len(text) >= len(name) and text[: len(name)].casefold() == name.casefold():
-        text = _DASH_PREFIX_RE.sub("", text[len(name) :])
-    return text
-
-
-def strip_generic_name_dash(summary: str) -> str:
-    """「短名称-后续」形态：去掉连接符前的短前缀（避免把「支付-…」当项目名）。"""
-    text = _cell(summary)
-    for dash in ("-", "－", "—", "–"):
-        if dash not in text:
-            continue
-        left, right = text.split(dash, 1)
-        left, right = left.strip(), right.strip()
-        if (
-            right
-            and 1 <= len(left) <= 16
-            and not _ACTION_PREFIX_RE.match(left)
-            and not left.isdigit()
-        ):
-            return right
-    return text
-
-
-def summary_variants(project_name: str, summary: str) -> List[str]:
-    """原文 + 去项目名前缀 + 去短名称- 前缀，去重保序。"""
-    raw = _cell(summary)
-    out: List[str] = []
-    for s in (raw, strip_project_prefix(project_name, raw), strip_generic_name_dash(raw)):
-        s = _cell(s)
-        if s and s not in out:
-            out.append(s)
-    if not out and raw:
-        out.append(raw)
-    return out
-
-
 def _result_rank(r: ClassifyResult) -> Tuple[int, float, int]:
     weak = (
         1
@@ -130,11 +86,6 @@ def _result_rank(r: ClassifyResult) -> Tuple[int, float, int]:
         else 0
     )
     return (weak, -float(r.confidence or 0), 0 if (r.l3_name or "") else 1)
-
-
-def pick_best_result(results: Iterable[ClassifyResult]) -> ClassifyResult:
-    ranked = sorted(results, key=_result_rank)
-    return ranked[0]
 
 
 def _to_float(v) -> float:
@@ -288,8 +239,8 @@ def classify_ledger_excel(
     subj_i = headers.get("科目")  # 账簿通常没有费用科目列
 
     max_row = ws.max_row or header_row
-    # 收集唯一 (科目提示, 摘要变体) 再分类
-    jobs: List[Tuple[int, str, str, List[str]]] = []
+    # 先识别业务摘要，再按 (科目提示, 业务摘要) 分类一次
+    jobs: List[Tuple[int, str, str]] = []
     unique_pairs: List[Tuple[str, str]] = []
     seen_pairs: set = set()
     empty_summary = 0
@@ -297,7 +248,7 @@ def classify_ledger_excel(
         summary = ws.cell(r, summ_i).value
         if _cell(summary) == "":
             empty_summary += 1
-            jobs.append((r, "", "", []))
+            jobs.append((r, "", ""))
             continue
         pname = ws.cell(r, name_i).value if name_i else ""
         subject = ""
@@ -305,35 +256,35 @@ def classify_ledger_excel(
             subject = _cell(ws.cell(r, subj_i).value)
         if not subject and nature_i:
             subject = _cell(ws.cell(r, nature_i).value)
-        variants = summary_variants(_cell(pname), _cell(summary))
-        jobs.append((r, subject, _cell(summary), variants))
-        for v in variants:
-            key = (subject, v)
-            if key not in seen_pairs:
-                seen_pairs.add(key)
-                unique_pairs.append(key)
+        biz = recognize_summary(summary, pname).business_summary
+        jobs.append((r, subject, biz))
+        key = (subject, biz)
+        if key not in seen_pairs:
+            seen_pairs.add(key)
+            unique_pairs.append(key)
 
     print(
         f"  行 {max_row - header_row}，空摘要 {empty_summary}，"
-        f"唯一 (科目提示,摘要变体) {len(unique_pairs)}"
+        f"唯一 (科目提示,业务摘要) {len(unique_pairs)}"
     )
     cache: Dict[Tuple[str, str], ClassifyResult] = {}
-    for i, (subject, summ) in enumerate(unique_pairs, 1):
-        cache[(subject, summ)] = engine.classify(subject, summ, None)
+    for i, (subject, biz) in enumerate(unique_pairs, 1):
+        _rec, cache[(subject, biz)] = classify_text(
+            engine, subject, biz, None, business_summary=biz
+        )
         if i % 2000 == 0 or i == len(unique_pairs):
             print(f"  分类进度 {i}/{len(unique_pairs)}")
 
     layer_count: Dict[str, int] = defaultdict(int)
     weak = 0
     filled = 0
-    for r, subject, _raw, variants in jobs:
-        if not variants:
+    for r, subject, biz in jobs:
+        if not biz:
             # 空摘要：三列保持空，不写「待复核」
             continue
-        results = [cache[(subject, v)] for v in variants if (subject, v) in cache]
-        if not results:
+        best = cache.get((subject, biz))
+        if best is None:
             continue
-        best = pick_best_result(results)
         ws.cell(r, l1_i).value = best.l1_name or None
         ws.cell(r, l2_i).value = best.l2_name or None
         ws.cell(r, l3_i).value = (best.l3_name or "") or None
@@ -592,10 +543,8 @@ def learn_from_ledger(
         if not leaf_id:
             would_register += 1
 
-        summaries = [summ]
-        stripped = strip_project_prefix(pname, summ)
-        if stripped and stripped != summ and len(stripped) >= 4:
-            summaries.append(stripped)
+        biz = recognize_summary(summ, pname).business_summary or summ
+        summaries = [biz]
 
         to_write: List[str] = []
         for s in summaries:

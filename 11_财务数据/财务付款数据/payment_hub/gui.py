@@ -91,7 +91,7 @@ class PaymentHubApp:
 
         ttk.Label(
             main,
-            text="日常：导出学习池 → 在 Excel 里改科目或点确认 → 应用确认。月结点「月结全流程」。",
+            text="日常：导出学习池 → 在 Excel 里改科目或点确认 → 应用确认。月结点「月结全流程」（含摘要识别）。",
             wraplength=880,
         ).grid(row=0, column=0, sticky="w", **pad)
 
@@ -111,9 +111,6 @@ class PaymentHubApp:
             ("应用确认", self._apply),
             ("重刷分类", self._cmd("reclassify")),
             ("健康度", self._cmd("health")),
-            ("待复核池", self._cmd("review")),
-            ("导出分类总表", self._cmd("export-class")),
-            ("应用分类总表", self._cmd("apply-class")),
             ("压缩记忆", self._cmd("compact-memory")),
         ], cols=3)
 
@@ -132,6 +129,7 @@ class PaymentHubApp:
         maint.grid(row=4, column=0, sticky="ew", **pad)
         self._btns(maint, [
             ("raw 标准化", self._cmd("raw-std", project=True)),
+            ("摘要识别", self._cmd("recognize")),
             ("分类科目", self._cmd("classify")),
             ("汇总 Excel", self._cmd("summary")),
             ("拆分 B_std", self._cmd("std", project=True)),

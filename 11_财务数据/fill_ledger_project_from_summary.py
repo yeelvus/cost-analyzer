@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 import argparse
-import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -23,10 +22,17 @@ from pathlib import Path
 import pandas as pd
 
 CODE_ROOT = Path(__file__).resolve().parents[1]
+HUB_ROOT = Path(__file__).resolve().parent / "财务付款数据"
 sys.path.insert(0, str(CODE_ROOT))
+sys.path.insert(0, str(HUB_ROOT))
 
 from common.project import load_or_init_db, match_project  # noqa: E402
 from settings import MATCH_DB_PATH  # noqa: E402
+from summary_recognize import (  # noqa: E402
+    extract_summary_prefix,
+    is_plausible_project_name,
+    strip_project_suffix,
+)
 
 DEFAULT_INPUT = Path(
     "/Users/wyattsun/Desktop/财务数据/CNY这是现在用的金蝶里边的数据从23.07-26.07月！"
@@ -34,68 +40,12 @@ DEFAULT_INPUT = Path(
 )
 DEFAULT_DB = MATCH_DB_PATH
 
-DASH_CHARS = ("－", "—", "–", "﹣", "−")
-NOISE_PREFIX_RE = re.compile(
-    r"^(内部|银行|订正|转账|未知|资金|手续费|利息|税费|工资|社保)"
-)
-DATE_PREFIX_RE = re.compile(r"^\d{1,2}([./月]\d{1,2})")
-# 摘要把业务动作写进了前缀（未正确用 - 分隔）
-ACTION_IN_PREFIX_RE = re.compile(
-    r"(支付|采购|工资|保证金|退回|外售|客户名|合同款|投标|退押金|存入|调拨|转账手续费)"
-)
-CJK_OR_LETTER_RE = re.compile(r"[\u4e00-\u9fffA-Za-z]")
-
 
 def is_empty_project(val) -> bool:
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return True
     text = str(val).strip()
     return (not text) or text.lower() == "nan"
-
-
-def extract_summary_prefix(summary) -> str:
-    """提取摘要中第一个 '-' 之前的内容。"""
-    if summary is None or (isinstance(summary, float) and pd.isna(summary)):
-        return ""
-    text = str(summary).strip()
-    if not text:
-        return ""
-    for ch in DASH_CHARS:
-        text = text.replace(ch, "-")
-    if "-" not in text:
-        return ""
-    return text.split("-", 1)[0].strip()
-
-
-def strip_project_suffix(name: str) -> str:
-    name = name.strip()
-    if name.endswith("项目") and len(name) > 2:
-        return name[:-2].strip()
-    return name
-
-
-def is_plausible_project_name(prefix: str) -> bool:
-    """启发式：像项目简称，而非日期/长业务描述。"""
-    if not prefix:
-        return False
-    # 过短/过长不像项目名
-    if len(prefix) < 2 or len(prefix) > 16:
-        return False
-    if DATE_PREFIX_RE.match(prefix):
-        return False
-    if NOISE_PREFIX_RE.search(prefix):
-        return False
-    if ACTION_IN_PREFIX_RE.search(prefix):
-        return False
-    if not CJK_OR_LETTER_RE.search(prefix):
-        return False
-    # 含过多数字/括号的描述
-    if prefix.count("(") + prefix.count("（") >= 1 and len(prefix) > 10:
-        return False
-    digit_ratio = sum(ch.isdigit() for ch in prefix) / max(len(prefix), 1)
-    if digit_ratio > 0.4:
-        return False
-    return True
 
 
 def build_known_names(series: pd.Series) -> set[str]:

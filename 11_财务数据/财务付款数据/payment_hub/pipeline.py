@@ -15,7 +15,8 @@ from .classify_raw_std import run_classify_raw_std
 from .config import LEGACY_SUM_DIR, Paths
 from .pkg import ensure_code_root
 from .raw_std_build import run_raw_std
-from .std_build import run_std
+from .recognize_build import run_recognize
+from .std_build import run_std, run_std_from_classified
 from .summary_build import run_summary
 
 
@@ -39,11 +40,21 @@ def step_raw_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
     return outs
 
 
+def step_recognize(paths: Paths) -> List[str]:
+    _banner("步骤 · 摘要识别 (recognize)")
+    print(f"输入: {paths.raw_std_dir}/{{组名}}_财务付款_raw_std.xlsx")
+    print("写回: 业务摘要、项目提示（不改项目名称，不分类）")
+    t0 = time.time()
+    outs = run_recognize(paths)
+    print(f"耗时 {time.time() - t0:.1f}s")
+    return outs
+
+
 def step_classify(paths: Paths) -> List[str]:
-    _banner("步骤 · 摘要科目分类 (classify)")
+    _banner("步骤 · 业务摘要分类 (classify)")
     print(f"输入: {paths.raw_std_dir}/{{组名}}_财务付款_raw_std.xlsx")
     print(f"输出: {paths.classified_dir}/{{组名}}/*_classified.xlsx")
-    print("分类: 学习记忆 + 规则 → 一级/二级/三级科目")
+    print("分类: 业务摘要 + 科目 + 供应商 → 一级/二级/三级科目")
     t0 = time.time()
     outs = run_classify_raw_std(paths)
     print(f"耗时 {time.time() - t0:.1f}s")
@@ -52,8 +63,7 @@ def step_classify(paths: Paths) -> List[str]:
 
 def step_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
     _banner("步骤 · 按项目拆分标准明细 (std)")
-    print("优先: A2_classified → B_std/{组}/有支出|未支出/")
-    print("回退: A_raw 全量重处理")
+    print("只读: A2_classified → B_std/{组}/有支出|未支出/")
     t0 = time.time()
     outs = run_std(paths, prompt_project=prompt_project)
     print(f"耗时 {time.time() - t0:.1f}s")
@@ -86,16 +96,15 @@ def step_amount_mismatch(paths: Paths, output: Optional[Path] = None):
 
 
 def step_reclassify(paths: Paths) -> dict:
-    _banner("分类重刷 · reclassify B_std")
-    ensure_code_root()
-    from learn_classify.engine import ClassifyEngine
-    from learn_classify.review import reclassify_std_dir
-
-    stats = reclassify_std_dir(
-        paths.std_dir, ClassifyEngine.from_data_dir(paths.classify_data)
-    )
-    print(f"✅ 重分类: {stats}")
-    return stats
+    """用当前记忆重写 A2，再按 A2 拆分 B_std。分类结果只留在 A2。"""
+    classified = step_classify(paths)
+    _banner("步骤 · 按 A2 重建 B_std")
+    if not classified:
+        print("没有 A2 分类结果，跳过 B_std 拆分")
+        return {"classify": [], "std": []}
+    std_outs = run_std_from_classified(paths)
+    print(f"✅ 重分类: A2 {len(classified)} 个分组，B_std {len(std_outs)} 个项目文件")
+    return {"classify": classified, "std": std_outs}
 
 
 def step_export_review(
@@ -191,6 +200,8 @@ def step_health(paths: Paths) -> None:
     import pandas as pd
     from learn_classify.engine import ClassifyEngine
 
+    from learn_classify.classify_text import classify_text
+
     engine = ClassifyEngine.from_data_dir(paths.classify_data)
     layer_c: Counter = Counter()
     l1_c: Counter = Counter()
@@ -207,10 +218,13 @@ def step_health(paths: Paths) -> None:
         for _, row in df.iterrows():
             total += 1
             vend_col = cols.get("供应商名称") or cols.get("供应商")
-            r = engine.classify(
+            _rec, r = classify_text(
+                engine,
                 row.get(cols["科目"]) if "科目" in cols else None,
                 row.get(cols["摘要"]) if "摘要" in cols else None,
                 row.get(vend_col) if vend_col else None,
+                row.get(cols["项目名称"]) if "项目名称" in cols else None,
+                row.get(cols["业务摘要"]) if "业务摘要" in cols else None,
             )
             layer_c[r.layer] += 1
             l1_c[r.l1_name] += 1
@@ -354,6 +368,7 @@ def run_pipeline(
     *,
     steps: Optional[Iterable[str]] = None,
     skip_raw_std: bool = False,
+    skip_recognize: bool = False,
     skip_classify: bool = False,
     skip_std: bool = False,
     skip_summary: bool = False,
@@ -364,14 +379,16 @@ def run_pipeline(
     paths.ensure_output_parents()
     result: dict = {"paths": {}, "ok": True}
 
-    # 快路径：raw_std → classify → summary → std → cashflow
+    # 快路径：raw_std → recognize → classify → summary → std → cashflow
     order = (
         list(steps)
         if steps
-        else ["raw_std", "classify", "summary", "std", "cashflow"]
+        else ["raw_std", "recognize", "classify", "summary", "std", "cashflow"]
     )
     if skip_raw_std:
         order = [s for s in order if s != "raw_std"]
+    if skip_recognize:
+        order = [s for s in order if s != "recognize"]
     if skip_classify:
         order = [s for s in order if s != "classify"]
     if skip_std:
@@ -380,11 +397,12 @@ def run_pipeline(
         order = [s for s in order if s != "summary"]
     if skip_cashflow:
         order = [s for s in order if s != "cashflow"]
-    if reclassify_before_summary and "reclassify" not in order:
+    # 汇总前重刷：只保证 classify 在 summary 之前。B_std 仍由后面的 std 从 A2 拆出。
+    if reclassify_before_summary and "classify" not in order:
         if "summary" in order:
-            order.insert(order.index("summary"), "reclassify")
+            order.insert(order.index("summary"), "classify")
         else:
-            order.append("reclassify")
+            order.append("classify")
 
     _banner("财务付款快路径流水线（按文件夹分组）")
     print(f"A_raw:        {paths.raw_dir}/{{组名}}/")
@@ -399,6 +417,9 @@ def run_pipeline(
     handlers = {
         "raw_std": lambda: result["paths"].__setitem__(
             "raw_std", step_raw_std(paths, prompt_project=prompt_project)
+        ),
+        "recognize": lambda: result["paths"].__setitem__(
+            "recognize", step_recognize(paths)
         ),
         "classify": lambda: result["paths"].__setitem__(
             "classify", step_classify(paths)
