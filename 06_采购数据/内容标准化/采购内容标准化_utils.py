@@ -22,7 +22,14 @@ import pandas as pd
 CURRENT_DIR = Path(__file__).resolve().parent
 PACKAGE_ROOT = CURRENT_DIR.parent  # 9_采购数据
 CODE_ROOT = PACKAGE_ROOT.parent  # Desktop/code
-UNIT_MAP_UTILS_PATH = CODE_ROOT / "0_项目基本信息" / "unit_map_utils.py"
+UNIT_MAP_UTILS_CANDIDATES = [
+    CODE_ROOT / "00_项目基本信息" / "unit_map_utils.py",
+    CODE_ROOT / "0_项目基本信息" / "unit_map_utils.py",
+]
+UNIT_MAP_UTILS_PATH = next(
+    (path for path in UNIT_MAP_UTILS_CANDIDATES if path.is_file()),
+    UNIT_MAP_UTILS_CANDIDATES[0],
+)
 STANDARDIZATION_PIPELINE_DIR = PACKAGE_ROOT / "规格标准化"
 
 _PIPELINE_CONTEXT = None
