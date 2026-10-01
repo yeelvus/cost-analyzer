@@ -1208,7 +1208,9 @@ def apply_learn_pool(
     learn_unconfirmed_edits: bool = True,
 ) -> Dict[str, Any]:
     """
-    检测手改/确认 → 按业务摘要写记忆 → 合并已确认表 → 剥离 → 刷新未确认建议 → 重写 A2 并重建 B_std。
+    检测手改/确认 → 按业务摘要写记忆 → 合并已确认表 → 剥离 → 刷新未确认建议。
+
+    不改 A2 / B_std。把科目填进月结文件是财务付款流程的事。
 
     auto_taxonomy:
         学习池中填写了体系里不存在的一/二/三级时，自动登记到 taxonomy（先备份）。
@@ -1532,18 +1534,14 @@ def apply_learn_pool(
     except Exception as e:
         print(f"  ⚠️ 重建优先级总览失败: {e}")
 
-    reclass_stats = {}
-    if reclassify and learned:
-        print("重刷 A2，并按 A2 重建 B_std …")
-        try:
-            from .pipeline import step_reclassify
-
-            reclass_stats = step_reclassify(paths)
-            print(f"reclassify: {reclass_stats}")
-        except Exception as e:
-            # 不因重刷失败而丢掉已完成的 apply/学习结果
-            print(f"  ⚠️ 重刷 A2/B_std 失败（学习结果已保存）: {e}")
-            reclass_stats = {"error": str(e)}
+    if reclassify:
+        print(
+            "应用确认不再改财务文件。本次只写入科目记忆和学习池。"
+            "要把科目填进月结结果，请另运行: python 财务付款一体化.py reclassify"
+        )
+    else:
+        print("本次只写入科目记忆和学习池，不改财务分类文件。")
+    reclass_stats = {"skipped": "pipeline_fill_is_separate"}
 
     stats = {
         "locked": len(locked),

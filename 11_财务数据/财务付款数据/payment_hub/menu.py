@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Tuple
 
 from .config import Paths
@@ -12,46 +11,31 @@ from .config import Paths
 # (键, 名称, 说明, 传给 dispatch 的 argv；None=特殊)
 MenuItem = Tuple[str, str, str, Optional[List[str]]]
 
-# 主菜单
+# 主菜单：只跑月结。科目对应关系在「摘要科目分类.py」。
 MENU_MAIN: Sequence[MenuItem] = (
-    ("1", "learn", "确认学习组（导出学习池 / 应用确认 / 健康度…）", None),
-    ("2", "run", "月结全流程：raw_std → recognize → classify → summary → std → cashflow", ["run"]),
-    ("3", "maint", "维护 / 分步出账（raw-std / classify / summary / std…）", None),
+    ("1", "run", "月结全流程：raw_std → recognize → classify → summary → std → cashflow", ["run"]),
+    ("2", "reclassify", "只填入科目：按当前对应重写 A2，并重建 B_std（不改记忆）", ["reclassify"]),
+    ("3", "maint", "分步出账（raw-std / recognize / classify / summary / std…）", None),
     ("4", "show-paths", "查看默认数据路径", ["show-paths"]),
     ("h", "help", "打印命令说明", ["help"]),
     ("0", "quit", "退出", None),
 )
 
-# 确认学习组
-MENU_LEARN: Sequence[MenuItem] = (
-    ("1", "pool", "导出学习池 → Std/财务付款/D_财务付款_学习池", ["pool"]),
-    ("2", "apply", "应用确认 → 写入记忆 + 抬升未确认 + 重刷 A2", ["apply"]),
-    ("3", "learn-ledger", "账簿已填科目 → 写入记忆（不改账簿）", ["learn-ledger"]),
-    ("4", "reclassify", "按当前记忆重写 A2，并重建 B_std", ["reclassify"]),
-    ("5", "health", "分类健康度（命中层 / 待复核率）", ["health"]),
-    ("6", "compact-memory", "压缩 memory / corrections", ["compact-memory"]),
-    ("0", "back", "返回主菜单", None),
-)
-
-# 维护 / 分步出账
+# 维护 / 分步出账。改科目记忆不在这里。
 MENU_MAINT: Sequence[MenuItem] = (
     ("1", "raw-std", "raw 标准化合并（按文件夹→一个Excel）", ["raw-std"]),
     ("2", "recognize", "摘要识别：业务摘要、项目提示写回 A1", ["recognize"]),
-    ("3", "classify", "业务摘要→一/二/三级科目（A1→A2）", ["classify"]),
+    ("3", "classify", "把业务摘要填成一/二/三级科目（写入 A2，不改记忆）", ["classify"]),
     ("4", "summary", "汇总（只读 A2_classified）", ["summary"]),
     ("5", "std", "拆分 B_std（只读 A2_classified）", ["std"]),
     ("6", "cashflow", "仅现金流 HTML", ["cashflow"]),
     ("7", "amount-mismatch", "应付≠预扣+实付 不平明细", ["amount-mismatch"]),
-    ("8", "export-taxonomy", "导出科目体系 Excel", ["export-taxonomy"]),
-    ("9", "import-taxonomy", "从 Excel 写回 taxonomy", ["import-taxonomy"]),
-    ("10", "dropdowns", "B_std 加分类下拉", ["dropdowns"]),
+    ("8", "dropdowns", "B_std 加分类下拉", ["dropdowns"]),
     ("0", "back", "返回主菜单", None),
 )
 
 _DIRECT = frozenset(
     {
-        "pool",
-        "apply",
         "run",
         "reclassify",
         "show-paths",
@@ -63,18 +47,9 @@ _DIRECT = frozenset(
         "std",
         "summary",
         "cashflow",
-        "compact-memory",
-        "export-class",
-        "apply-class",
         "health",
-        "review",
         "amount-mismatch",
-        "export-taxonomy",
-        "import-taxonomy",
         "dropdowns",
-        "learn",
-        "learn-ledger",
-        "ledger-learn",
         "maint",
     }
 )
@@ -83,26 +58,25 @@ _DIRECT = frozenset(
 def print_quick_help() -> None:
     print(
         """
-财务付款一体化 · 日常命令
+财务付款月结 · 日常命令
 ────────────────────────────────────────
-  python 财务付款一体化.py                # 交互式菜单（推荐）
-  python 财务付款一体化.py pool           # ① 导出学习池（确认学习）
-  python 财务付款一体化.py apply          # ② 应用确认并学习
-  python 财务付款一体化.py learn-ledger   # 账簿已填科目 → 写入记忆
-  python 财务付款一体化.py run            # ③ 月结全流程
+  python 财务付款一体化.py                # 月结窗口
+  python 财务付款一体化.py run            # 月结全流程
+  python 财务付款一体化.py reclassify     # 只把科目填进 A2 / B_std（不改记忆）
 
-菜单结构:
-  [1] 确认学习组  pool / apply / learn-ledger / reclassify / health
-  [2] 月结全流程  raw_std → recognize → classify → summary → std → cashflow
-  [3] 维护分步    raw-std / recognize / classify / summary / std …
+摘要对应一二三级科目（另一个程序，不改月结文件）:
+  python 摘要科目分类.py                  # 填科目 / 写入记忆
+  python 摘要科目分类.py fill -i 明细.xlsx
+  python 摘要科目分类.py learn -i 已填科目.xlsx
 
-快路径数据:
+菜单:
+  [1] 月结全流程  raw_std → recognize → classify → summary → std → cashflow
+  [2] 只填入科目  重写 A2，并重建 B_std
+  [3] 分步出账    raw-std / recognize / classify / summary / std …
+
+数据:
   A_raw → A1_raw_std（含业务摘要）→ A2_classified → Sum / B_std
-
-确认学习:
-  学习池: 1(pool) 导出 → Excel 改科目或点「确认」→ 2(apply) 写记忆并重刷 A2
-  账簿:   改一/二/三级 → 3(learn-ledger) 写入记忆
-  分类总表、待复核池仍可用命令行，不在菜单里
+  分类这一步只读科目记忆
 """.strip()
     )
 
@@ -113,29 +87,10 @@ def print_maint_help() -> None:
 维护 / 分步出账
 ────────────────────────────────────────
   raw-std / recognize / classify / summary / std / cashflow
-  amount-mismatch / export-taxonomy / import-taxonomy
-  dropdowns
+  amount-mismatch / dropdowns
 
-确认学习请回主菜单选 [1]
-""".strip()
-    )
-
-
-def print_learn_help() -> None:
-    print(
-        """
-确认学习组
-────────────────────────────────────────
-  pool           从明细导出学习池（按业务摘要去重）
-  apply          读确认结果 → memory + 泛化 + 重写 A2 / B_std
-  learn-ledger   账簿已填一/二/三级 → 按业务摘要写入记忆（不改账簿）
-  reclassify     按当前记忆重写 A2，并重建 B_std
-  health         看命中层与待复核率
-  compact-memory 压缩学习记忆文件
-
-推荐顺序:
-  学习池: pool → 人工确认 Excel → apply
-  账簿:   改科目后选 3(learn-ledger)
+classify 只把科目填进 A2，不改科目记忆。
+改对应关系请运行: python 摘要科目分类.py
 """.strip()
     )
 
@@ -143,11 +98,10 @@ def print_learn_help() -> None:
 def _print_banner(paths: Optional[Paths] = None) -> None:
     print()
     print("=" * 56)
-    print("  财务付款一体化 · 交互菜单")
+    print("  财务付款月结")
     print("=" * 56)
     if paths is not None:
         try:
-            print(f"  学习池: {paths.learn_pool_root}")
             print(f"  A1_raw_std: {paths.raw_std_dir}")
             print(f"  A2_classified: {paths.classified_dir}")
             print(f"  B_std: {paths.std_dir}/{{组名}}/…")
@@ -155,9 +109,10 @@ def _print_banner(paths: Optional[Paths] = None) -> None:
         except Exception:
             pass
     print()
-    print("  [1] 确认学习  →  pool / apply …")
-    print("  [2] 月结出账  →  run 全流程")
-    print("  [3] 维护分步  →  raw-std / recognize / classify / summary / std …")
+    print("  科目对应关系: python 摘要科目分类.py")
+    print("  [1] 月结全流程")
+    print("  [2] 只填入科目（不改记忆）")
+    print("  [3] 分步出账")
     print()
 
 
@@ -213,67 +168,6 @@ def _maybe_prompt_project(argv: List[str]) -> List[str]:
     return argv
 
 
-def _prompt_learn_ledger(argv: List[str]) -> List[str]:
-    """交互确认账簿路径；可选仅预览。"""
-    if not argv or argv[0] not in {"learn-ledger", "ledger-learn"}:
-        return argv
-    if "--ledger" in argv or not sys.stdin.isatty():
-        return argv
-    default = Paths().ledger_xlsx
-    exists = "存在" if default.is_file() else "不存在"
-    print()
-    print(f"  默认账簿: {default}")
-    print(f"  文件状态: {exists}")
-    ans = _read_choice("回车用默认，或粘贴账簿路径: ")
-    ledger = Path(ans.strip().strip('"').strip("'")).expanduser() if ans else default
-    extra = ["--ledger", str(ledger)]
-    dry = _read_choice("仅预览、不写入记忆？[y/N]: ")
-    if dry in {"y", "yes", "是", "1"}:
-        extra.append("--dry-run")
-    return argv + extra
-
-
-def interactive_learn_menu(dispatch: Callable[[Optional[list]], int]) -> int:
-    """确认学习组子菜单。"""
-    last = 0
-    while True:
-        print()
-        print("=" * 56)
-        print("  确认学习组")
-        print("=" * 56)
-        print()
-        print("  推荐: 1(pool) → Excel 改科目/点确认 → 2(apply)")
-        print("        账簿改科目后 → 3(learn-ledger) 写入记忆")
-        print()
-        _print_items(MENU_LEARN)
-        choice = _read_choice("确认学习，请选择: ")
-        if choice in {"0", "q", "b", "back", "返回"}:
-            return last
-        if choice in {"h", "help"}:
-            print_learn_help()
-            _pause()
-            continue
-
-        argv = None
-        if choice in {"账簿", "账簿学习", "写入记忆", "ledger"}:
-            argv = ["learn-ledger"]
-        else:
-            for key, name, _d, a in MENU_LEARN:
-                if choice in {key, name}:
-                    argv = list(a) if a is not None else None
-                    break
-        if argv is None and choice in _DIRECT:
-            argv = [choice]
-        if argv is None:
-            print(f"  无效选择: {choice!r}")
-            _pause()
-            continue
-
-        argv = _prompt_learn_ledger(argv)
-        last = _run(dispatch, argv)
-        _pause()
-
-
 def interactive_maint_menu(dispatch: Callable[[Optional[list]], int]) -> int:
     last = 0
     while True:
@@ -320,12 +214,6 @@ def interactive_menu(dispatch: Callable[[Optional[list]], int]) -> int:
             print("再见。")
             return last
 
-        # 确认学习组
-        if choice in {"1", "learn", "学习", "确认学习", "确认学习组"}:
-            last = interactive_learn_menu(dispatch)
-            continue
-
-        # 维护分步
         if choice in {"3", "m", "maint", "维护"}:
             last = interactive_maint_menu(dispatch)
             continue
@@ -341,7 +229,10 @@ def interactive_menu(dispatch: Callable[[Optional[list]], int]) -> int:
             argv = [choice]
             argv = _maybe_prompt_project(argv)
         if argv is None:
-            print(f"  无效选择: {choice!r}，请输入 1–4 / h / 0")
+            if choice in {"learn", "学习", "pool", "apply", "learn-ledger", "确认学习", "账簿"}:
+                print("  科目对应关系在另一个程序: python 摘要科目分类.py")
+            else:
+                print(f"  无效选择: {choice!r}，请输入 1–4 / h / 0")
             _pause()
             continue
 

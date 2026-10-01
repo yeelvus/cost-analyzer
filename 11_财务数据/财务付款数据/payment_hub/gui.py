@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""财务付款一体化 · 图形窗口。
+"""财务付款月结窗口。
 
 无参数运行 ``财务付款一体化.py`` 时进入本窗口。
-命令行子命令与 ``--menu`` 仍走原来的 CLI。
+科目对应关系在 ``摘要科目分类.py``，这里只跑流程，并按那份对应关系填入科目。
 """
 
 from __future__ import annotations
@@ -29,9 +29,9 @@ def gui_available() -> bool:
 
 def _tk():
     import tkinter as tk
-    from tkinter import filedialog, messagebox, ttk
+    from tkinter import messagebox, ttk
 
-    return tk, filedialog, messagebox, ttk
+    return tk, messagebox, ttk
 
 
 class _QueueWriter:
@@ -49,153 +49,78 @@ class _QueueWriter:
 
 class PaymentHubApp:
     def __init__(self, root: Any):
-        tk, filedialog, messagebox, ttk = _tk()
+        tk, messagebox, ttk = _tk()
         self.tk = tk
-        self.filedialog = filedialog
         self.messagebox = messagebox
         self.ttk = ttk
         self.root = root
-        self.root.title("财务付款一体化")
-        self.root.geometry("940x820")
-        self.root.minsize(800, 680)
+        self.root.title("财务付款")
+        self.root.geometry("720x480")
+        self.root.minsize(620, 400)
 
         self.paths = Paths()
         self._running = False
         self._log_q: queue.Queue = queue.Queue()
         self.prompt_project = tk.BooleanVar(value=False)
-        self.ledger_dry_run = tk.BooleanVar(value=False)
-        self.only_confirmed = tk.BooleanVar(value=False)
-        self.ledger_path = tk.StringVar(value=str(self.paths.ledger_xlsx))
-        self.sheet_name = tk.StringVar()
-        self.header_row = tk.StringVar(value="1")
-        self.summary_col = tk.StringVar()
-        self.l1_col = tk.StringVar()
-        self.l2_col = tk.StringVar()
-        self.l3_col = tk.StringVar()
         self.status = tk.StringVar(value="就绪")
-        self._sheets: list[str] = []
-        self._headers: dict[str, list[str]] = {}
+        self._more_open = tk.BooleanVar(value=False)
 
         self._build()
         self.root.after(120, self._drain_log)
-        if Path(self.ledger_path.get()).is_file():
-            self.root.after(200, lambda: self._reload_headers(silent=True))
 
     def _build(self) -> None:
         ttk = self.ttk
         tk = self.tk
-        pad = {"padx": 8, "pady": 4}
         main = ttk.Frame(self.root, padding=12)
         main.pack(fill="both", expand=True)
         main.columnconfigure(0, weight=1)
 
+        ttk.Label(main, text="财务付款月结", font=("", 16, "bold")).grid(
+            row=0, column=0, sticky="w", pady=(0, 4)
+        )
         ttk.Label(
             main,
-            text="日常：导出学习池 → 在 Excel 里改科目或点确认 → 应用确认。月结点「月结全流程」（含摘要识别）。",
-            wraplength=880,
-        ).grid(row=0, column=0, sticky="w", **pad)
+            text="科目和摘要的对应关系在「摘要科目分类」里单独处理。这里只跑月结，并按那份对应关系填入科目。",
+        ).grid(row=1, column=0, sticky="w", pady=(0, 8))
 
-        path_line = (
-            f"学习池  {self.paths.learn_pool_root}\n"
-            f"A_raw   {self.paths.raw_dir}\n"
-            f"B_std   {self.paths.std_dir}    Sum  {self.paths.sum_xlsx.parent}"
+        steps = ttk.Frame(main)
+        steps.grid(row=2, column=0, sticky="ew", pady=4)
+        steps.columnconfigure(1, weight=1)
+        ttk.Button(steps, text="月结全流程", command=self._run_month, width=16).grid(
+            row=0, column=0, sticky="ew", padx=(0, 12), pady=4
         )
-        ttk.Label(main, text=path_line, foreground="#444", wraplength=880).grid(
-            row=1, column=0, sticky="w", **pad
+        ttk.Label(steps, text="原始表 → 摘要识别 → 填入科目 → 汇总和现金流").grid(
+            row=0, column=1, sticky="w", pady=4
         )
 
-        learn = ttk.LabelFrame(main, text="确认学习", padding=8)
-        learn.grid(row=2, column=0, sticky="ew", **pad)
-        self._btns(learn, [
-            ("导出学习池", self._cmd("pool")),
-            ("应用确认", self._apply),
-            ("重刷分类", self._cmd("reclassify")),
-            ("健康度", self._cmd("health")),
-            ("压缩记忆", self._cmd("compact-memory")),
-        ], cols=3)
-
-        month = ttk.LabelFrame(main, text="月结出账", padding=8)
-        month.grid(row=3, column=0, sticky="ew", **pad)
-        ttk.Button(month, text="月结全流程", command=self._run_month).grid(
-            row=0, column=0, padx=4, pady=4, sticky="w"
-        )
+        links = ttk.Frame(main)
+        links.grid(row=3, column=0, sticky="w", pady=4)
+        ttk.Label(links, text="打开").pack(side="left", padx=(0, 8))
+        ttk.Button(links, text="汇总文件夹", command=self._open_sum).pack(side="left", padx=4)
         ttk.Checkbutton(
-            month,
-            text="弹窗补录未匹配项目名（会卡住窗口直到补完）",
+            links,
+            text="月结时补录未匹配项目名",
             variable=self.prompt_project,
-        ).grid(row=0, column=1, columnspan=2, padx=8, sticky="w")
+        ).pack(side="left", padx=(16, 0))
 
-        maint = ttk.LabelFrame(main, text="维护 / 分步", padding=8)
-        maint.grid(row=4, column=0, sticky="ew", **pad)
-        self._btns(maint, [
-            ("raw 标准化", self._cmd("raw-std", project=True)),
-            ("摘要识别", self._cmd("recognize")),
-            ("分类科目", self._cmd("classify")),
-            ("汇总 Excel", self._cmd("summary")),
-            ("拆分 B_std", self._cmd("std", project=True)),
-            ("现金流 HTML", self._cmd("cashflow")),
-            ("不平明细", self._cmd("amount-mismatch")),
-            ("导出科目体系", self._cmd("export-taxonomy")),
-            ("导入科目体系", self._import_taxonomy),
-            ("B_std 加下拉", self._cmd("dropdowns")),
-            ("查看路径", self._cmd("show-paths")),
-            ("打开学习池文件夹", self._open_learn_pool),
-            ("打开汇总文件夹", self._open_sum),
-        ], cols=4)
-
-        excel = ttk.LabelFrame(main, text="从 Excel 学习分类（选摘要列 + 一/二/三级科目列）", padding=8)
-        excel.grid(row=5, column=0, sticky="ew", **pad)
-        excel.columnconfigure(1, weight=1)
-        excel.columnconfigure(3, weight=1)
-
-        ttk.Label(excel, text="Excel").grid(row=0, column=0, sticky="e", padx=4, pady=2)
-        ttk.Entry(excel, textvariable=self.ledger_path).grid(
-            row=0, column=1, columnspan=3, sticky="ew", padx=4, pady=2
-        )
-        ttk.Button(excel, text="浏览…", command=self._browse_ledger).grid(
-            row=0, column=4, sticky="w", padx=4, pady=2
-        )
-
-        ttk.Label(excel, text="工作表").grid(row=1, column=0, sticky="e", padx=4, pady=2)
-        self.sheet_combo = ttk.Combobox(
-            excel, textvariable=self.sheet_name, state="readonly", width=22
-        )
-        self.sheet_combo.grid(row=1, column=1, sticky="ew", padx=4, pady=2)
-        self.sheet_combo.bind("<<ComboboxSelected>>", lambda _e: self._apply_sheet_headers())
-        ttk.Label(excel, text="表头行").grid(row=1, column=2, sticky="e", padx=4, pady=2)
-        ttk.Spinbox(excel, from_=1, to=20, textvariable=self.header_row, width=6).grid(
-            row=1, column=3, sticky="w", padx=4, pady=2
-        )
-        ttk.Button(excel, text="读取表头", command=self._reload_headers).grid(
-            row=1, column=4, sticky="w", padx=4, pady=2
-        )
-
-        ttk.Label(excel, text="摘要列").grid(row=2, column=0, sticky="e", padx=4, pady=2)
-        self.summary_combo = ttk.Combobox(excel, textvariable=self.summary_col, width=22)
-        self.summary_combo.grid(row=2, column=1, sticky="ew", padx=4, pady=2)
-        ttk.Label(excel, text="一级科目").grid(row=2, column=2, sticky="e", padx=4, pady=2)
-        self.l1_combo = ttk.Combobox(excel, textvariable=self.l1_col, width=22)
-        self.l1_combo.grid(row=2, column=3, sticky="ew", padx=4, pady=2)
-
-        ttk.Label(excel, text="二级科目").grid(row=3, column=0, sticky="e", padx=4, pady=2)
-        self.l2_combo = ttk.Combobox(excel, textvariable=self.l2_col, width=22)
-        self.l2_combo.grid(row=3, column=1, sticky="ew", padx=4, pady=2)
-        ttk.Label(excel, text="三级科目").grid(row=3, column=2, sticky="e", padx=4, pady=2)
-        self.l3_combo = ttk.Combobox(excel, textvariable=self.l3_col, width=22)
-        self.l3_combo.grid(row=3, column=3, sticky="ew", padx=4, pady=2)
-
-        ttk.Checkbutton(excel, text="仅预览，不写记忆", variable=self.ledger_dry_run).grid(
-            row=4, column=1, sticky="w", padx=4, pady=2
-        )
         ttk.Checkbutton(
-            excel, text="apply 仅学习「确认」行", variable=self.only_confirmed
-        ).grid(row=4, column=3, sticky="w", padx=4, pady=2)
-        ttk.Button(excel, text="开始学习分类", command=self._learn_ledger).grid(
-            row=4, column=4, sticky="ew", padx=4, pady=2
+            main,
+            text="更多",
+            variable=self._more_open,
+            command=self._toggle_more,
+        ).grid(row=4, column=0, sticky="w", pady=4)
+
+        self.more = ttk.LabelFrame(main, text="不重跑整月时", padding=8)
+        self.more.columnconfigure(1, weight=1)
+        ttk.Button(self.more, text="只填入科目", command=self._cmd("reclassify"), width=16).grid(
+            row=0, column=0, sticky="w", padx=4, pady=4
+        )
+        ttk.Label(self.more, text="按当前科目对应重写分类结果和项目明细，不改科目记忆").grid(
+            row=0, column=1, sticky="w", padx=4
         )
 
         opt = ttk.Frame(main)
-        opt.grid(row=6, column=0, sticky="nsew", **pad)
+        opt.grid(row=6, column=0, sticky="nsew", pady=4)
         opt.columnconfigure(0, weight=1)
         opt.rowconfigure(0, weight=1)
         main.rowconfigure(6, weight=1)
@@ -215,148 +140,22 @@ class PaymentHubApp:
         ttk.Label(bar, textvariable=self.status).pack(side="left")
         ttk.Button(bar, text="清空日志", command=self._clear_log).pack(side="right")
 
-    def _btns(self, parent, items: list, cols: int = 3) -> None:
-        ttk = self.ttk
-        for i, (label, cmd) in enumerate(items):
-            ttk.Button(parent, text=label, command=cmd).grid(
-                row=i // cols, column=i % cols, padx=4, pady=4, sticky="ew"
-            )
-            parent.columnconfigure(i % cols, weight=1)
+    def _toggle_more(self) -> None:
+        if self._more_open.get():
+            self.more.grid(row=5, column=0, sticky="ew", pady=4)
+        else:
+            self.more.grid_remove()
 
-    def _cmd(self, name: str, *, project: bool = False) -> Callable[[], None]:
+    def _cmd(self, name: str) -> Callable[[], None]:
         def _go() -> None:
-            argv = [name]
-            if project and self.prompt_project.get():
-                argv.append("--prompt-project")
-            self._run_argv(argv)
+            self._run_argv([name])
         return _go
-
-    def _apply(self) -> None:
-        argv = ["apply"]
-        if self.only_confirmed.get():
-            argv.append("--only-confirmed")
-        self._run_argv(argv)
 
     def _run_month(self) -> None:
         argv = ["run"]
         if self.prompt_project.get():
             argv.append("--prompt-project")
         self._run_argv(argv)
-
-    def _learn_ledger(self) -> None:
-        path = self.ledger_path.get().strip()
-        if not path:
-            self.messagebox.showwarning("从 Excel 学习", "请先选择 Excel 文件。")
-            return
-        if not Path(path).is_file():
-            self.messagebox.showwarning("从 Excel 学习", f"文件不存在：\n{path}")
-            return
-        summary = self.summary_col.get().strip()
-        l1 = self.l1_col.get().strip()
-        l2 = self.l2_col.get().strip()
-        if not summary or not l1 or not l2:
-            self.messagebox.showwarning(
-                "从 Excel 学习", "请指定摘要列、一级科目列、二级科目列。"
-            )
-            return
-        argv = [
-            "learn-ledger",
-            "--ledger",
-            path,
-            "--summary-col",
-            summary,
-            "--l1-col",
-            l1,
-            "--l2-col",
-            l2,
-            "--l3-col",
-            self.l3_col.get().strip(),
-            "--header-row",
-            str(self.header_row.get() or "1"),
-        ]
-        sheet = self.sheet_name.get().strip()
-        if sheet:
-            argv.extend(["--sheet", sheet])
-        if self.ledger_dry_run.get():
-            argv.append("--dry-run")
-        self._run_argv(argv)
-
-    def _import_taxonomy(self) -> None:
-        path = self.filedialog.askopenfilename(
-            title="选择科目体系 Excel",
-            filetypes=[("Excel", "*.xlsx *.xlsm"), ("全部", "*.*")],
-        )
-        if not path:
-            return
-        self._run_argv(["import-taxonomy", "-i", path])
-
-    def _browse_ledger(self) -> None:
-        initial = Path(self.ledger_path.get() or str(self.paths.ledger_xlsx))
-        path = self.filedialog.askopenfilename(
-            title="选择要学习的 Excel",
-            initialdir=str(initial.parent if initial.parent.exists() else Path.home()),
-            filetypes=[("Excel", "*.xlsx *.xlsm"), ("全部", "*.*")],
-        )
-        if path:
-            self.ledger_path.set(path)
-            self._reload_headers()
-
-    def _reload_headers(self, silent: bool = False) -> None:
-        path = self.ledger_path.get().strip()
-        if not path or not Path(path).is_file():
-            if not silent:
-                self.messagebox.showwarning("读取表头", "请先选择有效的 Excel 文件。")
-            return
-        try:
-            row = int(str(self.header_row.get() or "1").strip() or "1")
-        except ValueError:
-            row = 1
-            self.header_row.set("1")
-        try:
-            from .pkg import ensure_code_root
-
-            ensure_code_root()
-            from ledger_book_classify import peek_excel_sheets_and_headers
-
-            sheets, headers = peek_excel_sheets_and_headers(Path(path), header_row=row)
-        except Exception as e:
-            self.messagebox.showerror("读取表头失败", str(e))
-            return
-        self._sheets = sheets
-        self._headers = headers
-        self.sheet_combo["values"] = sheets
-        preferred = self.sheet_name.get().strip()
-        if preferred not in sheets:
-            preferred = "汇总" if "汇总" in sheets else (sheets[0] if sheets else "")
-        self.sheet_name.set(preferred)
-        self._apply_sheet_headers()
-
-    def _apply_sheet_headers(self) -> None:
-        cols = list(self._headers.get(self.sheet_name.get().strip(), []))
-        empty_plus = [""] + cols
-        for combo in (
-            self.summary_combo,
-            self.l1_combo,
-            self.l2_combo,
-            self.l3_combo,
-        ):
-            combo["values"] = cols if combo is not self.l3_combo else empty_plus
-        self.summary_col.set(self._pick_col(cols, ("摘要", "业务摘要", "摘要处理")))
-        self.l1_col.set(self._pick_col(cols, ("一级科目", "正确一级科目", "正确一级", "一级")))
-        self.l2_col.set(self._pick_col(cols, ("二级科目", "正确二级科目", "正确二级", "二级")))
-        self.l3_col.set(self._pick_col(cols, ("三级科目", "正确三级科目", "正确三级", "三级"), allow_empty=True))
-
-    @staticmethod
-    def _pick_col(columns: list[str], candidates: tuple[str, ...], *, allow_empty: bool = False) -> str:
-        for name in candidates:
-            if name in columns:
-                return name
-        if allow_empty:
-            return ""
-        return columns[0] if columns else ""
-
-    def _open_learn_pool(self) -> None:
-        self._open_dir(self.paths.learn_pool_root)
 
     def _open_sum(self) -> None:
         self._open_dir(self.paths.sum_xlsx.parent)
@@ -430,7 +229,7 @@ class PaymentHubApp:
 
 
 def launch_gui() -> int:
-    tk, _filedialog, _messagebox, _ttk = _tk()
+    tk, _messagebox, _ttk = _tk()
     root = tk.Tk()
     try:
         root.tk.call("tk", "scaling", 1.2)

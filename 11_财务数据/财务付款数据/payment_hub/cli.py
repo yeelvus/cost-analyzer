@@ -95,9 +95,9 @@ def _add_project_match_args(sp: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="财务付款一体化",
-        description="财务付款：学习池 + 月结（日常 pool / apply / run）",
+        description="财务付款月结。科目对应关系请用 摘要科目分类.py。",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="无参数 → 图形窗口；--menu → 终端菜单",
+        epilog="无参数 → 月结窗口；--menu → 终端菜单。填科目记忆不在本程序。",
     )
     _add_path_args(p)
     _add_project_match_args(p)
@@ -120,13 +120,17 @@ def build_parser() -> argparse.ArgumentParser:
     # 日常
     for name, aliases, help_ in [
         ("pool", ["export-learn-pool"], "导出学习池"),
-        ("apply", ["apply-learn-pool"], "应用确认并泛化"),
+        ("apply", ["apply-learn-pool"], "应用确认：只写科目记忆，不改 A2 / B_std"),
         ("run", ["all", "month"], "月结全流程"),
     ]:
         c = sub.add_parser(name, aliases=aliases, help=help_)
         _add_path_args(c)
         if name == "apply":
-            c.add_argument("--no-reclassify", action="store_true")
+            c.add_argument(
+                "--no-reclassify",
+                action="store_true",
+                help="保留的旧参数。应用确认现在一律不改 A2 / B_std",
+            )
             c.add_argument(
                 "--no-auto-taxonomy",
                 action="store_true",
@@ -162,7 +166,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("summary", "汇总（优先读 A2_classified）"),
         ("cashflow", "仅现金流"),
         ("amount-mismatch", "汇总应付≠预扣+实付的明细"),
-        ("reclassify", "重刷 B_std 分类"),
+        ("reclassify", "按当前科目对应重写 A2，并重建 B_std（不改记忆）"),
         ("health", "分类健康度"),
         ("dropdowns", "B_std 加下拉"),
         ("cleanup-sheets", "删废弃 sheet"),

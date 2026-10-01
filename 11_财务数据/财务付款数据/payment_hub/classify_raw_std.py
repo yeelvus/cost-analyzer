@@ -16,34 +16,9 @@ import pandas as pd
 
 from .config import Paths
 from .pkg import ensure_code_root
-from .utils import has_actual_payment, list_raw_groups, safe_text, to_numeric_series
-
-RECOGNIZE_COLS = ["业务摘要", "项目提示"]
+from .utils import list_raw_groups, to_numeric_series
 
 AMOUNT_COLUMNS = ["应付金额", "预扣税额", "实付金额", "增值税额", "不含税额"]
-DEFAULT_L1 = "6_管理费"
-DEFAULT_L2 = "待复核"
-
-CLASSIFY_COLS = [
-    "一级科目",
-    "二级科目",
-    "三级科目",
-    "分类ID",
-    "命中层",
-    "置信度",
-]
-
-
-def _cell(v) -> str:
-    if v is None:
-        return ""
-    try:
-        if pd.isna(v):
-            return ""
-    except (TypeError, ValueError):
-        pass
-    s = str(v).strip()
-    return "" if s.lower() in {"nan", "none", "nat"} else s
 
 
 def list_classified_groups(paths: Paths) -> List[Tuple[str, Path]]:
@@ -115,119 +90,17 @@ def load_raw_std_detail(path: Path) -> pd.DataFrame:
     return df
 
 
-def _business_rows(df: pd.DataFrame) -> tuple[list[str], list[str]]:
-    """每行的业务摘要、项目提示。已有业务摘要不再剥第二次。"""
-    ensure_code_root()
-    from summary_recognize import resolve_business
-
-    n = len(df)
-    summaries = df["摘要"].map(_cell).tolist() if "摘要" in df.columns else [""] * n
-    projects = (
-        df["项目名称"].map(_cell).tolist() if "项目名称" in df.columns else [""] * n
-    )
-    given = (
-        df["业务摘要"].map(_cell).tolist() if "业务摘要" in df.columns else [""] * n
-    )
-    businesses: list[str] = []
-    hints: list[str] = []
-    for summary, project, business in zip(summaries, projects, given):
-        rec = resolve_business(summary, project, business)
-        businesses.append(rec.business_summary)
-        hints.append(rec.project_hint)
-    return businesses, hints
-
-
 def classify_dataframe(df: pd.DataFrame, engine) -> pd.DataFrame:
     """
-    对明细附加一级/二级/三级科目（唯一三元组缓存）。
+    月结填科目：业务摘要 + 科目 + 供应商 → 一二三级。
 
-    分类键是业务摘要，不是带项目名前缀的原始摘要。
-    仅对「实付金额非空」的行做科目分类；实付为空的行不调用学习引擎，
-    科目列留空，命中层标记为 skip_no_payment。
+    只读科目记忆，不写学习库。仅实付金额非空的行分类；
+    实付为空的行科目留空，命中层为 skip_no_payment。
     """
-    out = df.copy()
-    n = len(out)
-    pay_mask = (
-        out["实付金额"].map(has_actual_payment)
-        if "实付金额" in out.columns
-        else pd.Series([False] * n, index=out.index)
-    )
-    n_pay = int(pay_mask.sum())
-    n_skip = n - n_pay
+    ensure_code_root()
+    from subject_fill import fill_subjects
 
-    subjects = (
-        out["科目"].map(_cell).tolist() if "科目" in out.columns else [""] * n
-    )
-    businesses, hints = _business_rows(out)
-    if "供应商名称" in out.columns:
-        vendors = out["供应商名称"].map(_cell).tolist()
-    elif "供应商" in out.columns:
-        vendors = out["供应商"].map(_cell).tolist()
-    else:
-        vendors = [""] * n
-
-    out["业务摘要"] = businesses
-    out["项目提示"] = hints
-
-    # 只对有实付金额的行建唯一三元组并分类
-    pay_indices = [i for i, ok in enumerate(pay_mask.tolist()) if ok]
-    triples_pay = [(subjects[i], businesses[i], vendors[i]) for i in pay_indices]
-    unique = list(dict.fromkeys(triples_pay))
-    print(
-        f"  摘要分类: 总 {n} 行，有实付 {n_pay} 行（跳过空实付 {n_skip}），"
-        f"唯一 (科目,业务摘要,供应商) = {len(unique)}"
-    )
-
-    cache = engine.classify_unique_map(unique) if unique else {}
-
-    l1s = [""] * n
-    l2s = [""] * n
-    l3s = [""] * n
-    ids = [""] * n
-    layers = [""] * n
-    confs: List = [None] * n
-
-    for i in range(n):
-        if not pay_mask.iloc[i]:
-            layers[i] = "skip_no_payment"
-            confs[i] = None
-            continue
-        t = (subjects[i], businesses[i], vendors[i])
-        r = cache.get(t)
-        if r is None:
-            l1s[i] = DEFAULT_L1
-            l2s[i] = DEFAULT_L2
-            l3s[i] = ""
-            ids[i] = ""
-            layers[i] = "error"
-            confs[i] = 0.0
-            continue
-        l1s[i] = str(getattr(r, "l1_name", "") or DEFAULT_L1)
-        l2s[i] = str(getattr(r, "l2_name", "") or DEFAULT_L2)
-        l3s[i] = str(getattr(r, "l3_name", "") or "")
-        leaf = getattr(r, "l3_id", "") or getattr(r, "l2_id", "") or ""
-        ids[i] = str(leaf or "")
-        layers[i] = str(getattr(r, "layer", "") or "")
-        confs[i] = getattr(r, "confidence", None)
-
-    out["一级科目"] = l1s
-    out["二级科目"] = l2s
-    out["三级科目"] = l3s
-    out["分类ID"] = ids
-    out["命中层"] = layers
-    out["置信度"] = confs
-
-    # 原始摘要 → 业务摘要 / 项目提示 → 科目
-    prefer = CLASSIFY_COLS
-    tail = RECOGNIZE_COLS
-    cols = [c for c in out.columns if c not in prefer and c not in tail]
-    block = tail + prefer
-    if "摘要" in cols:
-        i = cols.index("摘要") + 1
-        cols = cols[:i] + block + cols[i:]
-    else:
-        cols = block + cols
-    return out[cols]
+    return fill_subjects(df, engine=engine, only_paid=True, verbose=True)
 
 
 def _write_classified(df: pd.DataFrame, out_path: Path) -> None:

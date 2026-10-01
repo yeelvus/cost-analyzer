@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-财务付款一体化入口
+财务付款月结入口。
 
-推荐：
-  python 财务付款一体化.py           # 弹出图形窗口
-  python 财务付款一体化.py --menu    # 终端交互菜单
+  python 财务付款一体化.py           # 月结窗口
+  python 财务付款一体化.py --menu    # 终端菜单
+  python 财务付款一体化.py run       # 月结全流程
 
-也可直接子命令：
-  python 财务付款一体化.py pool          # 导出学习池
-  python 财务付款一体化.py apply         # 应用确认
-  python 财务付款一体化.py learn-ledger  # 账簿已填科目 → 写入记忆
-  python 财务付款一体化.py run           # 月结出账
-
-旧命令名（export-learn-pool / all / apply-class 等）仍兼容。
+摘要对应一二三级科目在旁边的「摘要科目分类.py」，两边分开运行。
+旧的 pool / apply / learn-ledger 仍可在命令行用，apply 不再改月结文件。
 """
 
 from __future__ import annotations

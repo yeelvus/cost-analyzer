@@ -54,7 +54,7 @@ def step_classify(paths: Paths) -> List[str]:
     _banner("步骤 · 业务摘要分类 (classify)")
     print(f"输入: {paths.raw_std_dir}/{{组名}}_财务付款_raw_std.xlsx")
     print(f"输出: {paths.classified_dir}/{{组名}}/*_classified.xlsx")
-    print("分类: 业务摘要 + 科目 + 供应商 → 一级/二级/三级科目")
+    print("分类: 业务摘要 + 科目 + 供应商 → 一级/二级/三级科目（只读科目记忆）")
     t0 = time.time()
     outs = run_classify_raw_std(paths)
     print(f"耗时 {time.time() - t0:.1f}s")
@@ -96,7 +96,7 @@ def step_amount_mismatch(paths: Paths, output: Optional[Path] = None):
 
 
 def step_reclassify(paths: Paths) -> dict:
-    """用当前记忆重写 A2，再按 A2 拆分 B_std。分类结果只留在 A2。"""
+    """用当前科目对应重写 A2，再按 A2 拆分 B_std。不改科目记忆。"""
     classified = step_classify(paths)
     _banner("步骤 · 按 A2 重建 B_std")
     if not classified:
