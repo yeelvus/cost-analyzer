@@ -1,2 +1,0 @@
-{"key": "其他|带关费用测试样例xyz|测试供应商a", "l2_id": "L2_mgmt_permit", "subject": "其他", "summary": "带关费用测试样例XYZ", "vendor": "测试供应商A", "source": "unit_test", "confidence": 1.0, "updated_at": "2026-07-17T17:04:55", "hit_count": 0, "notes": ""}
-{"key": "|带关费用测试样例xyz", "l2_id": "L2_mgmt_permit", "subject": "其他", "summary": "带关费用测试样例XYZ", "vendor": "测试供应商A", "source": "unit_test", "confidence": 1.0, "updated_at": "2026-07-17T17:04:55", "hit_count": 0, "notes": ""}
