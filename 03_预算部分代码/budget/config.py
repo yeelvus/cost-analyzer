@@ -36,7 +36,7 @@ except Exception:
     def raw_data_path(*parts, legacy=None, create=True):  # type: ignore
         if legacy:
             return Path(legacy)
-        return DATA_ROOT.joinpath("0_Raw", *parts)
+        return DATA_ROOT.joinpath("01_Raw", *parts)
 
     def html_data_path(*parts, create=True):  # type: ignore
         p = DATA_ROOT.joinpath("04_html", *parts)
@@ -45,7 +45,7 @@ except Exception:
         return p
 
     def sum_data_path(*parts, create=True, legacy=None):  # type: ignore
-        p = DATA_ROOT.joinpath("0_Sum", *parts)
+        p = DATA_ROOT.joinpath("03_Sum", *parts)
         if create:
             p.mkdir(parents=True, exist_ok=True)
         return p
@@ -55,7 +55,7 @@ except Exception:
             lp = Path(legacy)
             if lp.exists():
                 return lp
-        p = DATA_ROOT.joinpath("0_Std", *parts)
+        p = DATA_ROOT.joinpath("02_Std", *parts)
         if create:
             p.mkdir(parents=True, exist_ok=True)
         return p

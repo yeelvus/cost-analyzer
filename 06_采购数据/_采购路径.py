@@ -11,9 +11,9 @@
     分析看板/ / 工具/
 
 数据目录：
-  01_Raw/9_采购台账            A_raw
-  02_Std/9_采购台账            B_extract / C_std / D_raw_sum / F_std_split
-  03_Sum/9_采购台账            E_sum（采购部采购台账_std_sum.xlsx）
+  01_Raw/09_采购台账            A_raw
+  02_Std/09_采购台账            B_extract / C_std / D_raw_sum / F_std_split
+  03_Sum/09_采购台账            E_sum（采购部采购台账_std_sum.xlsx）
 """
 from __future__ import annotations
 
@@ -128,7 +128,7 @@ def _resolve_or_create_data_dir(
 
 # ── 数据目录（按流水线 A→F）────────────────────────────────
 # A 原始 → B 去重提取 → C 格式标准 → D 纯合并 → E 标准汇总 → F 按项目拆分
-# 原始台账在 0_Raw/9_采购台账（可带序号）；未迁移时回退旧目录
+# 原始台账在 01_Raw/09_采购台账（序号可不同）；未迁移时回退旧目录
 RAW_DIR = raw_data_path(
     "采购台账",
     legacy=_DATA_BASE / DIR_RAW,

@@ -1,43 +1,31 @@
 # -*- coding: utf-8 -*-
-"""路径工具：数据根、0_Raw / 0_Std / 0_Sum / 0_html，以及忽略序号前缀的目录匹配。"""
+"""路径工具：数据根、01_Raw / 02_Std / 03_Sum / 04_html。
+
+业务文件夹的正式名在 common.layout。查找忽略序号前缀。
+"""
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
+from common.layout import canonical_title, dir_key, stage_title, strip_order_prefix
 from settings import CODE_ROOT, DATA_ROOT, REPORT_ROOT, code_path, data_path, report_path
-
-# 0_  1_  10_  3.1_  12-
-_ORDER_PREFIX_RE = re.compile(r"^(?:\d+(?:\.\d+)?[_-])+")
-_NON_KEY_RE = re.compile(r"[^\w\u4e00-\u9fff]+", re.UNICODE)
 
 EXCEL_EXTS = {".xlsx", ".xls", ".xlsm"}
 _MONTH_TAIL_RE = re.compile(r"(\d{4}年\d{1,2}月)$")
 
-# 在 0_Raw 下新建目录时用的正式名（带序号，便于浏览）
+# 流水线子目录的正式名。业务域文件夹见 common.layout。
 RAW_CREATE_NAMES: dict[str, str] = {
-    "raw": "0_Raw",
     "成本报公司": "1_成本报公司",
-    "成本统计收集": "2_成本统计收集",
-    "预算部分": "3_预算部分",
-    "责任成本": "3.1_责任成本",
-    "分包合同": "5.1_分包合同",
-    "采购台账": "9_采购台账",
-    "商混站": "9.1_商混站",
-    "材料欠款": "9.1_材料欠款",
-    "机具费": "10_机具费",
-    "人工费": "11_人工费",
-    "人工费台账": "1_人工费台账",
-    "机票": "2_机票",
-    "财务付款": "12_财务付款",
     "html": "04_html",
     "机具费分析": "机具费分析",
     "采购数据分析": "采购数据分析",
     "综合成本看板": "综合成本看板",
     "财务付款分析": "财务付款",
-    "sum": "0_Sum",
-    "std": "0_Std",
+    "sum": "03_Sum",
+    "std": "02_Std",
+    "raw": "01_Raw",
     "采购部采购台账extract": "B_采购部采购台账_extract",
     "采购部采购台账std": "C_采购部采购台账_std",
     "采购部采购台账rawsum": "D_采购部采购台账_raw_sum",
@@ -52,18 +40,6 @@ RAW_CREATE_NAMES: dict[str, str] = {
     "财务付款std": "B_财务付款_std",
     "财务付款学习池": "D_财务付款_学习池",
 }
-
-
-def strip_order_prefix(name: str) -> str:
-    """去掉目录/文件名开头的 0_、1_、3.1_、12- 这类序号。"""
-    return _ORDER_PREFIX_RE.sub("", str(name or "").strip())
-
-
-def dir_key(name: str) -> str:
-    """用于比较的规范化名字：去序号、去 emoji/符号、小写。"""
-    text = strip_order_prefix(name)
-    text = _NON_KEY_RE.sub("", text)
-    return text.lower()
 
 
 def names_match(actual: str, logical: str) -> bool:
@@ -136,7 +112,7 @@ def resolve_under(base: Path, *parts: str, create: bool = False) -> Path:
         if found is not None:
             cur = found
             continue
-        create_name = RAW_CREATE_NAMES.get(dir_key(part), part)
+        create_name = canonical_title(part) or RAW_CREATE_NAMES.get(dir_key(part), part)
         cur = cur / create_name
         if create and i == len(parts) - 1:
             cur.mkdir(parents=True, exist_ok=True)
@@ -156,12 +132,12 @@ def _dir_has_entries(path: Path) -> bool:
 
 
 def discover_raw_root(data_root: Path | None = None) -> Path:
-    """定位 Raw / 0_Raw；没有则使用 0_Raw（不自动创建）。"""
+    """定位 01_Raw；没有则使用正式名（不自动创建）。"""
     root = Path(data_root or DATA_ROOT)
     found = find_named_dir(root, "Raw")
     if found is not None:
         return found
-    return root / "0_Raw"
+    return root / stage_title("raw")
 
 
 def ensure_raw_root() -> Path:
@@ -205,12 +181,12 @@ def html_data_path(*parts: str, create: bool = True) -> Path:
 
 
 def discover_sum_root(data_root: Path | None = None) -> Path:
-    """定位 Sum / 0_Sum；没有则使用 0_Sum。"""
+    """定位 03_Sum；没有则使用正式名。"""
     root = Path(data_root or DATA_ROOT)
     found = find_named_dir(root, "Sum")
     if found is not None:
         return found
-    return root / "0_Sum"
+    return root / stage_title("sum")
 
 
 def ensure_sum_root() -> Path:
@@ -227,10 +203,10 @@ def sum_data_path(
     create: bool = True,
     legacy: Path | str | None = None,
 ) -> Path:
-    """合并汇总 Excel 目录：0_Sum（也可写成 Sum / 1_Sum）。
+    """合并汇总 Excel 目录：03_Sum（也可写成 Sum）。
 
-    写出用 create=True（始终落在 0_Sum）。
-    读取可传 legacy：0_Sum 尚空时回退旧 sum 目录。
+    写出用 create=True（落在 03_Sum 下的正式业务文件夹）。
+    读取可传 legacy：正式目录尚空时回退旧目录。
     """
     root = discover_sum_root()
     preferred = resolve_under(root, *parts, create=False) if parts else root
@@ -248,12 +224,12 @@ def sum_data_path(
 
 
 def discover_std_root(data_root: Path | None = None) -> Path:
-    """定位 Std / 0_Std；没有则使用 0_Std。"""
+    """定位 02_Std；没有则使用正式名。"""
     root = Path(data_root or DATA_ROOT)
     found = find_named_dir(root, "Std")
     if found is not None:
         return found
-    return root / "0_Std"
+    return root / stage_title("std")
 
 
 def ensure_std_root() -> Path:
@@ -270,10 +246,10 @@ def std_data_path(
     create: bool = True,
     legacy: Path | str | None = None,
 ) -> Path:
-    """标准化中间结果：0_Std（也可写成 Std / 1_Std）。
+    """标准化中间结果：02_Std（也可写成 Std）。
 
-    写出用 create=True（始终落在 0_Std）。
-    读取可传 legacy：0_Std 尚空时回退旧 std 目录。
+    写出用 create=True（落在 02_Std 下的正式业务文件夹）。
+    读取可传 legacy：正式目录尚空时回退旧目录。
     """
     root = discover_std_root()
     preferred = resolve_under(root, *parts, create=False) if parts else root
@@ -293,7 +269,7 @@ def std_data_path(
 
 
 def raw_data_path(*parts: str, legacy: Path | str | None = None, create: bool = True) -> Path:
-    """原始数据目录：优先 0_Raw 下（忽略序号）；若尚未迁移则回退 legacy。"""
+    """原始数据目录：优先 01_Raw 下（忽略序号）；若尚未迁移则回退 legacy。"""
     raw_root = discover_raw_root()
     preferred = resolve_under(raw_root, *parts, create=False)
     if _dir_has_entries(preferred):

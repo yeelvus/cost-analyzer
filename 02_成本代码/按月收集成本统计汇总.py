@@ -559,11 +559,11 @@ def collect_cost_stat_files(base_path: Path):
 
     两种布局都支持：
     - 按月子目录（A_成本统计_raw）
-    - 扁平目录，月份写在文件名里（02_Std/2_成本统计收集）
+    - 扁平目录，月份写在文件名里（02_Std/02_成本统计收集）
     """
     if not base_path.is_dir():
         raise FileNotFoundError(
-            f"成本统计源目录不存在: {base_path}（期望 02_Std/2_成本统计收集）"
+            f"成本统计源目录不存在: {base_path}（期望 02_Std/02_成本统计收集）"
         )
     grouped = defaultdict(list)
     skipped = []

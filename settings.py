@@ -21,10 +21,11 @@ REPORT_ROOT = DATA_ROOT / "Z_report"
 #   reports/cost_analysis_report_config.json
 #   payment/learn_classify/data
 CONFIG_ROOT = DATA_ROOT / "config"
-# 原始收集：DATA_ROOT/0_Raw（也可写成 Raw）→ common.paths.raw_data_path
-# 标准化中间：DATA_ROOT/0_Std（也可写成 Std）→ common.paths.std_data_path
-# HTML 看板：DATA_ROOT/04_html（也可写成 html / 0_html）→ common.paths.html_data_path
-# 合并汇总 Excel：DATA_ROOT/0_Sum（也可写成 Sum）→ common.paths.sum_data_path
+# 原始收集：DATA_ROOT/01_Raw → common.paths.raw_data_path
+# 标准化中间：DATA_ROOT/02_Std → common.paths.std_data_path
+# HTML 看板：DATA_ROOT/04_html → common.paths.html_data_path
+# 合并汇总 Excel：DATA_ROOT/03_Sum → common.paths.sum_data_path
+# 业务文件夹正式名：common.layout（02_成本统计收集、09_采购台账 等）
 
 MATCH_DB_PATH = CONFIG_ROOT / "common" / "project_name_match_db.json"
 UNIT_MAP_PATH = CONFIG_ROOT / "project_info" / "unit_map.json"

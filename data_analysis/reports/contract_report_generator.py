@@ -60,19 +60,29 @@ try:
 except Exception:
     BASE_DIR = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计")
 
+def _domain_dir(stage: str, key: str) -> Path:
+    """01_Raw / 02_Std / 03_Sum 下的业务目录，正式名见 common.layout。"""
+    try:
+        from common.layout import domain_dir
+
+        return domain_dir(BASE_DIR, stage, key)
+    except Exception:
+        return BASE_DIR / key
+
+
 INPUT_PATHS = {
     "合同管理": BASE_DIR / "5_合同管理📑",
-    "采购明细": BASE_DIR / "0_Sum/9_采购台账/采购部采购台账_std_sum.xlsx",
-    "材料欠款": BASE_DIR / "0_Sum/9.1_材料欠款/泰国子公司材料采购欠款汇总_标准化.xlsx",
-    "商混混凝土": [BASE_DIR / "0_Sum/9.1_商混站/搅拌站混凝土汇总报表.xlsx"],
-    "机具使用费": BASE_DIR / "0_Sum/10_机具费/机具费_汇总.xlsx",
-    "人工费汇总": BASE_DIR / "0_Sum/11_人工费/人工费_汇总.xlsx",
-    "财务分包": BASE_DIR / "03_Sum/12_财务付款/银行账_财务付款数据_汇总.xlsx",
-    "分包合同台账": BASE_DIR / "0_Std/5.1_分包合同/分包签订合同汇总_2026-07.xlsx",
-    "成本统计": BASE_DIR / "0_Sum/2_成本统计收集/项目统计数据汇总_全月份.xlsx",
+    "采购明细": _domain_dir("sum", "采购台账") / "采购部采购台账_std_sum.xlsx",
+    "材料欠款": _domain_dir("sum", "材料欠款") / "材料采购欠款_汇总.xlsx",
+    "商混混凝土": [_domain_dir("sum", "商混站") / "搅拌站混凝土_汇总.xlsx"],
+    "机具使用费": _domain_dir("sum", "机具费") / "机具费_汇总.xlsx",
+    "人工费汇总": _domain_dir("sum", "人工费") / "人工费_汇总.xlsx",
+    "财务分包": _domain_dir("sum", "财务付款") / "流水_财务付款数据_汇总.xlsx",
+    "分包合同台账": _domain_dir("sum", "分包合同") / "分包合同台账_汇总.xlsx",
+    "成本统计": _domain_dir("sum", "成本统计收集") / "项目成本统计数据_汇总.xlsx",
     "项目经理": BASE_DIR / "0_项目基本信息情况/项目基本信息表.xlsx",
-    "预算金额": BASE_DIR / "0_Sum/3_预算部分/预算人材机汇总.xlsx",
-    "责任成本": BASE_DIR / "0_Std/3.1_责任成本",
+    "预算金额": _domain_dir("sum", "预算部分") / "预算人材机_汇总.xlsx",
+    "责任成本": _domain_dir("std", "责任成本"),
 }
 
 FORCED_EQUIPMENT_FILE = None
@@ -227,6 +237,8 @@ def resolve_input_paths() -> Dict:
 
     finance_latest = pick_latest_existing(
         [
+            (_domain_dir("sum", "财务付款"), "流水_财务付款数据_汇总.xlsx", False),
+            (_domain_dir("sum", "财务付款"), "银行账_财务付款数据_汇总.xlsx", False),
             (BASE_DIR / "03_Sum/12_财务付款", "银行账_财务付款数据_汇总.xlsx", False),
             (BASE_DIR / "03_Sum/12_财务付款", "流水_财务付款数据_汇总.xlsx", False),
             (BASE_DIR / "03_Sum/12_财务付款", "*财务付款数据_汇总.xlsx", False),
@@ -249,6 +261,8 @@ def resolve_input_paths() -> Dict:
         resolved["财务分包"] = finance_latest
 
     budget_latest = pick_latest_existing([
+        (_domain_dir("sum", "预算部分"), "预算人材机_汇总.xlsx", False),
+        (_domain_dir("sum", "预算部分"), "预算人材机汇总*.xlsx", False),
         (BASE_DIR / "3_预算部分/2_人材机_std", "预算人材机汇总*.xlsx", False),
         (BASE_DIR / "3_预算部分/5.1_主材汇总（广联达软件导出）", "预算人材机汇总*.xlsx", False),
         (BASE_DIR / "3_预算部分", "预算人材机汇总*.xlsx", True),
@@ -261,6 +275,7 @@ def resolve_input_paths() -> Dict:
     else:
         equip_latest = pick_latest_existing(
             [
+                (_domain_dir("sum", "机具费"), "机具费_汇总.xlsx", False),
                 (BASE_DIR / "10_机具费🚜/D_机具费_std_sum", "机具费汇总_*汇总.xlsx", False),
                 (BASE_DIR / "10_机具费🚜/D_机具费_std_sum", "*.xlsx", False),
                 (BASE_DIR / "Z_report/机具费分析", "机具租赁统计汇总_*.xlsx", False),
@@ -278,6 +293,8 @@ def resolve_input_paths() -> Dict:
             resolved.pop("机具使用费", None)
 
     cost_stats_latest = pick_latest_existing([
+        (_domain_dir("sum", "成本统计收集"), "项目成本统计数据_汇总.xlsx", False),
+        (_domain_dir("sum", "成本统计收集"), "项目统计数据汇总_*.xlsx", False),
         (BASE_DIR / "2_成本统计收集/B_成本统计_sum", "项目统计数据汇总_*.xlsx", False),
         (BASE_DIR / "2_成本统计收集/B_成本统计_sum", "*.xlsx", False),
         (BASE_DIR / "2_成本统计收集", "项目统计数据汇总_*.xlsx", True),
@@ -290,6 +307,7 @@ def resolve_input_paths() -> Dict:
         resolved["人工费汇总"] = labor_default
     else:
         labor_latest = pick_latest_existing([
+            (_domain_dir("sum", "人工费"), "人工费_汇总.xlsx", False),
             (BASE_DIR / "0_Sum/11_人工费", "人工费_汇总.xlsx", False),
             (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费_汇总.xlsx", False),
             (BASE_DIR / "11_人工费🙎🏻‍♂️/A_1_人工费台账/B_人工费台账_std", "人工费汇总_*.xlsx", False),
@@ -312,6 +330,7 @@ def resolve_input_paths() -> Dict:
     procurement_default = INPUT_PATHS.get("采购明细")
     proc_latest = pick_latest_existing(
         [
+            (_domain_dir("sum", "采购台账"), "采购部采购台账_std_sum.xlsx", False),
             (BASE_DIR / "0_Sum/9_采购台账", "采购部采购台账_std_sum.xlsx", False),
             (BASE_DIR / "0_Sum/9_采购台账", "*_std_sum.xlsx", False),
             (BASE_DIR / "9_采购台账📦/E_采购部采购台账_sum", "采购部采购台账_std_sum.xlsx", False),
@@ -329,6 +348,8 @@ def resolve_input_paths() -> Dict:
 
     arrears_default = INPUT_PATHS.get("材料欠款")
     arrears_latest = pick_latest_existing([
+        (_domain_dir("sum", "材料欠款"), "材料采购欠款_汇总.xlsx", False),
+        (_domain_dir("sum", "材料欠款"), "*欠款汇总*.xlsx", False),
         (BASE_DIR / "0_Sum/9.1_材料欠款", "*欠款汇总*.xlsx", False),
         (BASE_DIR / "9.1_材料欠款/B_材料欠款_std", "*材料采购欠款汇总*_标准化*.xlsx", False),
         (BASE_DIR / "9.1_材料欠款/B_材料欠款_std", "*欠款汇总*.xlsx", False),
@@ -347,6 +368,8 @@ def resolve_input_paths() -> Dict:
     else:
         concrete_latest = pick_latest_existing(
             [
+                (_domain_dir("sum", "商混站"), "搅拌站混凝土_汇总.xlsx", False),
+                (_domain_dir("sum", "商混站"), "搅拌站混凝土汇总报表.xlsx", False),
                 (BASE_DIR / "0_Sum/9.1_商混站", "搅拌站混凝土汇总报表.xlsx", False),
                 (BASE_DIR / "9.1_商混站🚛/B_商混站_std", "搅拌站混凝土汇总报表.xlsx", False),
                 (BASE_DIR / "9.1_商混站🚛/B_商混站_std", "搅拌站混凝土汇总报表_*.xlsx", False),
@@ -363,6 +386,8 @@ def resolve_input_paths() -> Dict:
 
     sub_contract_latest = pick_latest_existing(
         [
+            (_domain_dir("std", "分包合同"), "分包签订合同汇总_*.xlsx", False),
+            (_domain_dir("sum", "分包合同"), "分包合同台账_汇总.xlsx", False),
             (BASE_DIR / "0_Std/5.1_分包合同", "分包签订合同汇总_*.xlsx", False),
             (BASE_DIR / "0_Sum/5.1_分包合同", "分包合同台账_汇总.xlsx", False),
             (BASE_DIR / "5.1_分包合同/2_分包合同台账_std", "分包签订合同汇总_*.xlsx", False),
@@ -375,6 +400,7 @@ def resolve_input_paths() -> Dict:
         resolved["分包合同台账"] = sub_contract_latest
 
     resp_dir = _first_existing_dir([
+        _domain_dir("std", "责任成本"),
         BASE_DIR / "0_Std/3.1_责任成本",
         BASE_DIR / "3.1_责任成本/2_责任成本_std",
         BASE_DIR / "3_预算部分/6.1_责任成本书/汇总版",

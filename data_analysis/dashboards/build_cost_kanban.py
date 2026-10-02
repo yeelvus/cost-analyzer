@@ -14,9 +14,9 @@
 - 底部“相关专项报告”链接，指向 Z_report 里最新的详细 HTML（机具、人工、财务、预算看板等）
 
 数据来源：
-- 主表：2_成本统计收集/B_成本统计_sum/项目统计数据汇总_全月份.xlsx
-- 具体人/机数据：11_人工费.../按项目拆分/*_人工费.xlsx + 10_机具费.../*_机具费_汇总.xlsx
-- 采购：E_采购部采购台账_sum
+- 主表：03_Sum/02_成本统计收集/项目成本统计数据_汇总.xlsx
+- 具体人/机数据：02_Std/11_人工费/按项目拆分/*_人工费.xlsx + 03_Sum/10_机具费
+- 采购：03_Sum/09_采购台账
 
 运行后输出：0_html/成本控制看板_最新.html （可直接发给管理层）
 
@@ -66,14 +66,19 @@ except Exception:
         return p
 
     def _std_data_path(*parts, create=True, legacy=None):
-        return DATA_ROOT.joinpath("0_Std", *parts)
+        return DATA_ROOT.joinpath("02_Std", *parts)
+
+    def _sum_data_path(*parts, create=False, legacy=None):
+        return DATA_ROOT.joinpath("03_Sum", *parts)
+else:
+    from common.paths import sum_data_path as _sum_data_path
 Z_REPORT = DATA_ROOT / "Z_report"
-MASTER_SUMMARY = DATA_ROOT / "0_Sum/2_成本统计收集/项目统计数据汇总_全月份.xlsx"
+MASTER_SUMMARY = _sum_data_path("成本统计收集", create=False) / "项目成本统计数据_汇总.xlsx"
 LABOR_SPLIT_DIR = (
     _std_data_path("人工费", "B_人工费台账_std", create=False) / "按项目拆分"
 )
-MACHINE_SUM_DIR = DATA_ROOT / "0_Sum/10_机具费"
-PROC_SUM_DIR = DATA_ROOT / "0_Sum/9_采购台账"
+MACHINE_SUM_DIR = _sum_data_path("机具费", create=False)
+PROC_SUM_DIR = _sum_data_path("采购台账", create=False)
 
 OUTPUT_HTML = _html_data_path() / "成本控制看板_最新.html"
 

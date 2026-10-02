@@ -78,7 +78,33 @@ def test_std_key():
     assert dir_key("0_Std") == "std"
     assert dir_key("Std") == "std"
     assert dir_key("1_Std") == "std"
+    assert dir_key("02_Std") == "std"
     print("std key OK")
+
+
+def test_canonical_create_name(tmp_path: Path):
+    from common.layout import canonical_title
+    from common.paths import resolve_under
+
+    assert canonical_title("2_成本统计收集") == "02_成本统计收集"
+    assert canonical_title("3.1_责任成本") == "31_责任成本"
+    assert canonical_title("5.1_分包合同") == "05_分包合同"
+    assert canonical_title("9_采购台账") == "09_采购台账"
+    assert canonical_title("9.1_商混站") == "91_商混站"
+    assert canonical_title("9.1_材料欠款") == "91_材料欠款"
+    assert canonical_title("9.2_混凝土采购台账") == "92_混凝土采购台账"
+    assert canonical_title("10_机具费") == "10_机具费"
+    assert canonical_title("1_人工费台账") == "01_人工费台账"
+    assert canonical_title("B_机具费_raw_sum") is None
+
+    created = resolve_under(tmp_path, "Raw", "采购台账", create=True)
+    assert created.name == "09_采购台账"
+    assert created.is_dir()
+    # 旧序号目录仍能被逻辑名找到，不会另建一套。
+    legacy = tmp_path / "01_Raw" / "2_成本统计收集"
+    legacy.mkdir()
+    assert resolve_under(tmp_path, "Raw", "成本统计收集").name == "2_成本统计收集"
+    print("canonical OK")
 
 
 if __name__ == "__main__":
@@ -91,4 +117,6 @@ if __name__ == "__main__":
     test_html_key()
     test_sum_key()
     test_std_key()
+    with TemporaryDirectory() as d2:
+        test_canonical_create_name(Path(d2))
     print("all path tests OK")
