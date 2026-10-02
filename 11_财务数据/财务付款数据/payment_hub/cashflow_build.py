@@ -13,10 +13,13 @@ from typing import Dict, List
 import pandas as pd
 
 from .config import Paths
+from .payment_amount import ensure_payment_amount
 from .utils import iter_excel_files, resolve_business_groups
 
-REQUIRED_COLUMNS = ["项目编码", "项目名称", "日期", "实付金额", "增值税额"]
+ID_COLUMNS = ["项目编码", "项目名称", "日期"]
+REQUIRED_COLUMNS = ID_COLUMNS + ["付款金额"]
 SHEET_CANDIDATES = ["明细数据", "明细数据_万泰铢"]
+_AMOUNT_SOURCE = {"付款金额", "实付金额", "预扣税额"}
 
 
 def choose_sheet_name(excel_file: Path) -> str | None:
@@ -26,7 +29,8 @@ def choose_sheet_name(excel_file: Path) -> str | None:
             return sheet_name
     for sheet_name in xls.sheet_names:
         preview = pd.read_excel(excel_file, sheet_name=sheet_name, nrows=1)
-        if all(col in preview.columns for col in REQUIRED_COLUMNS):
+        cols = set(map(str, preview.columns))
+        if all(col in cols for col in ID_COLUMNS) and cols & _AMOUNT_SOURCE:
             return str(sheet_name)
     return None
 
@@ -40,10 +44,11 @@ def read_single_file(excel_file: Path) -> pd.DataFrame:
     if sheet_name == "明细数据_万泰铢" and "明细数据" in pd.ExcelFile(excel_file).sheet_names:
         sheet_name = "明细数据"
     df = pd.read_excel(excel_file, sheet_name=sheet_name)
-    missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
-    if missing:
-        print(f"跳过(缺列 {missing}): {excel_file.name}")
+    missing = [c for c in ID_COLUMNS if c not in df.columns]
+    if missing or not (set(map(str, df.columns)) & _AMOUNT_SOURCE):
+        print(f"跳过(缺列 {missing or ['付款金额']}): {excel_file.name}")
         return pd.DataFrame(columns=REQUIRED_COLUMNS)
+    df = ensure_payment_amount(df)
     out = df[REQUIRED_COLUMNS].copy()
     out["来源文件"] = excel_file.name
     return out
@@ -63,9 +68,8 @@ def build_cashflow_df(input_root: Path) -> pd.DataFrame:
     merged = merged.dropna(subset=["日期"])
     merged["项目编码"] = merged["项目编码"].astype(str).str.strip()
     merged["项目名称"] = merged["项目名称"].astype(str).str.strip()
-    merged["实付金额"] = pd.to_numeric(merged["实付金额"], errors="coerce").fillna(0.0)
-    merged["增值税额"] = pd.to_numeric(merged["增值税额"], errors="coerce").fillna(0.0)
-    merged["实际现金流"] = merged["实付金额"] + merged["增值税额"]
+    merged["付款金额"] = pd.to_numeric(merged["付款金额"], errors="coerce").fillna(0.0)
+    merged["实际现金流"] = merged["付款金额"]
 
     grouped = (
         merged.groupby(["项目编码", "项目名称", "日期"], as_index=False)
@@ -145,7 +149,7 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
             f"""
             <section class="project-row" id="section-{key}" data-status="{status_escaped}">
               <h2>{section_title}</h2>
-              <p class="meta">项目状态：{status_escaped} &nbsp;｜&nbsp; 累计实际现金流（实付金额 + 增值税额）：{item['totalWan']:,} 万</p>
+              <p class="meta">项目状态：{status_escaped} &nbsp;｜&nbsp; 累计实际现金流（付款金额）：{item['totalWan']:,} 万</p>
               <div class="chart" id="chart-{key}"></div>
             </section>
             """.strip()
@@ -236,7 +240,7 @@ def render_html(payload: Dict[str, Dict], output_html: Path) -> None:
 <body>
   <div class="wrap">
     <h1>财务付款项目实际现金流量分析</h1>
-    <p class="sub">项目数：{total_projects}。口径：先按日期汇总（实付金额 + 增值税额），再按日期累计形成现金流曲线；展示单位为万（无小数）。</p>
+    <p class="sub">项目数：{total_projects}。口径：先按日期汇总付款金额，再按日期累计形成现金流曲线；展示单位为万（无小数）。</p>
     <div class="status-bar">{status_buttons_html}</div>
     <div class="page-layout">
       <div class="main-list" id="main-list">{''.join(sections_html)}</div>

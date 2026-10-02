@@ -24,7 +24,7 @@ MENU_MAIN: Sequence[MenuItem] = (
 # 维护 / 分步出账。改科目记忆不在这里。
 MENU_MAINT: Sequence[MenuItem] = (
     ("1", "raw-std", "raw 标准化合并（按文件夹→一个Excel）", ["raw-std"]),
-    ("2", "recognize", "摘要识别：业务摘要、项目提示写回 A1", ["recognize"]),
+    ("2", "recognize", "摘要识别：项目提示写回 A1，不另存业务摘要", ["recognize"]),
     ("3", "classify", "把业务摘要填成一/二/三级科目（写入 A2，不改记忆）", ["classify"]),
     ("4", "summary", "汇总（只读 A2_classified）", ["summary"]),
     ("5", "std", "拆分 B_std（只读 A2_classified）", ["std"]),
@@ -75,7 +75,7 @@ def print_quick_help() -> None:
   [3] 分步出账    raw-std / recognize / classify / summary / std …
 
 数据:
-  A_raw → A1_raw_std（含业务摘要）→ A2_classified → Sum / B_std
+  A_raw → A1_raw_std → A2_classified → Sum / B_std
   分类这一步只读科目记忆
 """.strip()
     )

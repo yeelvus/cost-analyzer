@@ -187,8 +187,9 @@ def list_std_groups(std_dir: Path | str) -> List[tuple[str, Path]]:
     """
     发现 B_std 下业务分组目录。
 
-    - 新结构：B_std/{流水|银行账}/最新月份有支出|未支出/*.xlsx
-    - 旧结构：B_std/最新月份有支出|未支出/*.xlsx → 单组「未分组」
+    - 现行：B_std/{流水|银行账}/*.xlsx
+    - 旧结构：组目录下还有「最新月份有支出|未支出」，或这两层直接在 B_std 根上。
+      根上的归类目录不算业务分组，记为「未分组」。
     """
     std_dir = Path(std_dir)
     if not std_dir.is_dir():

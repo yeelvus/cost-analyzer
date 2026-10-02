@@ -17,6 +17,7 @@ from openpyxl.utils import get_column_letter
 
 from .config import Paths
 from .deps import get_excel_layout_fn
+from .payment_amount import ensure_payment_amount, payment_total
 from .utils import (
     infer_time_tag_from_path,
     iter_group_std_files,
@@ -28,7 +29,7 @@ from .utils import (
     ymd_to_month,
 )
 
-AMOUNT_COLUMNS = ["应付金额", "预扣税额", "实付金额", "增值税额", "不含税额"]
+AMOUNT_COLUMNS = ["付款金额"]
 # 不计入成本：一级科目名（taxonomy L1_exclude）
 EXCLUDE_COST_L1_NAMES = {"不计入成本"}
 # 总体汇总中追加的不计入/计入成本金额列
@@ -171,23 +172,13 @@ def _read_std_df(file_path: Path) -> pd.DataFrame:
 
 
 def extract_subject_rows(file_path: Path) -> List[Dict[str, object]]:
-    df = _read_std_df(file_path)
-    if df.empty:
-        return []
-    if "实付金额" not in df.columns and "预扣税额" not in df.columns:
-        print(f"⚠️ 缺少金额列: {file_path.name}")
+    df = ensure_payment_amount(_read_std_df(file_path))
+    if df.empty or "付款金额" not in df.columns:
+        if not df.empty:
+            print(f"⚠️ 缺少付款金额列: {file_path.name}")
         return []
 
-    # 科目汇总口径：预扣税额 + 实付金额
-    amount_df = pd.DataFrame()
-    for col in ["预扣税额", "实付金额"]:
-        amount_df[col] = (
-            pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-            if col in df.columns
-            else 0.0
-        )
-    df = df.copy()
-    df["金额汇总"] = amount_df.sum(axis=1)
+    df["金额汇总"] = pd.to_numeric(df["付款金额"], errors="coerce").fillna(0.0)
     df = df[df["金额汇总"] != 0]
     if df.empty:
         return []
@@ -217,16 +208,14 @@ def extract_subject_rows(file_path: Path) -> List[Dict[str, object]]:
 
 
 def extract_project_monthly_rows(file_path: Path, ymd: str) -> List[Dict]:
-    df = _read_std_df(file_path)
-    if df.empty or "实付金额" not in df.columns:
-        if not df.empty and "实付金额" not in df.columns:
-            print(f"⚠️ 缺少实付金额列: {file_path.name}")
+    df = ensure_payment_amount(_read_std_df(file_path))
+    if df.empty or "付款金额" not in df.columns:
+        if not df.empty:
+            print(f"⚠️ 缺少付款金额列: {file_path.name}")
         return []
 
-    amt_cols = [c for c in AMOUNT_COLUMNS if c in df.columns]
-    if amt_cols:
-        numeric = df[amt_cols].apply(pd.to_numeric, errors="coerce").fillna(0)
-        df = df[numeric.sum(axis=1) != 0]
+    df["付款金额"] = pd.to_numeric(df["付款金额"], errors="coerce").fillna(0.0)
+    df = df[df["付款金额"] != 0]
     if df.empty:
         return []
 
@@ -445,10 +434,10 @@ def build_summary_from_detail_df(
     """
     从已分类明细 DataFrame 直接汇总（快路径）。
 
-    金额列：
-    - 应付/预扣/实付/…：全部合计
-    - 不计入成本_*：一级科目=不计入成本 的合计
-    - 计入成本_*：全部 − 不计入成本
+    金额列是付款金额（预扣税额 + 实付金额）：
+    - 付款金额：全部合计
+    - 不计入成本_付款金额：一级科目=不计入成本 的合计
+    - 计入成本_付款金额：全部 − 不计入成本
     """
     label = group_label or ""
     base_cols = (
@@ -460,7 +449,7 @@ def build_summary_from_detail_df(
     if detail_df is None or detail_df.empty:
         return pd.DataFrame(columns=base_cols)
 
-    df = detail_df.copy()
+    df = ensure_payment_amount(detail_df)
     for col in AMOUNT_COLUMNS:
         if col not in df.columns:
             df[col] = 0.0
@@ -503,13 +492,9 @@ def build_summary_from_detail_df(
     overall = overall.rename(columns=rename)
     overall.insert(0, "业务分组", label)
 
-    # 不计入成本金额合计 / 计入成本金额合计（预扣+实付口径）
-    overall["不计入成本_金额合计"] = (
-        overall.get("不计入成本_预扣税额", 0) + overall.get("不计入成本_实付金额", 0)
-    )
-    overall["计入成本_金额合计"] = (
-        overall.get("计入成本_预扣税额", 0) + overall.get("计入成本_实付金额", 0)
-    )
+    # 金额合计与付款金额同一口径
+    overall["不计入成本_金额合计"] = overall["不计入成本_付款金额"]
+    overall["计入成本_金额合计"] = overall["计入成本_付款金额"]
 
     out_cols = (
         ["业务分组", "项目编码", "项目名称"]
@@ -532,7 +517,7 @@ def build_monthly_wide_from_detail_df(
     if detail_df is None or detail_df.empty:
         return pd.DataFrame(columns=["业务分组", "项目编码", "项目名称"])
 
-    df = detail_df.copy()
+    df = ensure_payment_amount(detail_df)
     for col in AMOUNT_COLUMNS:
         if col not in df.columns:
             df[col] = 0.0
@@ -560,17 +545,7 @@ def build_monthly_wide_from_detail_df(
                 ym = parsed.strftime("%Y-%m")
         months.append(ym or "未识别")
     df["_月份"] = months
-    w = (
-        pd.to_numeric(df["预扣税额"], errors="coerce").fillna(0.0)
-        if "预扣税额" in df.columns
-        else 0.0
-    )
-    a = (
-        pd.to_numeric(df["实付金额"], errors="coerce").fillna(0.0)
-        if "实付金额" in df.columns
-        else 0.0
-    )
-    df["_月度金额"] = w + a
+    df["_月度金额"] = pd.to_numeric(df["付款金额"], errors="coerce").fillna(0.0)
 
     monthly = (
         df.groupby(["项目编码", "项目名称", "_月份"], dropna=False, as_index=False)["_月度金额"]
@@ -598,18 +573,8 @@ def build_subject_wide_from_detail_df(detail_df: pd.DataFrame) -> Dict[str, obje
     if detail_df is None or detail_df.empty:
         return {"project_order": [], "layout": OrderedDict(), "project_map": {}, "grand_map": {}}
 
-    df = detail_df.copy()
-    withhold = (
-        pd.to_numeric(df["预扣税额"], errors="coerce").fillna(0.0)
-        if "预扣税额" in df.columns
-        else 0.0
-    )
-    actual = (
-        pd.to_numeric(df["实付金额"], errors="coerce").fillna(0.0)
-        if "实付金额" in df.columns
-        else 0.0
-    )
-    df["金额汇总"] = withhold + actual
+    df = ensure_payment_amount(detail_df)
+    df["金额汇总"] = pd.to_numeric(df["付款金额"], errors="coerce").fillna(0.0)
     df = df[df["金额汇总"] != 0]
     if df.empty:
         return {"project_order": [], "layout": OrderedDict(), "project_map": {}, "grand_map": {}}
@@ -659,18 +624,8 @@ def build_project_level1_from_detail_df(
     if detail_df is None or detail_df.empty:
         return pd.DataFrame(columns=["业务分组", "项目编码", "项目名称"]), []
 
-    df = detail_df.copy()
-    withhold = (
-        pd.to_numeric(df["预扣税额"], errors="coerce").fillna(0.0)
-        if "预扣税额" in df.columns
-        else 0.0
-    )
-    actual = (
-        pd.to_numeric(df["实付金额"], errors="coerce").fillna(0.0)
-        if "实付金额" in df.columns
-        else 0.0
-    )
-    df["金额汇总"] = withhold + actual
+    df = ensure_payment_amount(detail_df)
+    df["金额汇总"] = pd.to_numeric(df["付款金额"], errors="coerce").fillna(0.0)
     rows = []
     for _, row in df.iterrows():
         if float(row.get("金额汇总") or 0) == 0:
@@ -813,9 +768,7 @@ def build_monthly_wide_dataframe(std_dir: Path, *, group_label: str = "") -> pd.
                     "项目编码": safe_text(row.get("项目编码")),
                     "项目名称": safe_text(row.get("项目名称")),
                     "月份": month_key,
-                    # 按月宽表口径：预扣税额 + 实付金额
-                    "月度金额汇总": float(row.get("预扣税额", 0) or 0)
-                    + float(row.get("实付金额", 0) or 0),
+                    "月度金额汇总": float(row.get("付款金额", 0) or 0),
                 }
             )
     if not rows:
@@ -1099,11 +1052,7 @@ def run_summary_for_detail_df(
         print(
             f"   [{label}] 一级科目展开二级明细: {len(detail_groups)} 组 / 共 {n_detail} 列"
         )
-    pay = (
-        float(pd.to_numeric(summary_df["实付金额"], errors="coerce").sum())
-        if "实付金额" in summary_df.columns and not summary_df.empty
-        else 0.0
-    )
+    pay = payment_total(summary_df)
     excl = (
         float(pd.to_numeric(summary_df["不计入成本_金额合计"], errors="coerce").sum())
         if "不计入成本_金额合计" in summary_df.columns and not summary_df.empty
@@ -1115,7 +1064,7 @@ def run_summary_for_detail_df(
         else 0.0
     )
     print(
-        f"  ✅ [{label}] 汇总完成：项目 {len(summary_df)} 个 · 实付 {pay:,.2f}"
+        f"  ✅ [{label}] 汇总完成：项目 {len(summary_df)} 个 · 付款金额 {pay:,.2f}"
         f" · 计入成本 {incl:,.2f} · 不计入成本 {excl:,.2f}"
     )
     return written
@@ -1162,12 +1111,8 @@ def run_summary_for_group(
         print(
             f"   [{label}] 一级科目展开二级明细: {len(detail_groups)} 组 / 共 {n_detail} 列"
         )
-    pay = (
-        float(pd.to_numeric(summary_df["实付金额"], errors="coerce").sum())
-        if "实付金额" in summary_df.columns and not summary_df.empty
-        else 0.0
-    )
-    print(f"  ✅ [{label}] 汇总完成：项目 {len(summary_df)} 个 · 实付合计 {pay:,.2f}")
+    pay = payment_total(summary_df)
+    print(f"  ✅ [{label}] 汇总完成：项目 {len(summary_df)} 个 · 付款金额合计 {pay:,.2f}")
     return written
 
 
@@ -1227,7 +1172,7 @@ def run_summary(paths: Paths) -> List[str]:
     classified_groups = list_classified_groups(paths)
     if classified_groups:
         print(f"汇总快路径（A2_classified）: {', '.join(g for g, _ in classified_groups)}")
-        print(f"  源: {paths.classified_dir}/{{组名}}/*_classified.xlsx")
+        print(f"  源: {paths.classified_dir}/{{组名}}_classified.xlsx")
         print(f"  出: {paths.sum_dir}/{{组名}}_财务付款数据_汇总.xlsx")
 
         for group_name, class_xlsx in classified_groups:
@@ -1245,7 +1190,7 @@ def run_summary(paths: Paths) -> List[str]:
             try:
                 sdf = pd.read_excel(sum_path, sheet_name="总体汇总")
                 n_proj = len(sdf)
-                pay = float(pd.to_numeric(sdf.get("实付金额"), errors="coerce").sum())
+                pay = payment_total(sdf)
             except Exception:
                 n_proj, pay = 0, 0.0
             group_stats.append(
@@ -1254,7 +1199,7 @@ def run_summary(paths: Paths) -> List[str]:
                     "数据源": str(class_xlsx),
                     "汇总文件": str(sum_path),
                     "项目数": n_proj,
-                    "实付金额合计": pay,
+                    "付款金额合计": pay,
                 }
             )
     else:
@@ -1283,7 +1228,7 @@ def run_summary(paths: Paths) -> List[str]:
             try:
                 sdf = pd.read_excel(sum_path, sheet_name="总体汇总")
                 n_proj = len(sdf)
-                pay = float(pd.to_numeric(sdf.get("实付金额"), errors="coerce").sum())
+                pay = payment_total(sdf)
             except Exception:
                 n_proj, pay = 0, 0.0
             group_stats.append(
@@ -1292,7 +1237,7 @@ def run_summary(paths: Paths) -> List[str]:
                     "数据源": str(group_std),
                     "汇总文件": str(sum_path),
                     "项目数": n_proj,
-                    "实付金额合计": pay,
+                    "付款金额合计": pay,
                 }
             )
 

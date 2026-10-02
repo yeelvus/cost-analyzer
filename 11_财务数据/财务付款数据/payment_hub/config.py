@@ -196,14 +196,13 @@ class Paths:
         return self.raw_std_dir / f"{name}_财务付款_raw_std.xlsx"
 
     def group_classified_dir(self, group: str) -> Path:
-        """A2_classified/{组名}/"""
-        name = (group or "").strip() or "未分组"
-        return self.classified_dir / name
+        """A2_classified 根目录（不再按组建子文件夹）。"""
+        return self.classified_dir
 
     def group_classified_xlsx(self, group: str) -> Path:
-        """A2_classified/{组名}/{组名}_classified.xlsx"""
+        """A2_classified/{组名}_classified.xlsx"""
         name = (group or "").strip() or "未分组"
-        return self.group_classified_dir(name) / f"{name}_classified.xlsx"
+        return self.classified_dir / f"{name}_classified.xlsx"
 
     def group_std_dir(self, group: str) -> Path:
         """B_std/{组名}/"""

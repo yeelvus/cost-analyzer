@@ -6,10 +6,13 @@
 
 标准列（顺序）：
   项目编码, 项目名称, 原始项目名称, 摘要,
-  应付金额, 预扣税额, 实付金额, 增值税额, 不含税额, 供应商名称, 科目, 业务分组,
-  日期, 年, 月
+  应付金额, 预扣税额, 实付金额, 增值税额, 不含税额,
+  付款金额, 汇率, 供应商名称, 科目, 业务分组,
+  日期, 年, 月, 年月
 
-年 / 月 为数字（Excel 数值格式）；保留原始项目名称便于对比。
+五列金额保留原始数字。付款金额 = 预扣税额 + 实付金额。
+实付金额带人民币标注时按该月人民币对泰铢换成泰铢，带美元标注时按该月美元对泰铢换成泰铢，汇率记在该行。
+年月为 2026-09。年 / 月 仍是数字。
 """
 
 from __future__ import annotations
@@ -21,8 +24,19 @@ import pandas as pd
 
 from .config import Paths
 from .deps import get_excel_layout_fn, get_project_matcher_module, project_match_db_path
+from .payment_amount import (
+    FX_RATE_COL,
+    LEGACY_AMOUNT_COLUMNS,
+    PAYMENT_AMOUNT_COL,
+    YEAR_MONTH_COL,
+    FxRates,
+    collapse_to_payment_amount,
+    component_nonzero_mask,
+    describe_fx_stats,
+    fx_workbook_path,
+    load_fx_rates,
+)
 from .std_build import (
-    AMOUNT_COLUMNS,
     COLUMN_ALIASES,
     TARGET_COLUMNS,
     normalize_date_month_year,
@@ -31,38 +45,36 @@ from .utils import (
     iter_excel_files,
     list_raw_groups,
     normalize_text,
-    to_numeric_series,
 )
 
-# 明细导出列顺序：日期/年/月靠后；无年月、无来源列
+# 明细导出列顺序。来源文件 / 来源 Sheet 不写出。
 RAW_STD_ALL_COLUMNS = [
     "项目编码",
     "项目名称",
     "原始项目名称",
     "摘要",
-    "应付金额",
-    "预扣税额",
-    "实付金额",
-    "增值税额",
-    "不含税额",
+    *LEGACY_AMOUNT_COLUMNS,
+    PAYMENT_AMOUNT_COL,
+    FX_RATE_COL,
     "供应商名称",
     "科目",
     "业务分组",
     "日期",
     "年",
     "月",
+    YEAR_MONTH_COL,
 ]
+_AMOUNT_FORMAT_COLUMNS = [*LEGACY_AMOUNT_COLUMNS, PAYMENT_AMOUNT_COL]
 RAW_STD_CORE_COLUMNS = [
     "项目名称",
     "日期",
     "摘要",
-    "应付金额",
     "预扣税额",
     "实付金额",
-    "增值税额",
-    "不含税额",
     "供应商名称",
 ]
+# 源表里用来相加的列。应付 / 增值税 / 不含税不进入付款金额。
+_PAYMENT_PARTS = ["预扣税额", "实付金额"]
 # 内部追溯用，不写入明细表
 _INTERNAL_META = ["来源文件", "来源Sheet"]
 
@@ -81,10 +93,6 @@ RAW_STD_ALIASES["应付金额"] = list(
         RAW_STD_ALIASES.get("应付金额", []) + ["贷方", "贷方金额", "收入"]
     )
 )
-
-# 至少具备：摘要 或 项目名称；以及任一金额列
-_AMOUNT_ANY = set(AMOUNT_COLUMNS)
-
 
 def find_raw_std_column_mapping(df: pd.DataFrame) -> Dict[str, Optional[str]]:
     mapping: Dict[str, Optional[str]] = {}
@@ -134,9 +142,9 @@ def process_raw_sheet(
 
     has_name = mapping.get("项目名称") is not None
     has_summary = mapping.get("摘要") is not None
-    has_amount = any(mapping.get(c) is not None for c in AMOUNT_COLUMNS)
+    has_amount = any(mapping.get(c) is not None for c in _PAYMENT_PARTS)
     if not has_amount:
-        print(f"    - 跳过 sheet: {sheet_name}，无金额列")
+        print(f"    - 跳过 sheet: {sheet_name}，无预扣税额/实付金额列")
         return None
     if not (has_name or has_summary):
         print(f"    - 跳过 sheet: {sheet_name}，无项目名称/摘要")
@@ -147,12 +155,8 @@ def process_raw_sheet(
         src = mapping.get(col)
         out[col] = raw_df[src] if src is not None else pd.NA
 
-    for amount_col in AMOUNT_COLUMNS:
-        out[amount_col] = to_numeric_series(out[amount_col])
-
-    # 去掉金额全空/全 0 行
-    row_sum = out[AMOUNT_COLUMNS].fillna(0).sum(axis=1)
-    out = out[row_sum.ne(0)]
+    # 保留金额原文，人民币标注要等年月齐了再换算
+    out = out.loc[component_nonzero_mask(out)]
     if out.empty:
         return None
 
@@ -345,8 +349,7 @@ def process_raw_file(file_path: Path, *, group_name: str) -> List[pd.DataFrame]:
 def _prepare_excel_export(df: pd.DataFrame) -> pd.DataFrame:
     """导出前：仅明细列；年/月 为 int/None；日期为 datetime。"""
     out = df.copy()
-    # 去掉内部列与年月
-    drop_cols = [c for c in list(_INTERNAL_META) + ["年月"] if c in out.columns]
+    drop_cols = [c for c in _INTERNAL_META if c in out.columns]
     if drop_cols:
         out = out.drop(columns=drop_cols)
 
@@ -387,7 +390,7 @@ def apply_raw_std_format(path: Path) -> None:
                 layout_fn(
                     ws,
                     numeric_start_col=1,
-                    amount_headers=set(AMOUNT_COLUMNS),
+                    amount_headers=set(_AMOUNT_FORMAT_COLUMNS),
                     header_row=1,
                     header_height=35,
                     freeze_panes="A2",
@@ -400,7 +403,7 @@ def apply_raw_std_format(path: Path) -> None:
                 for c in ws[1]
                 if c.value is not None
             }
-            for col_name in ("年", "月", "日期"):
+            for col_name in ("年", "月", "日期", YEAR_MONTH_COL, FX_RATE_COL):
                 col_idx = headers.get(col_name)
                 if not col_idx:
                     continue
@@ -410,12 +413,16 @@ def apply_raw_std_format(path: Path) -> None:
                         continue
                     if col_name == "日期":
                         cell.number_format = "YYYY-MM-DD"
+                    elif col_name == YEAR_MONTH_COL:
+                        cell.number_format = "@"
+                    elif col_name == FX_RATE_COL:
+                        cell.number_format = "0.000000"
                     else:
                         if isinstance(cell.value, str) and cell.value.strip().isdigit():
                             cell.value = int(cell.value.strip())
                         cell.number_format = "0"
 
-            for amount_name in AMOUNT_COLUMNS:
+            for amount_name in _AMOUNT_FORMAT_COLUMNS:
                 col_idx = headers.get(amount_name)
                 if not col_idx:
                     continue
@@ -435,6 +442,7 @@ def run_raw_std_for_group(
     out_path: Path,
     *,
     prompt_project: bool = False,
+    fx_rates: Optional[FxRates] = None,
 ) -> Optional[Path]:
     group_raw_dir = Path(group_raw_dir)
     files = iter_excel_files(group_raw_dir)
@@ -454,6 +462,15 @@ def run_raw_std_for_group(
 
     merged = pd.concat(parts, ignore_index=True)
     merged = ensure_numeric_year_month(merged)
+    fx = fx_rates if fx_rates is not None else FxRates()
+    before_n = len(merged)
+    merged, fx_stats = collapse_to_payment_amount(merged, fx)
+    merged = merged.loc[merged[PAYMENT_AMOUNT_COL].abs() > 1e-9].reset_index(drop=True)
+    print(describe_fx_stats(fx_stats, fx))
+    print(f"  付款金额非零 {len(merged)} / {before_n} 行")
+    if merged.empty:
+        print(f"  [{group_name}] 付款金额全为 0")
+        return None
 
     # 标准项目名称匹配（组内合并后统一匹配一次；保留原始项目名称）
     merged = apply_project_name_match(
@@ -520,6 +537,16 @@ def run_raw_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
         print("未发现 A_raw 一级分组，跳过 raw_std")
         return []
 
+    fx_path = fx_workbook_path(paths)
+    try:
+        fx = load_fx_rates(fx_path)
+        print(
+            f"汇率: {fx_path} · 人民币 {len(fx.cny_thb)} 个月，美元 {len(fx.usd_thb)} 个月"
+        )
+    except Exception as exc:
+        fx = FxRates()
+        print(f"⚠️ 未能读取汇率，实付金额上的人民币、美元标注不换算: {exc}")
+
     print(f"raw_std 分组: {', '.join(g for g, _ in groups)}")
     print(f"输出目录: {out_root}/{{组名}}_财务付款_raw_std.xlsx")
     print(
@@ -538,6 +565,7 @@ def run_raw_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
             group_raw,
             out_path,
             prompt_project=prompt_project,
+            fx_rates=fx,
         )
         if result is not None:
             written.append(str(result))

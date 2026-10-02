@@ -93,9 +93,139 @@ if str(CODE_ROOT) not in sys.path:
     sys.path.insert(0, str(CODE_ROOT))
 
 from common.project import (  # noqa: E402
+    ProjectMatcher,
     build_standard_projects_from_dataframe,
     load_or_init_db,
 )
+
+# 文件名或拆分占位，不是项目主数据里的正式编码。
+_PLACEHOLDER_CODES = frozenset({"", "未编码", "未匹配", "需手动核对"})
+_PLACEHOLDER_NAMES = frozenset({"", "未匹配项目", "未命名项目", "未匹配"})
+_INTERNAL_GENERATED_SHEETS = {
+    SUMMARY_SHEET_NAME,
+    PROJECT_SUMMARY_SHEET_NAME,
+    PROJECT_MONTHLY_CHANGE_SHEET_NAME,
+    PROJECT_MONTHLY_WIDE_SHEET_NAME,
+    PROCESS_REPORT_SHEET_NAME,
+    "处理报告",
+}
+
+
+def _clean_cell(value) -> str:
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    text = str(value).strip()
+    if text.lower() in {"nan", "none", "nat"}:
+        return ""
+    return text
+
+
+def _is_real_project_code(code: str) -> bool:
+    text = _clean_cell(code)
+    return bool(text) and text not in _PLACEHOLDER_CODES and not is_month_like_text(text)
+
+
+def _candidate_project_name(*values) -> str:
+    """在使用项目、项目名称、文件名中取第一个可用来匹配的名称。"""
+    for value in values:
+        text = _clean_cell(value)
+        if text and text not in _PLACEHOLDER_NAMES and not is_month_like_text(text):
+            return text
+    return ""
+
+
+def _data_sheet_names(sheet_names: list[str]) -> list[str]:
+    """与汇总读取规则一致：有「明细」只读明细，跳过月份名和内部汇总 sheet。"""
+    names = []
+    has_detail = "明细" in sheet_names
+    for sheet_name in sheet_names:
+        if sheet_name in _INTERNAL_GENERATED_SHEETS or is_month_like_text(sheet_name):
+            continue
+        if has_detail and sheet_name != "明细":
+            continue
+        names.append(sheet_name)
+    return names
+
+
+def collect_names_needing_project_match(excel_paths) -> list[str]:
+    """收集还没有正式项目编码的原始项目名（优先「使用项目」）。"""
+    found: list[str] = []
+    seen: set[str] = set()
+    for source_path in excel_paths:
+        source_path = Path(source_path)
+        _, file_name = extract_project_code_and_name_from_filename(source_path)
+        wb = openpyxl.load_workbook(source_path, data_only=True)
+        try:
+            sheets = _data_sheet_names(list(wb.sheetnames))
+            header_rows = {}
+            for sheet_name in sheets:
+                header_rows[sheet_name] = find_header_row(wb[sheet_name]) or 1
+        finally:
+            wb.close()
+        for sheet_name, header_row in header_rows.items():
+            df = pd.read_excel(
+                source_path,
+                sheet_name=sheet_name,
+                header=header_row - 1,
+                engine="openpyxl",
+            )
+            df.columns = [re.sub(r"\s+", " ", str(c)).strip() for c in df.columns]
+            code_col = find_matching_column(df.columns, ["项目编码", "编码"], exact_only=True)
+            name_col = find_matching_column(df.columns, ["项目名称", "标准项目名称"], exact_only=True)
+            use_col = find_matching_column(df.columns, ["使用项目", "使用项目名称"], exact_only=True)
+            codes = df[code_col].tolist() if code_col else [""] * len(df)
+            names = df[name_col].tolist() if name_col else [""] * len(df)
+            uses = df[use_col].tolist() if use_col else [""] * len(df)
+            for code, name, use in zip(codes, names, uses):
+                if _is_real_project_code(code):
+                    continue
+                raw = _candidate_project_name(use, name, file_name)
+                if raw and raw not in seen:
+                    seen.add(raw)
+                    found.append(raw)
+    return found
+
+
+def _tk_available() -> bool:
+    try:
+        import tkinter  # noqa: F401
+        from tkinter import ttk  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
+def match_pending_project_names(raw_names: list[str]) -> dict:
+    """对未编码名称做项目库匹配。未命中的弹出补录窗口，并写回匹配库。"""
+    if not raw_names:
+        print("项目匹配: 明细里的项目都已有正式编码")
+        return {}
+    can_prompt = _tk_available()
+    if can_prompt:
+        print(f"项目匹配: {len(raw_names)} 个名称还没有正式编码，打开匹配窗口")
+    else:
+        print(
+            f"项目匹配: {len(raw_names)} 个名称还没有正式编码。"
+            "当前 Python 没有图形界面，只做已有别名匹配，不把这些名称记成未匹配。"
+        )
+    for name in raw_names:
+        print(f"  - {name}")
+    matcher = ProjectMatcher(db_path=PROJECT_MATCH_DB_PATH, load_info=True)
+    mapped = matcher.match_batch(
+        raw_names,
+        prompt=can_prompt,
+        interactive=can_prompt,
+        window_title="机具费汇总 项目匹配",
+        fuzzy=False,
+    )
+    if can_prompt:
+        matcher.save()
+    return mapped
 
 
 def main(excel_path_override=None, output_basename_override=None):
@@ -151,7 +281,7 @@ def main(excel_path_override=None, output_basename_override=None):
         print("统一映射表加载失败或为空，回退到旧项目配置")
         project_config = load_project_config()
 
-    # 项目匹配仅在 merge-raw（机具费_raw合并）完成；汇总阶段不再弹窗/再匹配
+    # 已有正式编码的行保持不动。还没有编码的名称在这里对项目库，未命中则弹窗补录。
     matcher_info_df = pd.DataFrame({
         '项目名称': [p.get('project_name', '') for p in project_config],
         '项目编码': [p.get('project_code', '') for p in project_config],
@@ -159,10 +289,11 @@ def main(excel_path_override=None, output_basename_override=None):
     })
     standard_projects = build_standard_projects_from_dataframe(matcher_info_df)
     match_db = load_or_init_db(PROJECT_MATCH_DB_PATH, standard_projects)
-    print(
-        f"✅ 项目主数据已加载（仅用于输出命名）：标准项目 {len(standard_projects)} 个；"
-        f"汇总阶段不弹窗匹配项目"
-    )
+    pending_names = collect_names_needing_project_match(excel_paths)
+    project_hits = match_pending_project_names(pending_names)
+    if project_hits:
+        match_db = load_or_init_db(PROJECT_MATCH_DB_PATH, standard_projects)
+    print(f"✅ 项目主数据：标准项目 {len(standard_projects)} 个")
 
     # 用于收集新发现的机具种类、型号（不再收集/补全项目映射）
     new_projects = set()
@@ -400,7 +531,7 @@ def main(excel_path_override=None, output_basename_override=None):
             
             print(f"  有效数据行数: {len(df)}")
             
-            # 项目编码/名称：仅使用 raw 合并阶段已写好的列，或文件名；不再 match_project / 弹窗
+            # 已有正式编码则沿用。否则用「使用项目」等原始名称查本次匹配结果。
             default_project_code = file_code or ""
             default_project_name = file_name or ""
 
@@ -418,23 +549,32 @@ def main(excel_path_override=None, output_basename_override=None):
 
             codes_in = _cell_str("项目编码")
             names_in = _cell_str("项目名称")
-            # 若列映射时「使用项目」被当成了项目名来源，也只作回退，不再匹配库
             use_in = _cell_str("使用项目")
 
             row_project_codes = []
             row_project_names = []
+            matched_here = 0
             for i in range(len(df)):
                 code = codes_in[i] if i < len(codes_in) else ""
                 name = names_in[i] if i < len(names_in) else ""
-                # 优先：明细里已有项目编码/名称（merge-raw 结果）
-                # 其次：文件名解析
-                # 不再用「使用项目」做匹配库查询（使用项目仅保留原始台账字段）
-                if not code:
-                    code = default_project_code
-                if not name or is_month_like_text(name):
-                    name = default_project_name
-                if is_month_like_text(code):
-                    code = default_project_code or ""
+                use = use_in[i] if i < len(use_in) else ""
+                if _is_real_project_code(code):
+                    if not name or is_month_like_text(name):
+                        name = _candidate_project_name(use, default_project_name) or name
+                    row_project_codes.append(code)
+                    row_project_names.append(name)
+                    continue
+                raw = _candidate_project_name(use, name, default_project_name)
+                hit = project_hits.get(raw) if raw else None
+                hit_code = _clean_cell((hit or {}).get("project_code"))
+                hit_name = _clean_cell((hit or {}).get("project_name"))
+                if hit and _is_real_project_code(hit_code):
+                    code = hit_code
+                    name = hit_name or raw
+                    matched_here += 1
+                else:
+                    code = ""
+                    name = raw or _candidate_project_name(default_project_name)
                 row_project_codes.append(code)
                 row_project_names.append(name)
 
@@ -442,8 +582,8 @@ def main(excel_path_override=None, output_basename_override=None):
             df["项目名称"] = row_project_names
             df["开始月份"] = start_month
             print(
-                f"  项目字段(不弹窗): [{default_project_code or '—'}] {default_project_name or '—'} "
-                f"| 行内已有编码 {sum(1 for c in codes_in if c)} 行"
+                f"  项目字段: 行内已有正式编码 {sum(1 for c in codes_in if _is_real_project_code(c))} 行"
+                f"，本表新匹配 {matched_here} 行"
             )
     
             # 区域：仅查映射表，未知则标未知，不弹窗、不写入项目映射

@@ -98,7 +98,7 @@ def export_review_pool(
         c_subj = cols.get("科目")
         c_summ = cols.get("摘要")
         c_vend = cols.get("供应商名称") or cols.get("供应商")
-        c_amt = cols.get("实付金额")
+        c_amt = cols.get("付款金额") or cols.get("实付金额")
         c_proj = cols.get("项目名称")
 
         for _, row in df.iterrows():
@@ -235,7 +235,7 @@ def update_excel_classification_columns(
             conf_idx = ensure_col("置信度")
 
         # 先扫一遍收集待分类行（仅有实付金额），按业务摘要去重后再写回
-        amt_idx = header_to_col.get("实付金额")
+        amt_idx = header_to_col.get("付款金额") or header_to_col.get("实付金额")
         biz_idx = header_to_col.get("业务摘要")
         name_idx = header_to_col.get("项目名称")
         pending: List[tuple] = []  # (row_idx, subj, business, vend)

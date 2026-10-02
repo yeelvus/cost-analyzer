@@ -160,7 +160,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     for name, help_ in [
         ("raw-std", "raw 标准化合并（按文件夹合并为一个 Excel）"),
-        ("recognize", "A1 摘要识别：写出业务摘要、项目提示"),
+        ("recognize", "A1 摘要识别：写出项目提示，不另存业务摘要"),
         ("classify", "业务摘要→一级/二级/三级科目（学习分类）"),
         ("std", "按项目拆分到 B_std（只读 A2_classified）"),
         ("summary", "汇总（优先读 A2_classified）"),

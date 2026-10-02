@@ -43,7 +43,7 @@ def step_raw_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
 def step_recognize(paths: Paths) -> List[str]:
     _banner("步骤 · 摘要识别 (recognize)")
     print(f"输入: {paths.raw_std_dir}/{{组名}}_财务付款_raw_std.xlsx")
-    print("写回: 业务摘要、项目提示（不改项目名称，不分类）")
+    print("写回: 项目提示（不改摘要、不改项目名称，不分类）")
     t0 = time.time()
     outs = run_recognize(paths)
     print(f"耗时 {time.time() - t0:.1f}s")
@@ -53,7 +53,7 @@ def step_recognize(paths: Paths) -> List[str]:
 def step_classify(paths: Paths) -> List[str]:
     _banner("步骤 · 业务摘要分类 (classify)")
     print(f"输入: {paths.raw_std_dir}/{{组名}}_财务付款_raw_std.xlsx")
-    print(f"输出: {paths.classified_dir}/{{组名}}/*_classified.xlsx")
+    print(f"输出: {paths.classified_dir}/{{组名}}_classified.xlsx")
     print("分类: 业务摘要 + 科目 + 供应商 → 一级/二级/三级科目（只读科目记忆）")
     t0 = time.time()
     outs = run_classify_raw_std(paths)
@@ -63,7 +63,7 @@ def step_classify(paths: Paths) -> List[str]:
 
 def step_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
     _banner("步骤 · 按项目拆分标准明细 (std)")
-    print("只读: A2_classified → B_std/{组}/有支出|未支出/")
+    print("只读: A2_classified → B_std/{组}/")
     t0 = time.time()
     outs = run_std(paths, prompt_project=prompt_project)
     print(f"耗时 {time.time() - t0:.1f}s")
@@ -407,9 +407,9 @@ def run_pipeline(
     _banner("财务付款快路径流水线（按文件夹分组）")
     print(f"A_raw:        {paths.raw_dir}/{{组名}}/")
     print(f"A1_raw_std:   {paths.raw_std_dir}/{{组名}}_财务付款_raw_std.xlsx")
-    print(f"A2_classified:{paths.classified_dir}/{{组名}}/*_classified.xlsx")
+    print(f"A2_classified:{paths.classified_dir}/{{组名}}_classified.xlsx")
     print(f"Sum:          {paths.sum_dir}/{{组名}}_财务付款数据_汇总.xlsx")
-    print(f"B_std:        {paths.std_dir}/{{组名}}/有支出|未支出/")
+    print(f"B_std:        {paths.std_dir}/{{组名}}/")
     print(f"项目弹窗: {'开' if prompt_project else '关'}（--prompt-project）")
     print(f"步骤: {' → '.join(order)}")
 

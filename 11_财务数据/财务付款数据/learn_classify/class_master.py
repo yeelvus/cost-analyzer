@@ -103,7 +103,7 @@ def _collect_raw_lines(std_dir: Path) -> List[Dict[str, Any]]:
         c_subj = col("科目")
         c_summ = col("摘要")
         c_vend = col("供应商名称", "供应商")
-        c_amt = col("实付金额")
+        c_amt = col("付款金额", "实付金额")
         c_l1 = col("一级科目")
         c_l2 = col("二级科目")
         c_l3 = col("三级科目")

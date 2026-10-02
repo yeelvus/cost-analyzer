@@ -8,7 +8,7 @@ D_财务付款_学习池（02_Std/12_财务付款/D_财务付款_学习池）
 - 02_按月份/{YYYY-MM}_财务数据.xlsx
 - 03_已确认/已确认分类.xlsx
 
-摘要去重；行内按「应付金额占比」优先排序（大额先确认，控比例误差）。
+摘要去重；行内按「付款金额占比」优先排序（大额先确认，控比例误差）。
 手改或确认后 apply → 按业务摘要写记忆 + 剥离 + 重写 A2 并重建 B_std。
 """
 
@@ -29,6 +29,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 from .category_dropdowns import apply_category_dropdowns
 from .config import Paths
+from .payment_amount import ensure_payment_amount
 from .pkg import ensure_code_root
 from .utils import (
     STD_SPEND_BUCKETS,
@@ -247,7 +248,7 @@ def has_formal_project_code(code: str) -> bool:
 
 
 def _line_payable(row: Any) -> float:
-    """行金额：优先应付；否则预扣+实付；再否则实付。"""
+    """行金额：付款金额。旧表没有该列时用预扣税额 + 实付金额。"""
 
     def _num(key: str) -> float:
         try:
@@ -259,7 +260,7 @@ def _line_payable(row: Any) -> float:
         except Exception:
             return 0.0
 
-    pay = _num("应付金额")
+    pay = _num("付款金额")
     if abs(pay) > 1e-12:
         return pay
     combo = _num("预扣税额") + _num("实付金额")
@@ -272,8 +273,9 @@ def _std_path_meta(file_path: Path, std_dir: Path) -> Tuple[str, str]:
     """
     从 B_std 路径解析 (来源分组, 支出归类)。
 
-    新结构：B_std/{流水|银行账}/最新月份有支出|未支出/xxx.xlsx
-    旧结构：B_std/最新月份有支出|未支出/xxx.xlsx → 来源分组=未分组
+    现行：B_std/{流水|银行账}/xxx.xlsx，支出归类留空。
+    旧结构若仍在「最新月份有支出|未支出」下，支出归类取该目录名。
+    归类目录直接在 B_std 根上时，来源分组=未分组。
     """
     try:
         parts = list(Path(file_path).resolve().relative_to(Path(std_dir).resolve()).parts)
@@ -287,8 +289,6 @@ def _std_path_meta(file_path: Path, std_dir: Path) -> Tuple[str, str]:
             spend = p
         else:
             group = p
-    if not spend:
-        spend = "未归类支出"
     return group, spend
 
 
@@ -310,6 +310,7 @@ def collect_raw_lines_from_std(std_dir: Path) -> List[Dict[str, Any]]:
             continue
         if df.empty:
             continue
+        df = ensure_payment_amount(df)
         # 文件名兜底项目（编码_名称_财务付款数据 / 旧编码_名称_(日期)）
         file_code, file_name = parse_std_project_filename(f)
         src_group, spend_bucket = _std_path_meta(f, std_dir)
@@ -319,8 +320,8 @@ def collect_raw_lines_from_std(std_dir: Path) -> List[Dict[str, Any]]:
             biz_summ = safe_text(row.get("业务摘要"))
             if not raw_summ and not biz_summ:
                 continue
-            # 仅学习「有实付金额」的摘要；空实付不进入学习池
-            if not has_actual_payment(row.get("实付金额")):
+            # 仅学习付款金额非零的摘要
+            if not has_actual_payment(row.get("付款金额")):
                 continue
             code = safe_text(row.get("项目编码")) or file_code or "未识别编码"
             pname = safe_text(row.get("项目名称")) or file_name or "未命名项目"
@@ -330,7 +331,7 @@ def collect_raw_lines_from_std(std_dir: Path) -> List[Dict[str, Any]]:
                 summ = recognize_summary(raw_summ, pname).business_summary or raw_summ
             if not summ:
                 continue
-            amt = pd.to_numeric(row.get("实付金额"), errors="coerce")
+            amt = pd.to_numeric(row.get("付款金额"), errors="coerce")
             payable = _line_payable(row)
             lines.append(
                 {
@@ -706,7 +707,7 @@ def _write_priority_overview(
             {
                 "建议顺序": 2,
                 "动作": "进入 01_按项目 对应文件，按处理优先级改科目/点确认",
-                "说明": "文件内摘要已按应付金额占比降序；累计占比%可看到覆盖了多少金额",
+                "说明": "文件内摘要已按付款金额占比降序；累计占比%可看到覆盖了多少金额",
             },
             {
                 "建议顺序": 3,
@@ -725,7 +726,7 @@ def _write_priority_overview(
             },
             {
                 "建议顺序": 0,
-                "动作": latest_note or "金额口径：优先应付金额；缺省时用预扣+实付",
+                "动作": latest_note or "金额口径：付款金额（预扣税额 + 实付金额）",
                 "说明": "金额列仅用于排序与占比，不改变 apply/记忆规则",
             },
         ]

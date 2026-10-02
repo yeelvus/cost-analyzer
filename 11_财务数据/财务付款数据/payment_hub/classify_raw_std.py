@@ -2,7 +2,7 @@
 """
 步骤 classify：读取 A1_财务付款_raw_std 合并表，
 用业务摘要（没有则现场识别）+ 科目 + 供应商 → 一级/二级/三级科目，
-写出 A2_财务付款_classified/{组名}/{组名}_classified.xlsx
+写出 A2_财务付款_classified/{组名}_classified.xlsx
 
 设计目标：一份组内明细只读一次、唯一三元组只分类一次，供后续 sum / std 复用。
 """
@@ -15,25 +15,77 @@ from typing import List, Optional, Tuple
 import pandas as pd
 
 from .config import Paths
+from .payment_amount import PAYMENT_AMOUNT_COL, ensure_payment_amount
 from .pkg import ensure_code_root
-from .utils import list_raw_groups, to_numeric_series
+from .utils import list_raw_groups
 
-AMOUNT_COLUMNS = ["应付金额", "预扣税额", "实付金额", "增值税额", "不含税额"]
+AMOUNT_COLUMNS = [PAYMENT_AMOUNT_COL]
+
+
+_CLASSIFIED_SUFFIX = "_classified.xlsx"
 
 
 def list_classified_groups(paths: Paths) -> List[Tuple[str, Path]]:
-    """已分类分组：(组名, classified xlsx)。"""
+    """已分类分组：(组名, classified xlsx)。
+
+    现行文件在 A2 根目录：{组名}_classified.xlsx。
+    仍能读到旧的 A2/{组名}/{组名}_classified.xlsx，同一组名以根目录文件为准。
+    """
     root = Path(paths.classified_dir)
     if not root.is_dir():
         return []
     out: List[Tuple[str, Path]] = []
+    seen: set[str] = set()
     for child in sorted(root.iterdir(), key=lambda p: p.name):
-        if not child.is_dir() or child.name.startswith("."):
+        if not child.is_file() or child.name.startswith("~$"):
             continue
-        xlsx = paths.group_classified_xlsx(child.name)
-        if xlsx.is_file():
-            out.append((child.name, xlsx))
+        if not child.name.endswith(_CLASSIFIED_SUFFIX):
+            continue
+        name = child.name[: -len(_CLASSIFIED_SUFFIX)]
+        if not name or name in seen:
+            continue
+        out.append((name, child))
+        seen.add(name)
+    for child in sorted(root.iterdir(), key=lambda p: p.name):
+        if not child.is_dir() or child.name.startswith(".") or child.name in seen:
+            continue
+        nested = child / f"{child.name}{_CLASSIFIED_SUFFIX}"
+        if nested.is_file():
+            out.append((child.name, nested))
+            seen.add(child.name)
     return out
+
+
+def _drop_old_classified_subdir(paths: Paths, group_name: str, written: Path) -> None:
+    """新文件写在 A2 根目录后，去掉同组的旧子目录副本。"""
+    old_dir = Path(paths.classified_dir) / group_name
+    if not old_dir.is_dir():
+        return
+    written = Path(written).resolve()
+    old_file = old_dir / f"{group_name}{_CLASSIFIED_SUFFIX}"
+    if old_file.is_file() and old_file.resolve() != written:
+        try:
+            old_file.unlink()
+            print(f"  🗑️ 移除旧分类文件: {old_file}")
+        except OSError as exc:
+            print(f"  ⚠️ 无法移除旧分类文件 {old_file}: {exc}")
+    try:
+        leftovers = [p for p in old_dir.iterdir() if p.name != ".DS_Store"]
+    except OSError:
+        return
+    if leftovers:
+        return
+    ds = old_dir / ".DS_Store"
+    if ds.exists():
+        try:
+            ds.unlink()
+        except OSError:
+            return
+    try:
+        old_dir.rmdir()
+        print(f"  🗑️ 移除旧分类目录: {old_dir.name}")
+    except OSError as exc:
+        print(f"  ⚠️ 无法移除旧分类目录 {old_dir}: {exc}")
 
 
 def _existing_raw_std_xlsx(paths: Paths, name: str) -> Optional[Path]:
@@ -84,23 +136,27 @@ def list_raw_std_groups(paths: Paths) -> List[Tuple[str, Path]]:
 def load_raw_std_detail(path: Path) -> pd.DataFrame:
     path = Path(path)
     df = pd.read_excel(path, sheet_name="明细")
-    for col in AMOUNT_COLUMNS:
-        if col in df.columns:
-            df[col] = to_numeric_series(df[col])
-    return df
+    return ensure_payment_amount(df)
 
 
 def classify_dataframe(df: pd.DataFrame, engine) -> pd.DataFrame:
     """
     月结填科目：业务摘要 + 科目 + 供应商 → 一二三级。
 
-    只读科目记忆，不写学习库。仅实付金额非空的行分类；
-    实付为空的行科目留空，命中层为 skip_no_payment。
+    只读科目记忆，不写学习库。仅付款金额非零的行分类；
+    付款金额为 0 的行科目留空，命中层为 skip_no_payment。
     """
     ensure_code_root()
     from subject_fill import fill_subjects
 
-    return fill_subjects(df, engine=engine, only_paid=True, verbose=True)
+    work = ensure_payment_amount(df)
+    return fill_subjects(
+        work,
+        engine=engine,
+        only_paid=True,
+        amount_col=PAYMENT_AMOUNT_COL,
+        verbose=True,
+    )
 
 
 def _write_classified(df: pd.DataFrame, out_path: Path) -> None:
@@ -169,7 +225,7 @@ def classify_one_group(
 def run_classify_raw_std(paths: Paths) -> List[str]:
     """
     A1_raw_std/{组}_财务付款_raw_std.xlsx
-      → A2_classified/{组}/*_classified.xlsx
+      → A2_classified/{组}_classified.xlsx
     """
     ensure_code_root()
     from learn_classify.engine import ClassifyEngine
@@ -180,7 +236,7 @@ def run_classify_raw_std(paths: Paths) -> List[str]:
         return []
 
     print(f"classify 分组: {', '.join(g for g, _ in groups)}")
-    print(f"输出: {paths.classified_dir}/{{组名}}/")
+    print(f"输出: {paths.classified_dir}/{{组名}}_classified.xlsx")
     engine = ClassifyEngine.from_data_dir(paths.classify_data)
 
     written: List[str] = []
@@ -191,6 +247,7 @@ def run_classify_raw_std(paths: Paths) -> List[str]:
         out = paths.group_classified_xlsx(group_name)
         result = classify_one_group(group_name, raw_path, out, engine)
         if result is not None:
+            _drop_old_classified_subdir(paths, group_name, result)
             written.append(str(result))
 
     print(f"\n✅ classify 完成：{len(written)} 个文件 → {paths.classified_dir}")
@@ -202,7 +259,4 @@ def run_classify_raw_std(paths: Paths) -> List[str]:
 def load_classified_detail(path: Path) -> pd.DataFrame:
     path = Path(path)
     df = pd.read_excel(path, sheet_name="明细")
-    for col in AMOUNT_COLUMNS:
-        if col in df.columns:
-            df[col] = to_numeric_series(df[col])
-    return df
+    return ensure_payment_amount(df)
