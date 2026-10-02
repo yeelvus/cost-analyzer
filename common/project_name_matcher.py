@@ -22,7 +22,7 @@
 兼容已有脚本，无需立刻改写。
 
 默认路径：
-  01成本统计/00_代码配置/common/project_name_match_db.json
+  01成本统计/config/common/project_name_match_db.json
   邯郸中材/…/0_项目基本信息情况/项目基本信息表.xlsx（若存在则合并标准名）
 """
 

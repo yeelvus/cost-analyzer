@@ -30,7 +30,7 @@ except Exception:
             str(Path.home() / "Desktop/邯郸中材/01成本统计"),
         )
     )
-    MATCH_DB_PATH = DATA_ROOT / "00_代码配置" / "common" / "project_name_match_db.json"
+    MATCH_DB_PATH = DATA_ROOT / "config" / "common" / "project_name_match_db.json"
     REPORT_ROOT = DATA_ROOT / "Z_report"
 
     def raw_data_path(*parts, legacy=None, create=True):  # type: ignore

@@ -29,8 +29,8 @@ try:
     from common.paths import html_data_path, raw_data_path, std_data_path, sum_data_path  # type: ignore
 except Exception:
     DATA_ROOT = Path(os.environ.get("COST_DATA_ROOT", str(Path.home() / "Desktop/邯郸中材/01成本统计")))
-    MATCH_DB_PATH = DATA_ROOT / "00_代码配置" / "common" / "project_name_match_db.json"
-    MACHINE_MAP_PATH = DATA_ROOT / "00_代码配置" / "09_机具费" / "机具映射表.json"
+    MATCH_DB_PATH = DATA_ROOT / "config" / "common" / "project_name_match_db.json"
+    MACHINE_MAP_PATH = DATA_ROOT / "config" / "machine" / "机具映射表.json"
     REPORT_ROOT = DATA_ROOT / "Z_report"
 
     def raw_data_path(*parts, legacy=None, create=True):  # type: ignore
