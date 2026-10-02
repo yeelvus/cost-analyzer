@@ -25,7 +25,12 @@ except ModuleNotFoundError:
     tk = None
     filedialog = messagebox = ttk = None
 
-DEFAULT_BROWSE = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑")
+_PKG = Path(__file__).resolve().parents[1]
+if str(_PKG) not in sys.path:
+    sys.path.insert(0, str(_PKG))
+from contract_paths import resolve_contract_root
+
+DEFAULT_BROWSE = resolve_contract_root()
 
 # 模板。name_field 会写成文件名（不含扩展名）。
 TEMPLATES: dict[str, dict] = {

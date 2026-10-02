@@ -6,12 +6,19 @@ import os
 import shutil
 import datetime
 import json
+import sys
 from collections import OrderedDict
+from pathlib import Path
 from typing import Dict, Tuple
+
+_PKG = Path(__file__).resolve().parents[1]
+if str(_PKG) not in sys.path:
+    sys.path.insert(0, str(_PKG))
+from contract_paths import resolve_contract_root
 
 # ==================== 配置区 ====================
 CONFIG = {
-    "default_contract_root": "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑",
+    "default_contract_root": str(resolve_contract_root()),
     "contract_group_keywords": ["总包合同", "分包合同"],
     "hidden_items": {".*", "Thumbs.db", "desktop.ini", "__MACOSX"},
     "contract_extensions": ('.pdf', '.doc', '.docx', '.xls', '.xlsx')

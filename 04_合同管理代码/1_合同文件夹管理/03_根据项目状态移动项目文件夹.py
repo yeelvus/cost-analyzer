@@ -18,14 +18,20 @@ import argparse
 import json
 import re
 import shutil
+import sys
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 
+_PKG = Path(__file__).resolve().parents[1]
+if str(_PKG) not in sys.path:
+    sys.path.insert(0, str(_PKG))
+from contract_paths import resolve_contract_root
+
 
 DEFAULT_EXCEL = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx")
-DEFAULT_ROOT = Path("/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑")
+DEFAULT_ROOT = resolve_contract_root()
 CODE_COLUMN = "项目编码"
 STATUS_COLUMN = "项目状态"
 CONTRACT_TYPE_KEYWORDS = ("总包合同", "分包合同", "总包签证", "分包签证")

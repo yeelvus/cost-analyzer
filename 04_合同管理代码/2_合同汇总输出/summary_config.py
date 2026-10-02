@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """合同汇总公共配置。
 
-路径按「_ 之后」的业务名匹配，前面的序号/字母可以改：
-  5_合同管理📑 / 6_合同管理 / 合同管理📑  → 合同管理
+合同根目录在 OneDrive「合同管理📑」（见 contract_paths.py）。
+其下子目录按「_ 之后」的业务名匹配，前面的序号/字母可以改：
   A_总包合同 / 总包合同                 → 总包合同
   B_分包合同                           → 分包合同
   0_Std / 5.1_分包合同                 → Std / 分包合同
@@ -17,19 +17,21 @@ import sys
 from pathlib import Path
 
 _CODE_ROOT = Path(__file__).resolve().parents[2]
-if str(_CODE_ROOT) not in sys.path:
-    sys.path.insert(0, str(_CODE_ROOT))
+_PKG_ROOT = Path(__file__).resolve().parents[1]
+for _p in (str(_PKG_ROOT), str(_CODE_ROOT)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from common.paths import dir_key, find_named_dir, std_data_path  # noqa: E402
+from contract_paths import resolve_contract_root  # noqa: E402
 from settings import DATA_ROOT, MATCH_DB_PATH  # noqa: E402
 
 # 排序前缀：5_ / 5.1_ / 00_ / A_ / B_
 _SORT_PREFIX_RE = re.compile(r"^(?:\d+(?:\.\d+)?|[A-Za-z])[_-]")
 
-# 合同根目录逻辑名（实际磁盘名可以带任意前缀，如 5_合同管理📑）
+# 合同根目录逻辑名（子目录匹配用；根目录本身见 contract_paths.CONTRACT_ROOT）
 CONTRACT_ROOT_LOGICAL = "合同管理"
-# 合同源文件目录：优先使用移动硬盘路径，未挂载时回退到 DATA_ROOT 下的目录。
-CONTRACT_ROOT_OVERRIDE = Path("/Volumes/PC-SunYongtao/5_合同管理📑")
+CONTRACT_ROOT_OVERRIDE = resolve_contract_root()
 PROJECT_CODE_DB = str(MATCH_DB_PATH)
 
 # 明细汇总（原 03）相关
@@ -143,8 +145,9 @@ def resolve_existing_path(path: str, fallbacks: list[str] | None = None) -> str:
 
 
 def get_contract_root() -> str:
-    if CONTRACT_ROOT_OVERRIDE.is_dir():
-        return str(CONTRACT_ROOT_OVERRIDE)
+    root = resolve_contract_root()
+    if root.is_dir():
+        return str(root)
     found = find_named_folder(DATA_ROOT, CONTRACT_ROOT_LOGICAL)
     if found is not None:
         return str(found)

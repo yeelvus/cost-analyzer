@@ -10,12 +10,19 @@
 日期：2026-04-24
 """
 
-import os
 import json
+import os
+import sys
 from datetime import datetime
+from pathlib import Path
+
+_PKG = Path(__file__).resolve().parents[1]
+if str(_PKG) not in sys.path:
+    sys.path.insert(0, str(_PKG))
+from contract_paths import resolve_contract_root
 
 # ==================== 配置区 ====================
-ROOT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑"
+ROOT_DIR = str(resolve_contract_root())
 
 VISA_CONTRACT_TYPES = [
     "总包签证",

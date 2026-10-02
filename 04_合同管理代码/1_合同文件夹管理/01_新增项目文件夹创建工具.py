@@ -11,9 +11,16 @@
 import json
 import os
 import re
+import sys
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
+
+_PKG = Path(__file__).resolve().parents[1]
+if str(_PKG) not in sys.path:
+    sys.path.insert(0, str(_PKG))
+from contract_paths import resolve_contract_root
 
 # ==================== 配置区 ====================
 # Excel配置
@@ -25,8 +32,7 @@ CODE_COLUMN = "项目编码"
 NAME_COLUMN = "项目名称"
 STATUS_COLUMN = "项目状态"
 
-# 根目录（相对于脚本执行位置）
-ROOT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑"
+ROOT_DIR = str(resolve_contract_root())
 
 # 合同类型目录（固定4类）
 CONTRACT_TYPES = [
@@ -261,7 +267,7 @@ def main():
 
     except FileNotFoundError as exc:
         print(f"\n❌ 错误: {exc}")
-        print("💡 提示: 请确保在 01成本统计 目录下运行此脚本")
+        print(f"💡 提示: 请确认项目基本信息表存在，且合同目录可访问: {ROOT_DIR}")
     except ValueError as exc:
         print(f"\n❌ 错误: {exc}")
     except Exception as exc:

@@ -7,8 +7,16 @@
 import os
 import re
 import json
+import sys
 from datetime import datetime
+from pathlib import Path
+
 import pandas as pd
+
+_PKG = Path(__file__).resolve().parents[1]
+if str(_PKG) not in sys.path:
+    sys.path.insert(0, str(_PKG))
+from contract_paths import resolve_contract_root
 
 # ==================== 配置区 ====================
 EXCEL_PATH = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
@@ -17,7 +25,7 @@ CODE_COLUMN = "项目编码"
 # 修改这里切换命名模式："项目名称" 或 "项目全称"
 NAME_MODE_COLUMN = "项目名称"
 
-ROOT_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/5_合同管理📑"
+ROOT_DIR = str(resolve_contract_root())
 LOG_FOLDER = "日志"
 
 # ==================== 工具函数 ====================
