@@ -27,7 +27,12 @@ _STAT_SHEETS = ("分类统计", "命中层统计")
 
 
 def default_data_dir() -> Path:
-    return _ROOT / "learn_classify" / "data"
+    code_root = _ROOT.parent.parent
+    if str(code_root) not in sys.path:
+        sys.path.insert(0, str(code_root))
+    from settings import CLASSIFY_DATA_DIR
+
+    return CLASSIFY_DATA_DIR
 
 
 def default_output_path(src: Path) -> Path:

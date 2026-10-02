@@ -46,7 +46,14 @@ def load_taxonomy_options(data_dir: Optional[Path] = None):
     _ensure_learn_path()
     from learn_classify.taxonomy import Taxonomy
 
-    data_dir = Path(data_dir) if data_dir else CODE_ROOT / "learn_classify" / "data"
+    if data_dir is None:
+        repo = CODE_ROOT.parent.parent
+        if str(repo) not in sys.path:
+            sys.path.insert(0, str(repo))
+        from settings import CLASSIFY_DATA_DIR
+
+        data_dir = CLASSIFY_DATA_DIR
+    data_dir = Path(data_dir)
     tax = Taxonomy.load(data_dir / "taxonomy.json")
 
     l1_sorted = sorted(

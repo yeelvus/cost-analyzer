@@ -17,6 +17,7 @@ except Exception:
         sys.path.insert(0, str(_p.parent))
 # --- end bootstrap ---
 
+from settings import MATCH_DB_PATH
 import importlib.util
 import re
 from pathlib import Path
@@ -27,7 +28,7 @@ import pandas as pd
 CONFIG = {
     "source_dir": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/1_成本报公司",
     "output_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/1_成本报公司/对比文件/项目预计毛利率对比_数据统计与环比.xlsx",
-    "match_db_file": r"/Users/wyattsun/Desktop/code/common/project_name_match_db.json",
+    "match_db_file": str(MATCH_DB_PATH),
     "project_info_file": r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx",
     "excel_formatting_utils_file": r"/Users/wyattsun/Desktop/code/00_项目基本信息/excel_formatting_utils.py",
 }

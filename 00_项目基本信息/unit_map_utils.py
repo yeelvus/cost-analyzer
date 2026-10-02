@@ -6,9 +6,15 @@ unit_map.json 使用 "标准单位 -> 别名列表" 结构。
 
 import json
 import os
+import sys
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-UNIT_MAP_JSON_PATH = os.path.join(_THIS_DIR, "unit_map.json")
+_CODE_ROOT = os.path.dirname(_THIS_DIR)
+if _CODE_ROOT not in sys.path:
+    sys.path.insert(0, _CODE_ROOT)
+from settings import UNIT_MAP_PATH  # noqa: E402
+
+UNIT_MAP_JSON_PATH = str(UNIT_MAP_PATH)
 INVALID_KEY = "__invalid__"
 
 # 无效单位：直接返回空字符串（兜底）

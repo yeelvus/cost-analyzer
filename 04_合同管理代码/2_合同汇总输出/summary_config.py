@@ -161,10 +161,7 @@ def get_contract_root() -> str:
 
 
 def get_project_db() -> str:
-    if os.path.isfile(PROJECT_CODE_DB):
-        return PROJECT_CODE_DB
-    alt = _CODE_ROOT / "common" / "project_name_match_db.json"
-    return str(alt) if alt.is_file() else PROJECT_CODE_DB
+    return PROJECT_CODE_DB
 
 
 def get_subpackage_std_dir() -> str:

@@ -14,3 +14,12 @@ env/
 .ruff_cache/
 
 ~$*
+
+# 业务配置已迁到 01成本统计/00_代码配置。下面是防手滑再提交回仓库。
+common/project_name_match_db.json
+00_项目基本信息/unit_map.json
+09_机具费/机具映射表.json
+09_机具费/区域映射表.json
+11_财务数据/财务付款数据/learn_classify/data/
+11_财务数据/财务付款数据/learn_classify/data_backup_*/
+data_analysis/reports/cost_analysis_report_config.json

@@ -97,4 +97,9 @@ def get_subject_mapper(data_dir: Optional[Path] = None):
 
     if data_dir is not None:
         return SubjectMapper(data_dir=data_dir)
-    return SubjectMapper(data_dir=CODE_ROOT / "learn_classify" / "data")
+    repo = CODE_ROOT.parent.parent
+    if str(repo) not in sys.path:
+        sys.path.insert(0, str(repo))
+    from settings import CLASSIFY_DATA_DIR
+
+    return SubjectMapper(data_dir=CLASSIFY_DATA_DIR)

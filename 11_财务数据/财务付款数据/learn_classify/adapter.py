@@ -10,13 +10,19 @@ SubjectMapper 适配器：供 payment_hub.std_build / deps 使用。
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Optional, Tuple
+
+_CODE_ROOT = Path(__file__).resolve().parents[3]
+if str(_CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_CODE_ROOT))
+from settings import CLASSIFY_DATA_DIR  # noqa: E402
 
 from .engine import ClassifyEngine
 from .review import update_excel_classification_columns
 
-DEFAULT_DATA_DIR = Path(__file__).resolve().parent / "data"
+DEFAULT_DATA_DIR = CLASSIFY_DATA_DIR
 
 
 class SubjectMapper:

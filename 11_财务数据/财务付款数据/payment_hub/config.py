@@ -13,7 +13,7 @@ if str(_CODE_ROOT) not in sys.path:
     sys.path.insert(0, str(_CODE_ROOT))
 
 from common.paths import html_data_path, raw_data_path, std_data_path, sum_data_path  # noqa: E402
-from settings import DATA_ROOT, REPORT_ROOT  # noqa: E402
+from settings import CLASSIFY_DATA_DIR, DATA_ROOT, REPORT_ROOT  # noqa: E402
 
 DESKTOP_COST = DATA_ROOT
 PAY_ROOT = DESKTOP_COST / "12-财务数据💰" / "A_财务付款数据"
@@ -101,9 +101,7 @@ class Paths:
         / "项目基本信息表.xlsx"
     )
 
-    classify_data: Path = field(
-        default_factory=lambda: CODE_DIR / "learn_classify" / "data"
-    )
+    classify_data: Path = field(default_factory=lambda: CLASSIFY_DATA_DIR)
     # 账簿：已填一/二/三级 → learn-ledger 写入记忆
     ledger_xlsx: Path = field(
         default_factory=lambda: Path(
@@ -111,31 +109,31 @@ class Paths:
         )
     )
     review_xlsx: Path = field(
-        default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "待复核池.xlsx"
+        default_factory=lambda: CLASSIFY_DATA_DIR / "待复核池.xlsx"
     )
     rules_suggest_xlsx: Path = field(
-        default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "规则建议.xlsx"
+        default_factory=lambda: CLASSIFY_DATA_DIR / "规则建议.xlsx"
     )
     # 分类总表：一份 Excel 调全部分类（也复制到 02_Std/12_财务付款 便于查找）
     class_master_xlsx: Path = field(
-        default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "付款分类总表.xlsx"
+        default_factory=lambda: CLASSIFY_DATA_DIR / "付款分类总表.xlsx"
     )
     class_master_xlsx_sum: Path = field(
         default_factory=lambda: _pay_std_root() / "付款分类总表.xlsx"
     )
     taxonomy_xlsx: Path = field(
-        default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "科目体系.xlsx"
+        default_factory=lambda: CLASSIFY_DATA_DIR / "科目体系.xlsx"
     )
     # 每次 apply-class 生成的可读学习报告
     learn_log_xlsx: Path = field(
-        default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "学习记录.xlsx"
+        default_factory=lambda: CLASSIFY_DATA_DIR / "学习记录.xlsx"
     )
     learn_log_xlsx_sum: Path = field(
         default_factory=lambda: _pay_std_root() / "学习记录.xlsx"
     )
     # 分类质量/修正报告（含仍待人工_高频）
     class_fix_report_xlsx: Path = field(
-        default_factory=lambda: CODE_DIR / "learn_classify" / "data" / "分类修正记录.xlsx"
+        default_factory=lambda: CLASSIFY_DATA_DIR / "分类修正记录.xlsx"
     )
     class_fix_report_xlsx_sum: Path = field(
         default_factory=lambda: _pay_std_root() / "分类修正记录.xlsx"

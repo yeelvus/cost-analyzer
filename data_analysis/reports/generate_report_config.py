@@ -325,7 +325,9 @@ class ReportConfigGenerator:
             output_path: 输出文件路径，默认为当前目录
         """
         if output_path is None:
-            output_path = Path(__file__).parent / "cost_analysis_report_config.json"
+            from settings import REPORT_CONFIG_PATH
+
+            output_path = REPORT_CONFIG_PATH
         else:
             output_path = Path(output_path)
         

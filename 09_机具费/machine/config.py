@@ -25,11 +25,12 @@ for p in (str(MACHINE_CODE_DIR), str(CODE_ROOT)):
         sys.path.insert(0, p)
 
 try:
-    from settings import DATA_ROOT, MATCH_DB_PATH, REPORT_ROOT  # type: ignore
+    from settings import DATA_ROOT, MACHINE_MAP_PATH, MATCH_DB_PATH, REPORT_ROOT  # type: ignore
     from common.paths import html_data_path, raw_data_path, std_data_path, sum_data_path  # type: ignore
 except Exception:
     DATA_ROOT = Path(os.environ.get("COST_DATA_ROOT", str(Path.home() / "Desktop/邯郸中材/01成本统计")))
-    MATCH_DB_PATH = CODE_ROOT / "common" / "project_name_match_db.json"
+    MATCH_DB_PATH = DATA_ROOT / "00_代码配置" / "common" / "project_name_match_db.json"
+    MACHINE_MAP_PATH = DATA_ROOT / "00_代码配置" / "09_机具费" / "机具映射表.json"
     REPORT_ROOT = DATA_ROOT / "Z_report"
 
     def raw_data_path(*parts, legacy=None, create=True):  # type: ignore
@@ -183,10 +184,14 @@ def migrate_legacy_dirs(*, move_files: bool = True) -> list[str]:
     return logs
 
 
-MACHINE_MAPPING_JSON = first_existing(MACHINE_CODE_DIR / "机具映射表.json")
-REGION_MAPPING_JSON = first_existing(
-    MACHINE_CODE_DIR / "区域映射表.json",
+MACHINE_MAPPING_JSON = first_existing(
+    MACHINE_MAP_PATH,
     MACHINE_CODE_DIR / "机具映射表.json",
+)
+REGION_MAPPING_JSON = first_existing(
+    MACHINE_MAP_PATH.parent / "区域映射表.json",
+    MACHINE_CODE_DIR / "区域映射表.json",
+    MACHINE_MAPPING_JSON,
 )
 REGION_MAPPING_TXT = first_existing(MACHINE_CODE_DIR / "区域映射表.txt")
 MACHINE_MAPPING_TXT = first_existing(MACHINE_CODE_DIR / "机具映射表.txt")

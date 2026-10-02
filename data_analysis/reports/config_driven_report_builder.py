@@ -51,7 +51,9 @@ class ConfigDrivenReportBuilder:
             config_path: 配置文件路径，默认使用同目录下的配置文件
         """
         if config_path is None:
-            config_path = Path(__file__).parent / "cost_analysis_report_config.json"
+            from settings import REPORT_CONFIG_PATH
+
+            config_path = REPORT_CONFIG_PATH
         
         self.config_path = Path(config_path)
         self.config = self._load_config()

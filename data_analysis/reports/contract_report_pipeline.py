@@ -166,7 +166,9 @@ def build_provenance_rows(
 
     add_input("代码", "合同汇总主程序", Path(__file__).resolve(), note="生成项目报告与索引")
     add_input("代码", "成本分析构建器", (Path(__file__).parent / "config_driven_report_builder.py").resolve())
-    add_input("配置", "成本分析配置", (Path(__file__).parent / "cost_analysis_report_config.json").resolve())
+    from settings import REPORT_CONFIG_PATH
+
+    add_input("配置", "成本分析配置", Path(REPORT_CONFIG_PATH).resolve())
 
     add_input("合同", "合同管理根目录", contract_dir, note="总包/分包合同文件夹")
     add_input("采购", "采购明细合并表", procurement_path, sheet="项目汇总(优先)/合并数据", columns="项目编码, 项目名称, 总采购金额")

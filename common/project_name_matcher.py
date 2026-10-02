@@ -22,7 +22,7 @@
 兼容已有脚本，无需立刻改写。
 
 默认路径：
-  common/project_name_match_db.json
+  01成本统计/00_代码配置/common/project_name_match_db.json
   邯郸中材/…/0_项目基本信息情况/项目基本信息表.xlsx（若存在则合并标准名）
 """
 
@@ -53,7 +53,9 @@ MODULE_DIR = Path(__file__).resolve().parent
 _CODE_ROOT = MODULE_DIR.parent
 if str(_CODE_ROOT) not in sys.path:
     sys.path.insert(0, str(_CODE_ROOT))
-DEFAULT_DB_PATH = MODULE_DIR / "project_name_match_db.json"
+from settings import MATCH_DB_PATH  # noqa: E402
+
+DEFAULT_DB_PATH = Path(MATCH_DB_PATH)
 
 # 项目基本信息表候选（按优先级）
 DEFAULT_INFO_EXCEL_CANDIDATES: Tuple[Path, ...] = (
