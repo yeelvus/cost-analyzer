@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from openpyxl import load_workbook
 
 ROOT = Path(__file__).resolve().parents[1]
 CODE = ROOT.parent
@@ -19,6 +20,7 @@ from budget.responsibility import (  # noqa: E402
     process_and_summarize,
     read_excel_data,
     sheet_preference_score,
+    write_excel_output,
 )
 
 from common.paths import raw_data_path  # noqa: E402
@@ -49,6 +51,17 @@ def test_sheet_score():
         "投标成本测算统计表_15点"
     )
     print("sheet score OK")
+
+
+def test_output_sheet_name(tmp_path):
+    output_file = tmp_path / "责任成本.xlsx"
+    assert write_excel_output([], "项目", output_file, "", {})
+
+    workbook = load_workbook(output_file, read_only=True)
+    try:
+        assert workbook.sheetnames == ["责任成本"]
+    finally:
+        workbook.close()
 
 
 def test_wbs_format_synthetic():

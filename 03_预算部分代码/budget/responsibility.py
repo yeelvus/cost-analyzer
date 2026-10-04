@@ -613,6 +613,7 @@ def write_excel_output(data_rows, project_name, output_file, project_code, heade
     try:
         wb = Workbook()
         ws = cast(Worksheet, wb.active)
+        ws.title = "责任成本"
         
         def display_header(value, default=""):
             text = normalize_text(value) or default
