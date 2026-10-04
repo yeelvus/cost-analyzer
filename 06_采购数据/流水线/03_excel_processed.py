@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3,.
 """
 步骤3：读取 EXTRACT_DIR（B_采购部采购台账_extract）去重后的台账
 → 列映射/项目匹配/日期 → 写出 STD_DIR（C_std）/*_processed.xlsx。
@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 import sys
 from datetime import date as date_type
 from datetime import datetime
@@ -488,6 +489,19 @@ def write_output(df: pd.DataFrame, output_path: Path) -> None:
     wb.save(output_path)
 
 
+def clear_output_dir(output_dir: Path) -> int:
+    """清空标准输出目录中的旧结果，保留目录本身。"""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    removed_count = 0
+    for path in output_dir.iterdir():
+        if path.is_symlink() or not path.is_dir():
+            path.unlink()
+        else:
+            shutil.rmtree(path)
+        removed_count += 1
+    return removed_count
+
+
 def process_one(file_path: Path, projects: list[dict], match_db) -> tuple[bool, str]:
     print(f"\n处理: {file_path.name}")
     raw_name = extract_project_name(file_path.name)
@@ -564,10 +578,11 @@ def main(argv: list[str] | None = None) -> None:
 
     if not EXTRACT_DIR.is_dir():
         raise FileNotFoundError(f"提取目录不存在: {EXTRACT_DIR}")
-    STD_DIR.mkdir(parents=True, exist_ok=True)
+    removed_count = clear_output_dir(STD_DIR)
 
     print(f"输入(提取): {EXTRACT_DIR}")
     print(f"输出(标准): {STD_DIR}")
+    print(f"已清理输出目录中的 {removed_count} 个旧文件/子目录")
     print(f"项目匹配: {MATCH_DB_PATH}")
     print(f"弹窗: {'关闭' if args.no_prompt else ('强制' if args.force_prompt else '仅新未匹配')}")
 
