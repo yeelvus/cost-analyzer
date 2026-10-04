@@ -733,80 +733,6 @@ def generate_profit_rate_chart(summary_df, output_html):
     fig.write_html(str(output_path), full_html=True, include_plotlyjs=True)
     print(f"✓ 毛利率变化图已生成: {output_path}")
 
-def build_margin_change_wide_df(summary_df):
-    required_cols = ["月份", "项目名称", "毛利率"]
-    missing_cols = [col for col in required_cols if col not in summary_df.columns]
-    if missing_cols:
-        print(f"⚠️ 无法生成毛利率环比宽表，缺少列: {', '.join(missing_cols)}")
-        return pd.DataFrame()
-
-    margin_df = summary_df[required_cols].copy()
-    margin_df["毛利率"] = margin_df["毛利率"].apply(normalize_margin_value)
-    margin_df["月份日期"] = margin_df["月份"].apply(parse_month_to_datetime)
-    margin_df = margin_df.dropna(subset=["项目名称", "月份日期", "毛利率"])
-    if margin_df.empty:
-        return pd.DataFrame()
-
-    margin_df = margin_df.sort_values(["项目名称", "月份日期"])
-    margin_df["毛利率环比变化"] = margin_df.groupby("项目名称")["毛利率"].diff()
-
-    ordered_month_dates = sorted(margin_df["月份日期"].unique())
-    ordered_month_labels = [f"{d.year}年{d.month}月" for d in ordered_month_dates]
-    margin_df["月份"] = margin_df["月份日期"].apply(lambda d: f"{d.year}年{d.month}月")
-
-    wide_df = margin_df.pivot_table(
-        index="项目名称",
-        columns="月份",
-        values="毛利率环比变化",
-        aggfunc="last",
-    )
-    wide_df = wide_df.reindex(columns=ordered_month_labels)
-    wide_df.index.name = "项目名称"
-    return wide_df
-
-def write_margin_change_sheet(wb, wide_df, sheet_name="毛利率环比变化宽表"):
-    if sheet_name in wb.sheetnames:
-        del wb[sheet_name]
-    ws = wb.create_sheet(title=sheet_name)
-
-    if wide_df is None or wide_df.empty:
-        ws.cell(row=1, column=1, value="项目名称")
-        ws.cell(row=1, column=2, value="提示")
-        ws.cell(row=2, column=2, value="暂无可用毛利率环比变化数据")
-        return
-
-    month_cols = list(wide_df.columns)
-    ws.cell(row=1, column=1, value="项目名称")
-    for col_idx, month_label in enumerate(month_cols, start=2):
-        ws.cell(row=1, column=col_idx, value=month_label)
-
-    for row_idx, project_name in enumerate(wide_df.index.tolist(), start=2):
-        ws.cell(row=row_idx, column=1, value=project_name)
-        for col_idx, month_label in enumerate(month_cols, start=2):
-            value = wide_df.at[project_name, month_label]
-            if pd.isna(value):
-                ws.cell(row=row_idx, column=col_idx, value=None)
-            else:
-                ws.cell(row=row_idx, column=col_idx, value=float(value))
-                ws.cell(row=row_idx, column=col_idx).number_format = numbers.FORMAT_PERCENTAGE_00
-
-    ws.row_dimensions[1].height = 38
-    for cell in ws[1]:
-        cell.alignment = Alignment(wrap_text=True, vertical='center', horizontal='center')
-
-    for col in ws.columns:
-        max_length = 0
-        column_idx = col[0].column
-        if column_idx is None:
-            continue
-        column = get_column_letter(column_idx)
-        for cell in col:
-            if cell.value is not None:
-                max_length = max(max_length, len(str(cell.value)))
-        ws.column_dimensions[column].width = min(max_length + 2, 35)
-
-    ws.auto_filter.ref = ws.dimensions
-
 def process_all_projects():
     base_path = Path(CONFIG["base_dir"])
     finance_col_name = "财务分包已付款"
@@ -1073,9 +999,6 @@ def process_all_projects():
         df["_month_sort"] = df["月份"].apply(parse_month_sort_key)
         df = df.sort_values(by=["项目名称", "_month_sort"], ascending=[True, False])
 
-        latest_month_df = df.drop_duplicates(subset=["项目名称"], keep="first").sort_values(by="_month_sort", ascending=False)
-        latest_month_df = latest_month_df.drop(columns=["_month_sort"])
-
         df = df.sort_values(by="_month_sort", ascending=False).drop(columns=["_month_sort"])
         chart_source_df = df.copy()
 
@@ -1166,6 +1089,7 @@ def process_all_projects():
         ws = wb.active
         if ws is None:
             raise ValueError("输出工作簿无可用活动工作表")
+        ws.title = "成本统计数据"
 
         ws.auto_filter.ref = ws.dimensions
         ws.row_dimensions[1].height = 50
@@ -1391,16 +1315,6 @@ def process_all_projects():
                 fill = yellow_fill if col_name in monthly_excel_cols else blue_fill
             for row in range(2, ws.max_row + 1):
                 ws.cell(row=row, column=col).fill = fill
-
-        margin_change_wide_df = build_margin_change_wide_df(chart_source_df)
-        write_margin_change_sheet(wb, margin_change_wide_df)
-
-        latest_month_sheet_name = "最新月份项目"
-        if latest_month_sheet_name in wb.sheetnames:
-            del wb[latest_month_sheet_name]
-        latest_ws = wb.create_sheet(title=latest_month_sheet_name)
-        write_dataframe_to_sheet(latest_ws, latest_month_df)
-        apply_sheet_default_style(latest_ws, latest_month_df)
 
         wb.save(CONFIG["output_file"])
         print(f"\n✓ 成功！所有项目数据已汇总至: {CONFIG['output_file']}")
