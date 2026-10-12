@@ -252,30 +252,68 @@ def extract_project_monthly_rows(file_path: Path, ymd: str) -> List[Dict]:
     return result
 
 
-def build_subject_wide_payload(std_dir: Path) -> Dict[str, object]:
-    rows: List[Dict[str, object]] = []
-    files = iter_group_std_files(std_dir)
-    print(f"\n检测到本组 std 文件数: {len(files)}  （目录: {std_dir}）")
-    for fp in files:
-        rows.extend(extract_subject_rows(fp))
-    if not rows:
-        return {"project_order": [], "layout": OrderedDict(), "project_map": {}, "grand_map": {}}
+def _empty_subject_wide_payload() -> Dict[str, object]:
+    return {"project_order": [], "layout": OrderedDict(), "project_map": {}, "grand_map": {}}
 
-    df = pd.DataFrame(rows)
-    grouped = df.groupby(["项目名称", "一级科目", "二级科目"], dropna=False, as_index=False)["金额汇总"].sum()
+
+def _order_project_columns(pairs: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
+    """项目列按项目编码倒序。没有编码的列排在后面，仍按名称排序。"""
+    unique = list(dict.fromkeys(pairs))
+    coded = [item for item in unique if item[0]]
+    blank = [item for item in unique if not item[0]]
+    coded.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    blank.sort(key=lambda item: level1_sort_key(item[1]))
+    return coded + blank
+
+
+def _subject_wide_payload_from_frame(df: pd.DataFrame) -> Dict[str, object]:
+    """明细 → 一级二级科目宽表。project_order 为 (项目编码, 项目名称)。"""
+    if df is None or df.empty or "金额汇总" not in df.columns:
+        return _empty_subject_wide_payload()
+
+    work = df.copy()
+    if "项目编码" not in work.columns:
+        work["项目编码"] = ""
+    if "项目名称" not in work.columns:
+        work["项目名称"] = ""
+    work["项目编码"] = work["项目编码"].map(safe_text)
+    work["项目名称"] = work["项目名称"].map(safe_text)
+    if "一级科目" in work.columns:
+        work["一级科目"] = work["一级科目"].map(safe_text).replace("", "未分类一级科目")
+    else:
+        work["一级科目"] = "未分类一级科目"
+    if "二级科目" in work.columns:
+        work["二级科目"] = work["二级科目"].map(safe_text).replace("", "未分类二级科目")
+    else:
+        work["二级科目"] = "未分类二级科目"
+    work["金额汇总"] = pd.to_numeric(work["金额汇总"], errors="coerce").fillna(0.0)
+    work = work[work["金额汇总"] != 0]
+    if work.empty:
+        return _empty_subject_wide_payload()
+
+    grouped = work.groupby(
+        ["项目编码", "项目名称", "一级科目", "二级科目"], dropna=False, as_index=False
+    )["金额汇总"].sum()
     level1_order = sorted(grouped["一级科目"].dropna().unique().tolist(), key=level1_sort_key)
     layout: OrderedDict[str, List[str]] = OrderedDict()
     for level1 in level1_order:
         l2s = grouped.loc[grouped["一级科目"] == level1, "二级科目"].dropna().unique().tolist()
         layout[level1] = sorted(l2s, key=level1_sort_key)
 
-    project_order = sorted(grouped["项目名称"].dropna().unique().tolist(), key=level1_sort_key)
-    project_map: Dict[str, Dict[str, Dict[str, float]]] = defaultdict(lambda: defaultdict(dict))
+    pairs = [
+        (safe_text(code), safe_text(name))
+        for code, name in zip(grouped["项目编码"], grouped["项目名称"])
+    ]
+    project_order = _order_project_columns(pairs)
+    project_map: Dict[Tuple[str, str], Dict[str, Dict[str, float]]] = defaultdict(
+        lambda: defaultdict(dict)
+    )
     grand_map: Dict[str, Dict[str, float]] = defaultdict(dict)
     for _, row in grouped.iterrows():
-        pn, l1, l2 = safe_text(row["项目名称"]), safe_text(row["一级科目"]), safe_text(row["二级科目"])
+        key = (safe_text(row["项目编码"]), safe_text(row["项目名称"]))
+        l1, l2 = safe_text(row["一级科目"]), safe_text(row["二级科目"])
         amount = float(row["金额汇总"] or 0)
-        project_map[pn][l1][l2] = amount
+        project_map[key][l1][l2] = amount
         grand_map[l1][l2] = grand_map[l1].get(l2, 0.0) + amount
     return {
         "project_order": project_order,
@@ -283,6 +321,17 @@ def build_subject_wide_payload(std_dir: Path) -> Dict[str, object]:
         "project_map": project_map,
         "grand_map": grand_map,
     }
+
+
+def build_subject_wide_payload(std_dir: Path) -> Dict[str, object]:
+    rows: List[Dict[str, object]] = []
+    files = iter_group_std_files(std_dir)
+    print(f"\n检测到本组 std 文件数: {len(files)}  （目录: {std_dir}）")
+    for fp in files:
+        rows.extend(extract_subject_rows(fp))
+    if not rows:
+        return _empty_subject_wide_payload()
+    return _subject_wide_payload_from_frame(pd.DataFrame(rows))
 
 
 def build_project_level1_summary_dataframe(
@@ -571,49 +620,13 @@ def build_monthly_wide_from_detail_df(
 
 def build_subject_wide_from_detail_df(detail_df: pd.DataFrame) -> Dict[str, object]:
     if detail_df is None or detail_df.empty:
-        return {"project_order": [], "layout": OrderedDict(), "project_map": {}, "grand_map": {}}
+        return _empty_subject_wide_payload()
 
-    df = ensure_payment_amount(detail_df)
+    df = ensure_payment_amount(detail_df).copy()
+    if "付款金额" not in df.columns:
+        return _empty_subject_wide_payload()
     df["金额汇总"] = pd.to_numeric(df["付款金额"], errors="coerce").fillna(0.0)
-    df = df[df["金额汇总"] != 0]
-    if df.empty:
-        return {"project_order": [], "layout": OrderedDict(), "project_map": {}, "grand_map": {}}
-
-    df["项目名称"] = df["项目名称"].map(safe_text) if "项目名称" in df.columns else ""
-    df["一级科目"] = (
-        df["一级科目"].map(safe_text).replace("", "未分类一级科目")
-        if "一级科目" in df.columns
-        else "未分类一级科目"
-    )
-    df["二级科目"] = (
-        df["二级科目"].map(safe_text).replace("", "未分类二级科目")
-        if "二级科目" in df.columns
-        else "未分类二级科目"
-    )
-
-    grouped = df.groupby(
-        ["项目名称", "一级科目", "二级科目"], dropna=False, as_index=False
-    )["金额汇总"].sum()
-    level1_order = sorted(grouped["一级科目"].dropna().unique().tolist(), key=level1_sort_key)
-    layout: OrderedDict[str, List[str]] = OrderedDict()
-    for level1 in level1_order:
-        l2s = grouped.loc[grouped["一级科目"] == level1, "二级科目"].dropna().unique().tolist()
-        layout[level1] = sorted(l2s, key=level1_sort_key)
-
-    project_order = sorted(grouped["项目名称"].dropna().unique().tolist(), key=level1_sort_key)
-    project_map: Dict[str, Dict[str, Dict[str, float]]] = defaultdict(lambda: defaultdict(dict))
-    grand_map: Dict[str, Dict[str, float]] = defaultdict(dict)
-    for _, row in grouped.iterrows():
-        pn, l1, l2 = safe_text(row["项目名称"]), safe_text(row["一级科目"]), safe_text(row["二级科目"])
-        amount = float(row["金额汇总"] or 0)
-        project_map[pn][l1][l2] = amount
-        grand_map[l1][l2] = grand_map[l1].get(l2, 0.0) + amount
-    return {
-        "project_order": project_order,
-        "layout": layout,
-        "project_map": project_map,
-        "grand_map": grand_map,
-    }
+    return _subject_wide_payload_from_frame(df)
 
 
 def build_project_level1_from_detail_df(
@@ -790,13 +803,31 @@ def build_monthly_wide_dataframe(std_dir: Path, *, group_label: str = "") -> pd.
     return wide.reset_index()
 
 
+def _paint(cell, fill, font, alignment, border) -> None:
+    cell.fill = fill
+    cell.font = font
+    cell.alignment = alignment
+    cell.border = border
+
+
+def _project_column_keys(project_order) -> List[Tuple[str, str]]:
+    keys: List[Tuple[str, str]] = []
+    for item in project_order or []:
+        if isinstance(item, (tuple, list)) and len(item) >= 2:
+            keys.append((safe_text(item[0]), safe_text(item[1])))
+        else:
+            keys.append(("", safe_text(item)))
+    return keys
+
+
 def write_subject_wide_sheet(wb, payload: Dict[str, object]):
     layout = cast(OrderedDict, payload.get("layout", OrderedDict()))
-    project_order = cast(List[str], payload.get("project_order", []))
+    projects = _project_column_keys(payload.get("project_order", []))
     project_map = cast(Dict, payload.get("project_map", {}))
 
     ws = wb.create_sheet(title=SUBJECT_WIDE_SHEET)
-    ws.freeze_panes = "C2"
+    # 第 1 行项目编码、第 2 行项目名称，左侧两列冻结
+    ws.freeze_panes = "C3"
     ws.sheet_view.showGridLines = False
     ws.sheet_properties.outlinePr.summaryBelow = False
 
@@ -808,57 +839,50 @@ def write_subject_wide_sheet(wb, payload: Dict[str, object]):
     thin = Side(style="thin", color="B7C7BC")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-    ws.cell(1, 1, "一级科目")
-    ws.cell(1, 2, "二级科目")
-    for c in (1, 2):
-        cell = ws.cell(1, c)
-        cell.fill = title_fill
-        cell.font = bold_font
-        cell.alignment = center
-        cell.border = border
+    code_row = 1
+    name_row = 2
+    ws.merge_cells(start_row=code_row, start_column=1, end_row=code_row, end_column=2)
+    code_label = ws.cell(code_row, 1, "项目编码")
+    _paint(code_label, title_fill, bold_font, center, border)
+    _paint(ws.cell(code_row, 2), title_fill, bold_font, center, border)
+
+    ws.cell(name_row, 1, "一级科目")
+    ws.cell(name_row, 2, "二级科目")
+    for col in (1, 2):
+        _paint(ws.cell(name_row, col), title_fill, bold_font, center, border)
 
     start_col = 3
-    for idx, project_name in enumerate(project_order):
-        cell = ws.cell(1, start_col + idx, project_name)
-        cell.fill = title_fill
-        cell.font = bold_font
-        cell.alignment = center
-        cell.border = border
+    for idx, (project_code, project_name) in enumerate(projects):
+        code_cell = ws.cell(code_row, start_col + idx, project_code or None)
+        _paint(code_cell, title_fill, bold_font, center, border)
+        name_cell = ws.cell(name_row, start_col + idx, project_name)
+        _paint(name_cell, title_fill, bold_font, center, border)
 
-    summary_col = start_col + len(project_order)
-    head = ws.cell(1, summary_col, SUBJECT_SUMMARY_ROW)
-    head.fill = title_fill
-    head.font = bold_font
-    head.alignment = center
-    head.border = border
+    summary_col = start_col + len(projects)
+    _paint(ws.cell(code_row, summary_col, None), title_fill, bold_font, center, border)
+    head = ws.cell(name_row, summary_col, SUBJECT_SUMMARY_ROW)
+    _paint(head, title_fill, bold_font, center, border)
 
-    row_idx = 2
+    def _level2_amount(key: Tuple[str, str], level1: str, level2: str) -> float:
+        return float(project_map.get(key, {}).get(level1, {}).get(level2, 0) or 0)
+
+    row_idx = 3
     for level1, level2_list in layout.items():
         subtotal_row = row_idx
         for col, val in ((1, level1), (2, "小计")):
             cell = ws.cell(subtotal_row, col, val)
-            cell.fill = header_fill
-            cell.font = bold_font
-            cell.alignment = center
-            cell.border = border
+            _paint(cell, header_fill, bold_font, center, border)
 
         level1_total = 0.0
-        for p_idx, project_name in enumerate(project_order):
-            pmap = project_map.get(project_name, {}).get(level1, {})
-            value = sum(float(pmap.get(l2, 0) or 0) for l2 in level2_list)
+        for p_idx, key in enumerate(projects):
+            value = sum(_level2_amount(key, level1, l2) for l2 in level2_list)
             cell = ws.cell(subtotal_row, start_col + p_idx, value)
             cell.number_format = "#,##0.00"
-            cell.fill = header_fill
-            cell.font = bold_font
-            cell.alignment = center
-            cell.border = border
+            _paint(cell, header_fill, bold_font, center, border)
             level1_total += value
         total_cell = ws.cell(subtotal_row, summary_col, level1_total)
         total_cell.number_format = "#,##0.00"
-        total_cell.fill = header_fill
-        total_cell.font = bold_font
-        total_cell.alignment = center
-        total_cell.border = border
+        _paint(total_cell, header_fill, bold_font, center, border)
         row_idx += 1
 
         detail_start = row_idx
@@ -868,10 +892,8 @@ def write_subject_wide_sheet(wb, payload: Dict[str, object]):
                 cell.alignment = center
                 cell.border = border
             l2_total = 0.0
-            for p_idx, project_name in enumerate(project_order):
-                value = float(
-                    project_map.get(project_name, {}).get(level1, {}).get(level2, 0) or 0
-                )
+            for p_idx, key in enumerate(projects):
+                value = _level2_amount(key, level1, level2)
                 cell = ws.cell(row_idx, start_col + p_idx, value)
                 cell.number_format = "#,##0.00"
                 cell.alignment = center
@@ -889,37 +911,27 @@ def write_subject_wide_sheet(wb, payload: Dict[str, object]):
     final_row = row_idx
     for col, val in ((1, "全部汇总"), (2, "-")):
         cell = ws.cell(final_row, col, val)
-        cell.fill = summary_fill
-        cell.font = bold_font
-        cell.alignment = center
-        cell.border = border
+        _paint(cell, summary_fill, bold_font, center, border)
     grand = 0.0
-    for p_idx, project_name in enumerate(project_order):
+    for p_idx, key in enumerate(projects):
         project_total = 0.0
         for level1, level2_list in layout.items():
             for level2 in level2_list:
-                project_total += float(
-                    project_map.get(project_name, {}).get(level1, {}).get(level2, 0) or 0
-                )
+                project_total += _level2_amount(key, level1, level2)
         cell = ws.cell(final_row, start_col + p_idx, project_total)
         cell.number_format = "#,##0.00"
-        cell.fill = summary_fill
-        cell.font = bold_font
-        cell.alignment = center
-        cell.border = border
+        _paint(cell, summary_fill, bold_font, center, border)
         grand += project_total
     cell = ws.cell(final_row, summary_col, grand)
     cell.number_format = "#,##0.00"
-    cell.fill = summary_fill
-    cell.font = bold_font
-    cell.alignment = center
-    cell.border = border
+    _paint(cell, summary_fill, bold_font, center, border)
 
     ws.column_dimensions["A"].width = 18
     ws.column_dimensions["B"].width = 22
     for col_idx in range(start_col, ws.max_column + 1):
         ws.column_dimensions[get_column_letter(col_idx)].width = 16
-    ws.row_dimensions[1].height = 30
+    ws.row_dimensions[code_row].height = 22
+    ws.row_dimensions[name_row].height = 30
     return ws
 
 
