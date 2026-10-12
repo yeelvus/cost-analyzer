@@ -41,10 +41,13 @@ from common.project import (  # noqa: E402
     save_db,
 )
 
+# 留空则读 02_Std/02_成本统计收集。要换源目录就写成完整路径。
+COST_DIR = "/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_成本统计收集"
+
 CONFIG = {
-"base_dir": str(std_data_path("成本统计收集", create=False)),
-"output_file": str(sum_data_path("成本统计收集") / "项目成本统计数据_汇总.xlsx"),
-"profit_rate_chart_file": str(html_data_path() / "项目毛利率变化图.html"),
+"base_dir": str(Path(COST_DIR).expanduser()) if COST_DIR.strip() else str(std_data_path("成本统计收集", create=False)),
+"output_file": str(sum_data_path("成本统计收集", create=False) / "项目成本统计数据_汇总.xlsx"),
+"profit_rate_chart_file": str(html_data_path(create=False) / "项目毛利率变化图.html"),
 "project_match_db_file": str(MATCH_DB_PATH),
 "project_info_file": str(DATA_ROOT / "0_项目基本信息情况" / "项目基本信息表.xlsx"),
 "finance_payment_dir": str(sum_data_path("财务付款", create=False, legacy=DATA_ROOT / "12-财务数据💰")),
@@ -55,8 +58,6 @@ CONFIG = {
 "labor_summary_dir": str(sum_data_path("人工费", create=False)),
 "concrete_summary_dir": str(sum_data_path("商混站", create=False)),
 "subcontract_summary_dir": str(sum_data_path("分包合同", create=False)),
-"finance_payment_date": "2026-03-14",
-"rmb_exchange_rate": 5,
 "items": {
 "预计总成本": ("概况统计", "D3", "0.00"),
 "毛利": ("概况统计", "D5", "0.00"),
@@ -527,6 +528,10 @@ COST_FILE_RE = re.compile(
     r"^(?P<project>.+?)_成本统计_(?P<yyyymm>\d{6})(?:\(\d+\))?\s*\.(?P<ext>xlsx|xls|xlsm)$",
     re.IGNORECASE,
 )
+COST_FILE_RE_CODED = re.compile(
+    r"^(?P<yyyymm>\d{6})_(?P<code>[^_]+)_(?P<project>.+)_成本统计\s*\.(?P<ext>xlsx|xls|xlsm)$",
+    re.IGNORECASE,
+)
 COST_FILE_RE_ALT = re.compile(
     r"^(?P<year>\d{4})年(?P<month>\d{1,2})月_成本统计_(?P<project>.+?)\s*\.(?P<ext>xlsx|xls|xlsm)$",
     re.IGNORECASE,
@@ -542,6 +547,9 @@ def parse_cost_stat_filename(name: str):
     """从成本统计文件名解析 (月份标签, 项目名)。无法识别则返回 None。"""
     if name.startswith("~$") or name.startswith(".") or "汇总" in name:
         return None
+    match = COST_FILE_RE_CODED.match(name)
+    if match:
+        return yyyymm_to_month_label(match.group("yyyymm")), match.group("project").strip()
     match = COST_FILE_RE.match(name)
     if match:
         return yyyymm_to_month_label(match.group("yyyymm")), match.group("project").strip()
@@ -734,7 +742,7 @@ def generate_profit_rate_chart(summary_df, output_html):
     print(f"✓ 毛利率变化图已生成: {output_path}")
 
 def process_all_projects():
-    base_path = Path(CONFIG["base_dir"])
+    base_path = Path(CONFIG["base_dir"]).expanduser()
     finance_col_name = "财务分包已付款"
     processor = ProjectProcessor(CONFIG)
 
@@ -911,7 +919,7 @@ def process_all_projects():
     files_by_month, skipped_files = collect_cost_stat_files(base_path)
     month_labels = sorted(files_by_month.keys(), key=parse_month_sort_key, reverse=True)
     if not month_labels:
-        print("⚠️ 未找到成本统计文件（需要「项目名_成本统计_YYYYMM.xlsx/.xlsm」）")
+        print("⚠️ 未找到成本统计文件（需要「项目名_成本统计_YYYYMM」或「YYYYMM_项目编码_项目名称_成本统计」）")
         return
 
     print(f"✓ 找到 {len(month_labels)} 个月份、{sum(len(v) for v in files_by_month.values())} 个项目文件:\n")
