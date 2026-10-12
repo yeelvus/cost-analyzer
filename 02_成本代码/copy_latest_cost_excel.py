@@ -217,18 +217,21 @@ def pick_latest_per_project(files: list[Path]) -> dict[str, tuple[str, Path]]:
 
 
 def _ensure_writable(path: Path) -> None:
-    """去掉只读/锁定，使文件可编辑。"""
+    """去掉只读和锁定，使复制后的文件可以修改。"""
+    if not path.is_file():
+        return
     try:
         if hasattr(os, "chflags"):
             os.chflags(path, 0)
     except OSError:
         pass
-
-    path.chmod(WRITABLE_MODE)
-
+    mode = path.stat().st_mode
+    path.chmod(mode | stat.S_IRUSR | stat.S_IWUSR)
+    if not os.access(path, os.W_OK):
+        path.chmod(WRITABLE_MODE)
     try:
         subprocess.run(
-            ["xattr", "-c", str(path)],
+            ["chmod", "u+w", str(path)],
             check=False,
             capture_output=True,
         )
@@ -415,6 +418,8 @@ def fill_missing_latest_from_raw(*, dry_run: bool = False) -> tuple[int, int, in
                 print(f"             改名为 {dest.name}")
                 if not dry_run:
                     keeper = _rename_std(keeper, dest)
+            elif not dry_run:
+                _ensure_writable(keeper)
             kept += 1
             removed += _drop_other_std(keeper, std_items, dry_run=dry_run)
             continue
@@ -431,6 +436,8 @@ def fill_missing_latest_from_raw(*, dry_run: bool = False) -> tuple[int, int, in
             keeper = same_month[0]
             if keeper.name == dest.name:
                 print(f"  [保留 STD] [{yyyymm}] {canon}  已有 {keeper.name}")
+                if not dry_run:
+                    _ensure_writable(keeper)
             else:
                 print(f"  [改用标准名] [{yyyymm}] {canon}")
                 print(f"             {keeper.name}  →  {dest.name}")
@@ -451,8 +458,23 @@ def fill_missing_latest_from_raw(*, dry_run: bool = False) -> tuple[int, int, in
     if dry_run:
         print(f"预览：将新增 {added}，保留或改名 {kept}，将移除重复 {removed}")
     else:
-        print(f"补齐完成：新增 {added}，保留或改名 {kept}，移除重复 {removed}")
+        unlocked = unlock_outputs()
+        print(f"补齐完成：新增 {added}，保留或改名 {kept}，移除重复 {removed}，可修改 {unlocked}")
     return added, kept, removed
+
+
+def unlock_outputs() -> int:
+    """标准目录里的成本文件一律改为当前用户可写。"""
+    count = 0
+    for path in iter_std_excels():
+        before = path.stat().st_mode
+        _ensure_writable(path)
+        if not os.access(path, os.W_OK):
+            raise OSError(f"复制后的文件仍然只读: {path}")
+        if not before & stat.S_IWUSR:
+            print(f"  [改为可修改] {path.name}")
+        count += 1
+    return count
 
 
 def _print_std_now() -> None:
