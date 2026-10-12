@@ -284,7 +284,7 @@ def apply_project_name_match(
         pending: List[str] = []
         for raw_name in unique:
             hit = mod.match_project(raw_name, db, fuzzy=False)
-            if hit and hit.get("source") not in {"unmatched_keep", "unmatched"}:
+            if mod.is_resolved_match(hit):
                 code_map[raw_name] = hit.get("project_code", "") or ""
                 name_map[raw_name] = hit.get("project_name", raw_name)
             else:
@@ -302,7 +302,7 @@ def apply_project_name_match(
             )
             for raw_name in pending:
                 hit = mod.match_project(raw_name, db, fuzzy=False)
-                if hit and hit.get("source") not in {"unmatched_keep", "unmatched"}:
+                if mod.is_resolved_match(hit):
                     code_map[raw_name] = hit.get("project_code", "") or ""
                     name_map[raw_name] = hit.get("project_name", raw_name)
                 else:

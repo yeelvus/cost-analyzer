@@ -129,6 +129,24 @@ def _clean_field(value, default: str = "") -> str:
     return s
 
 
+# 不是正式项目编码。命中这种编码，或编码为空，都要重新进入匹配。
+_MISSING_PROJECT_CODES = frozenset({"需手动核对"})
+
+
+def is_missing_project_code(code) -> bool:
+    """项目编码为空，或只是占位「需手动核对」。"""
+    text = _clean_field(code)
+    return (not text) or text in _MISSING_PROJECT_CODES
+
+
+def formal_project_code(code) -> str:
+    """正式项目编码。空和「需手动核对」都返回空字符串。"""
+    text = _clean_field(code)
+    if not text or text in _MISSING_PROJECT_CODES:
+        return ""
+    return text
+
+
 # 摘要前缀清理：去掉与项目名称相同的开头，以及随后的连接符
 _SUMMARY_DASH_PREFIX_RE = re.compile(r"^[\s\-－—–﹣−]+")
 
@@ -175,7 +193,8 @@ def _build_alias_map(db) -> dict:
     projects = db.get("projects", {}) or {}
     for std_name, meta in projects.items():
         std_name = str(std_name).strip()
-        if not std_name:
+        # 没有正式编码的项目不参与匹配，名称留给补录
+        if not std_name or is_missing_project_code((meta or {}).get("project_code")):
             continue
         for alias in meta.get("aliases", []) or []:
             alias = str(alias).strip()
@@ -223,7 +242,7 @@ def build_standard_projects_from_dataframe(info_df: pd.DataFrame) -> List[dict]:
         name = _clean_field(row.get(name_col, ""))
         if not name:
             continue
-        code = _clean_field(row.get(code_col, ""), default="需手动核对")
+        code = formal_project_code(row.get(code_col, ""))
         if status_col:
             status = _clean_field(row.get(status_col, ""), default="需手动核对")
         else:
@@ -282,18 +301,19 @@ def load_or_init_db(db_path, standard_projects=None) -> dict:
         code = _clean_field(item.get("project_code", "")) if has_code_key else ""
         status = _clean_field(item.get("target_status", "")) if has_status_key else ""
 
+        code = formal_project_code(code)
         if std_name not in db["projects"]:
             db["projects"][std_name] = {
-                "project_code": code or "需手动核对",
+                "project_code": code,
                 "target_status": status or "需手动核对",
                 "aliases": [],
             }
         else:
             meta = db["projects"][std_name]
-            if has_code_key and code and code != "需手动核对":
+            if has_code_key and code:
                 meta["project_code"] = code
-            elif not _clean_field(meta.get("project_code", "")):
-                meta["project_code"] = code or "需手动核对"
+            elif is_missing_project_code(meta.get("project_code")):
+                meta["project_code"] = code
             if has_status_key and status:
                 meta["target_status"] = status
             elif not _clean_field(meta.get("target_status", "")):
@@ -316,14 +336,22 @@ def save_db(db_path, db) -> None:
 
 
 def get_project_options(db) -> List[str]:
-    return sorted(db.get("projects", {}).keys())
+    """下拉只列出有正式项目编码的标准项目。"""
+    names = []
+    for name, meta in (db.get("projects") or {}).items():
+        if is_missing_project_code((meta or {}).get("project_code")):
+            continue
+        text = str(name).strip()
+        if text:
+            names.append(text)
+    return sorted(names)
 
 
 def get_project_lookup(db) -> dict:
     lookup = {}
     for name, meta in db.get("projects", {}).items():
         lookup[name] = (
-            meta.get("project_code", "需手动核对"),
+            formal_project_code(meta.get("project_code")),
             meta.get("target_status", "需手动核对"),
         )
     return lookup
@@ -338,7 +366,7 @@ def add_mapping(db, match_name, standard_name) -> None:
         return
     if standard_name not in db["projects"]:
         db["projects"][standard_name] = {
-            "project_code": "需手动核对",
+            "project_code": "",
             "target_status": "需手动核对",
             "aliases": [],
         }
@@ -394,7 +422,7 @@ def _result(raw_name, std_name, meta, source) -> dict:
     return {
         "raw_name": raw_name,
         "project_name": std_name,
-        "project_code": meta.get("project_code", "需手动核对"),
+        "project_code": formal_project_code(meta.get("project_code")),
         "target_status": meta.get("target_status", "需手动核对"),
         "source": source,
     }
@@ -433,6 +461,8 @@ def _fuzzy_match_project(raw_name: str, db, *, min_ratio: float = 0.82):
     if len(raw_clean) >= 4:
         contain = []
         for std in projects.keys():
+            if is_missing_project_code(projects.get(std, {}).get("project_code")):
+                continue
             sc = _clean_name(std)
             if not sc:
                 continue
@@ -451,6 +481,8 @@ def _fuzzy_match_project(raw_name: str, db, *, min_ratio: float = 0.82):
 
     best_std, best_r, second_r = None, 0.0, 0.0
     for std in projects.keys():
+        if is_missing_project_code(projects.get(std, {}).get("project_code")):
+            continue
         sc = _clean_name(std) or _normalize_key(std)
         if not sc:
             continue
@@ -489,6 +521,8 @@ def match_project(
     2. 若已在 unmatched_aliases 中标记过 → 直接保留原名，不再模糊匹配
        （自动批处理不再弹窗；手动运行 prompt=True 时仍会弹出补录对话框）
     3. 模糊匹配（仅对从未标记过的新名称）
+
+    标准项目没有正式编码，或编码是「需手动核对」时，不作为命中。
     """
     if raw_name is None:
         return None
@@ -500,15 +534,22 @@ def match_project(
     alias_map = _cached_alias_map(db)
 
     std_name = alias_map.get(raw_name)
-    if std_name and std_name in projects:
+    if (
+        std_name
+        and std_name in projects
+        and not is_missing_project_code(projects[std_name].get("project_code"))
+    ):
         return _result(raw_name, std_name, projects[std_name], "alias")
 
     raw_key = _normalize_key(raw_name)
     for alias, std in alias_map.items():
-        if _normalize_key(alias) == raw_key and std in projects:
-            meta = projects[std]
-            add_mapping(db, raw_name, std)
-            return _result(raw_name, std, meta, "normalized_alias")
+        if _normalize_key(alias) != raw_key or std not in projects:
+            continue
+        meta = projects[std]
+        if is_missing_project_code(meta.get("project_code")):
+            continue
+        add_mapping(db, raw_name, std)
+        return _result(raw_name, std, meta, "normalized_alias")
 
     # 二次及以后运行：曾标记为未匹配的名称，跳过模糊匹配与再次弹窗
     if skip_marked_unmatched and is_unmatched_alias(db, raw_name):
@@ -529,6 +570,13 @@ def match_project(
     return None
 
 
+def is_resolved_match(hit: Optional[dict]) -> bool:
+    """已匹配到有正式项目编码的标准项目。空编码和「需手动核对」都要进入匹配。"""
+    if not hit or hit.get("source") in {"unmatched_keep", "unmatched"}:
+        return False
+    return not is_missing_project_code(hit.get("project_code"))
+
+
 def collect_names_needing_prompt(
     raw_names,
     db,
@@ -547,7 +595,7 @@ def collect_names_needing_prompt(
             continue
         seen.add(key)
         hit = match_project(name, db, fuzzy=fuzzy, skip_marked_unmatched=True)
-        if hit and hit.get("source") not in {"unmatched_keep", "unmatched"}:
+        if is_resolved_match(hit):
             continue
         if (
             hit
@@ -742,7 +790,7 @@ def update_db_from_excel(
     new_count = 0
 
     for _, row in df.iterrows():
-        code = _clean_field(row.get(code_column, ""))
+        code = formal_project_code(row.get(code_column, ""))
         if not code:
             continue
         name = _clean_field(row.get(name_column, ""))
@@ -903,7 +951,7 @@ class ProjectMatcher:
         skipped_keep = 0
         for n in representatives:
             hit = self.match(n, fuzzy=fuzzy)
-            if hit and hit.get("source") != "unmatched_keep":
+            if is_resolved_match(hit):
                 _broadcast(n, hit)
             elif hit and hit.get("source") == "unmatched_keep":
                 # 手动弹窗：已保留原名的项也要再确认；自动批处理才跳过
@@ -933,7 +981,7 @@ class ProjectMatcher:
             for n in pending:
                 # 弹窗后：有别名则用别名；已点跳过/关闭的标记未匹配
                 hit = self.match(n, fuzzy=False)
-                if hit and hit.get("source") not in {"unmatched_keep", "unmatched"}:
+                if is_resolved_match(hit):
                     _broadcast(n, hit)
                 else:
                     mark_unmatched(self.db, n)
@@ -1173,11 +1221,7 @@ def _cell_is_empty(value) -> bool:
 
 
 def _is_unmatched_hit(hit: Optional[dict]) -> bool:
-    if not hit:
-        return True
-    if hit.get("source") in {"unmatched", "unmatched_keep"}:
-        return True
-    return False
+    return not is_resolved_match(hit)
 
 
 def fill_excel_project_columns(
