@@ -149,8 +149,10 @@ def load_summary_dataframe(excel_path: Path) -> tuple[pd.DataFrame, dict]:
     if rename:
         df = df.rename(columns=rename)
 
-    amount_col = "本次费用合计" if "本次费用合计" in df.columns else (
-        "结算费用_泰铢" if "结算费用_泰铢" in df.columns else None
+    amount_col = "成本金额" if "成本金额" in df.columns else (
+        "本次费用合计" if "本次费用合计" in df.columns else (
+            "结算费用_泰铢" if "结算费用_泰铢" in df.columns else None
+        )
     )
     if amount_col is None:
         raise KeyError(f"缺少金额列，当前列: {list(df.columns)}")
@@ -173,11 +175,22 @@ def load_summary_dataframe(excel_path: Path) -> tuple[pd.DataFrame, dict]:
     else:
         df["月份"] = pd.Timestamp(datetime.now().year, datetime.now().month, 1)
 
-    for col in ["台班费_泰铢", "本次结算台班", "结算费用_泰铢", "本次费用合计"]:
+    for col in [
+        "台班费_泰铢", "本次结算台班", "结算费用_泰铢", "本次费用合计",
+        "成本金额", "机具租赁预扣税3%", "机具租赁预扣税5%", "预扣税合计", "增值税7%",
+    ]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    df["_金额"] = df[amount_col]
+    # 分析报告用成本金额。旧汇总没有该列时，用付款金额加回预扣税。
+    if "成本金额" in df.columns:
+        df["_金额"] = df["成本金额"]
+    elif "本次费用合计" in df.columns:
+        tax3 = df["机具租赁预扣税3%"] if "机具租赁预扣税3%" in df.columns else 0
+        tax5 = df["机具租赁预扣税5%"] if "机具租赁预扣税5%" in df.columns else 0
+        df["_金额"] = df["本次费用合计"] + tax3 + tax5
+    else:
+        df["_金额"] = df[amount_col]
     return df, extra
 
 

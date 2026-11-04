@@ -694,21 +694,6 @@ def load_equipment(equipment_path: Path) -> pd.DataFrame:
                 df["项目名称"] = df[alt]
                 break
 
-    amount_col = None
-    for col in ["费用合计(泰铢)", "费用合计", "本次费用合计", "结算费用_泰铢", "月租金额_泰铢"]:
-        if col in df.columns:
-            amount_col = col
-            break
-    if amount_col is None:
-        for col in df.columns:
-            if "费用合计" in str(col) or "金额" in str(col):
-                amount_col = col
-                break
-
-    if amount_col is None:
-        df["金额_THB"] = 0.0
-        return df
-
     temp = df.copy()
     if "项目编码" not in temp.columns:
         temp["项目编码"] = ""
@@ -717,7 +702,35 @@ def load_equipment(equipment_path: Path) -> pd.DataFrame:
     temp["项目编码"] = temp["项目编码"].apply(normalize_project_code)
     temp["项目名称"] = temp["项目名称"].apply(normalize_project_name)
     temp = temp[(temp["项目编码"] != "") | (temp["项目名称"] != "")]
-    temp["金额_THB"] = temp[amount_col].apply(coerce_float)
+
+    # 成本不扣预扣税。明细优先用成本金额；旧表用付款金额加回预扣税。
+    if "成本金额" in temp.columns:
+        temp["金额_THB"] = temp["成本金额"].apply(coerce_float)
+    elif "本次费用合计" in temp.columns and (
+        "机具租赁预扣税3%" in temp.columns or "机具租赁预扣税5%" in temp.columns
+    ):
+        amount = temp["本次费用合计"].apply(coerce_float)
+        if "机具租赁预扣税3%" in temp.columns:
+            amount = amount + temp["机具租赁预扣税3%"].apply(coerce_float)
+        if "机具租赁预扣税5%" in temp.columns:
+            amount = amount + temp["机具租赁预扣税5%"].apply(coerce_float)
+        temp["金额_THB"] = amount
+    else:
+        amount_col = None
+        for col in ["费用合计(泰铢)", "费用合计", "本次费用合计", "结算费用_泰铢", "月租金额_泰铢"]:
+            if col in temp.columns:
+                amount_col = col
+                break
+        if amount_col is None:
+            for col in temp.columns:
+                if "费用合计" in str(col) or col == "成本金额":
+                    amount_col = col
+                    break
+        if amount_col is None:
+            temp["金额_THB"] = 0.0
+            temp["标准项目名称"] = temp.get("标准项目名称", temp["项目名称"]).apply(normalize_project_name)
+            return temp
+        temp["金额_THB"] = temp[amount_col].apply(coerce_float)
     temp["标准项目名称"] = temp.get("标准项目名称", temp["项目名称"]).apply(normalize_project_name)
     return temp
 

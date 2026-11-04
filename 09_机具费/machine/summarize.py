@@ -72,11 +72,13 @@ from machine.textutil import (
     safe_to_float,
 )
 from machine.validate import (
+    cost_amount,
     detect_and_fix_supplier_month_swap,
     detect_and_fix_swapped_values,
     validate_overtime_fee,
     validate_settlement_amount,
     validate_total_amount,
+    withhold_tax_amount,
 )
 
 # 输入：原始拆分；输出：标准汇总
@@ -366,6 +368,8 @@ def main(excel_path_override=None, output_basename_override=None):
                     "本次费用合计错误行数": 0,
                     "本次费用合计错误率(%)": 0,
                     "本次费用合计差异金额(泰铢)": 0,
+                    "付款金额(泰铢)": 0,
+                    "预扣税合计(泰铢)": 0,
                     "费用合计(泰铢)": 0
                 })
                 continue
@@ -431,7 +435,8 @@ def main(excel_path_override=None, output_basename_override=None):
             # 1. 结算费用 = 台班费 × 台班数 + 加班费 + 运费
             # 2. 增值税7% = 结算费用 × 0.07
             # 3. 预扣税3% = 结算费用 × 0.03
-            # 4. 本次费用合计 = 结算费用 + 增值税 - 预扣税3% - 预扣税5%
+            # 4. 本次费用合计 = 结算费用 + 增值税 - 预扣税3% - 预扣税5%（付款金额）
+            # 5. 成本金额 = 本次费用合计 + 预扣税3% + 预扣税5%（成本不扣预扣税）
             print(f"  正在检查并重新计算费用...")
             
             settlement_recalc = 0
@@ -525,6 +530,8 @@ def main(excel_path_override=None, output_basename_override=None):
                     "本次费用合计错误行数": 0,
                     "本次费用合计错误率(%)": 0,
                     "本次费用合计差异金额(泰铢)": 0,
+                    "付款金额(泰铢)": 0,
+                    "预扣税合计(泰铢)": 0,
                     "费用合计(泰铢)": 0
                 })
                 continue
@@ -636,8 +643,10 @@ def main(excel_path_override=None, output_basename_override=None):
             
             df["标准型号规格"] = df.apply(map_model, axis=1)
             
-            # 计算本sheet的费用合计
-            sheet_total = df["本次费用合计"].apply(safe_to_float).sum()
+            # 付款金额已扣预扣税；成本金额把预扣税加回
+            sheet_payment = df.apply(lambda row: safe_to_float(row.get("本次费用合计", 0)), axis=1).sum()
+            sheet_tax = df.apply(withhold_tax_amount, axis=1).sum()
+            sheet_total = sheet_payment + sheet_tax
             
             all_data.append(df)
             
@@ -712,6 +721,8 @@ def main(excel_path_override=None, output_basename_override=None):
                 "结算费用行数": settlement_count,
                 "结算费用合计(泰铢)": round(settlement_total, 2),
                 "本次费用行数": total_count,
+                "付款金额(泰铢)": round(sheet_payment, 2),
+                "预扣税合计(泰铢)": round(sheet_tax, 2),
                 "费用合计(泰铢)": round(sheet_total, 2)
             })
     
@@ -1020,12 +1031,17 @@ def main(excel_path_override=None, output_basename_override=None):
     refreshed_year_month_count = (summary_df["年月"] != "").sum()
     print(f"✅ 已按最新月份信息重算年月列，成功解析 {refreshed_year_month_count}/{len(summary_df)} 行")
     
+    # 预扣税单独汇总；成本金额 = 付款金额 + 预扣税，供后续成本计算使用
+    summary_df["预扣税合计"] = summary_df.apply(withhold_tax_amount, axis=1)
+    summary_df["成本金额"] = summary_df.apply(cost_amount, axis=1)
+
     # 调整列顺序（基础字段统一为：项目编码、项目名称）
     col_order = [
         "项目编码", "项目名称", "标准机具种类", "标准型号规格",
         "序号", "台班费_泰铢", "本次结算台班",
         "加班小时", "加班费", "进出场费运费", "移动费拆装费", "结算费用_泰铢",
-        "增值税7%", "机具租赁预扣税3%", "机具租赁预扣税5%", "本次费用合计",
+        "增值税7%", "机具租赁预扣税3%", "机具租赁预扣税5%", "预扣税合计",
+        "本次费用合计", "成本金额",
         "使用日期", "出租单位", "月份", "年月", "备注", "月租金额_泰铢", "日租金额_泰铢", "备注加班费单价"
     ]
     
@@ -1042,13 +1058,20 @@ def main(excel_path_override=None, output_basename_override=None):
     print(f"重新排序后的列: {list(summary_df.columns)}")
 
     # 5. 计算汇总金额并验证
-    summary_total = summary_df["本次费用合计"].apply(safe_to_float).sum()
+    # 费用合计是成本口径：付款金额 + 预扣税，不再扣除预扣税
+    summary_payment = summary_df["本次费用合计"].apply(safe_to_float).sum()
+    summary_tax = summary_df["预扣税合计"].apply(safe_to_float).sum()
+    summary_total = summary_df["成本金额"].apply(safe_to_float).sum()
+    report_payment = sum(item.get("付款金额(泰铢)", 0) for item in report_data if item["状态"] == "成功")
+    report_tax = sum(item.get("预扣税合计(泰铢)", 0) for item in report_data if item["状态"] == "成功")
     report_total = sum(item.get("费用合计(泰铢)", 0) for item in report_data if item["状态"] == "成功")
     
     print(f"\n{'='*60}")
-    print(f"金额验证：")
-    print(f"  各sheet费用合计: {report_total:,.2f} 泰铢")
-    print(f"  汇总表费用合计: {summary_total:,.2f} 泰铢")
+    print(f"金额验证（成本 = 付款金额 + 预扣税）：")
+    print(f"  各sheet成本合计: {report_total:,.2f} 泰铢")
+    print(f"  汇总表成本合计: {summary_total:,.2f} 泰铢")
+    print(f"  付款金额合计: {summary_payment:,.2f} 泰铢")
+    print(f"  预扣税合计: {summary_tax:,.2f} 泰铢")
     if abs(summary_total - report_total) < 0.01:
         print(f"  ✅ 金额验证通过，差异: {abs(summary_total - report_total):.2f} 泰铢")
     else:
@@ -1085,6 +1108,8 @@ def main(excel_path_override=None, output_basename_override=None):
         "结算费用行数": sum(item.get("结算费用行数", 0) for item in report_data),
         "结算费用合计(泰铢)": round(sum(item.get("结算费用合计(泰铢)", 0) for item in report_data), 2),
         "本次费用行数": sum(item.get("本次费用行数", 0) for item in report_data),
+        "付款金额(泰铢)": round(report_payment, 2),
+        "预扣税合计(泰铢)": round(report_tax, 2),
         "费用合计(泰铢)": round(report_total, 2)
     })
     
@@ -1095,7 +1120,8 @@ def main(excel_path_override=None, output_basename_override=None):
     numeric_columns = [
         "台班费_泰铢", "本次结算台班", "加班小时", "加班费",
         "进出场费运费", "移动费拆装费", "结算费用_泰铢",
-        "增值税7%", "机具租赁预扣税3%", "机具租赁预扣税5%", "本次费用合计",
+        "增值税7%", "机具租赁预扣税3%", "机具租赁预扣税5%", "预扣税合计",
+        "本次费用合计", "成本金额",
         "月租金额_泰铢", "日租金额_泰铢", "备注加班费单价"
     ]
     
@@ -1105,6 +1131,7 @@ def main(excel_path_override=None, output_basename_override=None):
     currency_columns = [
         "台班费_泰铢", "加班费", "进出场费运费", "移动费拆装费",
         "结算费用_泰铢", "增值税7%", "机具租赁预扣税3%", "机具租赁预扣税5%",
+        "预扣税合计", "本次费用合计", "成本金额",
         "月租金额_泰铢", "日租金额_泰铢", "备注加班费单价"
     ]
     
@@ -1113,14 +1140,23 @@ def main(excel_path_override=None, output_basename_override=None):
             summary_df[col] = summary_df[col].apply(safe_to_float)
 
     # 生成项目汇总机具费表
+    # 费用合计(泰铢) 是成本口径，等于付款金额 + 预扣税；预扣税另列，便于核对付款额
     project_summary_df = summary_df.groupby(['项目编码', '项目名称']).agg({
-        '本次费用合计': lambda x: x.apply(safe_to_float).sum(),
+        '成本金额': 'sum',
+        '本次费用合计': 'sum',
+        '机具租赁预扣税3%': 'sum',
+        '机具租赁预扣税5%': 'sum',
+        '预扣税合计': 'sum',
         '序号': 'count',
         '机具种类': 'nunique',
         '出租单位': 'nunique',
         '月份': 'nunique'
     }).round(2).reset_index()
-    project_summary_df.columns = ['项目编码', '项目名称', '费用合计(泰铢)', '使用次数', '机具种类数', '出租单位数', '覆盖月份数']
+    project_summary_df.columns = [
+        '项目编码', '项目名称', '费用合计(泰铢)', '付款金额(泰铢)',
+        '预扣税3%(泰铢)', '预扣税5%(泰铢)', '预扣税合计(泰铢)',
+        '使用次数', '机具种类数', '出租单位数', '覆盖月份数',
+    ]
     project_summary_df = project_summary_df.sort_values('费用合计(泰铢)', ascending=False).reset_index(drop=True)
 
     # 新增：按“年月(YYYY-MM)”生成项目月份金额宽表
@@ -1136,7 +1172,7 @@ def main(excel_path_override=None, output_basename_override=None):
     project_monthly_wide_report = monthly_wide_source.pivot_table(
         index=["月度项目编码", "月度项目名称"],
         columns="月度年月",
-        values="本次费用合计",
+        values="成本金额",
         aggfunc="sum",
         fill_value=0
     )
@@ -1336,6 +1372,9 @@ def main(excel_path_override=None, output_basename_override=None):
                             if not is_correct:
                                 cell.fill = pink_fill
 
+                        if col_name == "成本金额":
+                            cell.font = bold_font
+
                     if cell_value:
                         max_length = max(max_length, len(str(cell_value)))
 
@@ -1395,7 +1434,10 @@ def main(excel_path_override=None, output_basename_override=None):
             for row_idx in range(2, len(project_summary_df) + 2):
                 cell = ws_project_summary.cell(row=row_idx, column=col_idx)
                 cell_value = cell.value
-                if col_name == '费用合计(泰铢)':
+                if col_name in (
+                    '费用合计(泰铢)', '付款金额(泰铢)',
+                    '预扣税3%(泰铢)', '预扣税5%(泰铢)', '预扣税合计(泰铢)',
+                ):
                     if isinstance(cell_value, str):
                         try:
                             cell.value = float(cell_value.replace(',', '').strip()) if cell_value.strip() else 0.0
@@ -1434,8 +1476,8 @@ def main(excel_path_override=None, output_basename_override=None):
                 cell = ws_report.cell(row=row_idx, column=col_idx)
                 cell_value = cell.value
                 
-                # 为费用合计列设置货币格式（带泰铢符号）
-                if col_name == "费用合计(泰铢)":
+                # 为金额列设置货币格式
+                if col_name in ("费用合计(泰铢)", "付款金额(泰铢)", "预扣税合计(泰铢)"):
                     # 转换字符串为数字
                     if isinstance(cell_value, str):
                         try:
@@ -1478,13 +1520,21 @@ def main(excel_path_override=None, output_basename_override=None):
     print(f"\n处理报告：")
     for item in report_data[:-1]:  # 不显示合计行
         status_icon = "✅" if item["状态"] == "成功" else "❌"
-        amount_str = f"{item.get('费用合计(泰铢)', 0):,.2f}" if item["状态"] == "成功" else "0.00"
+        if item["状态"] == "成功":
+            amount_str = (
+                f"成本 {item.get('费用合计(泰铢)', 0):,.2f}"
+                f"（付款 {item.get('付款金额(泰铢)', 0):,.2f}，预扣税 {item.get('预扣税合计(泰铢)', 0):,.2f}）"
+            )
+        else:
+            amount_str = "0.00"
         print(f"  {status_icon} {item['sheet名称']}: {item['状态']} - {item.get('数据行数', 0)} 行 - {amount_str} 泰铢")
-    print(f"\n  💰 总计: {report_total:,.2f} 泰铢")
+    print(f"\n  💰 成本合计: {report_total:,.2f} 泰铢")
+    print(f"  付款金额: {report_payment:,.2f} 泰铢")
+    print(f"  预扣税合计: {report_tax:,.2f} 泰铢")
     print(f"\n已生成4个工作表（汇总置首）：")
-    print(f"  1. '{SUMMARY_SHEET_NAME}' - 所有数据明细 (共 {len(summary_df)} 行)")
-    print(f"  2. '{PROJECT_SUMMARY_SHEET_NAME}' - 项目汇总机具使用费")
-    print(f"  3. '{PROJECT_MONTHLY_WIDE_SHEET_NAME}' - 各项目按年月横向金额宽表")
+    print(f"  1. '{SUMMARY_SHEET_NAME}' - 明细；本次费用合计为付款金额，成本金额为付款金额加预扣税")
+    print(f"  2. '{PROJECT_SUMMARY_SHEET_NAME}' - 费用合计为成本，另列付款金额与预扣税")
+    print(f"  3. '{PROJECT_MONTHLY_WIDE_SHEET_NAME}' - 各项目按年月的成本金额")
     print(f"  4. '{PROCESS_REPORT_SHEET_NAME}' - 各项目处理情况统计")
     
     # 9. 生成筛选分析
@@ -1495,7 +1545,7 @@ def main(excel_path_override=None, output_basename_override=None):
     # 按标准机具种类统计
     print(f"\n🔧 按机具种类统计（Top 10）：")
     kind_stats = summary_df.groupby('机具种类').agg({
-        '本次费用合计': lambda x: x.apply(safe_to_float).sum(),
+        '成本金额': lambda x: x.apply(safe_to_float).sum(),
         '序号': 'count'
     }).round(2)
     kind_stats.columns = ['费用合计(泰铢)', '使用次数']
@@ -1506,7 +1556,7 @@ def main(excel_path_override=None, output_basename_override=None):
     # 按项目统计
     print(f"\n📊 按项目统计：")
     project_stats = summary_df.groupby('项目名称').agg({
-        '本次费用合计': lambda x: x.apply(safe_to_float).sum(),
+        '成本金额': lambda x: x.apply(safe_to_float).sum(),
         '机具种类': 'nunique'
     }).round(2)
     project_stats.columns = ['费用合计(泰铢)', '机具种类数']

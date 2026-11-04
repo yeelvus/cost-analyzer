@@ -52,9 +52,28 @@ def validate_settlement_amount(row):
     return is_correct, actual, calculated1, calculated2
 
 
+def withhold_tax_amount(row):
+    """预扣税合计 = 机具租赁预扣税3% + 机具租赁预扣税5%。"""
+    return (
+        safe_to_float(row.get('机具租赁预扣税3%', 0))
+        + safe_to_float(row.get('机具租赁预扣税5%', 0))
+    )
+
+
+def cost_amount(row):
+    """成本金额 = 本次费用合计 + 预扣税。
+
+    本次费用合计是需要支付的付款金额，已经扣除预扣税。
+    做成本时预扣税也是成本，所以成本金额不再扣除预扣税。
+    """
+    return safe_to_float(row.get('本次费用合计', 0)) + withhold_tax_amount(row)
+
+
 def validate_total_amount(row):
-    """验证本次费用合计是否正确
-    正确公式: 本次费用合计 = 结算费用_泰铢 + 增值税7% - 机具租赁预扣税3% - 机具租赁预扣税5%
+    """验证本次费用合计是否正确。
+
+    本次费用合计是付款金额：
+    结算费用_泰铢 + 增值税7% - 机具租赁预扣税3% - 机具租赁预扣税5%
     返回: (是否正确, 实际值, 计算值)
     """
     actual = safe_to_float(row.get('本次费用合计', 0))
