@@ -75,6 +75,7 @@ from machine.validate import (
     cost_amount,
     detect_and_fix_supplier_month_swap,
     detect_and_fix_swapped_values,
+    resolve_single_withholding,
     validate_overtime_fee,
     validate_settlement_amount,
     validate_total_amount,
@@ -434,9 +435,9 @@ def main(excel_path_override=None, output_basename_override=None):
             # Excel公式结构：
             # 1. 结算费用 = 台班费 × 台班数 + 加班费 + 运费
             # 2. 增值税7% = 结算费用 × 0.07
-            # 3. 预扣税3% = 结算费用 × 0.03
-            # 4. 本次费用合计 = 结算费用 + 增值税 - 预扣税3% - 预扣税5%（付款金额）
-            # 5. 成本金额 = 本次费用合计 + 预扣税3% + 预扣税5%（成本不扣预扣税）
+            # 3. 预扣税只取一种：已有 5% 时不补 3%；两种都空时才按结算费用 × 0.03 补 3%
+            # 4. 本次费用合计 = 结算费用 + 增值税 - 预扣税（付款金额）
+            # 5. 成本金额 = 本次费用合计 + 预扣税（成本不扣预扣税）
             print(f"  正在检查并重新计算费用...")
             
             settlement_recalc = 0
@@ -478,9 +479,20 @@ def main(excel_path_override=None, output_basename_override=None):
                     vat = calc_vat
                     vat_recalc += 1
                 
-                # 第三步：重新计算"预扣税3%"
+                # 第三步：预扣税。一行只能是 3% 或 5%，不能两列都有数。
                 tax3 = safe_to_float(df.iloc[idx]["机具租赁预扣税3%"])
-                if tax3 == 0 and settlement != 0:
+                tax5 = safe_to_float(df.iloc[idx]["机具租赁预扣税5%"])
+                kept3, kept5 = resolve_single_withholding(settlement, tax3, tax5)
+                if abs(kept3 - tax3) > 0.01:
+                    write_recalc_value(df, idx, "机具租赁预扣税3%", kept3)
+                    tax3 = kept3
+                    tax_recalc += 1
+                if abs(kept5 - tax5) > 0.01:
+                    write_recalc_value(df, idx, "机具租赁预扣税5%", kept5)
+                    tax5 = kept5
+                    tax_recalc += 1
+                # 两列都空、公式未缓存时，才按 3% 补。已有 5% 时不能再补 3%。
+                if tax3 == 0 and tax5 == 0 and settlement != 0:
                     calc_tax3 = settlement * 0.03
                     write_recalc_value(df, idx, "机具租赁预扣税3%", calc_tax3)
                     tax3 = calc_tax3
@@ -489,7 +501,6 @@ def main(excel_path_override=None, output_basename_override=None):
                 # 第四步：重新计算"本次费用合计"
                 current_fee = safe_to_float(df.iloc[idx]["本次费用合计"])
                 if current_fee == 0 and settlement != 0:
-                    tax5 = safe_to_float(df.iloc[idx]["机具租赁预扣税5%"])
                     calculated_fee = settlement + vat - tax3 - tax5
                     write_recalc_value(df, idx, "本次费用合计", calculated_fee)
                     fee_recalc += 1

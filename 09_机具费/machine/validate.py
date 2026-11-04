@@ -52,12 +52,27 @@ def validate_settlement_amount(row):
     return is_correct, actual, calculated1, calculated2
 
 
+def resolve_single_withholding(settlement, tax3, tax5):
+    """一行只保留一种预扣税。
+
+    原始记录里 3% 和 5% 不会同时有数。5% 已有金额时，不再保留按结算费用补出的 3%。
+    返回 (预扣税3%, 预扣税5%)。
+    """
+    tax3 = safe_to_float(tax3)
+    tax5 = safe_to_float(tax5)
+    if abs(tax3) <= 0.01 or abs(tax5) <= 0.01:
+        return tax3, tax5
+    return 0.0, tax5
+
+
 def withhold_tax_amount(row):
-    """预扣税合计 = 机具租赁预扣税3% + 机具租赁预扣税5%。"""
-    return (
-        safe_to_float(row.get('机具租赁预扣税3%', 0))
-        + safe_to_float(row.get('机具租赁预扣税5%', 0))
+    """预扣税合计。一行只计一种预扣税，3% 与 5% 不同时计入。"""
+    tax3, tax5 = resolve_single_withholding(
+        row.get('结算费用_泰铢', 0),
+        row.get('机具租赁预扣税3%', 0),
+        row.get('机具租赁预扣税5%', 0),
     )
+    return tax3 + tax5
 
 
 def cost_amount(row):
