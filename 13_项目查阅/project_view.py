@@ -457,12 +457,17 @@ def code_from_filename(filename: str) -> str:
     return formal_code(match.group(1))
 
 
-def finance_loose_name(filename: str) -> str:
+def finance_loose_name(filename: str, group_name: str = "") -> str:
     stem = Path(filename).stem
     for prefix in ("未识别编码_", "需手动核对_"):
         if stem.startswith(prefix):
             rest = stem[len(prefix):]
-            return re.sub(r"_财务付款数据$", "", rest).strip()
+            rest = re.sub(r"_财务付款数据$", "", rest).strip()
+            group = clean_text(group_name)
+            suffix = f"_{group}" if group else ""
+            if suffix and rest.endswith(suffix):
+                rest = rest[: -len(suffix)].strip()
+            return rest
     return ""
 
 
@@ -787,7 +792,7 @@ def index_std_files(resolve) -> tuple[dict[str, dict[str, list[Path]]], dict[str
         if code:
             add("finance", code, path)
             continue
-        loose = finance_loose_name(path.name)
+        loose = finance_loose_name(path.name, finance_dir.name)
         resolved, _name = resolve(loose)
         add("finance", resolved or (f"未编码:{norm_name(loose)}" if loose else ""), path, loose)
 

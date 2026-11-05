@@ -150,7 +150,7 @@ def extract_month_from_row(row: pd.Series, fallback_ymd: str) -> str:
 
 
 def parse_project_from_filename(file_path: Path) -> tuple[str, str]:
-    """兼容 编码_名称_财务付款数据 / 旧 编码_名称_(日期)。"""
+    """兼容 编码_名称_{组名} / 旧 编码_名称_财务付款数据 / 编码_名称_(日期)。"""
     return parse_std_project_filename(file_path)
 
 

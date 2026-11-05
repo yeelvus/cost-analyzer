@@ -52,6 +52,7 @@ def test_filename_code():
     assert view.code_from_filename("未识别编码_INSEE_财务付款数据.xlsx") == ""
     assert view.finance_loose_name("未识别编码_INSEE项目_财务付款数据.xlsx") == "INSEE项目"
     assert view.finance_loose_name("需手动核对_欣强项目_财务付款数据.xlsx") == "欣强项目"
+    assert view.finance_loose_name("未识别编码_巴真搅拌站_流水.xlsx", "流水") == "巴真搅拌站"
     assert view.budget_loose_name("标段人材机汇总-伊莱特_processed.xlsx") == "伊莱特"
     print("filename OK")
 

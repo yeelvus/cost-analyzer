@@ -311,7 +311,7 @@ def collect_raw_lines_from_std(std_dir: Path) -> List[Dict[str, Any]]:
         if df.empty:
             continue
         df = ensure_payment_amount(df)
-        # 文件名兜底项目（编码_名称_财务付款数据 / 旧编码_名称_(日期)）
+        # 文件名兜底项目（编码_名称_{组名} / 旧编码_名称_财务付款数据 / 编码_名称_(日期)）
         file_code, file_name = parse_std_project_filename(f)
         src_group, spend_bucket = _std_path_meta(f, std_dir)
 

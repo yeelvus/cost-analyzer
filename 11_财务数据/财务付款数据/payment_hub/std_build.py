@@ -386,11 +386,15 @@ def format_last_payment_date(df: pd.DataFrame) -> str:
     return "未识别日期"
 
 
-def build_std_project_filename(code: str, name: str) -> str:
-    """项目编码_项目名称_财务付款数据.xlsx"""
+def build_std_project_filename(code: str, name: str, group_name: str = "") -> str:
+    """项目编码_项目名称_{组名}.xlsx，例如 未识别编码_巴真搅拌站_流水.xlsx。
+
+    组名为空时仍用旧后缀「财务付款数据」，避免写出没有分组标记的文件。
+    """
     code_part = safe_filename(code) if code else "未识别编码"
     name_part = safe_filename(name) if name else "未命名项目"
-    return f"{code_part}_{name_part}_{STD_FILE_TAG}.xlsx"
+    tag = safe_filename(group_name) if str(group_name or "").strip() else STD_FILE_TAG
+    return f"{code_part}_{name_part}_{tag}.xlsx"
 
 
 def apply_output_format(output_path: Path, classify_data: Path | None = None) -> None:
@@ -464,7 +468,7 @@ def apply_output_format(output_path: Path, classify_data: Path | None = None) ->
 def _cleanup_stale_project_files(std_dir: Path, keep_relpaths: set[str]) -> None:
     """
     删除本次未产出的项目文件（含子目录）。
-    keep_relpaths: 相对组目录的路径，如「编码_名称_财务付款数据.xlsx」
+    keep_relpaths: 相对组目录的路径，如「编码_名称_流水.xlsx」
     """
     std_dir = Path(std_dir)
     for f in std_dir.rglob("*.xlsx"):
@@ -479,13 +483,14 @@ def _cleanup_stale_project_files(std_dir: Path, keep_relpaths: set[str]) -> None
         # 典型项目文件 / 新旧命名 / 两个归类子目录下的文件
         parent_name = f.parent.name
         in_bucket = parent_name in {STD_DIR_HAS_SPEND, STD_DIR_NO_SPEND}
+        group_tag = safe_filename(std_dir.name)
         looks_project = bool(
             re.match(
                 r"^(THCC|LSBM|XCY|未识别编码|需手动核对).*\.xlsx$",
                 f.name,
                 re.I,
             )
-        ) or f.name.endswith(f"_{STD_FILE_TAG}.xlsx")
+        ) or f.name.endswith(f"_{STD_FILE_TAG}.xlsx") or f.name.endswith(f"_{group_tag}.xlsx")
         if in_bucket or looks_project or f.parent == std_dir:
             try:
                 f.unlink()
@@ -559,7 +564,7 @@ def _process_group_std(
             if not codes.empty:
                 code = codes.iloc[0]
 
-        out_name = build_std_project_filename(code, name)
+        out_name = build_std_project_filename(code, name, group_name)
         out_path = group_std_dir / out_name
         keep_relpaths.add(out_name)
 
@@ -608,7 +613,10 @@ def _cleanup_legacy_flat_std(std_dir: Path, active_groups: set[str]) -> None:
         if active_groups and child.name not in active_groups:
             # 仅删除看起来是过期业务组（内含 std 项目文件）
             try:
-                has_std = any(child.rglob(f"*_{STD_FILE_TAG}.xlsx"))
+                group_tag = safe_filename(child.name)
+                has_std = any(child.rglob(f"*_{STD_FILE_TAG}.xlsx")) or any(
+                    child.rglob(f"*_{group_tag}.xlsx")
+                )
             except OSError:
                 has_std = False
             if has_std:
@@ -671,7 +679,7 @@ def _split_detail_df_to_std(
             if not codes.empty:
                 code = codes.iloc[0]
 
-        out_name = build_std_project_filename(code, name)
+        out_name = build_std_project_filename(code, name, group_name)
         out_path = group_std_dir / out_name
         keep_relpaths.add(out_name)
 

@@ -270,14 +270,22 @@ def parse_std_project_filename(file_path: Path | str) -> tuple[str, str]:
     从 B_std 项目文件名解析 (项目编码, 项目名称)。
 
     支持：
-    - 编码_名称_财务付款数据
-    - 编码_名称_(YYYY-MM-DD)  （旧命名）
+    - 编码_名称_{所在文件夹名}，例如 未识别编码_巴真搅拌站_流水
+    - 编码_名称_财务付款数据（旧命名）
+    - 编码_名称_(YYYY-MM-DD)  （更旧命名）
     - 编码_名称
     """
-    stem = safe_text(Path(file_path).stem)
+    path = Path(file_path)
+    stem = safe_text(path.stem)
     if not stem:
         return "", ""
     stem = re.sub(r"_财务付款数据$", "", stem)
+    parent = safe_text(path.parent.name)
+    if parent and parent not in {"最新月份有支出", "最新月份未支出"}:
+        parent_tag = safe_filename(parent)
+        suffix = f"_{parent_tag}"
+        if stem.endswith(suffix) and len(stem) > len(suffix):
+            stem = stem[: -len(suffix)]
     stem = re.sub(r"_\(\d{4}-\d{2}-\d{2}\)$", "", stem)
     match = re.match(r"^([A-Za-z0-9\-]+)[_\-\s]+(.+)$", stem)
     if not match:
