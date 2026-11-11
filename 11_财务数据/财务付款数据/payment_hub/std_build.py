@@ -443,14 +443,25 @@ def apply_output_format(output_path: Path, classify_data: Path | None = None) ->
         p_col = headers.get("应付金额")
         w_col = headers.get("预扣税额")
         a_col = headers.get("实付金额")
+        pay_ccy_col = headers.get("应付币种")
+        act_ccy_col = headers.get("实付币种")
         if p_col and w_col and a_col:
             for row_idx in range(2, ws.max_row + 1):
                 payable = _to_float(ws.cell(row=row_idx, column=p_col).value) or 0.0
                 withhold = _to_float(ws.cell(row=row_idx, column=w_col).value) or 0.0
                 actual = _to_float(ws.cell(row=row_idx, column=a_col).value) or 0.0
-                if abs(payable - (withhold + actual)) > 1e-6:
-                    for col_idx in range(1, ws.max_column + 1):
-                        ws.cell(row=row_idx, column=col_idx).fill = mismatch_fill
+                if abs(payable - (withhold + actual)) <= 1e-6:
+                    continue
+                pay_ccy = ""
+                act_ccy = ""
+                if pay_ccy_col:
+                    pay_ccy = str(ws.cell(row=row_idx, column=pay_ccy_col).value or "").upper()
+                if act_ccy_col:
+                    act_ccy = str(ws.cell(row=row_idx, column=act_ccy_col).value or "").upper()
+                if pay_ccy in {"CNY", "USD"} and act_ccy not in {"CNY", "USD"}:
+                    continue
+                for col_idx in range(1, ws.max_column + 1):
+                    ws.cell(row=row_idx, column=col_idx).fill = mismatch_fill
 
     # 一级/二级科目下拉（联动）
     try:

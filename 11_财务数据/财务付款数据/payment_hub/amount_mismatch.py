@@ -14,6 +14,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from .config import Paths
+from .payment_amount import same_currency_identity_mask
 from .utils import (
     iter_excel_files,
     parse_std_project_filename,
@@ -102,6 +103,9 @@ def extract_mismatches_from_file(file_path: Path, std_dir: Path) -> pd.DataFrame
     combo = withhold + actual
     diff = payable - combo
     mask = diff.abs() > AMOUNT_TOLERANCE
+    comparable = same_currency_identity_mask(out)
+    if not comparable.empty:
+        mask = mask & comparable.reindex(out.index).fillna(True)
     if not mask.any():
         return pd.DataFrame()
 

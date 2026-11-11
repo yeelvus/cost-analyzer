@@ -7,11 +7,13 @@
 标准列（顺序）：
   项目编码, 项目名称, 原始项目名称, 摘要,
   应付金额, 预扣税额, 实付金额, 增值税额, 不含税额,
-  付款金额, 汇率, 供应商名称, 科目, 业务分组,
+  应付币种, 预扣币种, 实付币种, 增值税币种, 不含税币种, 币别,
+  付款金额, 汇率, 汇率缺失, 供应商名称, 科目, 业务分组,
   日期, 年, 月, 年月
 
-五列金额保留原始数字。付款金额 = 预扣税额 + 实付金额。
-实付金额带人民币标注时按该月人民币对泰铢换成泰铢，带美元标注时按该月美元对泰铢换成泰铢，汇率记在该行。
+五列金额保留原始数字（RMB/CNY/USD 标注去掉，币种单列）。
+付款金额 = 预扣税额与实付金额换成泰铢后相加。
+格子或「币别」为人民币/美元时按当月汇率换算；摘要里的 1CNY= 也可。
 年月为 2026-09。年 / 月 仍是数字。
 """
 
@@ -25,9 +27,12 @@ import pandas as pd
 from .config import Paths
 from .deps import get_excel_layout_fn, get_project_matcher_module, project_match_db_path
 from .payment_amount import (
+    BILIE_COL,
+    CURRENCY_COLUMNS,
     FX_RATE_COL,
     LEGACY_AMOUNT_COLUMNS,
     PAYMENT_AMOUNT_COL,
+    RATE_MISSING_COL,
     YEAR_MONTH_COL,
     FxRates,
     collapse_to_payment_amount,
@@ -35,6 +40,7 @@ from .payment_amount import (
     describe_fx_stats,
     fx_workbook_path,
     load_fx_rates,
+    verify_collapsed_amounts,
 )
 from .std_build import (
     COLUMN_ALIASES,
@@ -54,8 +60,11 @@ RAW_STD_ALL_COLUMNS = [
     "原始项目名称",
     "摘要",
     *LEGACY_AMOUNT_COLUMNS,
+    *CURRENCY_COLUMNS.values(),
+    BILIE_COL,
     PAYMENT_AMOUNT_COL,
     FX_RATE_COL,
+    RATE_MISSING_COL,
     "供应商名称",
     "科目",
     "业务分组",
@@ -72,6 +81,7 @@ RAW_STD_CORE_COLUMNS = [
     "预扣税额",
     "实付金额",
     "供应商名称",
+    BILIE_COL,
 ]
 # 源表里用来相加的列。应付 / 增值税 / 不含税不进入付款金额。
 _PAYMENT_PARTS = ["预扣税额", "实付金额"]
@@ -93,6 +103,7 @@ RAW_STD_ALIASES["应付金额"] = list(
         RAW_STD_ALIASES.get("应付金额", []) + ["贷方", "贷方金额", "收入"]
     )
 )
+RAW_STD_ALIASES[BILIE_COL] = ["币别", "币种", "货币", "currency"]
 
 def find_raw_std_column_mapping(df: pd.DataFrame) -> Dict[str, Optional[str]]:
     mapping: Dict[str, Optional[str]] = {}
@@ -139,6 +150,9 @@ def process_raw_sheet(
         return None
 
     mapping = find_raw_std_column_mapping(raw_df)
+    if "对应关系" in raw_df.columns:
+        print(f"    - 跳过 sheet: {sheet_name}，这是对账结果不是原始流水")
+        return None
 
     has_name = mapping.get("项目名称") is not None
     has_summary = mapping.get("摘要") is not None
@@ -154,6 +168,9 @@ def process_raw_sheet(
     for col in TARGET_COLUMNS:
         src = mapping.get(col)
         out[col] = raw_df[src] if src is not None else pd.NA
+    src_ccy = mapping.get(BILIE_COL)
+    if src_ccy is not None:
+        out[BILIE_COL] = raw_df[src_ccy]
 
     # 保留金额原文，人民币标注要等年月齐了再换算
     out = out.loc[component_nonzero_mask(out)]
@@ -465,9 +482,14 @@ def run_raw_std_for_group(
     fx = fx_rates if fx_rates is not None else FxRates()
     before_n = len(merged)
     merged, fx_stats = collapse_to_payment_amount(merged, fx)
-    merged = merged.loc[merged[PAYMENT_AMOUNT_COL].abs() > 1e-9].reset_index(drop=True)
+    pay = pd.to_numeric(merged[PAYMENT_AMOUNT_COL], errors="coerce")
+    keep = pay.abs() > 1e-9
+    if RATE_MISSING_COL in merged.columns:
+        keep = keep | (pd.to_numeric(merged[RATE_MISSING_COL], errors="coerce").fillna(0) > 0)
+    merged = merged.loc[keep].reset_index(drop=True)
     print(describe_fx_stats(fx_stats, fx))
-    print(f"  付款金额非零 {len(merged)} / {before_n} 行")
+    verify_collapsed_amounts(merged, fx_stats)
+    print(f"  付款金额非零或待补汇率 {len(merged)} / {before_n} 行")
     if merged.empty:
         print(f"  [{group_name}] 付款金额全为 0")
         return None

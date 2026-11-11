@@ -32,24 +32,13 @@ def has_actual_payment(value) -> bool:
     是否「有实付金额」：非空且可解析为数字，且绝对值 > 0。
 
     空 / None / NaN / 空白 / 0 / 0.0 → False
+    含 11095RMB / 25美元 这类标注也能读出。
     （不进学习池、不做科目分类）
     """
-    if value is None:
-        return False
-    try:
-        if pd.isna(value):
-            return False
-    except (TypeError, ValueError):
-        pass
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return abs(float(value)) > 1e-12
-    text = str(value).strip().replace(",", "").replace("，", "").replace(" ", "")
-    if not text or text.lower() in {"nan", "none", "nat", "-"}:
-        return False
-    try:
-        return abs(float(text)) > 1e-12
-    except (TypeError, ValueError):
-        return False
+    from .payment_amount import money_number
+
+    amount = money_number(value)
+    return amount is not None and abs(amount) > 1e-12
 
 
 def filter_df_has_actual_payment(
@@ -104,13 +93,9 @@ def infer_time_tag_from_path(file_path: Path | str, input_root: Path | str) -> s
 
 
 def to_numeric_series(series: pd.Series) -> pd.Series:
-    cleaned = (
-        series.astype(str)
-        .str.replace(",", "", regex=False)
-        .str.replace(" ", "", regex=False)
-        .replace({"": pd.NA, "None": pd.NA, "nan": pd.NA, "NaN": pd.NA})
-    )
-    return pd.to_numeric(cleaned, errors="coerce")
+    from .payment_amount import money_number
+
+    return series.map(money_number).astype("float64")
 
 
 def iter_excel_files(

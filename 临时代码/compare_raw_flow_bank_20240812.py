@@ -16,13 +16,16 @@
 供应商再收一次：同一项目、同一天里没配上的流水，供应商名称相同的
 整组实付正好等于剩下的一笔银行账，就收成一组。银行摘要不必写报销
 或差旅。不拆这个供应商里面的子集，供应商空着的行不参与。别的供应商
-对不上的行留在原处。金额默认是泰铢。整组或单笔乘当月人民币、美元汇率
-后能对上银行账时，应付、预扣、实付、增值税、不含税保留原币并标上
-CNY 或 USD，付款金额写成换算后的泰铢。分位四舍五入的尾差补在该组
-最后一笔，使付款金额合计等于银行实付。行上已有增值税额的视为泰铢税票，
-不按外币换算。单笔外币只要求这个供应商当天只剩这一笔，而且只有一种
-货币、一笔银行账对得上。同一天里先配泰铢整组，再配外币整组。
-配上的流水把该组银行账摘要写入备注。
+对不上的行留在原处。金额默认是泰铢。格子里带 RMB / CNY / 人民币 / USD / 美元 后缀或前缀
+时，应付、预扣税、实付、增值税、不含税都按单元格解析：原币数字保留，
+展示写成 11095CNY。实付带外币标注、或「币别」为 CNY/USD 时，按当月
+汇率换成泰铢再配对；应付带 RMB、实付已是泰铢的，只标注应付、不改实付。
+缺汇率的外币实付不拿去当泰铢配对。整组或单笔乘汇率后能对上银行账时，
+五列原币保留并标上 CNY 或 USD，付款金额写成换算后的泰铢。分位四舍五入
+的尾差补在该组最后一笔，使付款金额合计等于银行实付。行上已有无外币标注
+的增值税额视为泰铢税票，不按外币换算。单笔外币只要求这个供应商当天只剩
+这一笔，而且只有一种货币、一笔银行账对得上。同一天里先配泰铢整组，再配
+外币整组。配上的流水把该组银行账摘要写入备注。
 
 项目内收完之后，同一天里同一个供应商的剩余流水如果散在两个以上项目，
 再把这些行当成一整组，对任意项目里剩下的一笔银行账。先按泰铢合计，
@@ -89,6 +92,24 @@ FX_PATH = Path(
 NEAR_GAP = 500
 NEAR_FILL = PatternFill("solid", fgColor="F9E79F")
 _YM_RE = re.compile(r"(20\d{2})\D*(\d{1,2})")
+AMOUNT_FIELDS = ["应付金额", "预扣税额", "实付金额", "增值税额", "不含税额"]
+_CNY_RE = re.compile(r"(?i)rmb|cny|人民币|￥|¥")
+_USD_RE = re.compile(r"(?i)(?<![A-Za-z])usd(?![A-Za-z])|美元|us\$")
+_THB_RE = re.compile(r"(?i)(?<![A-Za-z])thb(?![A-Za-z])|泰铢|฿")
+_NUMBER_RE = re.compile(r"[-+]?\d+(?:,\d{3})*(?:\.\d+)?")
+_INLINE_RATE_RE = re.compile(
+    r"1\s*(CNY|RMB|USD)\s*=\s*(\d+(?:\.\d+)?)\s*(THB)?",
+    re.IGNORECASE,
+)
+_CURRENCY_LABELS = {
+    "CNY": "CNY",
+    "RMB": "CNY",
+    "人民币": "CNY",
+    "USD": "USD",
+    "美元": "USD",
+    "THB": "THB",
+    "泰铢": "THB",
+}
 
 DETAIL_COLUMNS = [
     "对照项目",
@@ -144,6 +165,243 @@ COMPLETE_COLUMNS = [
 ]
 
 
+def _is_blank_cell(value) -> bool:
+    if value is None or isinstance(value, bool):
+        return True
+    try:
+        if pd.isna(value):
+            return True
+    except (TypeError, ValueError):
+        return False
+    if isinstance(value, (int, float)):
+        return False
+    text = str(value).strip()
+    return (not text) or text.lower() in {"nan", "none", "nat", "-"}
+
+
+def currency_code(text: str) -> str:
+    """从格子或币别列读出 CNY / USD / THB。两种外币同时出现时不猜。"""
+    folded = "".join(str(text).split())
+    if not folded:
+        return ""
+    mapped = _CURRENCY_LABELS.get(folded) or _CURRENCY_LABELS.get(folded.upper())
+    if mapped:
+        return mapped
+    has_cny = _CNY_RE.search(folded) is not None
+    has_usd = _USD_RE.search(folded) is not None
+    has_thb = _THB_RE.search(folded) is not None
+    found = [code for flag, code in ((has_cny, "CNY"), (has_usd, "USD"), (has_thb, "THB")) if flag]
+    if len(found) == 1:
+        return found[0]
+    return ""
+
+
+def parse_amount_cell(value) -> tuple[float | None, str]:
+    """(金额, 币种)。空单元格 → (None, '')。支持 11095RMB、RMB2532.39、25美元。"""
+    if _is_blank_cell(value):
+        return None, ""
+    if isinstance(value, (int, float)):
+        return float(value), ""
+    try:
+        import numpy as np
+
+        if isinstance(value, np.number):
+            return float(value), ""
+    except Exception:
+        pass
+    text = str(value).strip()
+    currency = currency_code(text)
+    cleaned = (
+        text.replace(",", "")
+        .replace("，", "")
+        .replace(" ", "")
+        .replace("\u00a0", "")
+        .replace("\u3000", "")
+    )
+    negative = False
+    if cleaned.startswith("(") and cleaned.endswith(")"):
+        negative = True
+        cleaned = cleaned[1:-1]
+    found = _NUMBER_RE.search(cleaned)
+    if not found:
+        return None, currency
+    number = float(found.group(0).replace(",", ""))
+    if negative and number > 0:
+        number = -number
+    return number, currency
+
+
+def cell_currency(row: pd.Series | None, column: str) -> str:
+    if row is None:
+        return ""
+    key = f"_ccy_{column}"
+    if key not in row.index:
+        return ""
+    value = row[key]
+    try:
+        if value is None or pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    return str(value).strip()
+
+
+def is_cell_fx(row: pd.Series | None) -> bool:
+    """实付在读表时已按格子/币别换成泰铢，不能再当原币乘一次汇率。"""
+    if row is None or "_cell_fx" not in row.index:
+        return False
+    value = row["_cell_fx"]
+    try:
+        if value is None or pd.isna(value):
+            return False
+    except (TypeError, ValueError):
+        return bool(value)
+    return bool(value)
+
+
+def _rate_of(day: str, currency: str, rate_table: dict, remark: str = "") -> float | None:
+    if currency not in {"CNY", "USD"}:
+        return None
+    for code, rate in rates_for(day, rate_table):
+        if code == currency:
+            return rate
+    if not remark:
+        return None
+    found = _INLINE_RATE_RE.search(str(remark))
+    if not found:
+        return None
+    code = found.group(1).upper()
+    if code == "RMB":
+        code = "CNY"
+    if code != currency:
+        return None
+    rate = float(found.group(2))
+    if rate <= 0:
+        return None
+    return rate
+
+
+def _to_thb(
+    amount: float | None,
+    currency: str,
+    day: str,
+    rate_table: dict,
+    remark: str = "",
+) -> tuple[float | None, bool]:
+    """原币 → 泰铢。返回 (泰铢或原值, 是否已换算)。缺汇率时金额为空，避免按原币去配银行账。"""
+    if amount is None:
+        return None, False
+    if currency not in {"CNY", "USD"}:
+        return round(float(amount), 2), False
+    rate = _rate_of(day, currency, rate_table, remark)
+    if rate is None or rate <= 0:
+        return None, True
+    return round(float(amount) * rate, 2), True
+
+
+def apply_amount_fields(frame: pd.DataFrame, rate_table: dict) -> pd.DataFrame:
+    """五列金额去掉 RMB/CNY/USD 标注，币种记在 _ccy_*。实付外币换成泰铢再配对。"""
+    out = frame.copy()
+    if "预扣税" in out.columns and "预扣税额" not in out.columns:
+        out = out.rename(columns={"预扣税": "预扣税额"})
+    n = len(out)
+    stamps = [
+        currency_code(value) if not _is_blank_cell(value) else ""
+        for value in (out["币别"].tolist() if "币别" in out.columns else [None] * n)
+    ]
+    days = [day_key(value) or "" for value in (out["日期"].tolist() if "日期" in out.columns else [None] * n)]
+    remarks = [
+        "" if _is_blank_cell(value) else str(value)
+        for value in (out["摘要"].tolist() if "摘要" in out.columns else [None] * n)
+    ]
+
+    amounts: dict[str, list] = {}
+    currencies: dict[str, list] = {}
+    marked: dict[str, Counter] = {col: Counter() for col in AMOUNT_FIELDS}
+    for col in AMOUNT_FIELDS:
+        if col not in out.columns:
+            amounts[col] = [None] * n
+            currencies[col] = [""] * n
+            continue
+        col_amounts = []
+        col_ccy = []
+        for value, stamp in zip(out[col].tolist(), stamps):
+            number, ccy = parse_amount_cell(value)
+            if number is not None and not ccy and stamp in {"CNY", "USD"}:
+                ccy = stamp
+            if ccy:
+                marked[col][ccy] += 1
+            col_amounts.append(number)
+            col_ccy.append(ccy)
+        amounts[col] = col_amounts
+        currencies[col] = col_ccy
+        out[col] = col_amounts
+        out[f"_ccy_{col}"] = col_ccy
+
+    orig_paid = []
+    pay_thb = []
+    cell_fx = []
+    missing_months: Counter = Counter()
+    converted = Counter()
+    for index in range(n):
+        paid = amounts["实付金额"][index]
+        ccy = currencies["实付金额"][index]
+        orig_paid.append(paid)
+        thb, converted_flag = _to_thb(paid, ccy, days[index], rate_table, remarks[index])
+        if converted_flag:
+            if thb is None:
+                missing_months[days[index][:7] or "无年月"] += 1
+                amounts["实付金额"][index] = None
+            else:
+                amounts["实付金额"][index] = thb
+                converted[ccy] += 1
+        pay_thb.append(thb)
+        cell_fx.append(converted_flag)
+
+    out["实付金额"] = amounts["实付金额"]
+    out["_orig_实付金额"] = orig_paid
+    out["_pay_thb"] = pay_thb
+    out["_cell_fx"] = cell_fx
+    out["_fx_currency"] = [
+        currencies["实付金额"][index] if cell_fx[index] else ""
+        for index in range(n)
+    ]
+
+    payments = []
+    for index in range(n):
+        withhold = amounts["预扣税额"][index]
+        withhold_ccy = currencies["预扣税额"][index]
+        withhold_thb, withhold_fx = _to_thb(
+            withhold, withhold_ccy, days[index], rate_table, remarks[index]
+        )
+        if withhold_fx and withhold_thb is None:
+            withhold_thb = 0.0
+        paid_thb = pay_thb[index]
+        if paid_thb is None and withhold is None:
+            payments.append(None)
+        else:
+            payments.append(round((paid_thb or 0.0) + (withhold_thb or 0.0), 2))
+    out["付款金额"] = payments
+
+    parts = []
+    for col in AMOUNT_FIELDS:
+        bits = [f"{code} {count} 笔" for code, count in sorted(marked[col].items()) if count]
+        if bits:
+            parts.append(f"{col} {', '.join(bits)}")
+    if parts:
+        print("金额标注: " + "；".join(parts), flush=True)
+    if converted:
+        print(
+            "实付已换算: "
+            + "，".join(f"{code} {count} 笔" for code, count in sorted(converted.items())),
+            flush=True,
+        )
+    if missing_months:
+        detail = ", ".join(f"{month}×{count}" for month, count in sorted(missing_months.items()))
+        print(f"缺汇率，这些外币实付不参与泰铢配对: {detail}", flush=True)
+    return out
+
+
 def family_name(value) -> str:
     """银行账的期间后缀和流水的项目名收成同一个对照项目。"""
     if value is None or pd.isna(value):
@@ -158,12 +416,13 @@ def family_name(value) -> str:
     return text
 
 
-def load_flow() -> pd.DataFrame:
-    frame = pd.read_excel(FLOW_PATH, sheet_name="明细")
+def load_flow(rate_table: dict) -> pd.DataFrame:
+    xl = pd.ExcelFile(FLOW_PATH)
+    sheet = "明细" if "明细" in xl.sheet_names else xl.sheet_names[0]
+    frame = pd.read_excel(FLOW_PATH, sheet_name=sheet)
     frame["日期"] = pd.to_datetime(frame["日期"], errors="coerce")
-    frame["实付金额"] = pd.to_numeric(frame["实付金额"], errors="coerce")
     frame["_family"] = frame["项目名称"].map(family_name)
-    return frame
+    return apply_amount_fields(frame, rate_table)
 
 
 def load_bank() -> pd.DataFrame:
@@ -189,10 +448,21 @@ def cell_value(row: pd.Series | None, column: str):
 
 
 def paid_or_none(row: pd.Series | None):
+    """配对和合计用的泰铢实付。外币行优先用换算后的 _pay_thb。"""
+    if row is not None and "_pay_thb" in row.index:
+        value = row["_pay_thb"]
+        try:
+            if value is not None and not pd.isna(value):
+                return round(float(value), 2)
+        except (TypeError, ValueError):
+            pass
     value = cell_value(row, "实付金额")
     if value is None:
         return None
-    return round(float(value), 2)
+    amount, _ccy = parse_amount_cell(value)
+    if amount is None:
+        return None
+    return round(amount, 2)
 
 
 def as_date(value):
@@ -405,21 +675,42 @@ def money_label(value, currency: str):
 
 
 def shown_amount(row: pd.Series | None, column: str):
-    value = _number(row, column)
+    """有外币标注的列写出 11095CNY；泰铢列仍是数字。"""
+    if row is None:
+        return None
+    number = None
+    currency = cell_currency(row, column)
+    if column == "实付金额":
+        orig = cell_value(row, "_orig_实付金额")
+        if orig is not None and currency in {"CNY", "USD"}:
+            return money_label(orig, currency)
+    value = cell_value(row, column)
     if value is None:
         return None
-    currency = fx_currency(row)
-    if not currency:
-        return value
-    return money_label(value, currency)
+    if isinstance(value, (int, float)):
+        number = float(value)
+    else:
+        number, parsed = parse_amount_cell(value)
+        if parsed:
+            currency = currency or parsed
+    if number is None:
+        return None
+    currency = currency or fx_currency(row)
+    if currency in {"CNY", "USD"}:
+        return money_label(number, currency)
+    return number
 
 
 def shown_payment(row: pd.Series | None):
     if row is None:
         return None
-    if fx_currency(row):
+    if fx_currency(row) or is_cell_fx(row):
         return matched_paid(row)
-    return _number(row, "付款金额")
+    value = _number(row, "付款金额")
+    if value is not None:
+        amount, _ccy = parse_amount_cell(value)
+        return amount if amount is None else round(amount, 2)
+    return matched_paid(row)
 
 
 def bank_remark(banks: list) -> str | None:
@@ -439,13 +730,17 @@ def supplier_key(row: pd.Series) -> str:
 
 
 def has_vat(row: pd.Series) -> bool:
+    """无外币标注且非零的增值税，视为泰铢税票，不拿去乘汇率。"""
     value = cell_value(row, "增值税额")
     if value is None:
         return False
-    try:
-        return float(value) != 0
-    except (TypeError, ValueError):
-        return True
+    amount, parsed = parse_amount_cell(value)
+    currency = parsed or cell_currency(row, "增值税额")
+    if currency in {"CNY", "USD"}:
+        return False
+    if amount is None:
+        return False
+    return amount != 0
 
 
 def amounts_of(rows: list) -> list[float] | None:
@@ -584,6 +879,8 @@ def pair_supplier_groups(banks: list, flows: list, day: str, family: str, rate_t
         for key, rows in by_supplier.items():
             if len(rows) < 2 or any(id(row) in used_flow for row in rows):
                 continue
+            if any(is_cell_fx(row) for row in rows):
+                continue
             if any(has_vat(row) for row in rows):
                 continue
             amounts = amounts_of(rows)
@@ -617,7 +914,7 @@ def pair_supplier_groups(banks: list, flows: list, day: str, family: str, rate_t
             if len(rows) != 1 or any(id(row) in used_flow for row in rows):
                 continue
             row = rows[0]
-            if has_vat(row):
+            if is_cell_fx(row) or has_vat(row):
                 continue
             amount = paid_or_none(row)
             if amount is None:
@@ -750,6 +1047,8 @@ def bind_cross_family_suppliers(groups: list[tuple], rate_table: dict) -> tuple[
     fx_options = []
     for day, key, rows, amounts in candidates:
         if any(id(row) in used_flow for row in rows):
+            continue
+        if any(is_cell_fx(row) for row in rows):
             continue
         if any(has_vat(row) for row in rows):
             continue
@@ -1040,7 +1339,8 @@ def check_totals(
     got_flow = int(detail["流水_日期"].notna().sum())
     if got_bank != bank_rows or got_flow != flow_rows:
         raise SystemExit(f"行数对不上: 银行 {got_bank}/{bank_rows}, 流水 {got_flow}/{flow_rows}")
-    flow_paid = round(float(pd.to_numeric(flow["实付金额"], errors="coerce").sum()), 2)
+    paid_col = "_pay_thb" if "_pay_thb" in flow.columns else "实付金额"
+    flow_paid = round(float(pd.to_numeric(flow[paid_col], errors="coerce").sum()), 2)
     bank_only = complete[complete["对应关系"] == BANK_ONLY]
     bank_only_paid = pd.to_numeric(bank_only["实付金额"], errors="coerce").sum()
     bank_only_paid = 0.0 if pd.isna(bank_only_paid) else round(float(bank_only_paid), 2)
@@ -1095,16 +1395,78 @@ def print_samples(detail: pd.DataFrame) -> None:
     print(picked.to_string(index=False), flush=True)
 
 
+def self_test() -> None:
+    samples = [
+        ("11095RMB", 11095.0, "CNY"),
+        ("RMB2532.39", 2532.39, "CNY"),
+        ("938rmb", 938.0, "CNY"),
+        ("25美元", 25.0, "USD"),
+        ("132500RMB", 132500.0, "CNY"),
+        ("350CNY", 350.0, "CNY"),
+        ("1000THB", 1000.0, "THB"),
+        (54365.5, 54365.5, ""),
+        (None, None, ""),
+    ]
+    for raw, expect_amount, expect_ccy in samples:
+        amount, ccy = parse_amount_cell(raw)
+        if amount != expect_amount or ccy != expect_ccy:
+            raise SystemExit(f"解析失败 {raw!r} → {(amount, ccy)}，期望 {(expect_amount, expect_ccy)}")
+    rates = {"2026-08": (4.892, 33.2)}
+    frame = pd.DataFrame(
+        {
+            "日期": [pd.Timestamp("2026-08-04")] * 3,
+            "应付金额": ["132500RMB", "11095RMB", 100],
+            "预扣税": [None, None, 3],
+            "实付金额": ["132500RMB", 54365.5, 100],
+            "增值税额": [None, None, 7],
+            "不含税额": ["132500RMB", 54365.5, 100],
+            "币别": [None, "THB", "THB"],
+            "项目名称": ["A", "B", "C"],
+        }
+    )
+    out = apply_amount_fields(frame, rates)
+    converted = 132500 * 4.892
+    if abs(out.loc[0, "实付金额"] - converted) > 0.02:
+        raise SystemExit(f"实付 RMB 未换成泰铢: {out.loc[0, '实付金额']}")
+    if out.loc[0, "_ccy_应付金额"] != "CNY" or out.loc[0, "_orig_实付金额"] != 132500:
+        raise SystemExit("配电箱行原币未保留")
+    if out.loc[1, "实付金额"] != 54365.5 or out.loc[1, "_ccy_应付金额"] != "CNY":
+        raise SystemExit("应付 RMB、实付泰铢 处理错了")
+    if out.loc[2, "实付金额"] != 100 or out.loc[2, "预扣税额"] != 3:
+        raise SystemExit("预扣税列未收成预扣税额")
+    inline = pd.DataFrame(
+        {
+            "日期": [pd.Timestamp("2026-10-16")],
+            "摘要": ["内部资金调拨 汇率：1CNY=4.959THB"],
+            "应付金额": [2238751.73],
+            "预扣税": [None],
+            "实付金额": [2238751.73],
+            "增值税额": [None],
+            "不含税额": [2238751.73],
+            "币别": ["CNY"],
+            "项目名称": ["资金"],
+        }
+    )
+    converted_inline = apply_amount_fields(inline, {})
+    expect_thb = round(2238751.73 * 4.959, 2)
+    if abs(converted_inline.loc[0, "实付金额"] - expect_thb) > 0.02:
+        raise SystemExit(f"摘要内汇率未用上: {converted_inline.loc[0, '实付金额']}")
+    print("金额后缀自检通过", flush=True)
+
+
 def main() -> int:
+    if "--self-test" in sys.argv:
+        self_test()
+        return 0
     if not FLOW_PATH.is_file() or not BANK_PATH.is_file():
         print("找不到流水或银行账文件", file=sys.stderr)
         return 1
     print(f"流水: {FLOW_PATH}", flush=True)
     print(f"银行账: {BANK_PATH}", flush=True)
-    flow = load_flow()
-    bank = load_bank()
     rate_table = load_month_rates(FX_PATH)
     print(f"汇率: {FX_PATH}，{len(rate_table)} 个月", flush=True)
+    flow = load_flow(rate_table)
+    bank = load_bank()
     compared, complete, fx_original_cents, fx_thb_cents = pair_frames(bank, flow, rate_table)
     detail = frame_of(compared, DETAIL_COLUMNS)
     full = frame_of(complete, COMPLETE_COLUMNS)
