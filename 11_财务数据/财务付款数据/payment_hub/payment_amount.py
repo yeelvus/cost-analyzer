@@ -3,10 +3,12 @@
 
 五列金额格子支持 RMB / CNY / 人民币 / USD / 美元 / THB 前缀或后缀。
 五列写出去掉标注后的原币数字，币种写在对应「*币种」列。
-「币别」为 CNY/USD 且格子本身没有标注时，该行数字按该币种处理。
-预扣、实付带外币时按当月汇率换成泰铢再相加；应付带 RMB、实付已是泰铢的，
-只标注应付，实付不再乘汇率。缺月汇率时若摘要写了 1CNY=4.959THB 就用该行汇率。
-再缺则付款金额留空、汇率缺失=1，不把原币写进泰铢合计。
+源表若已拆成「应付金额/预扣税额/实付金额/增值税额/不含税额」和
+「应付币种/预扣币种/实付币种/增值税币种/不含税币种」，数字按原币读，币种看分列。
+「币别」或「币种」为 CNY/USD，且格子和分列都没有标注时，该行数字按该币种处理。
+预扣、实付带外币时换成泰铢再相加。汇率优先用摘要里的 1CNY=，
+其次用本行「汇率」列，再其次用当月汇率表。应付带 RMB、实付已是泰铢的，
+只标注应付，实付不再乘汇率。再缺则付款金额留空、汇率缺失=1，不把原币写进泰铢合计。
 """
 
 from __future__ import annotations
@@ -75,7 +77,9 @@ class FxConvertStats:
     marked_withhold: int = 0
     converted_withhold: int = 0
     stamped_bilie: int = 0
+    stamped_split: int = 0
     inline_rate: int = 0
+    row_rate: int = 0
     missing_months: Dict[str, int] = field(default_factory=dict)
 
     def add_missing(self, key: str) -> None:
@@ -313,17 +317,48 @@ def _source_amount(value) -> Tuple[Optional[float], str]:
     return amount, currency
 
 
+def _optional_positive(value) -> Optional[float]:
+    if _is_blank_money(value):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = pd.to_numeric(value, errors="coerce")
+    try:
+        if pd.isna(number) or float(number) <= 0:
+            return None
+    except (TypeError, ValueError):
+        return None
+    return float(number)
+
+
+def _rate_fits(currency: str, rate: Optional[float]) -> Optional[float]:
+    """行内「汇率」只在量级对得上该币种时才用，避免把人民币汇率套到美元。"""
+    if rate is None or rate <= 0:
+        return None
+    if currency == "CNY" and 3.0 <= rate <= 8.0:
+        return rate
+    if currency == "USD" and 20.0 <= rate <= 45.0:
+        return rate
+    return None
+
+
 def _lookup_rate(
     currency: str,
     ym: Optional[str],
     remark,
     fx: FxRates,
     stats: FxConvertStats,
+    preferred: Optional[float] = None,
 ) -> Optional[float]:
     inline = inline_fx_rate(remark, currency)
     if inline:
         stats.inline_rate += 1
         return inline
+    fitted = _rate_fits(currency, preferred)
+    if fitted:
+        stats.row_rate += 1
+        return fitted
     table = fx.cny_thb if currency == "CNY" else fx.usd_thb
     rate = table.get(ym) if ym else None
     if rate is not None and rate > 0:
@@ -340,6 +375,7 @@ def _convert_part(
     stats: FxConvertStats,
     *,
     kind: str,
+    preferred: Optional[float] = None,
 ) -> Tuple[Optional[float], Optional[float], bool]:
     """原币 → 泰铢。返回 (泰铢, 汇率, 是否缺汇率)。"""
     table_label = "人民币" if currency == "CNY" else "美元"
@@ -350,7 +386,7 @@ def _convert_part(
             stats.marked_usd += 1
     elif kind == "withhold":
         stats.marked_withhold += 1
-    rate = _lookup_rate(currency, ym, remark, fx, stats)
+    rate = _lookup_rate(currency, ym, remark, fx, stats, preferred=preferred)
     if rate is None or rate <= 0:
         stats.add_missing(f"{ym or '无年月'} {table_label}")
         return None, None, True
@@ -403,6 +439,25 @@ def collapse_to_payment_amount(
     months = out["月"].tolist() if "月" in out.columns else [None] * n
 
     currencies = {col: [pair[1] for pair in parsed[col]] for col in LEGACY_AMOUNT_COLUMNS}
+    # 已拆开的「应付币种 / 实付币种 …」。格子里没有 RMB 字样时以这列为准。
+    split_used_rows = set()
+    for col in LEGACY_AMOUNT_COLUMNS:
+        header = CURRENCY_COLUMNS[col]
+        if header not in out.columns:
+            continue
+        for index, raw_ccy in enumerate(out[header].tolist()):
+            if currencies[col][index]:
+                continue
+            code = _currency_code(raw_ccy)
+            if not code:
+                continue
+            currencies[col][index] = code
+            if code in {"CNY", "USD"}:
+                split_used_rows.add(index)
+    stats.stamped_split = len(split_used_rows)
+    row_rate_values = (
+        out[FX_RATE_COL].tolist() if FX_RATE_COL in out.columns else [None] * n
+    )
     for index, stamp in enumerate(stamps):
         if stamp not in {"CNY", "USD"}:
             continue
@@ -435,7 +490,14 @@ def collapse_to_payment_amount(
                 continue
             if ccy in {"CNY", "USD"}:
                 thb, rate, miss = _convert_part(
-                    amount, ccy, ym, remark, fx, stats, kind=kind
+                    amount,
+                    ccy,
+                    ym,
+                    remark,
+                    fx,
+                    stats,
+                    kind=kind,
+                    preferred=_optional_positive(row_rate_values[index]),
                 )
                 if miss:
                     missing = True
@@ -477,6 +539,10 @@ def describe_fx_stats(stats: FxConvertStats, fx: FxRates) -> str:
             "（1 单位外币 = 当月泰铢）"
         ),
     ]
+    if stats.stamped_split:
+        lines.append(f"  按分列币种（应付/预扣/实付/增值税/不含税）换算 {stats.stamped_split} 行")
+    if stats.row_rate:
+        lines.append(f"  用表内「汇率」列 {stats.row_rate} 笔")
     if stats.stamped_bilie:
         lines.append(f"  按「币别」列补标 CNY/USD {stats.stamped_bilie} 行")
     if stats.inline_rate:
@@ -634,6 +700,38 @@ def self_test() -> None:
         raise SystemExit("应付人民币、实付泰铢 不应进入原币恒等核对")
     if stats.converted_cny < 1:
         raise SystemExit("换算计数为空")
+    # 金额、币种已经拆开的表：数字是原币，币种在「实付币种」，泰铢合计看行内汇率。
+    split = pd.DataFrame(
+        {
+            "年": [2024, 2026],
+            "月": [11, 8],
+            "摘要": ["钢结构", "泰铢劳务"],
+            "应付金额": [3000000, 1000],
+            "预扣税额": [None, 30],
+            "实付金额": [3000000, 970],
+            "增值税额": [None, None],
+            "不含税额": [3000000, 970],
+            "应付币种": ["CNY", None],
+            "预扣币种": [None, None],
+            "实付币种": ["CNY", None],
+            "增值税币种": [None, None],
+            "不含税币种": ["CNY", None],
+            "币别": [None, "THB"],
+            "汇率": [4.7847, None],
+        }
+    )
+    split_out, split_stats = collapse_to_payment_amount(
+        split,
+        FxRates(cny_thb={"2024-11": 4.7138}, usd_thb={}),
+    )
+    if abs(split_out.loc[0, PAYMENT_AMOUNT_COL] - round(3000000 * 4.7847, 2)) > 0.05:
+        raise SystemExit(f"分列币种未按行内汇率换算: {split_out.loc[0, PAYMENT_AMOUNT_COL]}")
+    if split_out.loc[0, "实付币种"] != "CNY" or split_out.loc[0, "实付金额"] != 3000000:
+        raise SystemExit("分列原币金额被改掉了")
+    if abs(split_out.loc[1, PAYMENT_AMOUNT_COL] - 1000) > 0.05:
+        raise SystemExit(f"币别 THB 被误换算: {split_out.loc[1, PAYMENT_AMOUNT_COL]}")
+    if split_stats.stamped_split != 1:
+        raise SystemExit(f"分列币种计数不对: {split_stats.stamped_split}")
     print("payment_amount 自检通过", flush=True)
 
 

@@ -13,7 +13,9 @@
 
 五列金额保留原始数字（RMB/CNY/USD 标注去掉，币种单列）。
 付款金额 = 预扣税额与实付金额换成泰铢后相加。
-格子或「币别」为人民币/美元时按当月汇率换算；摘要里的 1CNY= 也可。
+格子、「应付币种/实付币种」等分列，或「币别」为人民币/美元时按汇率换算。
+分列里的「汇率」优先于月汇率表；摘要里的 1CNY= 也可。
+已是这套表头（金额与币种分开，另有付款金额）时直接接着算，不必再把币种写回金额格子。
 年月为 2026-09。年 / 月 仍是数字。
 """
 
@@ -105,6 +107,44 @@ RAW_STD_ALIASES["应付金额"] = list(
 )
 RAW_STD_ALIASES[BILIE_COL] = ["币别", "币种", "货币", "currency"]
 
+# 这些表头只跟自己对应。模糊匹配时不能让「币种」撞上「应付币种」，
+# 也不能让「付款」撞上已经单独存在的「付款金额」。
+_EXACT_HEADER_NAMES = [
+    *LEGACY_AMOUNT_COLUMNS,
+    *list(CURRENCY_COLUMNS.values()),
+    BILIE_COL,
+    "币种",
+    PAYMENT_AMOUNT_COL,
+    FX_RATE_COL,
+    RATE_MISSING_COL,
+    "项目编码",
+    "项目名称",
+    "摘要",
+    "供应商名称",
+    "日期",
+    "年",
+    "月",
+    "年月",
+]
+_EXACT_HEADER_NORMS = {normalize_text(name) for name in _EXACT_HEADER_NAMES}
+
+
+def _exact_source_column(df: pd.DataFrame, names: List[str]) -> Optional[str]:
+    lookup = {normalize_text(col): col for col in df.columns}
+    for name in names:
+        hit = lookup.get(normalize_text(name))
+        if hit is not None:
+            return hit
+    return None
+
+
+def _fuzzy_column_allowed(norm_col: str, target: str) -> bool:
+    """标准列名只允许映射到自己的目标，避免短别名吞掉相邻列。"""
+    if norm_col not in _EXACT_HEADER_NORMS:
+        return True
+    return norm_col == normalize_text(target)
+
+
 def find_raw_std_column_mapping(df: pd.DataFrame) -> Dict[str, Optional[str]]:
     mapping: Dict[str, Optional[str]] = {}
     normalized_to_original = {normalize_text(col): col for col in df.columns}
@@ -121,6 +161,8 @@ def find_raw_std_column_mapping(df: pd.DataFrame) -> Dict[str, Optional[str]]:
             for alias in candidates:
                 norm_alias = normalize_text(alias)
                 for norm_col, origin_col in normalized_to_original.items():
+                    if not _fuzzy_column_allowed(norm_col, target):
+                        continue
                     if norm_alias and (norm_alias in norm_col or norm_col in norm_alias):
                         found_col = origin_col
                         break
@@ -171,6 +213,17 @@ def process_raw_sheet(
     src_ccy = mapping.get(BILIE_COL)
     if src_ccy is not None:
         out[BILIE_COL] = raw_df[src_ccy]
+    # 金额和币种已经拆开的表：原样带上，后面按分列币种算付款金额。
+    for target, names in (
+        ("项目编码", ["项目编码"]),
+        *[(name, [name]) for name in CURRENCY_COLUMNS.values()],
+        (PAYMENT_AMOUNT_COL, [PAYMENT_AMOUNT_COL]),
+        (FX_RATE_COL, [FX_RATE_COL]),
+        (RATE_MISSING_COL, [RATE_MISSING_COL]),
+    ):
+        src = _exact_source_column(raw_df, names)
+        if src is not None:
+            out[target] = raw_df[src]
 
     # 保留金额原文，人民币标注要等年月齐了再换算
     out = out.loc[component_nonzero_mask(out)]
@@ -328,7 +381,16 @@ def apply_project_name_match(
             print(f"  未匹配保留原名（未弹窗）: {len(pending)} 个")
         mod.save_db(db_path, db)
 
-    out["项目编码"] = raw_series.map(code_map).fillna("").astype(str)
+    prior_code = (
+        out["项目编码"].fillna("").astype(str).str.strip()
+        if "项目编码" in out.columns
+        else pd.Series("", index=out.index)
+    )
+    prior_code = prior_code.replace({"nan": "", "None": "", "NaT": ""})
+    out["项目编码"] = raw_series.map(code_map).fillna("").astype(str).str.strip()
+    # 源表已有项目编码、名称对不上标准库时，保留原编码
+    unmatched = out["项目编码"].isin({"", "nan", "None"})
+    out.loc[unmatched, "项目编码"] = prior_code.loc[unmatched]
     # 未匹配时标准名仍用原始名，便于对照
     out["项目名称"] = raw_series.map(name_map).fillna(raw_series).astype(str)
 
