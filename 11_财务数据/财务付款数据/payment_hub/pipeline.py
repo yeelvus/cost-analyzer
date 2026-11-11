@@ -17,7 +17,7 @@ from .pkg import ensure_code_root
 from .raw_std_build import run_raw_std
 from .recognize_build import run_recognize
 from .std_build import run_std, run_std_from_classified
-from .summary_build import run_summary
+from .summary_build import run_subject_sheets, run_summary
 
 
 def _banner(title: str) -> None:
@@ -58,6 +58,8 @@ def step_classify(paths: Paths) -> List[str]:
     t0 = time.time()
     outs = run_classify_raw_std(paths)
     print(f"耗时 {time.time() - t0:.1f}s")
+    if outs:
+        step_subject_sheets(paths)
     return outs
 
 
@@ -71,10 +73,20 @@ def step_std(paths: Paths, *, prompt_project: bool = False) -> List[str]:
 
 
 def step_summary(paths: Paths) -> List[str]:
-    _banner("步骤 · 汇总分析 Excel (summary)")
-    print("优先: A2_classified 直接汇总；回退扫 B_std")
+    _banner("步骤 · 付款汇总 (summary)")
+    print("读 A1：总体汇总（项目合计）、项目按月宽表")
+    print("已有的科目表会保留")
     t0 = time.time()
     outs = run_summary(paths)
+    print(f"耗时 {time.time() - t0:.1f}s")
+    return outs
+
+
+def step_subject_sheets(paths: Paths) -> List[str]:
+    _banner("步骤 · 科目汇总表 (summary-subject)")
+    print("读 A2 已填科目，写入项目一级科目汇总、一级二级科目宽表")
+    t0 = time.time()
+    outs = run_subject_sheets(paths)
     print(f"耗时 {time.time() - t0:.1f}s")
     return outs
 
@@ -379,12 +391,11 @@ def run_pipeline(
     paths.ensure_output_parents()
     result: dict = {"paths": {}, "ok": True}
 
-    # 快路径：raw_std → recognize → classify → summary → std → cashflow
-    order = (
-        list(steps)
-        if steps
-        else ["raw_std", "recognize", "classify", "summary", "std", "cashflow"]
-    )
+    # 月结：raw_std → summary（项目合计、按月合计）。科目表在 classify 之后另写。
+    order = [
+        "summary_subject" if step == "summary-subject" else step
+        for step in (list(steps) if steps else ["raw_std", "summary"])
+    ]
     if skip_raw_std:
         order = [s for s in order if s != "raw_std"]
     if skip_recognize:
@@ -404,7 +415,7 @@ def run_pipeline(
         else:
             order.append("classify")
 
-    _banner("财务付款快路径流水线（按文件夹分组）")
+    _banner("财务付款月结（项目合计、按月合计）")
     print(f"A_raw:        {paths.raw_dir}/{{组名}}/")
     print(f"A1_raw_std:   {paths.raw_std_dir}/{{组名}}_财务付款_raw_std.xlsx")
     print(f"A2_classified:{paths.classified_dir}/{{组名}}_classified.xlsx")
@@ -428,6 +439,9 @@ def run_pipeline(
             "std", step_std(paths, prompt_project=prompt_project)
         ),
         "summary": lambda: result["paths"].__setitem__("summary", step_summary(paths)),
+        "summary_subject": lambda: result["paths"].__setitem__(
+            "summary_subject", step_subject_sheets(paths)
+        ),
         "cashflow": lambda: result["paths"].__setitem__(
             "cashflow", step_cashflow(paths)
         ),

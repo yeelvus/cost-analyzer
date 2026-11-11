@@ -33,6 +33,7 @@ from .pipeline import (
     step_reclassify,
     step_recognize,
     step_std,
+    step_subject_sheets,
     step_summary,
 )
 from .pkg import ensure_code_root
@@ -121,7 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name, aliases, help_ in [
         ("pool", ["export-learn-pool"], "导出学习池"),
         ("apply", ["apply-learn-pool"], "应用确认：只写科目记忆，不改 A2 / B_std"),
-        ("run", ["all", "month"], "月结全流程"),
+        ("run", ["all", "month"], "月结：原始表 → 项目合计和按月合计"),
     ]:
         c = sub.add_parser(name, aliases=aliases, help=help_)
         _add_path_args(c)
@@ -161,9 +162,10 @@ def build_parser() -> argparse.ArgumentParser:
     for name, help_ in [
         ("raw-std", "raw 标准化合并（按文件夹合并为一个 Excel）"),
         ("recognize", "A1 摘要识别：写出项目提示，不另存业务摘要"),
-        ("classify", "业务摘要→一级/二级/三级科目（学习分类）"),
+        ("classify", "业务摘要→一级/二级/三级科目，并写出两张科目表"),
         ("std", "按项目拆分到 B_std（只读 A2_classified）"),
-        ("summary", "汇总（优先读 A2_classified）"),
+        ("summary", "项目合计和按月合计（读 A1，保留已有科目表）"),
+        ("summary-subject", "读 A2，把两张科目表写入汇总文件"),
         ("cashflow", "仅现金流"),
         ("amount-mismatch", "汇总应付≠预扣+实付的明细"),
         ("reclassify", "按当前科目对应重写 A2，并重建 B_std（不改记忆）"),
@@ -319,6 +321,9 @@ def _dispatch(cmd: str, paths: Paths, args: Any) -> int:
         return 0
     if cmd == "summary":
         step_summary(paths)
+        return 0
+    if cmd in {"summary-subject", "summary_subject"}:
+        step_subject_sheets(paths)
         return 0
     if cmd == "cashflow":
         step_cashflow(paths)

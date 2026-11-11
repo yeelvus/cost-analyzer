@@ -21,6 +21,8 @@ from typing import Dict, Optional, Tuple
 import pandas as pd
 
 PAYMENT_AMOUNT_COL = "付款金额"
+WITHHOLD_PAYMENT_COL = "预扣税付款金额"
+WITHHOLD_GROSS_COL = "含预扣税合计"
 FX_RATE_COL = "汇率"
 YEAR_MONTH_COL = "年月"
 BILIE_COL = "币别"
@@ -398,6 +400,60 @@ def _convert_part(
     elif kind == "withhold":
         stats.converted_withhold += 1
     return amount * rate, rate, False
+
+
+def column_thb_amounts(
+    df: pd.DataFrame,
+    column: str,
+    *,
+    kind: str,
+    fx: Optional[FxRates] = None,
+) -> pd.Series:
+    """一列原币金额换成泰铢。未标币种或泰铢按原数。外币汇率与付款金额相同。"""
+    fx = fx or FxRates()
+    stats = FxConvertStats()
+    if df is None or df.empty:
+        return pd.Series(dtype="float64")
+    n = len(df)
+    parsed = [
+        _source_amount(v)
+        for v in (df[column].tolist() if column in df.columns else [None] * n)
+    ]
+    header = CURRENCY_COLUMNS.get(column)
+    split_codes = [None] * n
+    if header and header in df.columns:
+        split_codes = df[header].tolist()
+    stamps = [
+        _currency_code(v) if not _is_blank_money(v) else ""
+        for v in (df[BILIE_COL].tolist() if BILIE_COL in df.columns else [None] * n)
+    ]
+    remarks = df["摘要"].tolist() if "摘要" in df.columns else [None] * n
+    years = df["年"].tolist() if "年" in df.columns else [None] * n
+    months = df["月"].tolist() if "月" in df.columns else [None] * n
+    row_rates = df[FX_RATE_COL].tolist() if FX_RATE_COL in df.columns else [None] * n
+    amounts: list[float] = []
+    for index, (amount, embedded) in enumerate(parsed):
+        currency = embedded or _currency_code(split_codes[index])
+        if not currency and stamps[index] in {"CNY", "USD"}:
+            currency = stamps[index]
+        if amount is None:
+            amounts.append(0.0)
+            continue
+        if currency in {"CNY", "USD"}:
+            thb, _rate, missing = _convert_part(
+                amount,
+                currency,
+                year_month_key(years[index], months[index]),
+                remarks[index],
+                fx,
+                stats,
+                kind=kind,
+                preferred=_optional_positive(row_rates[index]),
+            )
+            amounts.append(0.0 if missing or thb is None else round(float(thb), 2))
+        else:
+            amounts.append(round(float(amount), 2))
+    return pd.Series(amounts, index=df.index, dtype="float64")
 
 
 def collapse_to_payment_amount(

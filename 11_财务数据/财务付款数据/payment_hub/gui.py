@@ -2,7 +2,8 @@
 """财务付款月结窗口。
 
 无参数运行 ``财务付款一体化.py`` 时进入本窗口。
-科目对应关系在 ``摘要科目分类.py``，这里只跑流程，并按那份对应关系填入科目。
+月结只出项目合计和按月合计。科目对应关系在 ``摘要科目分类.py``。
+填入科目之后，汇总文件里才会写出两张科目表。
 """
 
 from __future__ import annotations
@@ -80,16 +81,16 @@ class PaymentHubApp:
         )
         ttk.Label(
             main,
-            text="科目和摘要的对应关系在「摘要科目分类」里单独处理。这里只跑月结，并按那份对应关系填入科目。",
+            text="月结只出项目合计和按月合计。科目对应关系在「摘要科目分类」里处理，填入科目后才写出科目表。",
         ).grid(row=1, column=0, sticky="w", pady=(0, 8))
 
         steps = ttk.Frame(main)
         steps.grid(row=2, column=0, sticky="ew", pady=4)
         steps.columnconfigure(1, weight=1)
-        ttk.Button(steps, text="月结全流程", command=self._run_month, width=16).grid(
+        ttk.Button(steps, text="月结", command=self._run_month, width=16).grid(
             row=0, column=0, sticky="ew", padx=(0, 12), pady=4
         )
-        ttk.Label(steps, text="原始表 → 摘要识别 → 填入科目 → 汇总和现金流").grid(
+        ttk.Label(steps, text="原始表 → 项目合计、按月合计").grid(
             row=0, column=1, sticky="w", pady=4
         )
 
@@ -112,10 +113,10 @@ class PaymentHubApp:
 
         self.more = ttk.LabelFrame(main, text="不重跑整月时", padding=8)
         self.more.columnconfigure(1, weight=1)
-        ttk.Button(self.more, text="只填入科目", command=self._cmd("reclassify"), width=16).grid(
+        ttk.Button(self.more, text="填入科目", command=self._cmd("reclassify"), width=16).grid(
             row=0, column=0, sticky="w", padx=4, pady=4
         )
-        ttk.Label(self.more, text="按当前科目对应重写分类结果和项目明细，不改科目记忆").grid(
+        ttk.Label(self.more, text="按当前科目对应重写分类结果、两张科目表和项目明细，不改科目记忆").grid(
             row=0, column=1, sticky="w", padx=4
         )
 
@@ -185,8 +186,6 @@ class PaymentHubApp:
     def _run_argv(self, argv: List[str]) -> None:
         if self._running:
             self.messagebox.showinfo("进行中", "请等待当前任务结束。")
-            return
-        if not self.messagebox.askokcancel("确认执行", "即将执行：\n  " + " ".join(argv)):
             return
         self._running = True
         self.status.set("运行中: " + " ".join(argv))
