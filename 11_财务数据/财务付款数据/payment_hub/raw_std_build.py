@@ -40,6 +40,7 @@ from .payment_amount import (
     collapse_to_payment_amount,
     component_nonzero_mask,
     describe_fx_stats,
+    parse_money_cell,
     fx_workbook_path,
     load_fx_rates,
     verify_collapsed_amounts,
@@ -172,6 +173,52 @@ def find_raw_std_column_mapping(df: pd.DataFrame) -> Dict[str, Optional[str]]:
     return mapping
 
 
+def _money_blank(series: pd.Series) -> pd.Series:
+    return series.map(lambda v: abs(parse_money_cell(v)[0]) <= 1e-9)
+
+
+def _fill_actual_from_bank_receipt(
+    out: pd.DataFrame,
+    raw_df: pd.DataFrame,
+    sheet_name: str,
+) -> pd.DataFrame:
+    """实付、预扣、付款金额都空时，用同一行的银行收款。"""
+    bank_col = _exact_source_column(raw_df, ["银行收款"])
+    if bank_col is None or out.empty:
+        return out
+    bank = raw_df[bank_col]
+
+    def blank_col(name: str) -> pd.Series:
+        if name not in out.columns:
+            return pd.Series(True, index=out.index)
+        return _money_blank(out[name])
+
+    fill = blank_col("实付金额") & blank_col("预扣税额")
+    if PAYMENT_AMOUNT_COL in out.columns:
+        fill = fill & blank_col(PAYMENT_AMOUNT_COL)
+    fill = fill & ~_money_blank(bank)
+    if not bool(fill.any()):
+        return out
+    if "实付金额" not in out.columns:
+        out["实付金额"] = pd.NA
+    amounts = bank.map(lambda v: parse_money_cell(v)[0])
+    out["实付金额"] = out["实付金额"].astype("object")
+    out.loc[fill, "实付金额"] = amounts.loc[fill].to_numpy()
+    print(f"    - {sheet_name} 实付为空，计入银行收款 {int(fill.sum())} 行")
+    return out
+
+
+def _payment_total_column(df: pd.DataFrame) -> Optional[str]:
+    """表里的付款金额列。付款金额THB 也算。不看文件名。"""
+    hit = _exact_source_column(df, [PAYMENT_AMOUNT_COL, "付款金额THB", "付款金额泰铢"])
+    if hit is not None:
+        return hit
+    for col in df.columns:
+        if normalize_text(col).startswith("付款金额"):
+            return str(col)
+    return None
+
+
 def process_raw_sheet(
     file_path: Path,
     sheet_name: str,
@@ -192,18 +239,19 @@ def process_raw_sheet(
         return None
 
     mapping = find_raw_std_column_mapping(raw_df)
-    if "对应关系" in raw_df.columns:
-        print(f"    - 跳过 sheet: {sheet_name}，这是对账结果不是原始流水")
-        return None
+    pay_total_col = _payment_total_column(raw_df)
 
+    # 文件名、文件夹名不参与取舍。有项目名称，并且有预扣、实付或付款金额，就提取。
     has_name = mapping.get("项目名称") is not None
-    has_summary = mapping.get("摘要") is not None
-    has_amount = any(mapping.get(c) is not None for c in _PAYMENT_PARTS)
-    if not has_amount:
-        print(f"    - 跳过 sheet: {sheet_name}，无预扣税额/实付金额列")
+    has_amount = (
+        any(mapping.get(c) is not None for c in _PAYMENT_PARTS)
+        or pay_total_col is not None
+    )
+    if not has_name:
+        print(f"    - 跳过 sheet: {sheet_name}，无项目名称")
         return None
-    if not (has_name or has_summary):
-        print(f"    - 跳过 sheet: {sheet_name}，无项目名称/摘要")
+    if not has_amount:
+        print(f"    - 跳过 sheet: {sheet_name}，无预扣税额/实付金额/付款金额")
         return None
 
     out = pd.DataFrame()
@@ -224,9 +272,18 @@ def process_raw_sheet(
         src = _exact_source_column(raw_df, names)
         if src is not None:
             out[target] = raw_df[src]
+    if pay_total_col is not None and (
+        PAYMENT_AMOUNT_COL not in out.columns or out[PAYMENT_AMOUNT_COL].isna().all()
+    ):
+        out[PAYMENT_AMOUNT_COL] = raw_df[pay_total_col]
+    out = _fill_actual_from_bank_receipt(out, raw_df, sheet_name)
 
-    # 保留金额原文，人民币标注要等年月齐了再换算
-    out = out.loc[component_nonzero_mask(out)]
+    # 预扣、实付、付款金额任一有数就留下。金额是空的配对表头行不留下。
+    keep = component_nonzero_mask(out)
+    if PAYMENT_AMOUNT_COL in out.columns:
+        pay = out[PAYMENT_AMOUNT_COL].map(lambda v: abs(parse_money_cell(v)[0]))
+        keep = keep | (pay > 1e-9)
+    out = out.loc[keep]
     if out.empty:
         return None
 
@@ -529,11 +586,18 @@ def run_raw_std_for_group(
         print(f"  [{group_name}] 无 Excel，跳过")
         return None
 
-    print(f"  [{group_name}] 源文件 {len(files)} 个 ← {group_raw_dir}")
+    print(f"  [{group_name}] 文件夹内全部 Excel {len(files)} 个 ← {group_raw_dir}")
     parts: List[pd.DataFrame] = []
+    used_files = 0
     for fp in files:
         print(f"  处理: {fp.name}")
-        parts.extend(process_raw_file(fp, group_name=group_name))
+        got = process_raw_file(fp, group_name=group_name)
+        if got:
+            used_files += 1
+            parts.extend(got)
+        else:
+            print(f"    - {fp.name} 没有可汇总的金额行")
+    print(f"  [{group_name}] 读完 {len(files)} 个文件，有金额 {used_files} 个")
 
     if not parts:
         print(f"  [{group_name}] 未提取到有效行")

@@ -527,6 +527,11 @@ def collapse_to_payment_amount(
         if used:
             stats.stamped_bilie += 1
 
+    source_pay = (
+        [money_number(v) for v in out[PAYMENT_AMOUNT_COL].tolist()]
+        if PAYMENT_AMOUNT_COL in out.columns
+        else [None] * n
+    )
     payments = []
     rate_cells = []
     year_months = []
@@ -567,7 +572,12 @@ def collapse_to_payment_amount(
         if missing:
             payments.append(None)
         else:
-            payments.append(round(sum(parts_thb), 2))
+            total = round(sum(parts_thb), 2)
+            src = source_pay[index]
+            # 实付和预扣都空时，用表上已经写好的付款金额。
+            if abs(total) <= 1e-9 and src is not None and abs(src) > 1e-9:
+                total = round(float(src), 2)
+            payments.append(total)
         rate_cells.append(used_rate)
         missing_flags.append(1 if missing else 0)
 
