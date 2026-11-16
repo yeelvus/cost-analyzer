@@ -24,6 +24,26 @@ AMOUNT_COLUMNS = [PAYMENT_AMOUNT_COL]
 
 _CLASSIFIED_SUFFIX = "_classified.xlsx"
 
+# 分类在内存里使用这些列。A1 仍保留原始项目名称、科目、业务分组。
+# A2 明细和 B_std 不写出它们。
+EXPORT_OMIT_COLUMNS = (
+    "业务摘要",
+    "项目提示",
+    "原始项目名称",
+    "分类ID",
+    "命中层",
+    "置信度",
+    "科目",
+    "业务分组",
+)
+
+
+def omit_export_columns(df: pd.DataFrame) -> pd.DataFrame:
+    drop = [col for col in EXPORT_OMIT_COLUMNS if col in df.columns]
+    if not drop:
+        return df
+    return df.drop(columns=drop)
+
 
 def list_classified_groups(paths: Paths) -> List[Tuple[str, Path]]:
     """已分类分组：(组名, classified xlsx)。
@@ -162,8 +182,8 @@ def classify_dataframe(df: pd.DataFrame, engine) -> pd.DataFrame:
 def _write_classified(df: pd.DataFrame, out_path: Path) -> None:
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    # 导出用轻量格式，提速
-    export = df.copy()
+    # 导出用轻量格式，提速。追溯列和分类过程列不写进明细。
+    export = omit_export_columns(df)
     for col in ("年", "月"):
         if col in export.columns:
             nums = pd.to_numeric(export[col], errors="coerce")
@@ -186,14 +206,6 @@ def _write_classified(df: pd.DataFrame, out_path: Path) -> None:
                 .sort_values("行数", ascending=False)
             )
             g.to_excel(writer, index=False, sheet_name="分类统计")
-        if "命中层" in df.columns:
-            layer = (
-                df.groupby("命中层", dropna=False)
-                .size()
-                .reset_index(name="行数")
-                .sort_values("行数", ascending=False)
-            )
-            layer.to_excel(writer, index=False, sheet_name="命中层统计")
 
 
 def classify_one_group(

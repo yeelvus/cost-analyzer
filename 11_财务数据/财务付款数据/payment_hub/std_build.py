@@ -634,6 +634,9 @@ def _process_group_std(
     final_df = pd.concat(parts, ignore_index=True)
     final_df = enrich_project_fields(final_df, prompt=prompt_project, interactive=True)
     final_df = append_subject_levels(final_df, mapper)
+    from .classify_raw_std import omit_export_columns
+
+    final_df = omit_export_columns(final_df)
 
     outputs: List[str] = []
     keep_relpaths: set[str] = set()
@@ -749,6 +752,10 @@ def _split_detail_df_to_std(
     if final_df is None or final_df.empty:
         print(f"  [{group_name}] 明细为空，跳过拆分")
         return []
+
+    from .classify_raw_std import omit_export_columns
+
+    final_df = omit_export_columns(final_df)
 
     outputs: List[str] = []
     keep_relpaths: set[str] = set()

@@ -17,6 +17,7 @@ from .pkg import ensure_code_root
 from .raw_std_build import run_raw_std
 from .recognize_build import run_recognize
 from .std_build import run_std, run_std_from_classified
+from .subject_wide_split import run_subject_wide_split
 from .summary_build import run_subject_sheets, run_summary
 
 
@@ -82,6 +83,16 @@ def step_summary(paths: Paths) -> List[str]:
     return outs
 
 
+def step_subject_wide(paths: Paths) -> List[str]:
+    _banner("步骤 · 一级二级科目宽表按项目拆分")
+    print("读 A2，每个项目一个工作簿：汇总 + 科目宽明细")
+    print(f"输出: {paths.sum_dir}/一级二级科目宽/{{组名}}/")
+    t0 = time.time()
+    outs = run_subject_wide_split(paths)
+    print(f"耗时 {time.time() - t0:.1f}s")
+    return outs
+
+
 def step_subject_sheets(paths: Paths) -> List[str]:
     _banner("步骤 · 科目汇总表 (summary-subject)")
     print("读 A2 已填科目，写入项目一级科目汇总、一级二级科目宽表")
@@ -115,8 +126,9 @@ def step_reclassify(paths: Paths) -> dict:
         print("没有 A2 分类结果，跳过 B_std 拆分")
         return {"classify": [], "std": []}
     std_outs = run_std_from_classified(paths)
+    wide_outs = step_subject_wide(paths)
     print(f"✅ 重分类: A2 {len(classified)} 个分组，B_std {len(std_outs)} 个项目文件")
-    return {"classify": classified, "std": std_outs}
+    return {"classify": classified, "std": std_outs, "subject_wide": wide_outs}
 
 
 def step_export_review(
@@ -375,6 +387,12 @@ def step_import_taxonomy(paths: Paths, src: Optional[Path] = None) -> dict:
     return stats
 
 
+# 月结默认：标准化 → 科目识别（A2）→ 按项目拆分（B_std）→ 项目合计和按月合计。
+# classify 会把两张科目表写入汇总文件；后面的 summary 保留这些表。
+# 摘要识别（项目提示）和现金流仍是单独步骤。学习记忆不在这条流水线里。
+DEFAULT_RUN_STEPS = ["raw_std", "classify", "std", "summary", "subject_wide"]
+
+
 def run_pipeline(
     paths: Paths,
     *,
@@ -391,10 +409,10 @@ def run_pipeline(
     paths.ensure_output_parents()
     result: dict = {"paths": {}, "ok": True}
 
-    # 月结：raw_std → summary（项目合计、按月合计）。科目表在 classify 之后另写。
+    step_alias = {"summary-subject": "summary_subject", "subject-wide": "subject_wide"}
     order = [
-        "summary_subject" if step == "summary-subject" else step
-        for step in (list(steps) if steps else ["raw_std", "summary"])
+        step_alias.get(step, step)
+        for step in (list(steps) if steps else list(DEFAULT_RUN_STEPS))
     ]
     if skip_raw_std:
         order = [s for s in order if s != "raw_std"]
@@ -415,12 +433,13 @@ def run_pipeline(
         else:
             order.append("classify")
 
-    _banner("财务付款月结（项目合计、按月合计）")
+    _banner("财务付款月结（科目识别、按项目拆分、项目合计）")
     print(f"A_raw:        {paths.raw_dir}/{{组名}}/")
     print(f"A1_raw_std:   {paths.raw_std_dir}/{{组名}}_财务付款_raw_std.xlsx")
     print(f"A2_classified:{paths.classified_dir}/{{组名}}_classified.xlsx")
     print(f"Sum:          {paths.sum_dir}/{{组名}}_财务付款数据_汇总.xlsx")
     print(f"B_std:        {paths.std_dir}/{{组名}}/")
+    print(f"科目宽拆分:   {paths.sum_dir}/一级二级科目宽/{{组名}}/")
     print(f"项目弹窗: {'开' if prompt_project else '关'}（--prompt-project）")
     print(f"步骤: {' → '.join(order)}")
 
@@ -441,6 +460,9 @@ def run_pipeline(
         "summary": lambda: result["paths"].__setitem__("summary", step_summary(paths)),
         "summary_subject": lambda: result["paths"].__setitem__(
             "summary_subject", step_subject_sheets(paths)
+        ),
+        "subject_wide": lambda: result["paths"].__setitem__(
+            "subject_wide", step_subject_wide(paths)
         ),
         "cashflow": lambda: result["paths"].__setitem__(
             "cashflow", step_cashflow(paths)

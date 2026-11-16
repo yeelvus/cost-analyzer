@@ -11,9 +11,9 @@ from .config import Paths
 # (键, 名称, 说明, 传给 dispatch 的 argv；None=特殊)
 MenuItem = Tuple[str, str, str, Optional[List[str]]]
 
-# 主菜单：只跑月结。科目对应关系在「摘要科目分类.py」。
+# 主菜单：月结含科目识别和按项目拆分。改科目记忆在「摘要科目分类.py」。
 MENU_MAIN: Sequence[MenuItem] = (
-    ("1", "run", "月结：raw_std → 项目合计和按月合计", ["run"]),
+    ("1", "run", "月结：raw_std → 科目识别 → 按项目拆分 → 项目合计和按月合计", ["run"]),
     ("2", "reclassify", "填入科目并写出两张科目表，同时重建 B_std（不改记忆）", ["reclassify"]),
     ("3", "maint", "分步出账（raw-std / recognize / classify / summary / std…）", None),
     ("4", "show-paths", "查看默认数据路径", ["show-paths"]),
@@ -28,6 +28,7 @@ MENU_MAINT: Sequence[MenuItem] = (
     ("3", "classify", "填入一/二/三级科目，并写出两张科目表（不改记忆）", ["classify"]),
     ("4", "summary", "项目合计和按月合计（读 A1，保留已有科目表）", ["summary"]),
     ("4b", "summary-subject", "只重写两张科目表（读已有 A2）", ["summary-subject"]),
+    ("4c", "subject-wide", "一级二级科目宽表按项目拆分（汇总+明细）", ["subject-wide"]),
     ("5", "std", "拆分 B_std（只读 A2_classified）", ["std"]),
     ("6", "cashflow", "仅现金流 HTML", ["cashflow"]),
     ("7", "amount-mismatch", "应付≠预扣+实付 不平明细", ["amount-mismatch"]),
@@ -49,6 +50,8 @@ _DIRECT = frozenset(
         "summary",
         "summary-subject",
         "summary_subject",
+        "subject-wide",
+        "subject_wide",
         "cashflow",
         "health",
         "amount-mismatch",
@@ -64,21 +67,21 @@ def print_quick_help() -> None:
 财务付款月结 · 日常命令
 ────────────────────────────────────────
   python 财务付款一体化.py                # 月结窗口
-  python 财务付款一体化.py run            # 月结：项目合计和按月合计
-  python 财务付款一体化.py reclassify     # 填入科目，写出科目表，并重建 B_std
+  python 财务付款一体化.py run            # 月结：科目识别、按项目拆分、项目合计
+  python 财务付款一体化.py reclassify     # 只重填科目，写出科目表，并重建 B_std
 
-摘要对应一二三级科目（另一个程序，不改月结文件）:
+科目记忆（另一个程序，月结不改记忆）:
   python 摘要科目分类.py                  # 填科目 / 写入记忆
   python 摘要科目分类.py fill -i 明细.xlsx
   python 摘要科目分类.py learn -i 已填科目.xlsx
 
 菜单:
-  [1] 月结        raw_std → 项目合计、按月合计
+  [1] 月结        raw_std → A2 → B_std → 项目合计 → 科目宽按项目
   [2] 填入科目    重写 A2、两张科目表，并重建 B_std
   [3] 分步出账    raw-std / recognize / classify / summary / summary-subject …
 
 数据:
-  A_raw → A1_raw_std → A2_classified → Sum / B_std
+  A_raw → A1_raw_std → A2_classified → B_std / Sum
   分类这一步只读科目记忆
 """.strip()
     )
@@ -89,7 +92,7 @@ def print_maint_help() -> None:
         """
 维护 / 分步出账
 ────────────────────────────────────────
-  raw-std / recognize / classify / summary / summary-subject / std / cashflow
+  raw-std / recognize / classify / summary / summary-subject / subject-wide / std / cashflow
   amount-mismatch / dropdowns
 
 classify 把科目填进 A2，并写出两张科目表，不改科目记忆。
@@ -113,9 +116,9 @@ def _print_banner(paths: Optional[Paths] = None) -> None:
         except Exception:
             pass
     print()
-    print("  科目对应关系: python 摘要科目分类.py")
-    print("  [1] 月结：项目合计和按月合计")
-    print("  [2] 填入科目并写出科目表")
+    print("  科目记忆: python 摘要科目分类.py（月结只读，不改记忆）")
+    print("  [1] 月结：科目识别（A2）→ 按项目拆分（B_std）→ 项目合计")
+    print("  [2] 只重填科目并重建 B_std")
     print("  [3] 分步出账")
     print()
 

@@ -34,6 +34,7 @@ from .pipeline import (
     step_recognize,
     step_std,
     step_subject_sheets,
+    step_subject_wide,
     step_summary,
 )
 from .pkg import ensure_code_root
@@ -96,7 +97,7 @@ def _add_project_match_args(sp: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="财务付款一体化",
-        description="财务付款月结。科目对应关系请用 摘要科目分类.py。",
+        description="财务付款月结：科目识别写出 A2，按项目拆分写出 B_std。改科目记忆请用 摘要科目分类.py。",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="无参数 → 月结窗口；--menu → 终端菜单。填科目记忆不在本程序。",
     )
@@ -122,7 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name, aliases, help_ in [
         ("pool", ["export-learn-pool"], "导出学习池"),
         ("apply", ["apply-learn-pool"], "应用确认：只写科目记忆，不改 A2 / B_std"),
-        ("run", ["all", "month"], "月结：原始表 → 项目合计和按月合计"),
+        ("run", ["all", "month"], "月结：原始表 → 科目识别（A2）→ 按项目拆分（B_std）→ 项目合计"),
     ]:
         c = sub.add_parser(name, aliases=aliases, help=help_)
         _add_path_args(c)
@@ -166,6 +167,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("std", "按项目拆分到 B_std（只读 A2_classified）"),
         ("summary", "项目合计和按月合计（读 A1，保留已有科目表）"),
         ("summary-subject", "读 A2，把两张科目表写入汇总文件"),
+        ("subject-wide", "按项目拆分一级二级科目宽表（汇总 + 明细）"),
         ("cashflow", "仅现金流"),
         ("amount-mismatch", "汇总应付≠预扣+实付的明细"),
         ("reclassify", "按当前科目对应重写 A2，并重建 B_std（不改记忆）"),
@@ -324,6 +326,9 @@ def _dispatch(cmd: str, paths: Paths, args: Any) -> int:
         return 0
     if cmd in {"summary-subject", "summary_subject"}:
         step_subject_sheets(paths)
+        return 0
+    if cmd in {"subject-wide", "subject_wide"}:
+        step_subject_wide(paths)
         return 0
     if cmd == "cashflow":
         step_cashflow(paths)

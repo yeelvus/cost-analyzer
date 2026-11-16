@@ -2,8 +2,8 @@
 """财务付款月结窗口。
 
 无参数运行 ``财务付款一体化.py`` 时进入本窗口。
-月结只出项目合计和按月合计。科目对应关系在 ``摘要科目分类.py``。
-填入科目之后，汇总文件里才会写出两张科目表。
+月结写出 A2 科目识别、B_std 按项目拆分，以及项目合计和按月合计。
+科目记忆的增删在 ``摘要科目分类.py``。月结只读记忆。
 """
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ class PaymentHubApp:
         )
         ttk.Label(
             main,
-            text="月结只出项目合计和按月合计。科目对应关系在「摘要科目分类」里处理，填入科目后才写出科目表。",
+            text="月结：标准化 → 科目识别（A2）→ 按项目拆分（B_std）→ 项目合计 → 科目宽按项目。改科目记忆请用「摘要科目分类」。",
         ).grid(row=1, column=0, sticky="w", pady=(0, 8))
 
         steps = ttk.Frame(main)
@@ -90,7 +90,7 @@ class PaymentHubApp:
         ttk.Button(steps, text="月结", command=self._run_month, width=16).grid(
             row=0, column=0, sticky="ew", padx=(0, 12), pady=4
         )
-        ttk.Label(steps, text="原始表 → 项目合计、按月合计").grid(
+        ttk.Label(steps, text="原始表 → A2 → B_std → 项目合计 → 一级二级科目宽按项目").grid(
             row=0, column=1, sticky="w", pady=4
         )
 
