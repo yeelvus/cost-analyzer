@@ -49,6 +49,7 @@ from .std_build import (
     COLUMN_ALIASES,
     TARGET_COLUMNS,
     normalize_date_month_year,
+    parse_payment_dates,
 )
 from .utils import (
     iter_excel_files,
@@ -317,7 +318,7 @@ def ensure_numeric_year_month(df: pd.DataFrame) -> pd.DataFrame:
     """
     out = df.copy()
     parsed = (
-        pd.to_datetime(out["日期"], errors="coerce")
+        parse_payment_dates(out["日期"])
         if "日期" in out.columns
         else pd.Series(pd.NaT, index=out.index)
     )
@@ -501,7 +502,7 @@ def _prepare_excel_export(df: pd.DataFrame) -> pd.DataFrame:
         out[col] = [None if pd.isna(v) else int(v) for v in nums]
 
     if "日期" in out.columns:
-        parsed = pd.to_datetime(out["日期"], errors="coerce")
+        parsed = parse_payment_dates(out["日期"])
         mixed = []
         for i, raw in enumerate(out["日期"].tolist()):
             if pd.notna(parsed.iloc[i]):
@@ -548,7 +549,7 @@ def apply_raw_std_format(path: Path) -> None:
                     if cell.value is None or cell.value == "":
                         continue
                     if col_name == "日期":
-                        cell.number_format = "YYYY-MM-DD"
+                        cell.number_format = "yyyy-mm-dd"
                     elif col_name == YEAR_MONTH_COL:
                         cell.number_format = "@"
                     elif col_name == FX_RATE_COL:
@@ -631,7 +632,7 @@ def run_raw_std_for_group(
     # 日期排序（无效日期靠后）
     if "日期" in merged.columns:
         merged = merged.copy()
-        merged["_sort_date"] = pd.to_datetime(merged["日期"], errors="coerce")
+        merged["_sort_date"] = parse_payment_dates(merged["日期"])
         sort_cols = ["_sort_date"]
         if "来源文件" in merged.columns:
             sort_cols.append("来源文件")

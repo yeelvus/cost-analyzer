@@ -70,6 +70,79 @@ COLUMN_ALIASES = {
     "年": ["年", "年份", "所属年份", "会计年度"],
 }
 
+# 浏览器 Date.toString()，例如 Sat Apr 19 2025 08:00:00 GMT+0800 (中国标准时间)。
+# 括号里的时区名会让 pandas / dateutil 解析失败。取字面日历日，不换到 UTC，
+# 避免当地 0 点被拨到前一天。
+_BROWSER_DATE_RE = re.compile(
+    r"^(?:(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)[,\s]+)?"
+    r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
+    r"\s+(\d{1,2})\s+(\d{4})"
+    r"(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?"
+    r"(?:\s+GMT[+-]\d{2}:?\d{2})?"
+    r"(?:\s*[（(][^)）]*[)）])?"
+    r"\s*$",
+    re.IGNORECASE,
+)
+_BROWSER_MONTHS = {
+    "jan": 1,
+    "feb": 2,
+    "mar": 3,
+    "apr": 4,
+    "may": 5,
+    "jun": 6,
+    "jul": 7,
+    "aug": 8,
+    "sep": 9,
+    "oct": 10,
+    "nov": 11,
+    "dec": 12,
+}
+
+
+def _browser_calendar_day(value):
+    if not isinstance(value, str) or "GMT" not in value:
+        return None
+    match = _BROWSER_DATE_RE.match(value.strip())
+    if match is None:
+        return None
+    month = _BROWSER_MONTHS.get(match.group(1).lower())
+    if month is None:
+        return None
+    try:
+        return pd.Timestamp(int(match.group(3)), month, int(match.group(2)))
+    except (TypeError, ValueError):
+        return None
+
+
+def replace_browser_dates(series: pd.Series) -> pd.Series:
+    """把 Date.toString() 换成当天 0 点。其它值保持原样。"""
+    if series is None or len(series) == 0:
+        return series
+    values = series.tolist()
+    changed = False
+    for index, value in enumerate(values):
+        parsed = _browser_calendar_day(value)
+        if parsed is not None:
+            values[index] = parsed
+            changed = True
+    if not changed:
+        return series
+    # 源列可能是 pandas 字符串类型，不能直接写入 Timestamp。
+    return pd.Series(values, index=series.index, dtype=object)
+
+
+def parse_payment_dates(values) -> pd.Series:
+    """日期列 → 无时区时间。浏览器日期文本按字面日历日。"""
+    series = values if isinstance(values, pd.Series) else pd.Series(values)
+    cleaned = replace_browser_dates(series)
+    try:
+        parsed = pd.to_datetime(cleaned, errors="coerce")
+    except (ValueError, TypeError):
+        parsed = pd.to_datetime(cleaned, errors="coerce", utc=True)
+    if getattr(parsed.dtype, "tz", None) is not None:
+        parsed = parsed.dt.tz_localize(None)
+    return parsed
+
 
 def find_column_mapping(df: pd.DataFrame) -> Dict[str, Optional[str]]:
     mapping: Dict[str, Optional[str]] = {}
@@ -98,7 +171,7 @@ def find_column_mapping(df: pd.DataFrame) -> Dict[str, Optional[str]]:
 def normalize_date_month_year(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     if "日期" in out.columns:
-        parsed = pd.to_datetime(out["日期"], errors="coerce")
+        parsed = parse_payment_dates(out["日期"])
         out["日期"] = parsed.dt.strftime("%Y-%m-%d").where(parsed.notna(), out["日期"])
         if "年" in out.columns:
             year_num = pd.to_numeric(out["年"], errors="coerce")
@@ -380,7 +453,7 @@ def build_detail_wan_sheet(detail_df: pd.DataFrame) -> pd.DataFrame:
 def format_last_payment_date(df: pd.DataFrame) -> str:
     if df is None or df.empty or "日期" not in df.columns:
         return "未识别日期"
-    parsed = pd.to_datetime(df["日期"], errors="coerce")
+    parsed = parse_payment_dates(df["日期"])
     if parsed.notna().any():
         return parsed.max().strftime("%Y-%m-%d")
     return "未识别日期"
