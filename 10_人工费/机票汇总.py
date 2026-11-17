@@ -1,4 +1,4 @@
-import html
+import.html
 import json
 import os
 import re
@@ -68,6 +68,7 @@ class Config:
         "本次机票价格（泰铢）",
         "人均机票价格（泰铢）",
         "机票类型",
+        "类别",
         "票代",
         "护照",
         "项目编码",
@@ -301,7 +302,7 @@ def export_per_project_excel(df: pd.DataFrame, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     non_numeric = {"所属单位", "姓名", "订票时间", "年-月", "去程机票日期", "回程机票日期",
-                   "出发地-到达地", "本次机票航班号", "舱位", "机票类型", "票代", "护照", "项目编码", "项目名称",
+                   "出发地-到达地", "本次机票航班号", "舱位", "机票类型", "类别", "票代", "护照", "项目编码", "项目名称",
                    "原始项目名称", "_来源文件"}
 
     projects = df[["项目编码", "项目名称"]].drop_duplicates()
@@ -734,7 +735,7 @@ def main():
     display_cols = [c for c in Config.TARGET_COLUMNS if c in df.columns]
 
     non_numeric_headers = {"所属单位", "姓名", "订票时间", "年-月", "去程机票日期", "回程机票日期",
-                           "出发地-到达地", "本次机票航班号", "舱位", "机票类型", "票代", "护照", "项目编码", "项目名称",
+                           "出发地-到达地", "本次机票航班号", "舱位", "机票类型", "类别", "票代", "护照", "项目编码", "项目名称",
                            "原始项目名称", "_来源文件"}
 
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
