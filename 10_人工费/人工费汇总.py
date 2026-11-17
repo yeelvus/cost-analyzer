@@ -27,67 +27,97 @@ from common.project import (
 )
 from common.excel import apply_common_excel_layout
 from settings import MATCH_DB_PATH as _SETTINGS_MATCH_DB_PATH
-from common.paths import html_data_path, raw_data_path, std_data_path, sum_data_path
+from common.paths import html_data_path, iter_excel_files, raw_data_path, std_data_path, sum_data_path
 
 # ====================== 配置区 ======================
 class Config:
-    # 输入
+    # 输入：01_Raw/11_人工费/01_人工费台账 下的全部 Excel 一起汇总。
     INPUT_SOURCE = str(
         raw_data_path(
             "人工费",
             "人工费台账",
-            legacy=Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻\u200d♂️/A_1_人工费台账/A_人工费台账_raw'),
+            legacy=Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎\u200d♂️/A_1_人工费台账/A_人工费台账_raw'),
         )
     )
-    INPUT_GLOB = "泰国子公司项目人工费统计台账*.xlsx"
-    
+
     # 项目匹配
     MAPPING_EXCEL_PATH = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/0_项目基本信息情况/项目基本信息表.xlsx"
     MATCH_DB_PATH = str(_SETTINGS_MATCH_DB_PATH)
-    
+
     # 输出
     OUTPUT_STD = str(
         std_data_path(
             "人工费",
             "B_人工费台账_std",
-            legacy=Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎🏻\u200d♂️/A_1_人工费台账/B_人工费台账_std'),
+            legacy=Path('/Users/wyattsun/Desktop/邯郸中材/01成本统计/11_人工费🙎\u200d♂️/A_1_人工费台账/B_人工费台账_std'),
         )
     )
     OUTPUT_Z_REPORT = r"/Users/wyattsun/Desktop/邯郸中材/01成本统计/Z_report"
-    
+
     MONEY_COLUMNS = ['中方正式工铢', '中方劳务工铢', '子公司属地工铢', '劳务公司铢', '签证费']
 
 
 
 # ====================== 辅助函数 ======================
-def _parse_date_key_from_name(file_name: str):
-    stem = Path(file_name).stem
-    m = re.search(r'(20\d{2})[.年\-/](\d{1,2})(?:[.月\-/](\d{1,2}))?', stem)
-    if not m:
-        return None
-    y = int(m.group(1))
-    mm = int(m.group(2))
-    dd = int(m.group(3)) if m.group(3) else 1
-    if mm < 1 or mm > 12 or dd < 1 or dd > 31:
-        return None
-    return y, mm, dd
+LEDGER_SHEET = "基础数据"
+COLUMN_MAPPING = {
+    '项目名称': ['项目名称'],
+    '地区': ['地区'],
+    '中方正式工铢': ['中方正式工铢'],
+    '中方劳务工铢': ['中方劳务工铢', '中方劳务工株'],
+    '子公司属地工铢': ['子公司属地工铢'],
+    '劳务公司铢': ['劳务公司铢'],
+    '签证费': ['签证费'],
+    '年': ['年'],
+    '月': ['月'],
+}
+REQUIRED_COLUMNS = ['项目名称', '中方正式工铢', '中方劳务工铢', '子公司属地工铢', '劳务公司铢', '年', '月']
 
 
-def resolve_input_file() -> Path:
+def resolve_input_files() -> List[Path]:
+    """文件则只用这一本；目录则读入其中每一本 Excel。"""
     p = Path(Config.INPUT_SOURCE).expanduser()
     if p.is_file():
-        return p.resolve()
-    if p.is_dir():
-        candidates = [x for x in p.glob(Config.INPUT_GLOB) if x.is_file()]
-        if not candidates:
-            raise FileNotFoundError(f"未找到匹配文件：{Config.INPUT_GLOB}")
+        return [p.resolve()]
+    if not p.is_dir():
+        raise FileNotFoundError(f"输入路径不存在：{p}")
+    files = iter_excel_files(p, recursive=False)
+    if not files:
+        raise FileNotFoundError(f"目录里没有 Excel：{p}")
+    return files
 
-        def sort_key(fp: Path):
-            parsed = _parse_date_key_from_name(fp.name)
-            return (1, parsed or (0, 0, 0), fp.stat().st_mtime)
 
-        return sorted(candidates, key=sort_key)[-1].resolve()
-    raise FileNotFoundError(f"输入路径不存在：{p}")
+def _standardize_columns(df: pd.DataFrame, source_name: str) -> pd.DataFrame:
+    df = df.dropna(how='all').dropna(axis=1, how='all')
+    df.columns = df.columns.astype(str).str.strip()
+    found = {}
+    for standard, variants in COLUMN_MAPPING.items():
+        for col in df.columns:
+            if any(variant in col for variant in variants):
+                found[standard] = col
+                break
+    missing = [col for col in REQUIRED_COLUMNS if col not in found]
+    if missing:
+        raise ValueError(f"{source_name} 的「{LEDGER_SHEET}」缺少列：{missing}")
+    df = df.rename(columns={src: name for name, src in found.items()})
+    df["来源文件"] = source_name
+    return df
+
+
+def load_ledger_frames(files: List[Path]) -> pd.DataFrame:
+    frames = []
+    for path in files:
+        book = pd.ExcelFile(path)
+        if LEDGER_SHEET not in book.sheet_names:
+            names = ", ".join(book.sheet_names)
+            book.close()
+            raise ValueError(f"{path.name} 没有「{LEDGER_SHEET}」工作表，现有：{names}")
+        frame = pd.read_excel(book, sheet_name=LEDGER_SHEET)
+        book.close()
+        frame = _standardize_columns(frame, path.name)
+        print(f"  · {path.name}  {len(frame)} 行")
+        frames.append(frame)
+    return pd.concat(frames, ignore_index=True)
 
 
 def parse_money(series: pd.Series) -> pd.Series:
@@ -275,7 +305,7 @@ def export_per_project_excel(
     """将人工费数据按项目拆分，每个项目输出一个独立 Excel 文件。"""
     output_dir.mkdir(parents=True, exist_ok=True)
     metrics = money_columns + ['总人工费']
-    non_numeric_headers = {'项目名称', '地区', '年', '月', '年-月', '项目编码', '项目状态', '原始项目名称'}
+    non_numeric_headers = {'项目名称', '地区', '年', '月', '年-月', '项目编码', '项目状态', '原始项目名称', '来源文件'}
 
     projects = grouped[['项目编码', '项目名称']].drop_duplicates()
     print(f"\n📂 开始按项目拆分输出（共 {len(projects)} 个项目）...")
@@ -358,42 +388,10 @@ def export_per_project_excel(
 def main():
     print("🚀 开始处理人工费台账...")
 
-    excel_file = resolve_input_file()
-    base_name = excel_file.stem
-    print(f"✅ 使用文件：{excel_file.name}")
-
-    df = pd.read_excel(excel_file, sheet_name="基础数据")
-    df.dropna(how='all', inplace=True)
-    df.dropna(axis=1, how='all', inplace=True)
-    df.columns = df.columns.str.strip()
-
-    # 列名映射
-    column_mapping = {
-        '项目名称': ['项目名称'],
-        '地区': ['地区'],
-        '中方正式工铢': ['中方正式工铢'],
-        '中方劳务工铢': ['中方劳务工铢', '中方劳务工株'],
-        '子公司属地工铢': ['子公司属地工铢'],
-        '劳务公司铢': ['劳务公司铢'],
-        '签证费': ['签证费'],
-        '年': ['年'],
-        '月': ['月']
-    }
-
-    found_columns = {}
-    for standard, variants in column_mapping.items():
-        for col in df.columns:
-            if any(v in col for v in variants):
-                found_columns[standard] = col
-                break
-
-    required = ['项目名称', '中方正式工铢', '中方劳务工铢', '子公司属地工铢', '劳务公司铢', '年', '月']
-    missing = [col for col in required if col not in found_columns]
-    if missing:
-        print(f"\n错误：以下必要列未找到：{missing}")
-        sys.exit(1)
-
-    df = df.rename(columns={v: k for k, v in found_columns.items()})
+    excel_files = resolve_input_files()
+    base_name = excel_files[0].stem if len(excel_files) == 1 else "人工费台账"
+    print(f"✅ 读取 {len(excel_files)} 个文件：")
+    df = load_ledger_frames(excel_files)
 
     # 金额转换
     money_columns = Config.MONEY_COLUMNS
@@ -519,7 +517,7 @@ def main():
 
         # 应用样式
         wb = load_workbook(out_path)
-        skip_headers = {'项目名称', '地区', '年', '月', '年-月', '项目编码'}
+        skip_headers = {'项目名称', '地区', '年', '月', '年-月', '项目编码', '来源文件'}
         for ws in wb.worksheets:
             headers = [cell.value for cell in ws[1]]
             numeric_start = next((i+1 for i, h in enumerate(headers) if h and str(h) not in skip_headers), 3)
