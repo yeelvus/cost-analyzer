@@ -14,6 +14,10 @@
   金额+行数一致 → 建议复核后复用
   仅金额一致 → 建议人工复核
   金额变化 → 保留
+
+金额变化写出总金额增加量（本月含税合计减上月含税合计），
+并与新增行的含税金额对照，标明是否一致。
+各文件汇总列出每一个 Excel 的含税总金额。
 """
 from __future__ import annotations
 
@@ -423,20 +427,107 @@ def scan_raw(raw_root: Path) -> tuple[pd.DataFrame, dict[str, dict]]:
     return pd.DataFrame(table_rows), ledgers
 
 
-def decide(df: pd.DataFrame) -> pd.DataFrame:
+def _tax_of(records: list[dict], indexes: list[int]) -> float:
+    total = 0.0
+    for index in indexes:
+        amount = _money(records[index].get("含税金额"))
+        if amount is not None:
+            total += amount
+    return round(total, 2)
+
+
+def _new_and_removed(current: list[dict], previous: list[dict]) -> tuple[int, float, int, float]:
+    """相对上一份台账，多出来的行和少掉的行。同一键按出现次数比较。"""
+    current_groups: dict[tuple, list[int]] = defaultdict(list)
+    previous_groups: dict[tuple, list[int]] = defaultdict(list)
+    for index, record in enumerate(current):
+        current_groups[_row_key(record)].append(index)
+    for index, record in enumerate(previous):
+        previous_groups[_row_key(record)].append(index)
+    new_indexes: list[int] = []
+    removed_indexes: list[int] = []
+    for key, indexes in current_groups.items():
+        extra = len(indexes) - len(previous_groups.get(key, []))
+        if extra > 0:
+            new_indexes.extend(indexes[-extra:])
+    for key, indexes in previous_groups.items():
+        extra = len(indexes) - len(current_groups.get(key, []))
+        if extra > 0:
+            removed_indexes.extend(indexes[-extra:])
+    return (
+        len(new_indexes),
+        _tax_of(current, new_indexes),
+        len(removed_indexes),
+        _tax_of(previous, removed_indexes),
+    )
+
+
+def _increase_fields(row: pd.Series, prev: pd.Series | None, ledgers: dict[str, dict]) -> dict:
+    """总金额增加量 = 本月含税合计 - 上月含税合计。新增行金额与它分开对照。"""
+    current_total = round(float(row["含税金额合计"]), 2)
+    current_rows = ledgers.get(str(row["文件路径"]), {}).get("明细", [])
+    if prev is None:
+        new_amount = _tax_of(current_rows, list(range(len(current_rows))))
+        gap = round(current_total - new_amount, 2)
+        return {
+            "上月含税总金额": None,
+            "总金额增加量": current_total,
+            "新增行数": len(current_rows),
+            "新增行含税金额": new_amount,
+            "减少行数": 0,
+            "减少行含税金额": 0.0,
+            "相差": gap,
+            "金额增加是否一致": "是" if abs(gap) <= 0.02 else "否",
+        }
+    previous_total = round(float(prev["含税金额合计"]), 2)
+    delta = round(current_total - previous_total, 2)
+    previous_rows = ledgers.get(str(prev["文件路径"]), {}).get("明细", [])
+    new_count, new_amount, removed_count, removed_amount = _new_and_removed(current_rows, previous_rows)
+    gap = round(delta - new_amount, 2)
+    return {
+        "上月含税总金额": previous_total,
+        "总金额增加量": delta,
+        "新增行数": new_count,
+        "新增行含税金额": new_amount,
+        "减少行数": removed_count,
+        "减少行含税金额": removed_amount,
+        "相差": gap,
+        "金额增加是否一致": "是" if abs(gap) <= 0.02 else "否",
+    }
+
+
+def _conclusion_amount(fields: dict) -> str:
+    text = (
+        f"总金额增加 {fields['总金额增加量']:,.2f}；"
+        f"新增{fields['新增行数']}行金额 {fields['新增行含税金额']:,.2f}；"
+        f"{'一致' if fields['金额增加是否一致'] == '是' else '不一致'}"
+    )
+    if fields["金额增加是否一致"] != "是":
+        text += f"，相差 {fields['相差']:,.2f}"
+        if fields["减少行数"]:
+            text += f"；减少{fields['减少行数']}行金额 {fields['减少行含税金额']:,.2f}"
+    return text
+
+
+def decide(df: pd.DataFrame, ledgers: dict[str, dict] | None = None) -> pd.DataFrame:
+    ledgers = ledgers or {}
+    extra = [
+        "上月含税总金额", "总金额增加量", "新增行数", "新增行含税金额",
+        "减少行数", "减少行含税金额", "相差", "金额增加是否一致",
+        "对比结论", "处理建议", "是否在最新口径体现",
+    ]
     if df.empty:
-        return pd.DataFrame(
-            columns=list(df.columns) + ["对比结论", "处理建议", "是否在最新口径体现"]
-        )
+        return pd.DataFrame(columns=list(df.columns) + extra)
 
     out = []
     for _, g in df.groupby("项目名称", sort=False):
         g = g.sort_values("月份", key=lambda s: s.map(month_sort_key))
         prev = None
         for _, row in g.iterrows():
+            fields = _increase_fields(row, prev, ledgers)
             reason, decision = "首月保留", "保留"
             if prev is not None:
-                amt_diff = abs(float(row["含税金额合计"]) - float(prev["含税金额合计"]))
+                amt_diff = abs(fields["总金额增加量"])
                 row_diff = int(row["行数"]) - int(prev["行数"])
                 if row["文件哈希"] == prev["文件哈希"]:
                     reason, decision = "与上月文件字节完全一致", SKIP_DECISION
@@ -447,10 +538,11 @@ def decide(df: pd.DataFrame) -> pd.DataFrame:
                 elif amt_diff <= 0.01:
                     reason, decision = "含税金额合计一致但行数变化", "建议人工复核"
                 else:
-                    reason, decision = f"金额变化 {amt_diff:,.2f}", "保留"
+                    reason, decision = _conclusion_amount(fields), "保留"
             out.append(
                 {
                     **row.to_dict(),
+                    **fields,
                     "对比结论": reason,
                     "处理建议": decision,
                     "是否在最新口径体现": "否" if decision == SKIP_DECISION else "是",
@@ -649,10 +741,11 @@ def run(raw_root: Path = RAW_DIR, extract_dir: Path = EXTRACT_DIR) -> None:
         increment_detail = pd.DataFrame()
         increment_summary = pd.DataFrame()
         amount_summary = pd.DataFrame()
+        file_amount = pd.DataFrame()
         repaired = 0
     else:
         df = df.sort_values(["项目名称", "月份"]).reset_index(drop=True)
-        decision = decide(df)
+        decision = decide(df, ledgers)
         summary = (
             decision.groupby(["月份", "处理建议"], as_index=False)
             .agg(
@@ -663,6 +756,14 @@ def run(raw_root: Path = RAW_DIR, extract_dir: Path = EXTRACT_DIR) -> None:
             .sort_values(["月份", "处理建议"])
         )
         summary["文件含税合计"] = summary["文件含税合计"].round(2)
+        file_amount = decision[
+            [
+                "月份", "项目名称", "文件名", "行数", "含税金额合计",
+                "上月含税总金额", "总金额增加量", "新增行数", "新增行含税金额",
+                "减少行数", "减少行含税金额", "相差", "金额增加是否一致",
+                "对比结论", "处理建议",
+            ]
+        ].rename(columns={"含税金额合计": "含税总金额"})
         increment_detail, increment_summary = build_increment(decision, ledgers)
         selected = _select_latest(decision)
         amount_summary = project_amount_summary(selected)
@@ -675,6 +776,7 @@ def run(raw_root: Path = RAW_DIR, extract_dir: Path = EXTRACT_DIR) -> None:
     report = analysis / "采购台账_月度去重分析.xlsx"
     with pd.ExcelWriter(report, engine="openpyxl") as writer:
         decision.to_excel(writer, index=False, sheet_name="逐文件判定")
+        file_amount.to_excel(writer, index=False, sheet_name="各文件汇总")
         summary.to_excel(writer, index=False, sheet_name="月份汇总")
         amount_summary.to_excel(writer, index=False, sheet_name="项目含税总金额")
         increment_summary.to_excel(writer, index=False, sheet_name="月度新增汇总")
